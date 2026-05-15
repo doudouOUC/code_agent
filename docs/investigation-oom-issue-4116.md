@@ -386,3 +386,130 @@ if (mcResult.meta) {
 
 - [Workaround 方案](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4447005872)
 - [完整技术分析](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4448193086)
+
+---
+
+## 9. 后续发现：存在第二类 OOM 场景
+
+阅读 issue #4116 新评论与关联 issue #2868、#2945 后，发现单纯的 `structuredClone` 放大理论**不能解释所有崩溃**，存在另一类更严重的内存泄漏问题。
+
+### 9.1 数据点对比
+
+| 来源 | 堆大小 | 运行时长 | 速率 | 平台 | 模型/认证 |
+|------|--------|----------|------|------|-----------|
+| #4116 (原报告) | ~2 GB | 50 min | ~40 MB/min | Win + Node v24.15 | deepseek API Key |
+| #4116 (Kieaer 评论) | **~45 GB** | 7.2 hours | ~100 MB/min | Win | n/a |
+| #2868 | ~2 GB | **100 秒** | **~20 MB/秒** | Linux + Node v24.12 | Qwen OAuth + coder-model |
+| #2945 | ~4 GB | 220 秒 | ~18 MB/秒 | Win + Node v22.17 | Qwen OAuth (`/resume` 触发) |
+
+### 9.2 关键观察
+
+1. **45GB 用户的存在彻底否定了"提升堆限即可"的方案**——即便堆给到 45GB 也会崩。这是**真实的内存增长**，不是仅由 `structuredClone` 临时放大造成的。
+
+2. **#2868 在 100 秒内崩溃**——根本没时间累积长会话历史。用户原话："RAM consumption keep rising until this happens. No backup options to schrink context"。说明在很短时间内有持续高速分配。
+
+3. **#2945 在 `/resume` 期间崩溃**——栈帧出现 `SSL_get_quiet_shutdown` / `BIO_ssl_shutdown`，怀疑是恢复历史时的 JSONL 加载与 TLS 资源混合压力。
+
+4. **跨平台/版本一致**——Linux/Windows、Node v22/v24、不同认证方式都有报告，说明问题在通用代码层而非平台特定。
+
+### 9.3 第二类问题的可疑代码路径
+
+#### 候选 1: 流式响应聚合数组
+
+**`packages/core/src/core/openaiContentGenerator/pipeline.ts:129`**:
+```typescript
+const collectedGeminiResponses: GenerateContentResponse[] = [];
+// ...
+for await (const chunk of stream) {
+  // ...
+  collectedGeminiResponses.push(response);  // 每个 chunk 都 push
+}
+```
+
+**`packages/core/src/core/loggingContentGenerator/loggingContentGenerator.ts:398`**:
+```typescript
+const responses: GenerateContentResponse[] = [];
+// ...
+for await (const response of stream) {
+  if (shouldCollectResponses) {
+    responses.push(response);
+  }
+}
+```
+
+- 流式响应的**每个 chunk** 都被收集到数组里供日志/合并使用
+- 对于很长的响应（如模型读了大文件并完整复述），这个数组可以非常大
+- 每个 chunk 是独立的 `GenerateContentResponse` 对象，不是简单字符串
+- 当流式响应中有大量 reasoning/thinking 内容时，累积更明显
+
+**改进方向**: 流处理改为**增量合并**到单个对象，不保留每个 chunk 的引用。
+
+#### 候选 2: ChatRecordingService 写入链
+
+**`packages/core/src/services/chatRecordingService.ts:480`**:
+```typescript
+private writeChain: Promise<void> = Promise.resolve();
+
+private appendRecord(record: ChatRecord, ...) {
+  this.writeChain = this.writeChain
+    .catch(() => {})
+    .then(() => jsonl.writeLine(conversationFile, record))  // 闭包捕获 record
+    .catch(...);
+}
+```
+
+- 每次写入都创建新的 Promise 节点链入 `writeChain`
+- `.then()` 闭包**捕获 `record` 对象的强引用**，直到该写入完成
+- 如果磁盘写入慢于产生速率（高延迟磁盘、网络盘、Windows Defender 实时扫描），闭包会堆积
+- 单条 `record` 可能很大（包含完整的 tool result）
+
+**改进方向**: 用真正的有界队列代替 promise chain，背压控制 + 丢弃溢出记录。
+
+#### 候选 3: EventEmitter 订阅泄漏
+
+**`packages/cli/src/ui/contexts/SessionContext.tsx:243`**:
+```typescript
+uiTelemetryService.on('update', handleUpdate);
+```
+
+需要核查所有 `.on()` 订阅是否都有对应 cleanup。React 严格模式下 effect 重跑会导致重复订阅；Ink 多次渲染同样可能。
+
+#### 候选 4: 流式响应未关闭
+
+如果 `for await (const chunk of stream)` 因异常退出而 stream 没被显式 `return()`（关闭迭代器），底层的 HTTP/SSE 连接和缓冲区可能留存。这能解释栈帧中的 OpenSSL 符号——TLS 缓冲区随未关闭连接累积。
+
+### 9.4 修订后的优化方案
+
+在原方案基础上**新增以下 P0**：
+
+10. **流式响应聚合改为增量合并**——`collectedGeminiResponses[]` / `responses[]` 不保留每个 chunk，仅维护合并后的单个对象 + 必要的元数据（token 统计等）。
+
+11. **强制关闭异常退出的流**——在 `processStreamWithLogging` 的 `catch` 中显式调用 `stream.return?.()` 释放底层资源；同样保护其他流消费点。
+
+12. **`writeChain` 替换为有界队列**——参考 `monitorRegistry.ts` 的 `pruneTerminalEntries` 模式，对内存中尚未写入磁盘的 record 设置硬上限。
+
+13. **核查所有 EventEmitter 订阅 cleanup**——`grep '.on('` 与 `grep 'removeListener'` 比例失衡（146 vs 67），需逐一审计 React effect/Ink 使用。
+
+14. **`/resume` 时分块读取 JSONL**——避免一次性把整个会话文件读到内存；或在加载后立即丢弃中间数据结构。
+
+### 9.5 复测方案
+
+为了区分两类问题，建议设计两种复测：
+
+**A. 验证 structuredClone 放大假设**
+- 长会话场景：连续做大量小请求 50+ 次，观察堆增长曲线
+- 加 `--max-old-space-size=8192` 后观察是否仅延迟崩溃
+
+**B. 验证流式聚合泄漏假设**
+- 让模型生成超长响应（一次输出几十 MB 文本），观察单次请求后堆是否回落
+- 启动 → 单次大请求 → idle 30 秒 → 强制 GC（`global.gc()` with `--expose-gc`）→ 检查 retained heap
+
+如果方案 B 显示单次请求后堆不回落，则 candidate 1/2 命中。
+
+### 9.6 给上游的更新评论建议
+
+应在 issue #4116 上追加一条评论，承认：
+- 原分析（structuredClone 放大）适用于原报告但不能解释 Kieaer 的 45GB 案例
+- 关联 #2868（100s 崩溃）说明存在快速增长的内存泄漏
+- 怀疑 streaming response 聚合数组未及时释放、writeChain 闭包堆积
+- 建议团队添加更细粒度的 heap profiling 工具（如 `/heapdump` 命令）以便用户主动抓快照
