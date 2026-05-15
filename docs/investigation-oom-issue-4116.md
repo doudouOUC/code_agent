@@ -513,3 +513,127 @@ uiTelemetryService.on('update', handleUpdate);
 - 关联 #2868（100s 崩溃）说明存在快速增长的内存泄漏
 - 怀疑 streaming response 聚合数组未及时释放、writeChain 闭包堆积
 - 建议团队添加更细粒度的 heap profiling 工具（如 `/heapdump` 命令）以便用户主动抓快照
+
+---
+
+## 10. 第三类场景：压缩峰值内存（Issue #4167）
+
+### 10.1 报告概要
+
+- **Issue**: [#4167 - cli crashed](https://github.com/QwenLM/qwen-code/issues/4167)
+- **触发**: 用户原话 "i was compressing"（手动 `/compress` 或自动压缩触发时崩溃）
+- **环境**:
+  - macOS arm64 (25.4.0) - Apple Silicon
+  - Node.js v22.12.0
+  - Auth: Coding Plan (Aliyun DashScope)
+  - 模型: **glm-5**（注意：不是 Qwen，而是智谱 GLM；context window 仅 **200K** 而非 1M）
+  - 运行时长: ~3.3 小时 (11,919,276 ms)
+  - 报告时 RSS: 105.1 MB（启动时记录，远低于 V8 堆崩溃时的 2GB）
+
+### 10.2 GC 日志特征
+
+```
+Mark-Compact 2017.1 (2080.4) -> 2004.3 (2080.4) MB  // 仅释放 13 MB
+Mark-Compact 2017.1 (2080.4) -> 2004.3 (2080.4) MB  // 再次仅释放 13 MB
+Ineffective mark-compacts near heap limit
+```
+
+栈帧关键：`Heap::CollectGarbage` → `MinorGCJob::Task::RunInternal` —— 普通 MinorGC（年轻代清理）触发的 OOM，**不是** `structuredClone` 反序列化时崩溃。
+
+含义：堆**已经接近满**，压缩流程中某次 V8 内部 GC 任务调度时无法分配。
+
+### 10.3 压缩流程的内存峰值放大
+
+`packages/core/src/services/chatCompressionService.ts:227-393` 的关键步骤：
+
+| 步骤 | 文件:行号 | 内存代价 |
+|------|----------|----------|
+| 1. 取 curated 历史 | `chat.getHistory(true)` (geminiChat.ts:1095) | **`structuredClone` × 1 全量历史** |
+| 2. 计算 compressCount | line 297-300 | 对每个 Content 做 `JSON.stringify` |
+| 3. 计算 totalCount | line 301-304 | 对**整个** `historyForSplit` **再做一次** `JSON.stringify` |
+| 4. 切片 compress + keep | line 276-277 | 浅拷贝，元素仍引用 |
+| 5. spread 到 runSideQuery contents | line 326-327 | 新数组（同引用） |
+| 6. 压缩 API 请求 | `runSideQuery` → OpenAI SDK | SDK 内部序列化请求体 |
+| 7. 流式响应 chunk 累积 | `pipeline.ts:129` | **`collectedGeminiResponses[]` 收集每个 chunk** |
+| 8. Logging 层再收集 | `loggingContentGenerator.ts:398` | **`responses[]` 第二份 chunk 收集** |
+| 9. 构造 extraHistory | line 366-393 | 新数组 spread `historyToKeep` |
+
+压缩窗口期内**同时存在**：
+- 原 `GeminiChat.history`（1×）
+- `curatedHistory` 深拷贝（1×）
+- 2× `JSON.stringify` 临时字符串
+- 压缩 API 请求体（OpenAI SDK 序列化）
+- 2× 流式 chunk 数组
+- 新构造的 `extraHistory`
+
+**峰值约稳态历史的 3-5 倍**。
+
+### 10.4 双重 `JSON.stringify` 的特别浪费
+
+```typescript
+// chatCompressionService.ts:297-304
+const compressCharCount = historyToCompress.reduce(
+  (sum, c) => sum + JSON.stringify(c).length, 0,    // 序列化每个 Content
+);
+const totalCharCount = historyForSplit.reduce(
+  (sum, c) => sum + JSON.stringify(c).length, 0,    // 再次序列化（包含 historyToCompress 全部）
+);
+```
+
+仅为了一个 size 校验做 O(2N) 序列化。对 200K token 历史而言，每次 stringify 都会产生数 MB 的临时字符串。
+
+### 10.5 与已知场景的对比
+
+| 维度 | #4116 原 | #4116 Kieaer | #2868 | #2945 | **#4167** |
+|------|---------|-------------|-------|-------|----------|
+| 触发 | idle | n/a | active 流式 | `/resume` | **`/compress`** |
+| 堆峰值 | 2 GB | **45 GB** | 2 GB | 4 GB | 2 GB |
+| 时长 | 50 min | 7 h | **100 秒** | 220 秒 | 3.3 h |
+| 模型 | deepseek-v4-pro | n/a | qwen coder-model | qwen-oauth | **glm-5** |
+| 上下文窗口 | 1M | n/a | n/a | n/a | **200K** |
+| 栈帧关键 | `ValueDeserializer::ReadValue` | OpenSSL/TLS | regular V8 | `BIO_ssl_shutdown` | **regular MinorGC** |
+| 推断分类 | Scenario A (structuredClone) | Scenario B (real leak) | Scenario B | A+B | **Scenario C (peak)** |
+
+### 10.6 关键启示
+
+`#4167` 用户使用的是 **200K 上下文窗口模型**，理论上稳态远低于 1M 模型。但 **3.3 小时**累积的工具调用结果 + 压缩窗口的 3-5 倍峰值放大，足以耗尽 2GB 默认堆。
+
+这说明**压缩本身是 OOM 的高风险时刻**，需要单独优化：
+
+### 10.7 针对 Scenario C 的修复（增量、可独立合并）
+
+**S0 — 消除双重 `JSON.stringify`**（最低成本，最直接收益）:
+```typescript
+// 单趟扫描：先算 compressCount，再借助闭包对剩余部分累加
+let compressCount = 0;
+let keepCount = 0;
+for (const c of historyForSplit) {
+  const len = JSON.stringify(c).length;
+  if (idx < splitPoint) compressCount += len;
+  else keepCount += len;
+}
+const totalCount = compressCount + keepCount;
+```
+
+或者**完全跳过 size 校验**：用条目数阈值代替（`historyToCompress.length / historyForSplit.length < MIN_FRACTION`）。
+
+**S1 — `getHistoryReadonly(true)` 接口**:
+压缩流程只读历史，不应该 `structuredClone`。新增只读接口避免这次拷贝。
+
+**S2 — 内部调用绕过 chunk accumulator**:
+对于 `runSideQuery` 这类内部调用（promptId 标记为 internal），跳过 `collectedGeminiResponses[]` 与 `responses[]` 累积。当前 `loggingContentGenerator.ts:397` 已有 `isInternal` 判断但仍然累积——应改为完全跳过。
+
+**S3 — `extraHistory` 构造改为 push**:
+```typescript
+const newHistory: Content[] = [
+  { role: 'user', parts: [{ text: summary }] },
+  { role: 'model', parts: [{ text: 'Got it...' }] },
+];
+if (keepNeedsContinuationBridge) newHistory.push({ role: 'user', parts: [...] });
+for (const item of historyToKeep) newHistory.push(item);
+// 替代当前的 [...spread...] + [...spread] 模式
+```
+
+### 10.8 已发布评论
+
+- [#4167 详细分析](https://github.com/QwenLM/qwen-code/issues/4167#issuecomment-4458237121)
