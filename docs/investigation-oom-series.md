@@ -15,6 +15,7 @@
 - [Issue #4167 — `/compress` 触发的峰值 OOM](#issue-4167--compress-触发的峰值-oom)
 - [Issue #4167（@wwwi2vv-dev 跟进） — 8GB 堆 + Object.defineProperty 栈帧](#issue-4167wwwi2vv-dev-跟进--8gb-堆--objectdefineproperty-栈帧)
 - [Issue #4315 — 19 小时长会话 + 输入触发 OOM](#issue-4315--19-小时长会话--输入触发-oom)
+- [Issue #4322 — 4GB 堆 + BIO_ssl_shutdown 第三次 TLS 帧](#issue-4322--4gb-堆--bio_ssl_shutdown-第三次-tls-帧)
 - [Claude Code 对照设计](#claude-code-对照设计)
 - [最终总结与行动项](#最终总结与行动项)
 - [附录：相关链接](#附录相关链接)
@@ -509,6 +510,80 @@ function cloneErrorWithRedactedFields(...) {
 
 ---
 
+## Issue #4322 — 4GB 堆 + BIO_ssl_shutdown 第三次 TLS 帧
+
+### 报告概要
+
+| 项 | 值 |
+|---|---|
+| Issue | [#4322](https://github.com/QwenLM/qwen-code/issues/4322) |
+| OS | Windows（PS 路径 `D:\odoo\odoo-18.0`） |
+| 堆峰值 | ~4023 MB（committed 4129 MB ≈ Node v22 在 64-bit Windows 默认堆限） |
+| Mark-Compact 释放 | 仅 ~14 MB / 4023 MB |
+| Mutator 利用率 | 0.126 / 0.076 — V8 87-92% CPU 在 GC |
+| 运行时长 | ~7.1 小时（25,553,508 ms） |
+| 工作目录 | Odoo 18.0 项目（暗示大代码库） |
+
+### 栈帧（第三次出现 OpenSSL 关键）
+
+```
+1: node::SetCppgcReference                            ← Node Cppgc API
+2: SSL_get_quiet_shutdown                             ← OpenSSL TLS shutdown
+3: v8::Isolate::ReportExternalAllocationLimitReached  ← 外部内存限触发！
+4: v8::Function::Experimental_IsNopFunction
+5-6: v8::internal::StrongRootAllocatorBase
+7: v8::CpuProfileNode::GetScriptResourceNameStr       ← 仅符号锚点（偏移过大）
+8: BIO_ssl_shutdown                                   ← OpenSSL Basic I/O shutdown
+```
+
+**两个关键诊断点**：
+
+1. **Frame 3 `ReportExternalAllocationLimitReached`**：触发不是 V8 普通堆分配，而是 V8 的**外部内存追踪**触发的。"外部内存"是 native（C++ 管理）层面的分配——TLS 读缓冲区、Node Buffer、native handle 等。
+
+2. **Frame 2 + 8 `BIO_ssl_shutdown` / `SSL_get_quiet_shutdown`**：失败的分配发生在 **TLS 连接拆除过程中**。每次 shutdown 都要分配内部 OpenSSL 状态结构。
+
+### TLS 模式跨报告强化
+
+至此，**已有三个独立报告含 OpenSSL 栈帧**：
+
+| Issue | 堆 | 时长 | OpenSSL 帧 |
+|-------|----|------|-----------|
+| #2945 | 4 GB | 220s | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`（`/resume` 期间） |
+| #4116（@Kieaer 评论） | **45 GB** | 7.2h | `X509_STORE_set_cleanup`、`SSL_CTX_set_cookie_generate_cb` |
+| **#4322** | 4 GB | 7.1h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown` |
+
+三次独立出现，**已超过巧合范围**。
+
+### 根因假设：流式 HTTPS 连接错误路径未完全清理
+
+代码侧关键证据：
+
+```bash
+$ grep "stream\.return\|stream\.close" \
+    packages/core/src/core/openaiContentGenerator/pipeline.ts \
+    packages/core/src/core/loggingContentGenerator/loggingContentGenerator.ts
+# 无匹配
+```
+
+`pipeline.ts` 与 `loggingContentGenerator.ts` 都没有显式调用 `stream.return?.()` / `stream.close()`。`for await (... of stream)` 异常退出时 JS 会尝试调用 iterator 的 `return()`，但 OpenAI SDK 的流封装坐落在 HTTPS Response body 之上。如果底层 `Response.body` 的 reader 没被释放、或释放了但 TLS socket 没被 agent pool 回收，native TLS 资源就累积。7 小时会话 + 重试 + 网络抖动逐步堆积，最终外部内存溢出，连 `BIO_ssl_shutdown` 自身都无法分配。
+
+### 与其他 issue 关系
+
+属于 **Scenario B（持续真实泄漏）** 的 **TLS 子类**：
+- @Kieaer (#4116) ：45GB 堆，OpenSSL 帧（X509、SSL_CTX）
+- #2945：4GB 堆，OpenSSL 帧（BIO_ssl_shutdown、SSL_get_quiet_shutdown），`/resume` 触发
+- **#4322**：4GB 堆，OpenSSL 帧（BIO_ssl_shutdown、SSL_get_quiet_shutdown），普通使用
+
+与 @wwwi2vv-dev 的 8GB / `Object.defineProperty` 案例（也是 Scenario B 但栈帧不同）共同构成 Scenario B 的两条独立子线索：
+- **TLS 子类**（#2945、#4116-Kieaer、#4322）
+- **defineProperty/NameDictionary 子类**（#4167-wwwi2vv-dev）
+
+### 已发布动作
+
+- [#4322 分析评论](https://github.com/QwenLM/qwen-code/issues/4322#issuecomment-4487156141)
+
+---
+
 ## Claude Code 对照设计
 
 通过分析 Claude Code 代码 (`/Users/jinye.djy/Projects/claude-code`)，发现其在内存管理上有几个根本性不同的设计：
@@ -582,7 +657,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 场景 | 代表 issue | 触发 | 堆峰值 | 时长 | 关键栈帧 | 修复路径 |
 |------|-----------|------|--------|------|----------|---------|
 | **A — 长会话 + structuredClone 放大** | #4116（原）、**#4315** | idle / 输入 / 任务完成后 | 2 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone` | 减少深拷贝；`readonly` 引用语义 |
-| **B — 持续真实泄漏** | #4116 (@Kieaer)、#2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-45 GB | 100s ~ 7h | OpenSSL/TLS、`Object.defineProperty + NameDictionary` 或 regular V8 | 流 accumulator、错误克隆链、writeChain 闭包、订阅审计 |
+| **B — 持续真实泄漏（TLS 子类）** | #2945、#4116 (@Kieaer)、**#4322** | active 流式 / `/resume` | 4-45 GB | 220s ~ 7h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`、`X509_STORE_set_cleanup`、`ReportExternalAllocationLimitReached` | 流异常退出时 TLS 资源未释放、HTTPS agent pool 不回收 |
+| **B — 持续真实泄漏（defineProperty 子类）** | #2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-8 GB | 100s ~ 17 min | `Object.defineProperty + NameDictionary` 或 regular V8 | 错误克隆链、流 accumulator、writeChain 闭包 |
 | **C — 操作期峰值放大** | #4167 | `/compress`、`/resume` | 2-4 GB | 操作触发 | regular GC | 压缩流程双重 stringify、spread 链 |
 
 ### 核心理念对比（qwen-code vs Claude Code）
@@ -667,6 +743,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-15 | [#4167 详细分析评论](https://github.com/QwenLM/qwen-code/issues/4167#issuecomment-4458237121) |
 | 2026-05-15 | [#4167 跟进评论：@wwwi2vv-dev 8GB 案例分析](https://github.com/QwenLM/qwen-code/issues/4167#issuecomment-4459269515) |
 | 2026-05-19 | [#4315 分析评论：19h 长会话输入触发 OOM](https://github.com/QwenLM/qwen-code/issues/4315#issuecomment-4485434397) |
+| 2026-05-19 | [#4322 分析评论：第三次 OpenSSL/TLS 帧 OOM](https://github.com/QwenLM/qwen-code/issues/4322#issuecomment-4487156141) |
 
 ---
 
@@ -677,6 +754,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 - [#4116 - problem critical error](https://github.com/QwenLM/qwen-code/issues/4116)
 - [#4167 - cli crashed](https://github.com/QwenLM/qwen-code/issues/4167)
 - [#4315 - cli crashed when i was just typing](https://github.com/QwenLM/qwen-code/issues/4315)
+- [#4322 - 用着用着, 就这样了](https://github.com/QwenLM/qwen-code/issues/4322)
 - [#2868 - Heap out of memory](https://github.com/QwenLM/qwen-code/issues/2868)
 - [#2945 - Heap OOM during /resume](https://github.com/QwenLM/qwen-code/issues/2945)
 - [#728 - 早期同类 OOM 报告](https://github.com/QwenLM/qwen-code/issues/728)
