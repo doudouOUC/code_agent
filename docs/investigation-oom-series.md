@@ -14,6 +14,7 @@
 - [Issue #2945 — `/resume` 期间崩溃](#issue-2945--resume-期间崩溃)
 - [Issue #4167 — `/compress` 触发的峰值 OOM](#issue-4167--compress-触发的峰值-oom)
 - [Issue #4167（@wwwi2vv-dev 跟进） — 8GB 堆 + Object.defineProperty 栈帧](#issue-4167wwwi2vv-dev-跟进--8gb-堆--objectdefineproperty-栈帧)
+- [Issue #4315 — 19 小时长会话 + 输入触发 OOM](#issue-4315--19-小时长会话--输入触发-oom)
 - [Claude Code 对照设计](#claude-code-对照设计)
 - [最终总结与行动项](#最终总结与行动项)
 - [附录：相关链接](#附录相关链接)
@@ -419,6 +420,95 @@ function cloneErrorWithRedactedFields(...) {
 
 ---
 
+## Issue #4315 — 19 小时长会话 + 输入触发 OOM
+
+### 报告概要
+
+| 项 | 值 |
+|---|---|
+| Issue | [#4315](https://github.com/QwenLM/qwen-code/issues/4315) |
+| Qwen Code | 0.15.11 (782403d71) |
+| Node.js | v22.12.0 |
+| OS | macOS arm64 (25.4.0) |
+| 认证 | Coding Plan (Aliyun DashScope) |
+| 模型 | **glm-5**（200K 上下文） |
+| 堆峰值 | ~2027 MB（默认 2GB 堆限） |
+| **运行时长** | **70,561,968 ms ≈ 19.6 小时** ← 系列中最长 |
+| 触发动作 | 任务完成后**用户在输入框打字**时崩溃 |
+| /about 时 RSS | 127.5 MB（启动期记录） |
+
+### GC 日志特征
+
+```
+[21822] 70561968 ms: Scavenge (interleaved)
+  2027.9 (2079.0) -> 2024.1 (2079.5) MB
+
+[21822] 70562036 ms: Scavenge
+  2029.7 (2079.5) -> 2026.8 (2098.0) MB
+  allocation failure
+```
+
+### 栈帧关键解读
+
+```
+9-22:  ValueDeserializer::ReadDenseJSArray ↔ ReadObject  ← 深层嵌套数组对象递归
+24:    v8::ValueDeserializer::ReadValue
+25:    node::worker::Message::Deserialize           ← 走 worker_threads 消息通道
+26:    node::worker::StructuredClone                ← Node 全局 structuredClone()
+27:    Builtins_CallApiCallbackOptimizedNoProfiling
+28:    0x10b59b3d8                                   ← JIT'd 用户代码调用 structuredClone
+...
+34:    v8_inspector::V8Console::runTask             ← async 上下文跟踪
+36-92: 大量重复地址                                   ← 深递归 JIT JS 代码
+100:   node::Environment::CheckImmediate            ← libuv check 阶段
+101:   uv__run_check
+102:   uv_run
+```
+
+三个关键观察：
+
+1. **Frame 26 = `node::worker::StructuredClone`**：Node.js 全局 `structuredClone()`（v17+）。与 #4116 原报告（V8 内置 `ValueDeserializer`）路径一致，从 Node 表面 API 进入。
+
+2. **Frame 100 = `CheckImmediate`**：崩溃实际发生在 **libuv check 阶段**（`setImmediate` 回调执行）。用户打字未直接调用 `structuredClone`——keystroke 触发了状态变更，状态变更落地到一条 setImmediate 链上，链中某处的 `structuredClone(history)` 撑爆了堆。
+
+3. **Frame 34 = `V8Console::runTask`**：V8 Inspector 的 async 上下文跟踪。出现在普通堆栈说明运行期开启了 async stack traces 或 inspector，每个 task 都背负额外开销。
+
+### 根因分析
+
+**Scenario A 的输入触发变种**。任务完成后会触发的 `getHistory()` 调用点（每个都会 `structuredClone`）：
+
+- `recordAssistantTurn` 写 JSONL
+- `checkNextSpeaker`（**两次**全量克隆，行 55、63）
+- 自动压缩阈值检查
+- IDE 上下文同步
+- microcompaction 时间触发评估
+
+任意一个在 setImmediate 链上的 continuation 都可能在 19+ 小时累积的历史上 OOM。
+
+### 与其他 issue 的对比
+
+| | #4116 原 | #4167 原 | #4167 (@wwwi2vv-dev) | **#4315** |
+|---|---------|---------|---------|---------|
+| 触发 | idle | `/compress` | 流式 + 错误 | **输入打字** |
+| 堆 | 2 GB | 2 GB | 8 GB | 2 GB |
+| 时长 | 50 min | 3.3 h | 17 min | **19.6 h** |
+| 栈关键 | `ValueDeserializer` | regular GC | `Object.defineProperty` | `node::worker::StructuredClone` |
+| 分类 | A | C | B | **A 变种** |
+
+19.6 小时是系列中最长的。说明现有的 microcompaction（按时间清理工具结果）+ 自动压缩（按 token 阈值）在长期运行中**没能保持稳态**，历史持续增长。
+
+### 不需要新机制
+
+根因与 #4116 原报告一致。已识别的 P0 修复（`getHistoryReadonly`、`peekLastHistoryEntry`、消除压缩双重 stringify、启动时设置堆限）全部适用，无需新增 P 级修复项。
+
+唯一新增的细节是：**输入处理路径上的 setImmediate 链需要审计**——任何在 keystroke 后的 continuation 中的 `structuredClone(history)` 都应替换为 readonly 引用或 peek 访问。
+
+### 已发布动作
+
+- [#4315 分析评论](https://github.com/QwenLM/qwen-code/issues/4315#issuecomment-4485434397)
+
+---
+
 ## Claude Code 对照设计
 
 通过分析 Claude Code 代码 (`/Users/jinye.djy/Projects/claude-code`)，发现其在内存管理上有几个根本性不同的设计：
@@ -491,7 +581,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 
 | 场景 | 代表 issue | 触发 | 堆峰值 | 时长 | 关键栈帧 | 修复路径 |
 |------|-----------|------|--------|------|----------|---------|
-| **A — 长会话 + structuredClone 放大** | #4116（原） | idle | 2 GB | 50 min | `ValueDeserializer::ReadValue` | 减少深拷贝；`readonly` 引用语义 |
+| **A — 长会话 + structuredClone 放大** | #4116（原）、**#4315** | idle / 输入 / 任务完成后 | 2 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone` | 减少深拷贝；`readonly` 引用语义 |
 | **B — 持续真实泄漏** | #4116 (@Kieaer)、#2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-45 GB | 100s ~ 7h | OpenSSL/TLS、`Object.defineProperty + NameDictionary` 或 regular V8 | 流 accumulator、错误克隆链、writeChain 闭包、订阅审计 |
 | **C — 操作期峰值放大** | #4167 | `/compress`、`/resume` | 2-4 GB | 操作触发 | regular GC | 压缩流程双重 stringify、spread 链 |
 
@@ -576,6 +666,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-15 | [#4116 区分两类场景追加评论](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4456488521) |
 | 2026-05-15 | [#4167 详细分析评论](https://github.com/QwenLM/qwen-code/issues/4167#issuecomment-4458237121) |
 | 2026-05-15 | [#4167 跟进评论：@wwwi2vv-dev 8GB 案例分析](https://github.com/QwenLM/qwen-code/issues/4167#issuecomment-4459269515) |
+| 2026-05-19 | [#4315 分析评论：19h 长会话输入触发 OOM](https://github.com/QwenLM/qwen-code/issues/4315#issuecomment-4485434397) |
 
 ---
 
@@ -585,6 +676,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 
 - [#4116 - problem critical error](https://github.com/QwenLM/qwen-code/issues/4116)
 - [#4167 - cli crashed](https://github.com/QwenLM/qwen-code/issues/4167)
+- [#4315 - cli crashed when i was just typing](https://github.com/QwenLM/qwen-code/issues/4315)
 - [#2868 - Heap out of memory](https://github.com/QwenLM/qwen-code/issues/2868)
 - [#2945 - Heap OOM during /resume](https://github.com/QwenLM/qwen-code/issues/2945)
 - [#728 - 早期同类 OOM 报告](https://github.com/QwenLM/qwen-code/issues/728)
