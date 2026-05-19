@@ -744,6 +744,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-15 | [#4167 跟进评论：@wwwi2vv-dev 8GB 案例分析](https://github.com/QwenLM/qwen-code/issues/4167#issuecomment-4459269515) |
 | 2026-05-19 | [#4315 分析评论：19h 长会话输入触发 OOM](https://github.com/QwenLM/qwen-code/issues/4315#issuecomment-4485434397) |
 | 2026-05-19 | [#4322 分析评论：第三次 OpenSSL/TLS 帧 OOM](https://github.com/QwenLM/qwen-code/issues/4322#issuecomment-4487156141) |
+| 2026-05-19 | [#2868 交叉引用评论：100s 快速崩溃归类到 Scenario B](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4487242267) |
+| 2026-05-19 | [#2945 交叉引用评论：TLS 子类第一次出现](https://github.com/QwenLM/qwen-code/issues/2945#issuecomment-4487242968) |
 
 ---
 
