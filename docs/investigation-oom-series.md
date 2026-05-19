@@ -17,6 +17,7 @@
 - [Issue #4315 — 19 小时长会话 + 输入触发 OOM](#issue-4315--19-小时长会话--输入触发-oom)
 - [Issue #4322 — 4GB 堆 + BIO_ssl_shutdown 第三次 TLS 帧](#issue-4322--4gb-堆--bio_ssl_shutdown-第三次-tls-帧)
 - [内部 Case A — 6.45h + StackGuard 栈帧](#内部-case-a--645h--stackguard-栈帧)
+- [内部 Case B — 孤儿 tool_use 死锁 + new Set 触发 OOM](#内部-case-b--孤儿-tool_use-死锁--new-set-触发-oom)
 - [Claude Code 对照设计](#claude-code-对照设计)
 - [最终总结与行动项](#最终总结与行动项)
 - [附录：相关链接](#附录相关链接)
@@ -668,6 +669,124 @@ Allocation failed - JavaScript heap out of memory
 
 ---
 
+## 内部 Case B — 孤儿 tool_use 死锁 + new Set 触发 OOM
+
+### 报告概要
+
+| 项 | 值 |
+|---|---|
+| 来源 | 内部同事反馈（非公开 issue） |
+| 堆峰值 | 4085-4088 MB（committed 4098 MB ≈ Node 24 默认 4GB） |
+| Mark-Compact 释放 | 仅 ~9 MB（4088 → 4079） |
+| Mark-Compact 增量步数 | **707 步**（与内部 Case A 的 0 步不同——GC 真的在尝试，但徒劳） |
+| 运行时长 | 3,826,469 ms ≈ **63.8 分钟** |
+| Node | v24.9.0（Homebrew） |
+| 平台 | macOS arm64 |
+| 模型 | **DeepSeek/deepseek-v4-pro（1M 上下文）** |
+| Auth | anthropic（Aliyun 内部 `idealab.alibaba-inc.com/api/anthropic` 代理） |
+
+### 应用层错误（载荷信息！）
+
+```
+✕ [API Error: messages.7:tool_use ids were found without tool_result blocks
+   immediately after: call_01_WJDOodB3Djek95FFdMdF5651,
+                       call_02_GGdFyaUSKytaTlMUbtXr9527,
+                       call_03_T7jppFFL8y9SUKpgh2jZ7160.
+   Each tool_use block must have a corresponding tool_result block in the next message.]
+```
+
+用户在崩溃前输入"继续"，立即返回服务端 400 错误，错误指出会话第 7 条消息有 **3 个孤儿 tool_use 块**（无对应 `tool_result`）。
+
+### 原始栈帧（保留）
+
+```
+[19707:0x7f740c000]  3826469 ms: Scavenge (interleaved)
+  4085.8 (4098.1) → 4082.3 (4098.4) MB
+
+[19707:0x7f740c000]  3826871 ms: Mark-Compact (reduce)
+  4088.3 (4100.4) → 4079.8 (4091.4) MB
+  (+ 15.2 ms in 707 steps since start of marking)
+
+----- Native stack trace -----
+ 1: node::OOMErrorHandler
+ 2-3: v8::FatalProcessOutOfMemory
+ 4-10: v8::Heap::CollectGarbage / RecomputeLimits 调用链
+11: v8::HeapAllocator::AllocateRawWithRetryOrFailSlowPath
+12: v8::Factory::NewFillerObject
+13: v8::Runtime_AllocateInYoungGeneration
+14: Builtins_CEntry_Return1_ArgvOnStack_NoBuiltinExit
+15: Builtins_SetConstructor                  ← new Set() 失败！
+16: Builtins_JSBuiltinsConstructStub
+17-28: JIT'd JS 代码（深递归）
+29-30: Builtins_JSEntry / JSEntryTrampoline
+36: node::Environment::CheckImmediate         ← libuv check 阶段
+37: uv__run_check
+```
+
+### 栈帧定位 — 找到了源头
+
+`packages/core/src/core/openaiContentGenerator/converter.ts:1379-1510` 有一个 `cleanOrphanedToolCalls` 函数：
+
+```typescript
+function cleanOrphanedToolCalls(messages) {
+  const cleaned = [];
+  const toolCallIds = new Set<string>();        // ← Set #1 (line 1383)
+  const toolResponseIds = new Set<string>();    // ← Set #2 (line 1384)
+  // First pass: collect IDs ...
+  // Second pass: filter ...
+  const finalToolCallIds = new Set<string>();   // ← Set #3 (line 1459)
+  const finalToolResponseIds = new Set<string>(); // ← Set #4 (line 1477)
+  // Final validation pass ...
+}
+```
+
+**单次调用创建 4 个 Set + 3 趟遍历整个 messages 数组 + 多次对象 spread**。栈帧 15 的 `Builtins_SetConstructor` 大概率就是这里某次构造失败。
+
+注意：`anthropicContentGenerator/` 目录下**没有等价的 `cleanOrphanedTools` 函数**——这意味着 Anthropic 路径的孤儿处理可能在客户端缺失，全靠服务端报错（即用户看到的 400）。
+
+### 完整因果链
+
+1. 用户跑了一段时间会话使用 deepseek-v4-pro（**1M 上下文**）
+2. 某次模型并行调用 3 个工具（`call_01_*`、`call_02_*`、`call_03_*`）
+3. **某种原因**（Ctrl+C / abort / 错误）工具未完成，3 个 `tool_use` 块没有对应 `tool_result`
+4. 会话进入**孤儿 tool_use 死锁状态**——任何后续 API 请求都被服务端 400 拒绝
+5. 用户看到错误后输入"继续"重试
+6. 客户端构造请求 → 调用 `cleanOrphanedToolCalls`（或 Anthropic 路径等价逻辑）
+7. **关键**：1M 上下文 + 63 分钟会话，history 已接近 4GB 堆限
+8. `new Set<string>()` 构造时分配失败 → OOM
+9. `707 步`增量 GC 徒劳挤出 9 MB——history 几乎全部 reachable
+
+### 新维度：会话级死锁阻止 history 收缩
+
+之前所有报告都没暴露这个细节：
+
+- **孤儿 tool_use 状态阻止 turn 完成**
+  → microcompaction（按时间清理工具结果）等待"上一个完成的 turn"，被卡死
+  → 自动压缩需要等下一个成功 turn，但下一个 turn 永远 400 失败
+  → **history 只能增长不能收缩**
+- 用户主动输入"继续"重试，进一步放大每次请求的内存占用
+
+本质是一个**会话级死锁**：history 状态错误 → 服务端拒绝 → 客户端重试时再次建请求 → 所有内存压力工具都被触发但**无任何进展**。
+
+### 分类归属
+
+**Scenario A 长会话累积**，新次因："**会话状态死锁场景下 history 无法收缩**"。
+
+### 新增修复项
+
+**P1-11（新）— 孤儿 tool_use 在客户端发请求前主动剪枝**：
+- 现有 `cleanOrphanedToolCalls` 在 OpenAI 路径上有，但**它本身就是 4 Set + 3 pass 的内存压力源**
+- 应改为**单趟扫描 + 原地修改**（减少 Set 与对象拷贝）
+- **Anthropic 路径同样需要等价逻辑**（本次栈帧表明现有逻辑要么没被命中、要么也存在）
+- 检测到孤儿 tool_use 时应有用户可见的恢复路径（自动剪枝并提示，而不是无限重试 400）
+
+### 已采取动作
+
+- 信息保留在本调研文档（去掉用户名）
+- 未在公开渠道发布（内部 case）
+
+---
+
 ## Claude Code 对照设计
 
 通过分析 Claude Code 代码 (`/Users/jinye.djy/Projects/claude-code`)，发现其在内存管理上有几个根本性不同的设计：
@@ -740,7 +859,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 
 | 场景 | 代表 issue | 触发 | 堆峰值 | 时长 | 关键栈帧 | 修复路径 |
 |------|-----------|------|--------|------|----------|---------|
-| **A — 长会话 + structuredClone 放大** | #4116（原）、#4315、**内部 Case A** | idle / 输入 / 任务完成后 | 2-4 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone`、或仅 `StackGuard::HandleInterrupts`（堆已满任何 GC 都失败） | 减少深拷贝；`readonly` 引用语义 |
+| **A — 长会话 + structuredClone 放大** | #4116（原）、#4315、内部 Case A、**内部 Case B** | idle / 输入 / 任务完成后 / 孤儿 tool_use 死锁 | 2-4 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone`、`StackGuard::HandleInterrupts`、`Builtins_SetConstructor`（孤儿剪枝时） | 减少深拷贝；`readonly` 引用语义；客户端提前剪枝孤儿 tool_use |
 | **B — 持续真实泄漏（TLS 子类）** | #2945、#4116 (@Kieaer)、**#4322** | active 流式 / `/resume` | 4-45 GB | 220s ~ 7h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`、`X509_STORE_set_cleanup`、`ReportExternalAllocationLimitReached` | 流异常退出时 TLS 资源未释放、HTTPS agent pool 不回收 |
 | **B — 持续真实泄漏（defineProperty 子类）** | #2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-8 GB | 100s ~ 17 min | `Object.defineProperty + NameDictionary` 或 regular V8 | 错误克隆链、流 accumulator、writeChain 闭包 |
 | **C — 操作期峰值放大** | #4167 | `/compress`、`/resume` | 2-4 GB | 操作触发 | regular GC | 压缩流程双重 stringify、spread 链 |
@@ -782,6 +901,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | P1-5 | EventEmitter 订阅 cleanup 审计 | B | M |
 | P1-9 | `cloneErrorWithRedactedFields` 改为字符串/原型替换，避免 `Object.defineProperty` 触发字典模式 | B | M |
 | P1-10 | 错误链路上限：包装多于 N 层时丢弃中间 `cause` 节点（保留最深处原始错误） | B | M |
+| P1-11 | 孤儿 tool_use 在客户端发请求前主动剪枝；`cleanOrphanedToolCalls` 改为单趟扫描；Anthropic 路径补齐等价逻辑 | A（死锁场景） | M |
+| P1-12 | 检测到孤儿 tool_use 时给出用户可见的恢复路径（自动剪枝并提示），而不是无限触发 400 重试 | A（死锁场景） | S |
 | P1-6 | `/resume` 分块读取 JSONL，避免一次性整文件入内存 | B | M |
 | P1-7 | `React.memo + isStatic` 替代 Ink `<Static>` 完全保留 | A、内存常量 | L |
 | P1-8 | 大文本展示层截断（10K chars） | A | S |
@@ -831,6 +952,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-19 | [#2868 交叉引用评论：100s 快速崩溃归类到 Scenario B](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4487242267) |
 | 2026-05-19 | [#2945 交叉引用评论：TLS 子类第一次出现](https://github.com/QwenLM/qwen-code/issues/2945#issuecomment-4487242968) |
 | 2026-05-19 | 内部 Case A 入档：6.45h + StackGuard 栈帧（仅文档，未公开） |
+| 2026-05-19 | 内部 Case B 入档：孤儿 tool_use 死锁 + new Set 触发 OOM（仅文档，未公开） |
 
 ---
 
