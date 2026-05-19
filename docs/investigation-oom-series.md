@@ -16,6 +16,7 @@
 - [Issue #4167（@wwwi2vv-dev 跟进） — 8GB 堆 + Object.defineProperty 栈帧](#issue-4167wwwi2vv-dev-跟进--8gb-堆--objectdefineproperty-栈帧)
 - [Issue #4315 — 19 小时长会话 + 输入触发 OOM](#issue-4315--19-小时长会话--输入触发-oom)
 - [Issue #4322 — 4GB 堆 + BIO_ssl_shutdown 第三次 TLS 帧](#issue-4322--4gb-堆--bio_ssl_shutdown-第三次-tls-帧)
+- [内部 Case A — 6.45h + StackGuard 栈帧](#内部-case-a--645h--stackguard-栈帧)
 - [Claude Code 对照设计](#claude-code-对照设计)
 - [最终总结与行动项](#最终总结与行动项)
 - [附录：相关链接](#附录相关链接)
@@ -584,6 +585,89 @@ $ grep "stream\.return\|stream\.close" \
 
 ---
 
+## 内部 Case A — 6.45h + StackGuard 栈帧
+
+### 报告概要
+
+| 项 | 值 |
+|---|---|
+| 来源 | 内部同事反馈（非公开 issue） |
+| 堆峰值 | 4061-4062 MB（committed 4076 MB） |
+| Mark-Compact 释放 | 仅 ~21 MB（4062 → 4041） |
+| 运行时长 | 23,205,336 ms ≈ **6.45 小时** |
+| Node | v23.11.1（fnm 管理） |
+| 平台 | macOS |
+| 推测后端 | 内部 DashScope / Coding Plan（与 #4167、#4315 同栈生态） |
+
+### 原始栈帧（保留供日后参考）
+
+```
+[85150:0x8ec800000] 23205336 ms: Scavenge (reduce) (interleaved)
+  4061.9 (4076.7) → 4061.7 (4077.4) MB
+  pooled: 0 MB, 4.42 / 0.00 ms
+  (average mu = 0.374, current mu = 0.377) allocation failure;
+
+[85150:0x8ec800000] 23205375 ms: Mark-Compact (reduce)
+  4062.0 (4077.4) → 4041.1 (4061.4) MB
+  pooled: 0 MB, 15.08 / 0.46 ms
+  (+ 409.0 ms in 0 steps since start of marking, biggest step 0.0 ms,
+   walltime since start of marking 512 ms)
+  (average mu = 0.359, current mu = ...)
+
+FATAL ERROR: Ineffective mark-compacts near heap limit
+Allocation failed - JavaScript heap out of memory
+
+----- Native stack trace -----
+1: node::OOMErrorHandler
+2: v8::internal::V8::FatalProcessOutOfMemory
+3: v8::internal::Heap::stack()
+4: v8::internal::Heap::CollectGarbage::$_1::operator()()
+5: heap::base::Stack::SetMarkerAndCallbackImpl
+6: PushAllRegistersAndIterateStack
+7: v8::internal::Heap::CollectGarbage
+8: v8::internal::StackGuard::HandleInterrupts          ← 关键
+9: v8::internal::Runtime_StackGuardWithGap             ← 关键
+```
+
+### 栈帧的特殊性：触发点是 V8 内部周期性 GC 检查
+
+- `Runtime_StackGuardWithGap` 是 V8 在 JS 函数序言 / 循环回边插入的**栈守卫检查**
+- JS 跑到检查点 → V8 发现有挂起的中断（其中包括"内存压力，做一次 GC"）→ `HandleInterrupts` 触发 GC → GC 失败 OOM
+- **这条栈不揭示泄漏源** —— 没有具体的分配方代码（不像 #4116 的 `ValueDeserializer`、#4167 的 `Object.defineProperty`、#4322 的 `BIO_ssl_shutdown`）
+- 唯一告诉我们的是："堆已经满了，任何后续 GC 都救不回来"
+
+`+ 409 ms in 0 steps`（增量步数为 0）特别关键 —— Mark-Compact 跑了 409 ms 但实际有效步数 0，说明 GC 还没来得及做增量工作就被强制收尾，**堆里对象绝大部分是 reachable**（不是泄漏临时对象，是真的持有大量数据）。
+
+### 分类归属：Scenario A 或 B 长会话累积，无具体子类证据
+
+判断依据：
+1. **6.45 小时时长** —— 与 #4322（7.1h）、@Kieaer（7.2h）同一量级
+2. **~4GB 堆 + 默认 Node v23** —— Node v23 在 macOS 默认约 4GB，**很可能未设 `--max-old-space-size`**
+3. **Mark-Compact 仅释放 21 MB** —— 整堆基本都是 reachable，**真的累积了数据**
+4. **mu = 0.359** —— GC 在崩溃前已频繁打断 JS 执行
+5. 推测使用 DashScope / glm-5（同 #4167、#4315 栈生态）→ 倾向 Scenario A 长会话
+
+### 缺什么信息才能进一步定性
+
+| 信息 | 能定性的内容 |
+|------|------------|
+| `/about` 输出 | 模型 + Auth → 是否同 DashScope 栈 |
+| 崩溃前几十行日志 | retry / rate-limit / `/compress` → C 或 B |
+| `process.memoryUsage().external` 趋势 | 持续增长 → B-TLS |
+| 用户在做什么（agent 循环 / 读大文件 / 流响应大） | A 还是 B-defineProperty |
+| 是否设过 `NODE_OPTIONS` | 没设 + 4GB → 默认堆 |
+
+### 与已识别场景的关系
+
+最佳猜测：**Scenario A 的又一例**（长会话 + `structuredClone` 累积），与 #4315（19.6h glm-5 macOS）同源。已识别的 P0 修复（`getHistoryReadonly`、启动时设置堆限）适用，无需新增 P 级修复项。
+
+### 已采取动作
+
+- 信息保留在本调研文档（去掉用户名）
+- 未在公开渠道发布（内部 case）
+
+---
+
 ## Claude Code 对照设计
 
 通过分析 Claude Code 代码 (`/Users/jinye.djy/Projects/claude-code`)，发现其在内存管理上有几个根本性不同的设计：
@@ -656,7 +740,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 
 | 场景 | 代表 issue | 触发 | 堆峰值 | 时长 | 关键栈帧 | 修复路径 |
 |------|-----------|------|--------|------|----------|---------|
-| **A — 长会话 + structuredClone 放大** | #4116（原）、**#4315** | idle / 输入 / 任务完成后 | 2 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone` | 减少深拷贝；`readonly` 引用语义 |
+| **A — 长会话 + structuredClone 放大** | #4116（原）、#4315、**内部 Case A** | idle / 输入 / 任务完成后 | 2-4 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone`、或仅 `StackGuard::HandleInterrupts`（堆已满任何 GC 都失败） | 减少深拷贝；`readonly` 引用语义 |
 | **B — 持续真实泄漏（TLS 子类）** | #2945、#4116 (@Kieaer)、**#4322** | active 流式 / `/resume` | 4-45 GB | 220s ~ 7h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`、`X509_STORE_set_cleanup`、`ReportExternalAllocationLimitReached` | 流异常退出时 TLS 资源未释放、HTTPS agent pool 不回收 |
 | **B — 持续真实泄漏（defineProperty 子类）** | #2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-8 GB | 100s ~ 17 min | `Object.defineProperty + NameDictionary` 或 regular V8 | 错误克隆链、流 accumulator、writeChain 闭包 |
 | **C — 操作期峰值放大** | #4167 | `/compress`、`/resume` | 2-4 GB | 操作触发 | regular GC | 压缩流程双重 stringify、spread 链 |
@@ -746,6 +830,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-19 | [#4322 分析评论：第三次 OpenSSL/TLS 帧 OOM](https://github.com/QwenLM/qwen-code/issues/4322#issuecomment-4487156141) |
 | 2026-05-19 | [#2868 交叉引用评论：100s 快速崩溃归类到 Scenario B](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4487242267) |
 | 2026-05-19 | [#2945 交叉引用评论：TLS 子类第一次出现](https://github.com/QwenLM/qwen-code/issues/2945#issuecomment-4487242968) |
+| 2026-05-19 | 内部 Case A 入档：6.45h + StackGuard 栈帧（仅文档，未公开） |
 
 ---
 
