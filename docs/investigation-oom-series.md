@@ -224,6 +224,52 @@ private appendRecord(record: ChatRecord, ...) {
 
 与 @Kieaer 同属 **Scenario B（持续泄漏）**，但触发更快（active 状态 + 大流式响应）。
 
+### 后续评论新数据（2026-05-15 ~ 05-20）
+
+| 评论者 | 日期 | 内容 |
+|--------|------|------|
+| @dyrnq | 2026-05-15 | "关注这个问题" |
+| @supercargotim-rgb | 2026-05-17 | 俄语，"今天一天崩了 4 次" |
+| @kstepyra | 2026-05-17 | "happens constantly" |
+| @gkubon | 2026-05-20 | "happens multiple times a day" + 完整 GC trace |
+
+**频率从偶发升到高频** —— 三个独立用户在 3 天内反映"频繁崩溃"，与 v0.15.10/0.15.11 时间线吻合，是**版本回归确实存在**的强证据。
+
+### @gkubon 数据点详细分析
+
+| 项 | 值 |
+|---|---|
+| 上下文使用 | **56.4%** （UI 显示）|
+| 当前响应 | 6.3k tokens（最近一次模型输出） |
+| 已运行 | 5m 54s（agent 任务进行中） |
+| 总运行时长 | 533,546 ms ≈ **8.9 分钟** |
+| 堆峰值 | 4044 MB（committed 4146 MB ≈ 默认 4GB） |
+| Mark-Compact 释放 | 仅 ~9-10 MB |
+| 平均 mu | 0.120 / 0.028 — **GC 占 88-97% CPU** |
+| 模式 | **YOLO mode**（自动接受工具调用） |
+| 当前操作 | "Checking for syntax errors in the universe..." |
+| 平台 | 系统 Node `/usr/bin/node`（Linux/容器，默认 4GB 堆） |
+
+栈帧截断在 frame 10：
+
+```
+8: Factory::NewFillerObject
+9: Runtime_AllocateInYoungGeneration
+10: 0x752bff66c476   ← JIT'd JS 代码（最具诊断价值的位置，被截断了）
+```
+
+**推断**：
+
+1. **增长速率 ~6-8 MB/sec** —— 与 @wwwi2vv-dev（7.6 MB/sec）同量级
+2. **YOLO mode 是关键放大器** —— 没有用户停顿，agent 持续调用工具，每次 turn 都跑 `checkNextSpeaker`（双 `structuredClone`）+ `microcompactHistory` 入参的 `getHistory()`
+3. **"Checking for syntax errors in the universe"** 看起来像 codegraph 或自定义 skill 在大量并行扫描文件
+4. **56.4% 接近 70% 自动压缩阈值** —— 可能正在或即将触发压缩窗口期峰值
+
+### 已发布动作
+
+- [#2868 交叉引用评论（2026-05-19）](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4487242267)
+- [#2868 跟进评论（2026-05-20）](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4498312245) — 请求 @gkubon 补完整 stack + /about + 试用 `kill -USR2` 抓 heap snapshot
+
 ---
 
 ## Issue #2945 — `/resume` 期间崩溃
@@ -953,6 +999,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-19 | [#2945 交叉引用评论：TLS 子类第一次出现](https://github.com/QwenLM/qwen-code/issues/2945#issuecomment-4487242968) |
 | 2026-05-19 | 内部 Case A 入档：6.45h + StackGuard 栈帧（仅文档，未公开） |
 | 2026-05-19 | 内部 Case B 入档：孤儿 tool_use 死锁 + new Set 触发 OOM（仅文档，未公开） |
+| 2026-05-20 | [#2868 跟进评论：@gkubon 数据点 + 请求完整 stack + heap snapshot 抓取指南](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4498312245) |
 
 ---
 
