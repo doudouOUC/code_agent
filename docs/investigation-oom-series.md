@@ -10,6 +10,7 @@
 - [背景与方法](#背景与方法)
 - [Issue #4116 — idle 状态长会话 OOM](#issue-4116--idle-状态长会话-oom)
 - [Issue #4116（@Kieaer 跟进） — 45GB 堆持续泄漏](#issue-4116kieaer-跟进--45gb-堆持续泄漏)
+- [Issue #4116（@maxinteresa-ops，v0.16.0 升级后仍崩） — Scenario B-TLS 验证](#issue-4116maxinteresa-opsv0160-升级后仍崩--scenario-b-tls-验证)
 - [Issue #2868 — 100 秒快速崩溃](#issue-2868--100-秒快速崩溃)
 - [Issue #2945 — `/resume` 期间崩溃](#issue-2945--resume-期间崩溃)
 - [Issue #4167 — `/compress` 触发的峰值 OOM](#issue-4167--compress-触发的峰值-oom)
@@ -192,6 +193,96 @@ private appendRecord(record: ChatRecord, ...) {
 ### 已发布动作
 
 - [追加评论](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4456488521) 区分两类场景
+
+---
+
+## Issue #4116（@maxinteresa-ops，v0.16.0 升级后仍崩） — Scenario B-TLS 验证
+
+### 报告概要
+
+| 项 | 值 |
+|---|---|
+| 来源 | [#4116 评论 1](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4516854785)、[#4116 评论 2](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4517382471) |
+| 报告人 | @maxinteresa-ops |
+| Qwen Code | **0.16.0 (1b1f48674)** ← 已升级 |
+| Node.js | v24.15.0 |
+| OS | Windows 11 (10.0.26200) x64 |
+| `NODE_OPTIONS` | `--max-old-space-size=6000 --max-semi-space-size=32 --expose-gc` |
+| 模型 | deepseek-v4-pro via api.deepseek.com（DeepSeek API Key auth） |
+
+### Crash 1
+
+- 堆峰值：5984 MB（committed 6009 MB，**用户已主动调到 6GB**）
+- 运行时长：6,422,934 ms ≈ **107 分钟**
+- 上下文使用：**11.3%**（low！）
+- 模式：YOLO mode（多次切换）
+- 泄漏速率 ≈ **1 MB/秒**
+
+栈帧（关键部分）：
+
+```
+9:  X509_STORE_set_cleanup+5098         ← OpenSSL 证书清理
+10-12: uv_timer_set_repeat × 多次       ← libuv 周期定时器
+13-22: RegExp::GetFlags（多次）         ← regex 代码路径
+23: EVP_MD_CTX_set_update_fn+464390     ← OpenSSL 摘要上下文
+```
+
+### Crash 2
+
+- 堆峰值：5957 MB
+- 运行时长：3,839,322 ms ≈ **64 分钟**
+- 上下文使用：**12.4%**
+- 模式：YOLO mode、"2 tasks done"
+
+栈帧关键：
+
+```
+9:  v8::Unlocker::~Unlocker+9273        ← V8 isolate locker（worker thread?）
+10: v8::String::Utf8Value::~Utf8Value   ← V8 string 转换
+```
+
+### 关键判断：v0.16.0 只修了 Scenario A，B-TLS 仍存在
+
+数据三连击：
+
+1. **上下文 11-12% 低使用率** → 排除 history 累积（Scenario A 在 6GB 堆下根本撑不到这种程度）
+2. **6GB 堆 + 1 MB/秒泄漏** → 真实持续泄漏（Scenario B）
+3. **OpenSSL `X509_STORE_set_cleanup` + `EVP_MD_CTX_set_update_fn` 帧** → 具体子类是 **B-TLS**
+
+栈帧中**`uv_timer_set_repeat` 出现 4 次** → 周期性定时器在做 TLS 清理时分配失败。
+
+### 怀疑的具体来源（周期性定时器 + TLS）
+
+| 来源 | 周期 | 涉及 TLS |
+|------|------|---------|
+| MCP client health-check (`mcp-client-manager.ts:337`) | 可配置 | ✅ |
+| `BatchSpanProcessor` flush（OpenTelemetry） | 5s | ✅ |
+| `LogToSpanProcessor` flush (`log-to-span-processor.ts:105`) | 5s | ✅ |
+| undici HTTPS agent connection pool reaper | 可配置 | ✅ |
+| session-tracing 清理定时器（`session-tracing.ts:78`） | 60s | ❌（不直接 TLS） |
+
+### 与已有报告的关系（B-TLS 子类累积）
+
+至此，**B-TLS 子类已有 4 个独立报告**：
+
+| Issue | 堆 | 时长 | 触发 |
+|-------|-----|------|------|
+| #2945 | 4 GB | 220s | `/resume` |
+| #4116 (@Kieaer) | 45 GB | 7.2h | 普通使用 |
+| #4322 | 4 GB | 7.1h | 普通使用 |
+| **#4116 (@maxinteresa-ops)** | **6 GB** | **107min** | **YOLO mode + DeepSeek API（v0.16.0 升级后仍崩）** |
+
+### 关键意义：v0.16.0 修复有效性的验证
+
+**正面**：v0.16.0 的 PR #4286 确实在 Scenario A 上做对了——@maxinteresa-ops 的崩溃已经**不在 `structuredClone` 路径上**（栈帧不含 `ValueDeserializer`）。
+
+**负面**：B-TLS 子类**完全没有修**。v0.16.0 用户只要使用任何 HTTPS API + 周期性后台任务（telemetry / MCP 等），仍然会 OOM。
+
+### 已发布动作
+
+- [#4116 跟进评论：v0.16.0 后崩溃分析 + 给 @maxinteresa-ops 的针对性建议](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521009279)
+- 评论里**澄清**了 @LaZzyMan 错误声称"#4286 还在 review"——实际已在 v0.16.0
+- 给出了具体的临时缓解：关闭 telemetry、禁用 HTTPS MCP server、避免长会话、降级 v0.15.9 对照测试
 
 ---
 
@@ -906,7 +997,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 场景 | 代表 issue | 触发 | 堆峰值 | 时长 | 关键栈帧 | 修复路径 |
 |------|-----------|------|--------|------|----------|---------|
 | **A — 长会话 + structuredClone 放大** | #4116（原）、#4315、内部 Case A、**内部 Case B** | idle / 输入 / 任务完成后 / 孤儿 tool_use 死锁 | 2-4 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone`、`StackGuard::HandleInterrupts`、`Builtins_SetConstructor`（孤儿剪枝时） | 减少深拷贝；`readonly` 引用语义；客户端提前剪枝孤儿 tool_use |
-| **B — 持续真实泄漏（TLS 子类）** | #2945、#4116 (@Kieaer)、**#4322** | active 流式 / `/resume` | 4-45 GB | 220s ~ 7h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`、`X509_STORE_set_cleanup`、`ReportExternalAllocationLimitReached` | 流异常退出时 TLS 资源未释放、HTTPS agent pool 不回收 |
+| **B — 持续真实泄漏（TLS 子类）** | #2945、#4116 (@Kieaer)、#4322、**#4116 (@maxinteresa-ops, v0.16.0)** | active 流式 / `/resume` / **YOLO mode** | 4-45 GB | 107min ~ 7h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`、`X509_STORE_set_cleanup`、`EVP_MD_CTX_set_update_fn`、`ReportExternalAllocationLimitReached`、`uv_timer_set_repeat` | 流异常退出时 TLS 资源未释放、HTTPS agent pool 不回收、周期性定时器 TLS 清理失败 |
 | **B — 持续真实泄漏（defineProperty 子类）** | #2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-8 GB | 100s ~ 17 min | `Object.defineProperty + NameDictionary` 或 regular V8 | 错误克隆链、流 accumulator、writeChain 闭包 |
 | **C — 操作期峰值放大** | #4167 | `/compress`、`/resume` | 2-4 GB | 操作触发 | regular GC | 压缩流程双重 stringify、spread 链 |
 
@@ -1000,6 +1091,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-19 | 内部 Case A 入档：6.45h + StackGuard 栈帧（仅文档，未公开） |
 | 2026-05-19 | 内部 Case B 入档：孤儿 tool_use 死锁 + new Set 触发 OOM（仅文档，未公开） |
 | 2026-05-20 | [#2868 跟进评论：@gkubon 数据点 + 请求完整 stack + heap snapshot 抓取指南](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4498312245) |
+| 2026-05-23 | [#4116 跟进评论：v0.16.0 升级后 @maxinteresa-ops 仍崩，确认 B-TLS 未修，澄清 #4286 已合并到 v0.16.0](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521009279) |
 
 ---
 
