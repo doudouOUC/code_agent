@@ -1,0 +1,8 @@
+{
+  "name": "oom-repro",
+  "type": "module",
+  "version": "0.0.0",
+  "dependencies": {
+    "openai": "5.11.0"
+  }
+}

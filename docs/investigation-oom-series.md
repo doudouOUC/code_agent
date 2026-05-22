@@ -281,8 +281,41 @@ private appendRecord(record: ChatRecord, ...) {
 ### 已发布动作
 
 - [#4116 跟进评论：v0.16.0 后崩溃分析 + 给 @maxinteresa-ops 的针对性建议](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521009279)
-- 评论里**澄清**了 @LaZzyMan 错误声称"#4286 还在 review"——实际已在 v0.16.0
+- [#4116 修正评论：BatchSpanProcessor / LogToSpanProcessor 默认不启用，符号 offset 解读修正](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521113616)
 - 给出了具体的临时缓解：关闭 telemetry、禁用 HTTPS MCP server、避免长会话、降级 v0.15.9 对照测试
+
+### 本地复现验证 — Scenario B-TLS 已确证
+
+仓库内附独立可执行的复现：[`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/)。
+
+三层渐进式测试（Node fetch / fetch + for-await / 真实 OpenAI SDK 5.11.0），每层都对 BAD / GOOD / BEST 三种模式跑 300 次迭代。
+
+V3（真实 OpenAI SDK）结果，macOS arm64 / Node v24.12.0：
+
+```
+Pattern                              heap          external      arrayBuffers   rss
+A: BAD  (qwen-code current)         1.9 MB       0.2 MB       0.1 MB      55.1 MB
+B: GOOD (iter.return cleanup)       0.2 MB       0.0 MB       0.0 MB      -4.8 MB
+C: BEST (AbortController)           0.0 MB       0.0 MB       0.0 MB      -1.5 MB
+
+Per-iteration leak (BAD vs GOOD):
+  RSS: 194.9 KB/iter   External: 0.7 KB/iter
+```
+
+**关键观察**：
+1. JS 堆 / external / ArrayBuffer 三个 V8 可见层**几乎都不漏**——OpenAI SDK 的 `Stream<T>` 类做了基本的 reader 释放
+2. **但 RSS 持续增长 ~195 KB/iter**——native socket / TLS 状态被 undici keep-alive 池保留，**V8 看不到这部分**
+3. 加 `finally { iter.return() }` 或 `AbortController.abort()` 后，**RSS 增长完全消除**（甚至略降）
+
+**与生产报告对照**：
+
+| 报告 | 速率 | 推算 iter 频率 |
+|------|------|--------------|
+| @maxinteresa-ops（6GB/107min） | ~56 MB/min RSS | ~280 iter/min ≈ 5 iter/sec |
+| @Kieaer（45GB/7.2h） | ~104 MB/min RSS | ~500 iter/min ≈ 8 iter/sec |
+| #4322（4GB/7.1h） | ~9 MB/min RSS | ~50 iter/min ≈ 1 iter/sec |
+
+YOLO mode + tool 循环 + 偶发网络抖动下，每秒 1-8 次 stream 异常退出完全合理（每个 turn 含 1-3 个 stream）。
 
 ---
 
@@ -1092,6 +1125,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-19 | 内部 Case B 入档：孤儿 tool_use 死锁 + new Set 触发 OOM（仅文档，未公开） |
 | 2026-05-20 | [#2868 跟进评论：@gkubon 数据点 + 请求完整 stack + heap snapshot 抓取指南](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4498312245) |
 | 2026-05-23 | [#4116 跟进评论：v0.16.0 升级后 @maxinteresa-ops 仍崩，确认 B-TLS 未修，澄清 #4286 已合并到 v0.16.0](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521009279) |
+| 2026-05-23 | [#4116 修正评论：BatchSpanProcessor / LogToSpanProcessor 默认不启用，符号 offset 解读修正](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521113616) |
+| 2026-05-23 | 仓库内增加 [`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/) 本地复现 — V3 实测 OpenAI SDK 5.11.0 + mock SSE 服务器，确认 ~195 KB/iter RSS 累积 |
 
 ---
 
