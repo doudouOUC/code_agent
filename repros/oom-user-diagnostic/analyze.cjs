@@ -84,25 +84,45 @@ if (durationMin < MIN_DURATION_MIN) {
 } else if (heapDelta < 50 && externalDelta < 20 && rssDelta < 50) {
   console.log('✅ Memory growth looks healthy. Probably not the leak causing your OOM.');
   console.log('   Consider whether the OOM happened at a different time / different workload.');
+} else if (heapRate > HEAP_GROWS && externalRate < EXT_GROWS && nativeOnlyRate < 10) {
+  // Heap grows but external/native flat → JS-heap leak.
+  // Could be EITHER:
+  //   A1: structuredClone amplification of conversation history
+  //       (fixed in v0.16.0 PR #4286 — getHistoryShallow + readonly accessors)
+  //   A2: React reconciler dev-build PerformanceMeasure leak
+  //       (fixed in PR #4462 — not yet in any release as of 2026-05-23)
+  // Distinguishing them needs a heap snapshot; the recommendation covers both.
+  console.log('⚠️ Pattern: heap grows steadily, external flat, RSS tracks heap.');
+  console.log(`   (heap=${heapRate.toFixed(1)} MB/min, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
+  console.log('   → Likely Scenario A — JS-heap leak. Two known causes:');
+  console.log('     A1: long-session structuredClone of history → fixed in v0.16.0 (PR #4286).');
+  console.log('     A2: React reconciler dev-build PerformanceMeasure → NOT in any release yet (PR #4462).');
+  console.log('   → If on Qwen Code < v0.16.0, upgrade first — covers A1.');
+  console.log('   → If still leaking on v0.16.0: this is A2. Watch for PR #4462 to ship.');
+  console.log('   → To confirm A2: capture heap snapshot (kill -USR2 <pid>) and look for');
+  console.log('     `measureEntryBuffer` retaining a large share (PR #4462 found 45% of heap).');
 } else if (nativeOnlyRate > NATIVE_DOMINANT && nativeOnlyRate > heapRate * 3) {
   // RSS grows much faster than heap+external → native socket / TLS pool leak.
+  // This is a real but SECONDARY leak. The dominant production OOMs in v0.15.11
+  // and v0.16.0 are actually Scenario A2 (React PerformanceMeasure), not this.
+  // This branch only fires if heap stays flat — usually the React leak co-occurs
+  // and you land in the "Multiple leaks" branch instead.
   console.log('⚠️ Pattern: RSS grows much faster than V8-visible memory.');
   console.log(`   (rss=${rssRate.toFixed(1)} MB/min, heap=${heapRate.toFixed(1)}, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
   console.log('   → Likely Scenario B-TLS (streaming HTTPS resource not released).');
-  console.log('   → V0.16.0 does NOT fix this. Workaround: avoid long sessions, restart periodically.');
-  console.log('   → Heap snapshot won\'t show much — the leak is in undici socket pool / TLS state.');
-  console.log('   → See: https://github.com/doudouOUC/code_agent/blob/main/docs/investigation-oom-series.md');
-} else if (heapRate > HEAP_GROWS && externalRate < EXT_GROWS && nativeOnlyRate < 10) {
-  console.log('⚠️ Pattern: heap grows steadily, external flat, RSS tracks heap.');
-  console.log(`   (heap=${heapRate.toFixed(1)} MB/min, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
-  console.log('   → Likely Scenario A (long-session structuredClone / history accumulation).');
-  console.log('   → If on Qwen Code < v0.16.0, upgrade — PR #4286 in v0.16.0 fixes this.');
+  console.log('   → SECONDARY contributor — usually smaller than the React leak (Scenario A2).');
+  console.log('   → No release fix yet. Workaround: avoid long sessions, restart periodically.');
 } else if (heapRate > HEAP_GROWS && (externalRate > EXT_GROWS || nativeOnlyRate > 10)) {
-  console.log('⚠️ Pattern: heap and native both grow. Multiple leaks possible.');
+  // Both heap and native grow — most likely the React PerformanceMeasure leak
+  // (A2) dominating the JS heap PLUS undici socket retention (B-TLS) bumping RSS.
+  console.log('⚠️ Pattern: heap and native both grow. Multiple leaks likely.');
   console.log(`   (heap=${heapRate.toFixed(1)} MB/min, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
-  console.log('   → Could be a mix of Scenarios A (heap) and B (native).');
-  console.log('   → Capture a heap snapshot at ~70% heap usage (kill -USR2 <pid>) and');
-  console.log('     analyze in Chrome DevTools to see which objects dominate retained size.');
+  console.log('   → Most common combination in v0.15.11 / v0.16.0:');
+  console.log('     - Heap growth: Scenario A2 (React reconciler dev build PerformanceMeasure)');
+  console.log('       → fixed by PR #4462 (not released yet as of 2026-05-23)');
+  console.log('     - RSS/native growth: Scenario B-TLS (undici socket pool retention)');
+  console.log('       → no release fix yet');
+  console.log('   → Confirm A2: heap snapshot (kill -USR2 <pid>), look for `measureEntryBuffer`.');
 } else {
   console.log('? Pattern is unclear or noise-level. Try recording for longer (≥ 30 min).');
   console.log(`   heap=${heapRate.toFixed(2)} MB/min, external=${externalRate.toFixed(2)} MB/min, rss=${rssRate.toFixed(2)} MB/min, native-only=${nativeOnlyRate.toFixed(2)} MB/min`);

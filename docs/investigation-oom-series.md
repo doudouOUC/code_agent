@@ -1,9 +1,23 @@
 # Qwen Code OOM 系列问题调研
 
-**日期**: 2026-05-14 ~ 2026-05-15
+**日期**: 2026-05-14 ~ 2026-05-23
 **调研者**: doudouOUC
 **仓库**: [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code)
-**版本**: 0.13.x ~ 0.15.11
+**版本**: 0.13.x ~ 0.16.0
+
+## ⚠️ 重要修正（2026-05-23）
+
+[PR #4462](https://github.com/QwenLM/qwen-code/pull/4462) by @huww98 揭示了 OOM 集群的**真正主因**——**不是**本文最初猜测的"TLS native pool 泄漏 (Scenario B-TLS)"，而是：
+
+> **React reconciler 0.33 的 dev-build 在每次组件 render 调 `performance.measure()`**，因为 esbuild 没设 `NODE_ENV=production` define，bundle 把 dev + prod 两份都打了进来运行时挑了 dev 版。`PerformanceMeasure` 对象进 V8 内部的 `measureEntryBuffer` **永远不清**——heap snapshot 实测 **148 MB / 45% of heap** 都是这些对象。
+
+事实链路：
+- `v0.15.10`：react-reconciler **0.31**（无 dev-build PerformanceMeasure 调用）✅
+- `v0.15.11`：尽管 PR #4083 把 ink 7→6 回滚，但 `package-lock.json` 里 react-reconciler **0.33 残留没回退**——leak 此时开始
+- `v0.16.0`：仍然带 react-reconciler 0.33 + 未设 NODE_ENV → **leak 仍存在**
+- PR #4462（待发布）：esbuild define `process.env.NODE_ENV = "production"`，tree-shake 掉所有 React dev build 路径
+
+本文档原先把这条主因误判为 "B-TLS native pool 泄漏"。**B-TLS 是真实存在的次级泄漏**（V3 repro 测得 ~195 KB/iter），但量级远小于 React 那条。具体修正见各章节的更新说明。
 
 ## 目录
 
@@ -1060,14 +1074,25 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 
 ## 最终总结与行动项
 
-### 三类 OOM 场景汇总
+### OOM 场景汇总（2026-05-23 修订）
 
-| 场景 | 代表 issue | 触发 | 堆峰值 | 时长 | 关键栈帧 | 修复路径 |
-|------|-----------|------|--------|------|----------|---------|
-| **A — 长会话 + structuredClone 放大** | #4116（原）、#4315、内部 Case A、**内部 Case B** | idle / 输入 / 任务完成后 / 孤儿 tool_use 死锁 | 2-4 GB | 50 min ~ **19.6 h** | `ValueDeserializer::ReadValue`、`node::worker::StructuredClone`、`StackGuard::HandleInterrupts`、`Builtins_SetConstructor`（孤儿剪枝时） | 减少深拷贝；`readonly` 引用语义；客户端提前剪枝孤儿 tool_use |
-| **B — 持续真实泄漏（TLS 子类）** | #2945、#4116 (@Kieaer)、#4322、**#4116 (@maxinteresa-ops, v0.16.0)** | active 流式 / `/resume` / **YOLO mode** | 4-45 GB | 107min ~ 7h | `BIO_ssl_shutdown`、`SSL_get_quiet_shutdown`、`X509_STORE_set_cleanup`、`EVP_MD_CTX_set_update_fn`、`ReportExternalAllocationLimitReached`、`uv_timer_set_repeat` | 流异常退出时 TLS 资源未释放、HTTPS agent pool 不回收、周期性定时器 TLS 清理失败 |
-| **B — 持续真实泄漏（defineProperty 子类）** | #2868、**#4167 (@wwwi2vv-dev)** | active 流式 / 错误重试 | 2-8 GB | 100s ~ 17 min | `Object.defineProperty + NameDictionary` 或 regular V8 | 错误克隆链、流 accumulator、writeChain 闭包 |
-| **C — 操作期峰值放大** | #4167 | `/compress`、`/resume` | 2-4 GB | 操作触发 | regular GC | 压缩流程双重 stringify、spread 链 |
+| 场景 | 代表 issue | 主因 | 修复 PR | v0.16.0 修了？ |
+|------|-----------|------|---------|---------------|
+| **A1 — 长会话 + structuredClone 放大** | #4116（原）、#4315、内部 Case A | `getHistory()` 每次 send 路径上深拷贝 4× | **PR #4286** | ✅ 是 |
+| **A2 — React reconciler dev-build PerformanceMeasure 累积**（**真正主因**） | #4116、#4167、#4134、#4149、#4254、#4276、#4309、#4322、#4351、#4399、#4435、#2945、#2868 | esbuild 未设 NODE_ENV=production → bundle 同时带 dev 和 prod build → 运行时挑 dev → `measureEntryBuffer` 持有 PerformanceMeasure 永不清，**实测 148 MB/45% of heap** | **PR #4462** | ❌ **否**（待下个 release） |
+| **B-TLS — 流式 HTTPS 资源未释放（次级）** | 同上（部分） | undici keep-alive socket 池保留 | 未提 PR | ❌ 否 |
+| **B-defineProperty — 错误克隆链（次级）** | #2868、#4167 (@wwwi2vv-dev) | `cloneErrorWithRedactedFields` 用 `defineProperty` 触发 NameDictionary 爆炸 | 未提 PR | ❌ 否 |
+| **C — 压缩窗口期峰值放大** | #4167 原 | 压缩流程同时持有 5-7 份历史副本 | 间接（A1 修后峰值降低） | 🟡 间接缓解 |
+| **D — 孤儿 tool_use 死锁** | 内部 Case B | SSE 流中断在 `content_block_stop` 和 `message_stop` 之间，tool_use 块丢失 | **PR #4176**（晚 v0.16.0 3 分钟合入）| ❌ 否 |
+
+### 主因与次级的关系
+
+之前本文档把 B-TLS / B-defineProperty / C 列为并列三类。**真实生产环境的 OOM 主导是 A2**（PerformanceMeasure 在 V8 堆累积），其他都是次级贡献者：
+
+- **A2** 在 active session 下 **每分钟可累积几十~几百 MB heap**（每个 React render 都触发）
+- **B-TLS** ~195 KB/iter，需要 5+ iter/sec 持续才能达到 60 MB/min
+- **B-defineProperty** 仅在错误密集场景显著
+- **C** 仅在压缩操作窗口期短时间峰值
 
 ### 核心理念对比（qwen-code vs Claude Code）
 
@@ -1163,6 +1188,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-23 | [#4116 修正评论：BatchSpanProcessor / LogToSpanProcessor 默认不启用，符号 offset 解读修正](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521113616) |
 | 2026-05-23 | 仓库内增加 [`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/) 本地复现 — V3 实测 OpenAI SDK 5.11.0 + mock SSE 服务器，确认 ~195 KB/iter RSS 累积 |
 | 2026-05-23 | 仓库内增加 [`repros/oom-user-diagnostic/`](../../repros/oom-user-diagnostic/) 用户自助诊断工具 — monitor.cjs（NODE_OPTIONS 注入采样） + analyze.cjs（启发式分类），让用户在自己的 OOM 会话上确定属于哪类 |
+| 2026-05-23 | **PR #4462 by @huww98 揭露真正主因** — react-reconciler 0.33 dev-build 的 PerformanceMeasure 泄漏（heap snapshot 实测 45%/148 MB），esbuild 通过 NODE_ENV=production define tree-shake 修复。本文档承认之前 B-TLS 主因判断错误，重新分类。 |
+| 2026-05-23 | 更新 analyze.cjs 启发式：Scenario A 区分 A1（structuredClone，v0.16.0 修复）与 A2（PerformanceMeasure，待发布），建议加上 heap snapshot 看 measureEntryBuffer。 |
 
 ---
 
