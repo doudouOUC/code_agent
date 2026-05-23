@@ -65,32 +65,47 @@ console.log();
 // Heuristic classification
 console.log('=== Heuristic classification ===');
 
-const sigHeapGrowth = heapRate > 5;
-const sigExternalGrowth = externalRate > 5;
-const sigRssGrowth = rssRate > 10;
-const rssMinusJsGrowth = rssRate - heapRate - externalRate;
+// Key metric: RSS minus JS-visible (heap+external) = pure native growth
+// (libuv handles, undici sockets, TLS state — invisible to V8).
+const nativeOnlyRate = rssRate - heapRate - externalRate;
 
-if (heapDelta < 50 && externalDelta < 20 && rssDelta < 50) {
+const NATIVE_DOMINANT = 20; // MB/min — native-only growth is significant
+const HEAP_GROWS = 10;
+const EXT_GROWS = 5;
+const MIN_DURATION_MIN = 3; // need at least this long to distinguish leak from startup noise
+
+if (durationMin < MIN_DURATION_MIN) {
+  console.log(`⚠️ Session too short (${durationMin.toFixed(1)} min) to classify reliably.`);
+  console.log(`   Early samples are dominated by Node.js + qwen-code module loading and warm-up.`);
+  console.log(`   To get a useful diagnosis: keep the session running for at least ${MIN_DURATION_MIN} minutes,`);
+  console.log(`   ideally until the OOM (or close to it). Then re-run analyze.cjs on the same log file.`);
+  console.log();
+  console.log(`Observed: heap=${heapRate.toFixed(1)} MB/min, external=${externalRate.toFixed(1)} MB/min, rss=${rssRate.toFixed(1)} MB/min (likely startup noise — ignore).`);
+} else if (heapDelta < 50 && externalDelta < 20 && rssDelta < 50) {
   console.log('✅ Memory growth looks healthy. Probably not the leak causing your OOM.');
   console.log('   Consider whether the OOM happened at a different time / different workload.');
-} else if (sigHeapGrowth && !sigExternalGrowth && rssMinusJsGrowth < 5) {
-  console.log('⚠️ Pattern: heap_used grows steadily, external is flat.');
-  console.log('   → Likely Scenario A (long-session structuredClone / history accumulation).');
-  console.log('   → If on Qwen Code < v0.16.0, upgrade — PR #4286 in v0.16.0 fixes this.');
-} else if (!sigHeapGrowth && sigRssGrowth && rssMinusJsGrowth > 10) {
-  console.log('⚠️ Pattern: RSS grows but heap is flat. Native (non-V8) memory leak.');
+} else if (nativeOnlyRate > NATIVE_DOMINANT && nativeOnlyRate > heapRate * 3) {
+  // RSS grows much faster than heap+external → native socket / TLS pool leak.
+  console.log('⚠️ Pattern: RSS grows much faster than V8-visible memory.');
+  console.log(`   (rss=${rssRate.toFixed(1)} MB/min, heap=${heapRate.toFixed(1)}, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
   console.log('   → Likely Scenario B-TLS (streaming HTTPS resource not released).');
   console.log('   → V0.16.0 does NOT fix this. Workaround: avoid long sessions, restart periodically.');
-  console.log('   → Heap snapshot may not show much (leak is in native socket pool).');
+  console.log('   → Heap snapshot won\'t show much — the leak is in undici socket pool / TLS state.');
   console.log('   → See: https://github.com/doudouOUC/code_agent/blob/main/docs/investigation-oom-series.md');
-} else if (sigHeapGrowth && sigExternalGrowth) {
-  console.log('⚠️ Pattern: both heap and external grow. Multiple leaks possible.');
+} else if (heapRate > HEAP_GROWS && externalRate < EXT_GROWS && nativeOnlyRate < 10) {
+  console.log('⚠️ Pattern: heap grows steadily, external flat, RSS tracks heap.');
+  console.log(`   (heap=${heapRate.toFixed(1)} MB/min, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
+  console.log('   → Likely Scenario A (long-session structuredClone / history accumulation).');
+  console.log('   → If on Qwen Code < v0.16.0, upgrade — PR #4286 in v0.16.0 fixes this.');
+} else if (heapRate > HEAP_GROWS && (externalRate > EXT_GROWS || nativeOnlyRate > 10)) {
+  console.log('⚠️ Pattern: heap and native both grow. Multiple leaks possible.');
+  console.log(`   (heap=${heapRate.toFixed(1)} MB/min, external=${externalRate.toFixed(1)}, native-only=${nativeOnlyRate.toFixed(1)})`);
   console.log('   → Could be a mix of Scenarios A (heap) and B (native).');
   console.log('   → Capture a heap snapshot at ~70% heap usage (kill -USR2 <pid>) and');
   console.log('     analyze in Chrome DevTools to see which objects dominate retained size.');
 } else {
-  console.log('? Pattern is mixed or noisy. Try recording for longer (≥ 30 min).');
-  console.log(`   heap rate=${heapRate.toFixed(2)} MB/min, external rate=${externalRate.toFixed(2)} MB/min, rss rate=${rssRate.toFixed(2)} MB/min`);
+  console.log('? Pattern is unclear or noise-level. Try recording for longer (≥ 30 min).');
+  console.log(`   heap=${heapRate.toFixed(2)} MB/min, external=${externalRate.toFixed(2)} MB/min, rss=${rssRate.toFixed(2)} MB/min, native-only=${nativeOnlyRate.toFixed(2)} MB/min`);
 }
 
 console.log();
