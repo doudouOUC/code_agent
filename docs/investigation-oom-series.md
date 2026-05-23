@@ -286,7 +286,42 @@ private appendRecord(record: ChatRecord, ...) {
 
 ### 本地复现验证 — Scenario B-TLS 已确证
 
-仓库内附独立可执行的复现：[`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/)。
+仓库内附两个独立可执行工具：
+
+1. **假设验证 repro**（开发者侧）：[`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/) —— 证明这种 pattern 确实泄漏
+2. **用户自助诊断**：[`repros/oom-user-diagnostic/`](../../repros/oom-user-diagnostic/) —— 用户在自己的 qwen 会话里收集数据，判断 OOM 属于哪类，是否升级 v0.16.0 能修
+
+**用户诊断工具用法**：
+
+```bash
+# 下载脚本
+mkdir -p ~/oom-diag
+curl -o ~/oom-diag/monitor.cjs https://raw.githubusercontent.com/doudouOUC/code_agent/main/repros/oom-user-diagnostic/monitor.cjs
+curl -o ~/oom-diag/analyze.cjs https://raw.githubusercontent.com/doudouOUC/code_agent/main/repros/oom-user-diagnostic/analyze.cjs
+
+# 用注入了监控的方式启动
+NODE_OPTIONS="--require $HOME/oom-diag/monitor.cjs" qwen
+
+# 崩溃后分析
+node ~/oom-diag/analyze.cjs ~/.qwen/oom-diag/memory-*.log
+```
+
+输出示例：
+
+```
+⚠️ Pattern: RSS grows but heap is flat. Native (non-V8) memory leak.
+   → Likely Scenario B-TLS (streaming HTTPS resource not released).
+   → V0.16.0 does NOT fix this. Workaround: avoid long sessions, restart periodically.
+```
+
+启发式分类对应：
+
+| 增长模式 | 推断 | 修复路径 |
+|---------|------|---------|
+| `heap_used` 涨，其他平稳 | Scenario A | **升级 v0.16.0**（PR #4286） |
+| `rss` 涨但 `heap_used` 平稳 | Scenario B-TLS | v0.16.0 不修；定期重启 |
+| 两者都涨 | 多种泄漏 | 抓 heap snapshot 进一步分析 |
+| 周期性 3-5x heap spike | Scenario C | v0.16.0 间接缓解 |
 
 三层渐进式测试（Node fetch / fetch + for-await / 真实 OpenAI SDK 5.11.0），每层都对 BAD / GOOD / BEST 三种模式跑 300 次迭代。
 
@@ -1127,6 +1162,7 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-23 | [#4116 跟进评论：v0.16.0 升级后 @maxinteresa-ops 仍崩，确认 B-TLS 未修，澄清 #4286 已合并到 v0.16.0](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521009279) |
 | 2026-05-23 | [#4116 修正评论：BatchSpanProcessor / LogToSpanProcessor 默认不启用，符号 offset 解读修正](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521113616) |
 | 2026-05-23 | 仓库内增加 [`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/) 本地复现 — V3 实测 OpenAI SDK 5.11.0 + mock SSE 服务器，确认 ~195 KB/iter RSS 累积 |
+| 2026-05-23 | 仓库内增加 [`repros/oom-user-diagnostic/`](../../repros/oom-user-diagnostic/) 用户自助诊断工具 — monitor.cjs（NODE_OPTIONS 注入采样） + analyze.cjs（启发式分类），让用户在自己的 OOM 会话上确定属于哪类 |
 
 ---
 
