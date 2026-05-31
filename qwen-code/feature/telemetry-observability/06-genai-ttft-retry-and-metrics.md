@@ -1,6 +1,6 @@
 # GenAI 语义双发 / TTFT / 重试可见性 / 指标与资源属性（深入）
 
-> 子文档；总览见 ../README.md
+> 子文档；总览见 README.md
 > 本文 **取代并细化** 总览 `telemetry-observability.md` 的 §3.7（GenAI 语义双发 / TTFT / retry）与 §3.8（资源属性与基数控制），下沉到 function/line 级。
 > 代码均基于 `QwenLM/qwen-code@main`（除显式标注分支/PR 外）。引用格式 `file:symbol`（+行号），行号以阅读时的 `main` 为准。
 > **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，OPEN 未合入）** 的符号均显式标注 `【#4432 OPEN】`；其行号以 `gh pr diff 4432` 为准，合入后会漂移。

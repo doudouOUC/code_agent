@@ -1,6 +1,6 @@
 # 能力注册表与协议（深入）
 
-> 子文档；总览见 [../README.md](../README.md)（以及总览正文 `daemon-serve-mode.md` §3.4 / §3.9）。本文在 file/symbol/line 级别**取代**总览的 §3.4、§3.9 协议相关段落，深入到注册表过滤逻辑、协议补全字段的产生与消费、以及三处镜像 lockstep 的漂移机理。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.4 / §3.9）。本文在 file/symbol/line 级别**取代**总览的 §3.4、§3.9 协议相关段落，深入到注册表过滤逻辑、协议补全字段的产生与消费、以及三处镜像 lockstep 的漂移机理。
 >
 > 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。关联 PR：#4191（capability registry + protocol versions）、#4226（typed_event_schema + 固定 SDK 公共面）、#4360（serverTimestamp / provenance / errorKind / state_resync_required）、#4214/#4245/#4284/#4306（注册表↔镜像漂移修复）。
 

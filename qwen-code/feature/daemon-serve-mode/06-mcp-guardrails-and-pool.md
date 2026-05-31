@@ -1,6 +1,6 @@
 # MCP 守卫与共享传输池（深入）
 
-> 子文档；总览见 [../README.md](../README.md)（以及总览正文 `daemon-serve-mode.md` §3.7、§5.1、§7.1）。本文在 file/symbol/line 级别**取代**总览的 §3.7，深入到预算预留的 TOCTOU 消除、引用计数与 `statusChangeListener` 的全终态移除、按名封顶（budget-by-name）与按指纹隔离（fingerprint-isolation）的语义裂缝，以及 #4460 的自愈可观测性。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.7、§5.1、§7.1）。本文在 file/symbol/line 级别**取代**总览的 §3.7，深入到预算预留的 TOCTOU 消除、引用计数与 `statusChangeListener` 的全终态移除、按名封顶（budget-by-name）与按指纹隔离（fingerprint-isolation）的语义裂缝，以及 #4460 的自愈可观测性。
 >
 > 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。涉及文件主要位于 `packages/core/src/tools/`（池本体）与 `packages/cli/src/{serve,acp-integration}/`（boot 校验与 daemon 装配）。
 

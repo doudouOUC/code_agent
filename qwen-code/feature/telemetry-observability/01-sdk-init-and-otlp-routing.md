@@ -1,6 +1,6 @@
 # OTel SDK 初始化与 OTLP 信号路由（深入）
 
-> 子文档；总览见 [../README.md](../README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 §3.1，进入 function / line 级。
+> 子文档；总览见 [README.md](README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 §3.1，进入 function / line 级。
 > 代码基准：`QwenLM/qwen-code@main`。核心文件 `packages/core/src/telemetry/sdk.ts`（全文 630 行）。
 > 引用约定：`file:symbol`（+行号），行号对应 `main` 当前快照，仅作定位锚点。
 

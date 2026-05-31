@@ -97,7 +97,7 @@
 
 ## 执行状态（2026-05-31）
 
-- 上述清单 + 补充共 **48 个 PR** 已逐个 **append-only** 追加「描述准确性更新」说明到 GitHub PR body（保留原文，本地备份 `/tmp/prbody_orig_<n>.md`）：6 个 open + 41 个 merged/closed（清单 A–E）+ 补充的 #4505。
+- 上述清单 + 补充共 **48 个 PR** 已逐个 **append-only** 追加「描述准确性更新」说明到 GitHub PR body（保留原文、未覆盖）：6 个 open + 41 个 merged/closed（清单 A–E）+ 补充的 #4505。
 - 追加格式：原 body 末尾加一段 `> 📝 描述准确性更新（2026-05-31，作者自查）`；编辑 body **不发通知**、可撤销（PR 会显示 "edited"）。
 - 补充条目 **#4505**（merged，归 B 类）：body 称 `enable_thinking` 为 unconditional / mirroring deepseek，实际还有 model-name 门（`model` 以 qwen 开头或 `coder-model`）。注：该门基于 `request.model`（= side-query 运行时模型，符合预期、非缺陷）。
 

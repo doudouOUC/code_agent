@@ -28,4 +28,4 @@ feat ×74, fix ×44, refactor ×10, docs ×6, other ×4, chore ×4, test ×1, pe
 serve ×42, telemetry ×27, cli ×17, core ×17, acp-bridge ×6, sdk-python ×5, daemon ×5, sdk ×3, rewind ×3, integration ×3, skills ×2, ci ×2, tool-registry ×1, i18n ×1, test ×1
 
 
-_生成于 2026-05-30_
+_生成于 2026-05-31_

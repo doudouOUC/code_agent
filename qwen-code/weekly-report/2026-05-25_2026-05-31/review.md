@@ -229,4 +229,4 @@
 - **#4630**（tool spans / session.id）**撤回前述更正**：复核 `origin/daemon_mode_b_main`（#4630 已合并）确认 **#4630 本身新增了 `resolveSessionId`**（`session-tracing.ts:175`，从父 span 属性派生 session.id，用于 llm_request/tool/tool.execution）——原 W22 审查的 resolveSessionId 说法**正确**；先前「无此函数」系深挖时误读 `main`（彼时 #4630 未合入）所致，特此更正（PR #4630 上的误注已移除）。
 - **#4576**（server-side shell）补充：除 `ChannelBase` `this`-binding 隐患外，`/shell` 端点**未在 `/capabilities` 暴露 feature 标签**（recap/btw/tasks 均有），客户端无法能力协商。
 
-_审查于 2026-05-30；方法：7 个并行只读子代理逐 PR 拉取 issue+描述+diff，关键负面结论由主代理 `gh pr diff` 二次核验。_
+_审查于 2026-05-30（初版）；2026-05-31 追加「深挖补充」与更正（见上节）。方法：7 个并行只读子代理逐 PR 拉取 issue+描述+diff，关键负面结论由主代理 `gh pr diff` 二次核验。_

@@ -1,6 +1,6 @@
 # 出站关联：HTTP span 与 W3C traceparent 传播（深入）
 
-> 子文档；总览见 [../README.md](../README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 §3.9，进入 function / line 级。
+> 子文档；总览见 [README.md](README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 §3.9，进入 function / line 级。
 > 代码基准：`QwenLM/qwen-code@main`。核心文件 `packages/core/src/telemetry/sdk.ts`（全文 629 行）、`packages/core/src/config/config.ts`、`packages/cli/src/config/settingsSchema.ts`。
 > 引用约定：`file:symbol`（+行号），行号对应 `main` 当前快照，仅作定位锚点。
 > **标记**：凡引用 **CLOSED PR #4393** 的代码（`llm-correlation-fetch.ts` 等），均显式标注 `[CLOSED #4393 · 未合入]`——这些符号在 `main` 上**不存在**，仅存在于 `gh pr diff 4393` 的 diff 中。

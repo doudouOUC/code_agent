@@ -1,8 +1,8 @@
 # trace↔日志关联与 daemon 端遥测（深入）
 
-> 子文档；总览见 [../README.md](../README.md)。本篇**取代**总览 telemetry-observability.md 的 §3.5 / §3.6，下沉到函数与行级。
+> 子文档；总览见 [README.md](README.md)。本篇**取代**总览 telemetry-observability.md 的 §3.5 / §3.6，下沉到函数与行级。
 >
-> **分支说明**：`getTraceContext` 及 debug log 注入位于 `main`（`packages/core/src/utils/debugLogger.ts`）；**daemon 端全部遥测**（`daemon-tracing.ts`、`withDaemonRequestSpan`、`daemonTelemetryMiddleware`、bridge 生命周期 span、`withInteractionSpan` 的 `parentContext` 支持）位于 **`daemon_mode_b_main`**，尚未并入 `main`。文中凡 daemon 符号均显式标注分支，读取方式 `git -C /Users/jinye.djy/Projects/qwen-code show daemon_mode_b_main:<path>`。
+> **分支说明**：`getTraceContext` 及 debug log 注入位于 `main`（`packages/core/src/utils/debugLogger.ts`）；**daemon 端全部遥测**（`daemon-tracing.ts`、`withDaemonRequestSpan`、`daemonTelemetryMiddleware`、bridge 生命周期 span、`withInteractionSpan` 的 `parentContext` 支持）位于 **`daemon_mode_b_main`**，尚未并入 `main`。文中凡 daemon 符号均显式标注分支，读取方式 `git -C <qwen-code 仓库根> show daemon_mode_b_main:<path>`。
 
 ---
 

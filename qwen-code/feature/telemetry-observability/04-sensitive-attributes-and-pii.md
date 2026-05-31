@@ -1,6 +1,6 @@
 # 敏感属性 opt-in 与 PII（深入）
 
-> 子文档；总览见 ../README.md
+> 子文档；总览见 README.md
 > 本文 **取代并细化** 总览 `telemetry-observability.md` 的 §3.4，下沉到 function/line 级。
 > 代码均基于 `QwenLM/qwen-code@main`（除显式标注分支外）。引用格式 `file:symbol`（+行号），行号以阅读时的 `main` 为准。
 

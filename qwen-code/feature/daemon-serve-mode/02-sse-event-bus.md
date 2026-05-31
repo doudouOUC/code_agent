@@ -1,6 +1,6 @@
 # SSE 事件总线（深入）
 
-> 子文档；总览见 [../README.md](../README.md)。本文 **取代** 总览 §3.2，下沉到函数/行级。
+> 子文档；总览见 [README.md](README.md)。本文 **取代** 总览 §3.2，下沉到函数/行级。
 > 所有 `file:symbol`(+line) 锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（用 `git -C <repo> show daemon_mode_b_main:<path>` 阅读）。代码/路径用英文，正文用中文。
 
 ---

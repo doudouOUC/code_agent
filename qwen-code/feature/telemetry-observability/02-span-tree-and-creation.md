@@ -1,7 +1,7 @@
 # 层级 span 树与统一创建（深入）
 
-> telemetry 可观测性技术方案子文档；总览见 [`../telemetry-observability.md`](../telemetry-observability.md)。
-> 本文 **取代** 总览 §3.2，下沉到 function/line 级。所有 `file:symbol`(+line) 锚点除特别说明外均以 **`main`** 分支为准（读取方式：`git -C /Users/jinye.djy/Projects/qwen-code show main:<path>`）。代码/路径用英文，正文用中文。
+> telemetry 可观测性技术方案子文档；总览见 [`README.md`](README.md)。
+> 本文 **取代** 总览 §3.2，下沉到 function/line 级。所有 `file:symbol`(+line) 锚点除特别说明外均以 **`main`** 分支为准（读取方式：`git -C <qwen-code 仓库根> show main:<path>`）。代码/路径用英文，正文用中文。
 > 关键文件：`packages/core/src/telemetry/session-tracing.ts`（976 行）、`telemetry/tracer.ts`（271 行）、`telemetry/constants.ts`、`telemetry/session-context.ts`、`core/coreToolScheduler.ts`、`core/client.ts`、`core/loggingContentGenerator/loggingContentGenerator.ts`。
 
 ---

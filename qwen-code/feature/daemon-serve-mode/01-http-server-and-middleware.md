@@ -1,6 +1,6 @@
 # HTTP 服务 / 路由 / 中间件链（深入）
 
-> daemon/serve（Mode B）技术方案子文档；总览见 [`../daemon-serve-mode.md`](../daemon-serve-mode.md)。
+> daemon/serve（Mode B）技术方案子文档；总览见 [`README.md`](README.md)。
 > 本文 **取代** 总览 §3.1 / §3.5，下沉到 function/line 级。所有 `file:symbol`(+line) 锚点若未特别说明均以集成分支 **`daemon_mode_b_main`** 为准（读取方式：`git -C <repo> show daemon_mode_b_main:<path>`）。
 > 关键文件：`packages/cli/src/serve/server.ts`（Express app 装配，4053 行）、`auth.ts`（452 行）、`runQwenServe.ts`（1203 行，boot 门控）、`capabilities.ts`、`loopbackBinds.ts`、`daemonLogger.ts`。
 

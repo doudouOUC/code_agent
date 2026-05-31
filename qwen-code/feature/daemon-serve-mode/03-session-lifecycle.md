@@ -1,6 +1,6 @@
 # 会话生命周期（深入）
 
-> 子文档：daemon/serve 模式总览见 [`../daemon-serve-mode.md`](../daemon-serve-mode.md)（本篇 **取代并深化** 其 §3.3）；同主题其它子文档见 `./README.md`。
+> 子文档：daemon/serve 模式总览见 [`README.md`](README.md)（本篇 **取代并深化** 其 §3.3）；同主题其它子文档见 `./README.md`。
 > 代码分支：除特别标注外，所有 `file:symbol`(+line) 锚点以集成分支 **`daemon_mode_b_main`** 为准（`git -C <repo> show daemon_mode_b_main:<path>`）。#4222 的 load/resume 同时也在 `main`。
 
 ---

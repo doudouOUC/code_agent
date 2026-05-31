@@ -1,6 +1,6 @@
 # 上下文传播与并发隔离（深入）
 
-> 子文档；总览见 [../README.md](../README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 3.3 节，下沉到函数 / 行级。
+> 子文档；总览见 [README.md](README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 3.3 节，下沉到函数 / 行级。
 >
 > 代码基线：`QwenLM/qwen-code@main`（`c699738f9`, v0.17.0 线）。所有 **MERGED** 符号均给出 `main` 上的 `file:symbol(+line)`。
 >
