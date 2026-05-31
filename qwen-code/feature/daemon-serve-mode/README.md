@@ -19,6 +19,7 @@
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
 | 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量 |
 | 08 | [扩展端点 recap/btw/tasks/shell/logger](08-extension-endpoints.md) | 控制面端点、绕过 prompt FIFO、shell `this`-binding 隐患 |
+| 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（**#4490 mainline 合并仍 CONFLICTING——F1–F5 等 ~40 PR 目前只在 `daemon_mode_b_main`、未进 main/npm**） |
 
 ---
 
