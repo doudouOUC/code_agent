@@ -1,7 +1,7 @@
 # 原子文件写技术方案
 
 > 适用代码库：`QwenLM/qwen-code`（TypeScript CLI agent）
-> 涉及 PR：#4096（MERGED，Phase 1）、#4333（OPEN，Phase 2 rollout）、#4431（OPEN，uid 保留修复）
+> 涉及 PR：#4096（MERGED，Phase 1）、#4333（MERGED 2026-06-02，Phase 2 rollout）、#4431（MERGED 2026-06-01，uid 保留修复）
 > 关联 issue：#4095（atomic write & transaction rollback）、#3681（JSONL reader/writer follow-ups）
 > 核心源文件：`packages/core/src/utils/atomicFileWrite.ts`
 
