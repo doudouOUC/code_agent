@@ -64,9 +64,9 @@
 | [#4255](https://github.com/QwenLM/qwen-code/pull/4255) | merged | "What ships"表称 GET device-flow/:id 为 bearerAuth-only | 代码经 fold-in 已升级为 `mutate({strict:true})`（更安全）；更新表格。 |
 | [#4271](https://github.com/QwenLM/qwen-code/pull/4271) | merged | 测试计划"rejects thresholdRatio !== 0.75"与代码矛盾（改为 `isFiniteNumber`） | 更新该断言条目。 |
 | [#4291](https://github.com/QwenLM/qwen-code/pull/4291) | merged | 表 #1 称"writes raw err.message to stderr"，代码恰相反（`sanitizeForStderr` 防泄漏） | 更正：实际脱敏，不打印 raw message。 |
-| [#4333](https://github.com/QwenLM/qwen-code/pull/4333) | open | commit-5 称 debugLogger `appendFile` 加 `flush:true`，代码恰相反（有意不 fsync）；"closes #3681"仅覆盖 Item 2 | 更正 debugLogger flush 说法；澄清 #3681 仅 Item 2。 |
+| [#4333](https://github.com/QwenLM/qwen-code/pull/4333) | merged | commit-5 称 debugLogger `appendFile` 加 `flush:true`，代码恰相反（有意不 fsync）；"closes #3681"仅覆盖 Item 2 | 更正 debugLogger flush 说法；澄清 #3681 仅 Item 2。 |
 | [#4360](https://github.com/QwenLM/qwen-code/pull/4360) | merged | `errorKind` 枚举 SDK 缺 `stat_failed`（daemon 侧有；本 PR JSDoc 已自披露此 gap） | 补充：SDK `DAEMON_ERROR_KINDS` 需补 `stat_failed`。 |
-| [#4431](https://github.com/QwenLM/qwen-code/pull/4431) | open | 反复称"uid/gid"，实现**仅按 uid** 触发（gid 跳过）；非 root 写只读文件现抛 EACCES | 更正为 uid-only；说明 EACCES 行为变更。 |
+| [#4431](https://github.com/QwenLM/qwen-code/pull/4431) | merged | 反复称"uid/gid"，实现**仅按 uid** 触发（gid 跳过）；非 root 写只读文件现抛 EACCES | 更正为 uid-only；说明 EACCES 行为变更。 |
 | [#4445](https://github.com/QwenLM/qwen-code/pull/4445) | merged | body 称 testUtils.js "does ship in dist"，但 `files` 用负向 glob 排除；JSDoc 又称经 `.npmignore`（不存在） | 统一：testUtils 经 `files` 负向 glob 排除发布。 |
 | [#4460](https://github.com/QwenLM/qwen-code/pull/4460) | merged | Changes 表行数偏旧（mcp-pool-entry 实 +113/-5） | 更新行数（非阻塞）。 |
 | [#4490](https://github.com/QwenLM/qwen-code/pull/4490) | open | "14 PR/139 files/+42368"实为 **28 commit/489 files/+93283**（~3×）；"out of scope #4472/#4484"实际已在 commit list（自相矛盾）；web-shell 109 文件未提 | 刷新统计；删除自相矛盾的 out-of-scope 条目；补 web-shell 范围；解决 mergeable=dirty。 |
@@ -92,7 +92,7 @@
 ## 备注
 
 - **修正 GitHub PR 描述**时建议 **append-only**：在原 body 末尾追加一段「更新说明（2026-05-31）」，保留原文，不覆盖。
-- **优先级**：A 类（4 个，尤其 open 的 #3103/#4333/#4431）> open PR 的 D 类（#4490/#4630）> merged 的 ❌/隐私（#4097/#4453/#4530/#3893）> 其余过时细节。
+- **优先级**：A 类（4 个，尤其 open 的 #3103（#4333/#4431 已合并））> open PR 的 D 类（#4490/#4630）> merged 的 ❌/隐私（#4097/#4453/#4530/#3893）> 其余过时细节。
 - 本清单与 [`weekly-report/`](weekly-report/) 的逐 PR「描述准确性」项一一对应，可交叉查证。
 
 ## 执行状态（2026-05-31）

@@ -119,7 +119,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 ### `core/btwUtils.ts`
 
 - **`buildBtwPrompt(question)`**：把问题包进一段 `<system-reminder>`，强约束「You have **NO tools** available」「ONLY use information already present in the conversation context」「NEVER promise to look something up」「The main conversation is NOT interrupted; you are a separate, lightweight fork」。这把分叉 agent 钉死成「只读上下文、单轮直答」。
-- **`buildBtwCacheSafeParams(config)`**：构造 `runForkedAgent` 的 **cache 路径**入参——`structuredClone(chat.getGenerationConfig())` + `geminiClient.getHistoryTail(40, true)`（最近 40 条历史）+ `config.getModel()`，组成 `CacheSafeParams`。「cache-safe」指这套快照可以复用主 session 的 prompt-cache slot（KV cache），让旁路问答**便宜**。任何异常 → `null`，由 acpAgent 回落 `getCacheSafeParams()`（主 session 之前保存的全局快照）；再 null 则直接 `{answer:null}`。
+- **`buildBtwCacheSafeParams(config)`**：构造 `runForkedAgent` 的 **cache 路径**入参——`structuredClone(chat.getGenerationConfig())` + `geminiClient.getHistoryTail(40, true)`（最近 40 条历史）+ `config.getModel()`，组成 `CacheSafeParams`。「cache-safe」指这套快照可以复用主 session 的 prompt-cache slot（KV cache），让旁路问答**便宜**。任何异常 → `null`，~~由 acpAgent 回落 `getCacheSafeParams()`~~（**#4666 已移除该回退**——它会借到别 session 的历史，造成跨 session 泄漏）；现在直接 `{answer:null}`。另 #4666 还修了：超时分支改 `childSignal.aborted`（原 DOMException 判断永不匹配）、斜杠命令补 `BTW_MAX_INPUT_LENGTH=4096` 守卫、`getHistoryTail(40, false)` 浅拷贝。
 
 ### 超时分层（child 55s < bridge 60s）
 
@@ -465,7 +465,7 @@ flowchart TD
 
 3. **shell 端点无能力标签**。`capabilities.ts` 有 `session_tasks`/`session_recap`/`session_btw`，**独缺 shell**。客户端无法用 `/capabilities` 预探测 server-side shell 支持，只能盲发。与「gate on features 而非 mode」的总契约不一致，应补一个 `session_shell`（或同名）always-on 标签。
 
-4. **btw 取消跨进程半生效**。HTTP 断连只能让 bridge 停等、放弃 HTTP 响应；子进程的 `runForkedAgent` 仍跑到出结果或 55s。根治需要 request-id 级跨进程 cancel ext-method（recap PR 也提到同一 follow-up）。
+4. **btw 取消跨进程半生效**。HTTP 断连只能让 bridge 停等、放弃 HTTP 响应；子进程的 `runForkedAgent` 仍跑到出结果或 55s。**#4666 已修复超时检测**（`childSignal.aborted`）使超时分支可达，但子进程 55s 自跑完仍不变。根治仍需 request-id 级跨进程 cancel ext-method。
 
 5. **tasks 仅快照**。无 task stop、无 output tailing、无 SSE 增量（#4578 PR body 自陈）。
 
