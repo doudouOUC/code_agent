@@ -34,7 +34,7 @@
 | #4313 | ⬜ closed | fix(serve) | fix(serve): post-PR-17 Codex P2 fold-ins (against daemon_mode_b_main) | +1497/-58 | 14 | 05-19 | 05-19 | https://github.com/QwenLM/qwen-code/pull/4313 |
 | #4319 | ✅ merged | feat(acp-bridge) | feat(acp-bridge): F1 — acp-bridge package self-sufficiency (#4175 mechanical lift + BridgeFileSystem seam) | +5620/-4710 | 19 | 05-19 | 05-19 | https://github.com/QwenLM/qwen-code/pull/4319 |
 | #4321 | ✅ merged | feat(telemetry) | feat(telemetry): Phase 2 — tool.blocked_on_user + hook spans (#3731) | +3287/-99 | 8 | 05-19 | 05-21 | https://github.com/QwenLM/qwen-code/pull/4321 |
-| #4333 | 🟡 open | feat(core) | feat(core): atomic write rollout for credentials, memory, config, JSONL (closes #3681, #4095 Phase 2) | +2308/-155 | 31 | 05-19 | — | https://github.com/QwenLM/qwen-code/pull/4333 |
+| #4333 | ✅ merged | feat(core) | feat(core): atomic write rollout for credentials, memory, config, JSONL (closes #3681, #4095 Phase 2) | +2308/-155 | 31 | 05-19 | — | https://github.com/QwenLM/qwen-code/pull/4333 |
 | #4334 | ✅ merged | feat(serve) | feat(serve): F1 follow-up — BridgeFileSystem wiring + #4325 channelInfo fix | +1365/-59 | 9 | 05-19 | 05-20 | https://github.com/QwenLM/qwen-code/pull/4334 |
 | #4335 | ✅ merged | feat(acp-bridge) | feat(acp-bridge): F3 — multi-client permission coordination (#4175) | +5263/-417 | 27 | 05-19 | 05-20 | https://github.com/QwenLM/qwen-code/pull/4335 |
 | #4336 | ✅ merged | feat(serve) | feat(serve): shared MCP transport pool [F2] | +10308/-147 | 38 | 05-19 | 05-21 | https://github.com/QwenLM/qwen-code/pull/4336 |
@@ -46,9 +46,9 @@
 | #4410 | 🟡 open | feat(telemetry) | feat(telemetry): Phase 3 — qwen-code.subagent span with concurrent isolation (#3731) | +2335/-91 | 11 | 05-21 | — | https://github.com/QwenLM/qwen-code/pull/4410 |
 | #4411 | ✅ merged | perf(core) | perf(core): F2 cleanup PR A — R9/W11/W12/R10 (post-merge follow-ups) | +823/-594 | 8 | 05-21 | 05-23 | https://github.com/QwenLM/qwen-code/pull/4411 |
 | #4412 | 🟡 open | docs(developers) | docs(developers): add daemon-mode developer deep-dive documentation set | +4513/-0 | 23 | 05-21 | — | https://github.com/QwenLM/qwen-code/pull/4412 |
-| #4414 | 🟡 open | feat(cli) | feat(cli): background housekeeping for stale file-history dirs | +1059/-12 | 13 | 05-21 | — | https://github.com/QwenLM/qwen-code/pull/4414 |
+| #4414 | ✅ merged | feat(cli) | feat(cli): background housekeeping for stale file-history dirs | +1059/-12 | 13 | 05-21 | — | https://github.com/QwenLM/qwen-code/pull/4414 |
 | #4417 | ✅ merged | feat(telemetry) | feat(telemetry): Phase 4a — TTFT capture + GenAI semconv dual-emit (#3731) | +1190/-2 | 7 | 05-22 | 05-22 | https://github.com/QwenLM/qwen-code/pull/4417 |
-| #4431 | 🟡 open | fix(core) | fix(core): preserve uid/gid in atomicWriteFile to avoid breaking shared-write files | +203/-47 | 4 | 05-22 | — | https://github.com/QwenLM/qwen-code/pull/4431 |
+| #4431 | ✅ merged | fix(core) | fix(core): preserve uid/gid in atomicWriteFile to avoid breaking shared-write files | +203/-47 | 4 | 05-22 | — | https://github.com/QwenLM/qwen-code/pull/4431 |
 | #4432 | 🟡 open | feat(telemetry) | feat(telemetry): Phase 4b — retry visibility for qwen-code.llm_request (#3731) | +1240/-40 | 18 | 05-22 | — | https://github.com/QwenLM/qwen-code/pull/4432 |
 | #4445 | ✅ merged | refactor(acp-bridge) | refactor(acp-bridge): F1 test split — lift bridge.test.ts (6861 LOC) to acp-bridge | +597/-449 | 5 | 05-22 | 05-23 | https://github.com/QwenLM/qwen-code/pull/4445 |
 | #4453 | ✅ merged | fix(build) | fix(build): clean stale outputs before tsc --build to prevent TS5055 | +9/-1 | 1 | 05-23 | 05-23 | https://github.com/QwenLM/qwen-code/pull/4453 |

@@ -30,7 +30,7 @@
 | [#4302](https://github.com/QwenLM/qwen-code/pull/4302) | merged | ✅ | ✅ | telemetry Phase 1.5 收尾，描述高度吻合 |
 | [#4319](https://github.com/QwenLM/qwen-code/pull/4319) | merged | ⚠️ | ✅ | acp-bridge F1 自足；lift 行为保持，文件清单陈旧 |
 | [#4321](https://github.com/QwenLM/qwen-code/pull/4321) | merged | ✅ | ✅ | telemetry Phase 2，防泄漏无 PII，187 测试 |
-| [#4333](https://github.com/QwenLM/qwen-code/pull/4333) | open | ⚠️ | ✅ | 原子写铺开扎实；debugLogger flush 描述与代码相反 |
+| [#4333](https://github.com/QwenLM/qwen-code/pull/4333) | merged | ⚠️ | ✅ | 原子写铺开扎实；debugLogger flush 描述与代码相反 |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | merged | ✅ | ✅ | BridgeFileSystem 接线 + #4325 修复，无 TOCTOU |
 | [#4335](https://github.com/QwenLM/qwen-code/pull/4335) | merged | ✅ | ✅ | 多客户端权限协调，并发不变量成立 |
 | [#4336](https://github.com/QwenLM/qwen-code/pull/4336) | merged | ✅ | ✅ | 共享 MCP 传输池，生命周期/引用计数谨慎 |
@@ -42,9 +42,9 @@
 | [#4410](https://github.com/QwenLM/qwen-code/pull/4410) | open | ✅ | ✅ | Phase 3 subagent span，并发隔离正确 |
 | [#4411](https://github.com/QwenLM/qwen-code/pull/4411) | merged | ✅ | ✅ | F2 cleanup A，纯重构行为保持 |
 | [#4412](https://github.com/QwenLM/qwen-code/pull/4412) | open | ⚠️ | ⚠️ | daemon 开发文档；非杜撰但 doc-rot（事件数/行号过时） |
-| [#4414](https://github.com/QwenLM/qwen-code/pull/4414) | open | ✅ | ✅ | file-history 后台清理，数据丢失防护充分 |
+| [#4414](https://github.com/QwenLM/qwen-code/pull/4414) | merged | ✅ | ✅ | file-history 后台清理，数据丢失防护充分 |
 | [#4417](https://github.com/QwenLM/qwen-code/pull/4417) | merged | ✅ | ✅ | Phase 4a TTFT + 语义双发，无双计 |
-| [#4431](https://github.com/QwenLM/qwen-code/pull/4431) | open | ⚠️ | ⚠️ | 修 #4096 属主丢失；实为 uid-only，"uid/gid"超出实现 |
+| [#4431](https://github.com/QwenLM/qwen-code/pull/4431) | merged | ⚠️ | ⚠️ | 修 #4096 属主丢失；实为 uid-only，"uid/gid"超出实现 |
 | [#4432](https://github.com/QwenLM/qwen-code/pull/4432) | open | ✅ | ✅ | Phase 4b retry 可见性，sampling_ms 公式修复正确 |
 | [#4445](https://github.com/QwenLM/qwen-code/pull/4445) | merged | ⚠️ | ✅ | 测试拆分 lift；body 对 testUtils 是否发布自相矛盾 |
 | [#4453](https://github.com/QwenLM/qwen-code/pull/4453) | merged | ❌ | ✅ | 修 TS5055；**body 讲 tsc --clean，代码实为 rmSync（相反）** |
@@ -371,7 +371,7 @@
 1. **#4333**（原子写铺开）：修正 body —— `debugLogger` 实为**保留** bare appendFile（描述说加 flush:true，相反）；澄清 "closes #3681" 仅覆盖 Item 2。
 2. **#4431**（修 #4096 属主）：标题/正文称 "uid/gid"，实现**仅按 uid** 触发（gid 跳过）——要么改述、要么补 gid 处理；并评审"非 root 写只读文件现抛 EACCES"这一行为变更是否可接受。
 3. **#4412**（daemon 文档 draft）：合并前刷新 doc 09 事件数（29→38）与行号锚（doc-rot，PR 已自认）。
-4. **#4410 / #4414 / #4432**（open）：均干净，仅 #4410 的 fork 子 span TTL 继承是已声明的 follow-up。
+4. **#4410 / #4432**（open；#4414 已于 2026-06-02 合并）：均干净，仅 #4410 的 fork 子 span TTL 继承是已声明的 follow-up。
 
 ### Merged（代码 OK，建议修订描述）
 5. **#4453**：body 讲 `tsc --build --clean` 但代码是 `rmSync`（机制相反）——修复正确，描述需重写。
