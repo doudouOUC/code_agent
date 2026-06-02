@@ -123,7 +123,7 @@ qwen-code.interaction                         ← 一次用户「回合」(turn)
 └─ qwen-code.subagent (规划中, #4410, 未合入)  ← 子 agent 子树；fork/background 用 Link 另起 trace
 ```
 
-- session 根**不是真实 span**，而是一个由 `tracer.ts:createSessionRootContext(sessionId)` 构造的、`traceId = SHA-256(sessionId)[:32]` 的合成根 context（`session-context.ts` 持有）。同一 session 内所有 span 与 log 桥接 span 共享同一 traceId。
+- ~~session 根**不是真实 span**，而是一个由 `tracer.ts:createSessionRootContext(sessionId)` 构造的、`traceId = SHA-256(sessionId)[:32]` 的合成根 context（`session-context.ts` 持有）。同一 session 内所有 span 与 log 桥接 span 共享同一 traceId。~~ **#4661 后已取代**：每次 interaction 以 `ROOT_CONTEXT` 为 parent，获得独立 traceId；跨 prompt 关联改用 `session.id` span 属性查询（由 `SessionIdSpanProcessor` 全 span 自动附加）。详见 [02-span-tree-and-creation.md § per-prompt traceId](02-span-tree-and-creation.md#per-prompt-traceid每次交互独立-trace4661)。
 - 上图所有 span 名称常量定义在 `constants.ts`（`SPAN_INTERACTION`、`SPAN_LLM_REQUEST`、`SPAN_TOOL`、`SPAN_TOOL_EXECUTION`、`SPAN_TOOL_BLOCKED_ON_USER`、`SPAN_HOOK`）。
 
 ---
@@ -437,6 +437,7 @@ sequenceDiagram
 | #4126 | 统一创建路径 | 统一 span 创建路径，修复 trace 树扁平 | 1 |
 | #4302 | Phase 1.5 打磨 | fallback 顺序、abort-as-result、log/span 一致性、stream idle 超时 | 1.5 |
 | #4499 | interaction 归属 | interaction span 直接 pin 到 session 根 context | 1.5 |
+| #4661 | per-prompt traceId | interaction 改为 trace root（`ROOT_CONTEXT`）；`SessionIdSpanProcessor` 全 span 附加 `session.id`；移除 session 根回落 | 1.5 |
 | #4321 | blocked + hook span | `tool.blocked_on_user` + `hook` span + TTL 哨兵属性 | 2 |
 | #4410 | subagent span | `qwen-code.subagent` + 并发隔离 + fork/Link + 4h TTL（**OPEN 未合入**） | 3 |
 
