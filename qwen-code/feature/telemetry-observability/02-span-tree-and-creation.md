@@ -43,6 +43,7 @@ session(合成根 context，非真实 span)
 | [#4302](https://github.com/QwenLM/qwen-code/pull/4302) | MERGED | Phase 1.5 打磨 | fallback 顺序、abort-as-result、`cancelled` 保持 UNSET、stream idle 超时与 log/span 一致性 |
 | [#4499](https://github.com/QwenLM/qwen-code/pull/4499) | MERGED | interaction 归属 | interaction span 直接 pin 到 session 根 context（不再被 `resolveParentContext` 改挂到 active span） |
 | [#4321](https://github.com/QwenLM/qwen-code/pull/4321) | MERGED | Phase 2 | `tool.blocked_on_user` + `hook` span、TTL 哨兵属性、`truncateSpanError`、batch listener drain/release |
+| [#4661](https://github.com/QwenLM/qwen-code/pull/4661) | MERGED | per-prompt traceId | interaction span 改为 trace root（`ROOT_CONTEXT`）；新增 `SessionIdSpanProcessor`；`resolveParentContext`/`getParentContext` 移除 session 根回落 |
 | [#4212](https://github.com/QwenLM/qwen-code/issues/4212) | （issue） | deferred-status 一致性 | stream span idle 超时后不得再发 success/api_response，避免自相矛盾记录 |
 | [#4058](https://github.com/QwenLM/qwen-code/pull/4058) | MERGED | trace 关联跟进 | parent-resolution follow-up |
 
@@ -119,6 +120,61 @@ return trace.setSpan(ROOT_CONTEXT, rootSpan);
 ```
 
 它是一个 **wrap 出来的 SpanContext**（不 `startSpan`、不导出、不 `end()`），仅用于给所有真实 span 提供确定性 traceId 与 SAMPLED 标志。持有方是 `session-context.ts`（`setSessionContext`/`getSessionContext`，L12/L20）。`deriveTraceId` 的确定性使「debug log 行注入的 traceId、log→span 桥接 span 的 traceId、真实 span 的 traceId」三者一致，从而在后端聚合到同一棵 trace。
+
+> **#4661 后该机制已被取代**——见下一节「per-prompt traceId」。`createSessionRootContext` 保留并标记 `@deprecated`，但不再参与 span parenting。
+
+### per-prompt traceId：每次交互独立 trace（#4661）
+
+> **本节描述 PR [#4661](https://github.com/QwenLM/qwen-code/pull/4661) 的变更，取代上一节的 session 级 traceId 模型。**
+
+**动机**：长时间 session 在一个 traceId 下累积成千上万个 span，ARMS / Jaeger 无法渲染如此庞大的 trace 树（UI 卡死或截断）。daemon 模式更严重——整个进程生命周期共享一个 traceId。这是 [#4554](https://github.com/QwenLM/qwen-code/issues/4554) 的遗留子项。
+
+**核心变更**：
+
+1. **interaction span 改为 trace root**：`startInteractionSpan`（`:308`）与 `withInteractionSpan`（`:382`）使用 `ROOT_CONTEXT` 作为 parent context（而非 `getSessionContext()`），使每次 prompt 获得 OTel SDK 随机生成的独立 traceId。
+2. **`SessionIdSpanProcessor`**（`sdk.ts:151`）：新增 `SpanProcessor`，在每个 span 的 `onStart` 阶段自动附加 `session.id` 属性（若 span 未自带）。这保证**包括 auto-instrumented HTTP span 在内的所有导出 span** 都带有 session 归属信息，支持跨 prompt 的属性级关联查询。
+3. **`resolveParentContext` 简化**（`:122`）：移除了原第 ③ 级的 session 根回落。现在只有两级：① 显式 ALS parent → ② `otelContext.active()` 兜底。无 parent 的 side-query span（auto-title、recap 等）不再挂到 session 根，而是成为独立 trace root；跨 prompt 关联改为依赖 `session.id` 属性。
+4. **`getParentContext` 同步简化**（`tracer.ts:77`）：直接返回 `context.active()`，不再查 session 根。两处仍用 `// SYNC:` 互相约束。
+5. **debug log 回落**（`debugLogger.ts:getSessionRootTraceContext`）：不再读取 session 根 span context，改为直接调 `deriveTraceId(sessionId)` 生成日志行 `trace_id`（仅用于 grep 关联，不影响真实 span 归属）。
+
+**`resolveParentContext` 简化后**（对比上文四级优先级）：
+
+```ts
+// session-tracing.ts:122（#4661 后）
+function resolveParentContext(parent: SpanContext | undefined): Context {
+  if (parent) {                                   // ① 显式 ALS parent
+    return trace.setSpan(otelContext.active(), parent.span);
+  }
+  return otelContext.active();                    // ② active context（含 active span 或空）
+}
+```
+
+**对 span 树的影响**：
+
+```
+# #4661 之前：一个 session 一棵 trace
+session 合成根 (traceId = SHA-256(sessionId)[:32])
+├─ interaction-1  (同 traceId)
+│   ├─ llm_request ...
+│   └─ tool ...
+├─ interaction-2  (同 traceId)
+│   └─ ...
+└─ side-query     (同 traceId)
+
+# #4661 之后：每次 prompt 一棵 trace
+interaction-1  (traceId = SDK 随机生成)            ← 独立 trace root
+├─ llm_request ...
+└─ tool ...
+
+interaction-2  (traceId = SDK 随机生成)            ← 独立 trace root
+└─ ...
+
+side-query     (traceId = SDK 随机生成)            ← 独立 trace root
+```
+
+**ARMS 查询迁移**：`traceId = SHA256(sessionId)[:32]` → `attribute.session.id = <sessionId>`。旧 session（单 traceId）与新 session（per-prompt traceId）自然共存。
+
+**不变的部分**：`session.id` 属性（interaction span 上已有）——现扩展到**所有** span；`LogToSpanProcessor` 桥接仍用 `deriveTraceId(sessionId)` 作兜底 traceId；`createSessionRootContext` 保留为 `@deprecated`，不影响现有测试。
 
 ### span 树图
 

@@ -27,6 +27,7 @@
 | #4482 | MERGED | 桥接错误信息 | 改进 LogToSpan export 错误信息 + TUI diagnosticsSink | main |
 | #4556 | MERGED | daemon prompt 生命周期 | `daemon-tracing.ts` route/bridge span + `_meta` traceparent 注入/提取；`channel.spawn` / `channel.initialize` / `session.new` / `prompt.dispatch` / `session.cancel` / `session.close` | `daemon_mode_b_main` |
 | #4628 | MERGED | client_id + 权限 span | `qwen-code.client_id` 属性 + 校验 + permission route span | `daemon_mode_b_main` |
+| #4682 | MERGED | daemon 路由覆盖扩展 | 扩展 `resolveDaemonTelemetryRoute` 覆盖所有写路由（除 heartbeat）；修复尾部斜杠不匹配 + workspace sessions regex 过度匹配 | `daemon_mode_b_main` |
 
 ---
 
@@ -87,18 +88,31 @@ function getTraceContext(): TraceContext | null {
 
 ### 路由归一：resolveDaemonTelemetryRoute（基数控制）
 
-`server.ts:resolveDaemonTelemetryRoute(req)`（`daemon_mode_b_main`, L280）是一张**显式路由白名单**，对每个匹配返回**模板化**的 `route` 字符串与抽出的 id：
+`server.ts:resolveDaemonTelemetryRoute(req)`（`daemon_mode_b_main`, L280）是一张**显式路由白名单**，对每个匹配返回**模板化**的 `route` 字符串与抽出的 id。
+
+> **尾部斜杠归一化**（#4682）：匹配前先 `req.path.replace(/\/$/, '') || '/'` 去尾部斜杠，避免 `/session/abc/prompt/` 这类请求因多一个 `/` 而静默不匹配、丢失 span。
 
 | 匹配 | 返回 route（`http.route` 值） | 旁带 |
 |---|---|---|
 | `POST /session` | `POST /session` | — |
-| `POST /session/:id/{load\|resume\|prompt\|cancel}` | `POST /session/:id/{action}` | `sessionId` |
+| `POST /sessions/delete` | `POST /sessions/delete` | — |
+| `POST /session/:id/{load\|resume\|prompt\|cancel\|recap\|btw\|model\|shell\|detach\|approval-mode}` | `POST /session/:id/{action}` | `sessionId` |
+| `PATCH /session/:id/metadata` | `PATCH /session/:id/metadata` | `sessionId` |
 | `POST /session/:id/permission/:requestId` | `POST /session/:id/permission/:requestId` | `sessionId`, `permissionRequestId` |
 | `POST /permission/:requestId` | `POST /permission/:requestId` | `permissionRequestId` |
 | `DELETE /session/:id` | `DELETE /session/:id` | `sessionId` |
 | `GET /workspace/:id/sessions` | `GET /workspace/:id/sessions` | — |
+| `POST /workspace/init` | `POST /workspace/init` | — |
+| `POST /workspace/mcp/:server/restart` | `POST /workspace/mcp/:server/restart` | — |
+| `POST /workspace/mcp/servers` | `POST /workspace/mcp/servers` | — |
+| `DELETE /workspace/mcp/servers/:name` | `DELETE /workspace/mcp/servers/:name` | — |
+| `POST /workspace/auth/device-flow` | `POST /workspace/auth/device-flow` | — |
+| `DELETE /workspace/auth/device-flow/:id` | `DELETE /workspace/auth/device-flow/:id` | — |
+| `POST /workspace/tools/:name/enable` | `POST /workspace/tools/:name/enable` | — |
 
-**基数关键**：`http.route` 永远写**模板**（`:id` 占位），真实的 sessionId / requestId 落到**专属属性**（`session.id` / `qwen-code.daemon.permission.request_id`）。这样 `http.route` 维度有界（≈6 个值），不会被 UUID 撑爆时序基数；需要按具体 session 下钻时再用专属属性过滤。
+> **regex 修正**（#4682）：`GET /workspace/:id/sessions` 的匹配从 `.+` 收紧为 `[^/]+`，防止跨路径段过度匹配。
+
+**基数关键**：`http.route` 永远写**模板**（`:id` 占位），真实的 sessionId / requestId 落到**专属属性**（`session.id` / `qwen-code.daemon.permission.request_id`）。这样 `http.route` 维度有界（≈15 个值），不会被 UUID 撑爆时序基数；需要按具体 session 下钻时再用专属属性过滤。
 
 ### route span：withDaemonRequestSpan
 

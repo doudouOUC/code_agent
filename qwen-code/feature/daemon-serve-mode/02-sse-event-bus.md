@@ -37,6 +37,7 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 | [#4245](https://github.com/QwenLM/qwen-code/pull/4245) / [#4306](https://github.com/QwenLM/qwen-code/pull/4306) | mirror sync | `originatorClientId` 扇出回声抑制、`prompt_cancelled` / `replay_complete` 跨客户端实时同步语义。 |
 | [#4484](https://github.com/QwenLM/qwen-code/pull/4484) | post-merge review (doudouOUC) | `epoch_reset` resync（D1）、`replay_complete` 字段重命名 `lastReplayedEventId`（D4，保留 `lastEventId` 别名）。 |
 | [#4507](https://github.com/QwenLM/qwen-code/pull/4507) | — | server-pushed `followup_suggestion` 事件（走同一 per-session bus）。 |
+| [#4702](https://github.com/QwenLM/qwen-code/pull/4702) | — | WebUI `DaemonSessionProvider` 对所有 resync reason（含 `ring_evicted`）统一提前调 `store.reset()`，自动恢复 transcript；移除误导性 "Reload the session to recover." 提示文案。 |
 
 > 注：`forced`/`liveCount` 重写、`slow_client_warning` 滞回均在 #4237；`epoch_reset` 与 `replay_complete` 字段名是 #4360 合并后由 #4484 post-merge review 补强；二者都已在 `daemon_mode_b_main` 上。
 
@@ -289,6 +290,7 @@ switch (event.type) { ... }
 - `state_resync_required` case（`events.ts:1591`）：`awaitingResync=true`、`resyncRequiredCount++`、`lastResyncRequired=data`。**不动 `alive`/`terminalEvent`**（流仍健康，只是本地累积可疑），**保留 `pendingPermissions`**（由 `loadSession` 恢复清，而非 resync 信号本身清）。
 - **`RESYNC_PASSTHROUGH_TYPES`（`events.ts:1117`）** = `{ state_resync_required, session_died, session_closed, client_evicted, stream_error }`。闩开时仍处理这 5 类：前者用于更新后续 resync 计数（罕见但可能连续两次跨 ring 重连）；后 4 类是 critical end-of-stream 信号，不依赖先验 state——UI 必须看到"session 死了"即使当时正处于 resync limbo。其余一切（session_update / permission_* / 工作区变更 / mcp guardrail / auth flow）被 auto-skip。
 - **恢复路径**：消费者见 `awaitingResync` 后调 `loadSession` 拉 daemon 权威快照，再 `createDaemonSessionViewState({...loaded})`——新 reducer 实例从头开始，闩隐式清零。UI 层 `store.ts:clearAwaitingResync()`（`ui/store.ts:92`）提供显式恢复：保留本地 blocks 接纳新事件，**必须在新 SSE 流（或 `Last-Event-ID: 0` replay）开始投递前调用**，否则 replay 帧会被闩 guard 丢弃（wenshao R6 纠正的流序 bug）；另一选项是 `reset()` 清白重来。`ui/transcript.ts:142` 的 guard 还带一行 diagnostic `console.warn`（R5）记录被丢弃的事件类型。
+- **WebUI 自动恢复（#4702）**：`DaemonSessionProvider.tsx` 在收到 `state_resync_required` 时，将 `store.reset()` 提升到 reason 分支**之前**统一执行（而非仅在 `epoch_reset` / 非 `ring_evicted` 分支内各自调用）。对 `ring_evicted` 的效果：`reset()` 清空 stale transcript 并隐式重置 `awaitingResync` 闩，使后续 ring replay 帧（最多 8000 条幸存事件）能被 reducer 正常处理、重建 transcript，无需用户手动 reload。修复前 `ring_evicted` 分支未调 `reset()`，`awaitingResync` 闩保持开启，replay 帧全部被 auto-skip，transcript 留下永久空洞。同 PR 移除了 `transcript.ts` 中 `"Reload the session to recover."` 提示——reload 对长 session 会再次触发 ring eviction，自动恢复才是正确路径。
 
 ### terminal 事件归并 `chooseTerminalEvent`（`events.ts:1979`）
 
