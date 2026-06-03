@@ -111,7 +111,7 @@
 
 ### 📝 建议
 2. **#4661**：`SessionIdSpanProcessor.onStart` 的 `getCurrentSessionId()` 全局读在 daemon 多 session 下可能误归因——可考虑 ALS 化（如已有 `interactionContext`），或接受 best-effort。
-3. **#4694**（open）：resume 路径不返 compactedReplay——若 ring eviction 发生在上一完整 turn 与 resume 之间，客户端有盲区。per-session 压缩引擎无 turn 上限——超长 session 的内存需关注。
+3. **#4694**（已合并）：resume 路径不返 compactedReplay——若 ring eviction 发生在上一完整 turn 与 resume 之间，客户端有盲区。per-session 压缩引擎无 turn 上限——超长 session 的内存需关注。
 
 ---
 
