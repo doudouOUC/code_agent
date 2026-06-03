@@ -37,6 +37,7 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 | [#4245](https://github.com/QwenLM/qwen-code/pull/4245) / [#4306](https://github.com/QwenLM/qwen-code/pull/4306) | mirror sync | `originatorClientId` 扇出回声抑制、`prompt_cancelled` / `replay_complete` 跨客户端实时同步语义。 |
 | [#4484](https://github.com/QwenLM/qwen-code/pull/4484) | post-merge review (doudouOUC) | `epoch_reset` resync（D1）、`replay_complete` 字段重命名 `lastReplayedEventId`（D4，保留 `lastEventId` 别名）。 |
 | [#4507](https://github.com/QwenLM/qwen-code/pull/4507) | — | server-pushed `followup_suggestion` 事件（走同一 per-session bus）。 |
+| [#4689](https://github.com/QwenLM/qwen-code/pull/4689) | — | 并行 subAgent 文本流已通过 per-parentToolCallId keyed map 隔离：`transcript.ts` reducer 用 `activeAssistantBlockByParent` 按 `parentToolCallId` 维护独立 active block pointer，scoped `clearActiveText` 不打断其他 subAgent，`finishAssistant` 遍历 map 清 streaming。 |
 | [#4702](https://github.com/QwenLM/qwen-code/pull/4702) | — | WebUI `DaemonSessionProvider` 对所有 resync reason（含 `ring_evicted`）统一提前调 `store.reset()`，自动恢复 transcript；移除误导性 "Reload the session to recover." 提示文案。 |
 
 > 注：`forced`/`liveCount` 重写、`slow_client_warning` 滞回均在 #4237；`epoch_reset` 与 `replay_complete` 字段名是 #4360 合并后由 #4484 post-merge review 补强；二者都已在 `daemon_mode_b_main` 上。
