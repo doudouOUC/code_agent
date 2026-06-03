@@ -17,10 +17,10 @@
 | [#4683](https://github.com/QwenLM/qwen-code/pull/4683) | closed | — | — | chore，未合并无代码 |
 | [#4702](https://github.com/QwenLM/qwen-code/pull/4702) | merged | ✅ | ✅ | ring_evicted resync 自动恢复 transcript，逻辑正确 |
 | [#4703](https://github.com/QwenLM/qwen-code/pull/4703) | merged | ✅ | ✅ | 非流式请求显式 stream:false，最小安全修复 |
-| [#4667](https://github.com/QwenLM/qwen-code/pull/4667) | open | ✅ | ✅ | bodyTimeout 可配置，55 测试全绿 |
-| [#4689](https://github.com/QwenLM/qwen-code/pull/4689) | open | ✅ | ✅ | 并行 subAgent 文本流隔离，keyed/scalar 双路径正确 |
-| [#4693](https://github.com/QwenLM/qwen-code/pull/4693) | open | ✅ | ✅ | llm_request span 补响应元数据，无 PII/secret 泄漏 |
-| [#4694](https://github.com/QwenLM/qwen-code/pull/4694) | open | ✅ | ⚠️ | 压缩重放设计合理；resume 后环淘汰间隙未覆盖 + O(turns) 无界增长 |
+| [#4667](https://github.com/QwenLM/qwen-code/pull/4667) | closed | ✅ | ✅ | bodyTimeout 可配置，55 测试全绿 |
+| [#4689](https://github.com/QwenLM/qwen-code/pull/4689) | merged | ✅ | ✅ | 并行 subAgent 文本流隔离，keyed/scalar 双路径正确 |
+| [#4693](https://github.com/QwenLM/qwen-code/pull/4693) | merged | ✅ | ✅ | llm_request span 补响应元数据，无 PII/secret 泄漏 |
+| [#4694](https://github.com/QwenLM/qwen-code/pull/4694) | merged | ✅ | ⚠️ | 压缩重放设计合理；resume 后环淘汰间隙未覆盖 + O(turns) 无界增长 |
 
 **一致性**：✅7 / ⚠️2 / ❌0　　**正确性**：✅8 / ⚠️2 / ❌0
 

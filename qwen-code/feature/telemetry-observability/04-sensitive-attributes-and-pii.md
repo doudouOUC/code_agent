@@ -229,7 +229,8 @@ if (!seenHashes.has(hash)) {                           // 仅首次写全文
 const seenHashes = new Set<string>();
 ```
 
-- 进程级单例，跨 span / 跨 session 共享。`clearDetailedSpanState()`（L213–215）只清 `seenHashes`，**仅测试用**（`detailed-span-attributes.test.ts:beforeEach` 调用）。
+- 进程级单例，跨 span / 跨 session 共享。`clearDetailedSpanState()`（L213–215）只清 `seenHashes`，测试中由 `beforeEach` 调用；**生产中由 chat compression callback 调用**（见下条）。
+- #4660 修复了 chat compression 后 `seenHashes` 未清除的 bug——压缩使历史重置，但 dedup Set 残留导致压缩后首条 system prompt 的 hash 仍「已见」而跳过全量属性。现在 compression callback 中调用 `clearSeenHashes()`。
 - 上界 = 「一个 session 内 unique system prompt + tool schema 数」，量级很小。但**对长寿 daemon 常驻进程（多 session 复用同一进程）会单调增长**，属慢内存增长点（见「已知限制」）。
 - 副作用：去重是进程级，意味着**同一全量 system_prompt 在整个进程生命周期内只写一次**。若第一次写它的那条 trace 后来被采样丢弃 / 导出失败，后续 span 只剩 hash 引用，**全量内容在后端永久缺失**（见「已知限制」）。
 
