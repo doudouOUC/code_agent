@@ -35,6 +35,10 @@
 | #4606 | request 级访问日志 | `server.ts` access-log middleware L875-920；`daemonLogger.ts` |
 | #4360 | errorKind / serverTimestamp（F4 prereq） | `formatSseFrame`(L3629)、`mapDomainErrorToErrorKind` 用于 SSE `stream_error`(L3010) |
 | #4191 | capability registry + protocol versions | `capabilities.ts:SERVE_CAPABILITY_REGISTRY`(L37) |
+| [#4248](https://github.com/QwenLM/qwen-code/pull/4248) | @wenshao: fix build/integration | merged |
+| [#4268](https://github.com/QwenLM/qwen-code/pull/4268) | @wenshao: add mcp_guardrails E2E | merged |
+| [#4132](https://github.com/QwenLM/qwen-code/pull/4132) | @jifeng: /demo page | merged |
+| [#4585](https://github.com/QwenLM/qwen-code/pull/4585) | @chiga0: non-blocking prompt 202 | merged |
 
 ---
 
