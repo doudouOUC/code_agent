@@ -11,7 +11,7 @@
 
 | 主题 | 文档 | 关键 PR | 一句话 |
 |---|---|---|---|
-| daemon/serve 模式 | [daemon-serve-mode/](daemon-serve-mode/) 📁 | epic #4175 / #3803（~47 PR） | Mode B：agent core 常驻 HTTP daemon，多客户端经 REST+SSE 并发附着，ACP bridge 解耦（README + 8 篇深入 + 09 路线图/覆盖/缺口） |
+| daemon/serve 模式 | [daemon-serve-mode/](daemon-serve-mode/) 📁 | epic #4175 / #3803（~47 PR） | Mode B：agent core 常驻 HTTP daemon，多客户端经 REST+SSE 并发附着，ACP bridge 解耦（README + 8 篇深入 + 09 路线图 + 10 客户端/SDK + 11 WebUI/传输） |
 | telemetry 可观测性 | [telemetry-observability/](telemetry-observability/) 📁 | epic #3731 / #4384（~25 PR） | 层级 span 树 + 上下文传播 + OTLP 路由 + 敏感属性门控 + daemon 端到端追踪（README + 7 篇深入） |
 | conversation rewind | [conversation-rewind.md](conversation-rewind.md) | #3441 #4064 #4216 #4122 #4580 | double-ESC/`/rewind` 回退历史 + 文件恢复 + TOCTOU 顺序 |
 | 原子文件写 | [atomic-file-write.md](atomic-file-write.md) | #4096 #4333 #4431 | temp+rename+fsync 原子写，铺开到 credentials/memory/config/JSONL |

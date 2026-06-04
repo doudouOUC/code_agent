@@ -44,6 +44,7 @@
 | #4334 | F1 follow-up: BridgeFileSystem wiring | F1 | `BridgeFileSystem` 接线 + `channelInfo` 修复。 |
 | #4445 | lift `bridge.test.ts` | F1 | 把 6861 行 bridge 测试抬到 acp-bridge（`daemon_mode_b_main` 上已增长到 8386 行）。 |
 | **#4335** | **feat(acp-bridge): F3 — multi-client permission coordination** | **F3** | **本文重点**：四策略实现 + `PermissionAuditRing` + 2 个新 SSE 事件 + 3 个 typed error（403/501/500）+ 设置项 + 能力面 + SDK reducer。 |
+| [#4639](https://github.com/QwenLM/qwen-code/pull/4639) | merged | @he-yufeng | drop discontinued OAuth |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
