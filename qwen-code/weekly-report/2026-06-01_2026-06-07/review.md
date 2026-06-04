@@ -22,7 +22,7 @@
 | [#4693](https://github.com/QwenLM/qwen-code/pull/4693) | merged | ✅ | ✅ | llm_request span 补响应元数据，无 PII/secret 泄漏 |
 | [#4694](https://github.com/QwenLM/qwen-code/pull/4694) | merged | ✅ | ⚠️ | 压缩重放设计合理；resume 后环淘汰间隙未覆盖 + O(turns) 无界增长 |
 
-**一致性**：✅7 / ⚠️2 / ❌0　　**正确性**：✅8 / ⚠️2 / ❌0
+**一致性**：✅8 / ⚠️2 / ❌0　　**正确性**：✅8 / ⚠️2 / ❌0
 
 ---
 
@@ -75,28 +75,28 @@
 - **结论**: 一行修复，干净。
 
 ### #4667 fix(core): add configurable bodyTimeout to prevent streaming timeout with local models
-- **状态**: open | **关联 issue**: 无
+- **状态**: closed | **关联 issue**: 无
 - **一致性**: ✅ — config 字段 + undici Agent + sanitize + proxy 回退 + keepAliveTimeout 五项全落地。
 - **描述准确性**: 准确，诚实披露了 no-proxy 用户的行为变更。
 - **正确性**: ✅ — `sanitizeBodyTimeout` 处理 negative/float/NaN/Infinity/undefined 全回退 0；`noProxyDispatcherCache` 按 bodyTimeout keyed 防 Agent 膨胀；proxy 路径硬编码 `bodyTimeout:0` 并忽略用户配置；Bun 路径优雅降级。55 测试全绿。
 - **结论**: 设计全面、测试充分、无问题。
 
 ### #4689 fix(daemon): isolate parallel subAgent text streams in transcript reducer
-- **状态**: open | **关联 issue**: 无
+- **状态**: merged | **关联 issue**: 无
 - **一致性**: ✅ — per-parent keyed map 替代标量、六层修改（emit/tracker/types/normalizer/reducer/store）全对应。
 - **描述准确性**: 准确，已知限制（WebUI renderer、global clear）诚实披露。
 - **正确性**: ✅ — `appendTextDelta` 按 `parentToolCallId` 分流（keyed vs scalar），无交叉污染（T5 测试验证）；`finishAssistant` 遍历所有 keyed map 条目防 zombie spinner；`trimTranscriptState` 裁剪过期条目防内存泄漏。11 reducer + 4 normalizer 测试覆盖充分。
 - **结论**: 并发隔离设计正确、测试到位。
 
 ### #4693 feat(telemetry): enrich llm_request span with response metadata and error details
-- **状态**: open | **关联 issue**: 无
+- **状态**: merged | **关联 issue**: 无
 - **一致性**: ✅ — 6 个新属性 + GenAI semconv dual 全落地。
 - **描述准确性**: 准确。
 - **正确性**: ✅ — 无 PII/secret 泄漏（response_id 是 provider 请求 ID、finish_reason 是枚举、error_type/status_code 是结构化元数据）；`lastError` 闭包捕获不抑制原始 throw；`thoughtsTokenCount` 值 0 有意义（测试验证），undefined 时 omit。12 新测试。
 - **结论**: 安全、正确的 span 补强。
 
 ### #4694 fix(daemon): compacted session replay for long-session recovery
-- **状态**: open | **关联 issue**: 无
+- **状态**: merged | **关联 issue**: 无
 - **一致性**: ✅ — turn-boundary 压缩引擎、同步 snapshot、slot 压缩、`liveJournal`、向后兼容可选字段全落地。
 - **描述准确性**: 准确（supersedes #4678 的声明经验证）。
 - **正确性**: ⚠️ — 核心压缩逻辑（文本合并、tool 折叠、slot 排序、transient 过滤）正确；但 (1) **resume 路径仅返回 `lastEventId`**，若 ring 淘汰了上一完整 turn 与 resume 之间的事件，客户端丢失该段状态；(2) 压缩引擎 per-session、O(turns) 无上限增长，超长 session（数百 turn）可能显著。22 compaction + 20 EventBus + 19 SDK 测试覆盖。
@@ -115,4 +115,4 @@
 
 ---
 
-_审查于 2026-06-03；方法：3 个并行只读子代理逐 PR 拉取 issue+描述+diff。_
+_审查于 2026-06-03（明细段状态 2026-06-05 更新）；方法：3 个并行只读子代理逐 PR 拉取 issue+描述+diff。_

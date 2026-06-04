@@ -474,3 +474,5 @@ wave 1（24 method） + wave 2（5 method）= 29 个 `_qwen/*` extension method 
 5. **reconciliation 缺 timeout-race staleness check**：#4546（A1）的 suppress guard 在 bridge model roundtrip 期间抑制 in-session promotion，但并发 in-session + HTTP model switch 的 timed-out-then-late race 仍是 tracked follow-up（#4613 §2.2 覆盖）。
 6. **ACP/REST parity 未涵盖 global permission vote**：因架构差异（permission vote 的 bus event routing 不同于 REST 的 request-response），标记为 P4 不在 parity scope 内（#4737 body）。
 7. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
+
+_生成于 2026-06-05_
