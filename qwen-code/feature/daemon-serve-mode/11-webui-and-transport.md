@@ -485,3 +485,5 @@ PR #4555 在 `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` 新增 `qwen
 | ACP HTTP 设计文档 | `docs/design/daemon-acp-http/README.md` |
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
+
+_生成于 2026-06-05_
