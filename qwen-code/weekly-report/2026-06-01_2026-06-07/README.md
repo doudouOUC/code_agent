@@ -1,6 +1,4 @@
-# qwen-code PRs · 2026-06-01 ~ 2026-06-07  (W23)
-
-**主题**: daemon（btw泄漏/transcript隔离/resync/压缩重放/DaemonWorkspaceService抽取/lifecycle优化/重构精简）、telemetry（路由覆盖/span补强/per-prompt traceId/dedup/Phase3 subagent/Phase4b retry/OTel metrics）、core（stream:false/ACP remember·forget·dream）
+# qwen-code PRs · 2026-06-01 ~ 2026-06-07  (W23 最终版)
 
 **统计**: 23 PRs — 15 merged / 5 open / 3 closed
 
@@ -22,12 +20,12 @@
 | #4765 | ✅ merged | fix(daemon): preserve parentToolCallId in compaction engine for parall | +569/-29 | 2 | 06-04 | 06-04 | https://github.com/QwenLM/qwen-code/pull/4765 |
 | #4774 | ✅ merged | refactor(daemon): simplify code and strip PR/commit references from co | +2775/-4969 | 81 | 06-04 | 06-05 | https://github.com/QwenLM/qwen-code/pull/4774 |
 | #4811 | ✅ merged | feat(cli): enable /remember, /forget, /dream in ACP mode | +278/-43 | 6 | 06-05 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4811 |
-| #4812 | 🟡 open | feat(serve): add POST /session/:id/branch for session forking | +347/-3 | 14 | 06-05 | — | https://github.com/QwenLM/qwen-code/pull/4812 |
-| #4816 | 🟡 open | feat(serve): add /settings slash command for web-shell | +1092/-5 | 25 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4816 |
+| #4812 | 🟡 open | feat(serve): add POST /session/:id/branch for session forking | +345/-3 | 14 | 06-05 | — | https://github.com/QwenLM/qwen-code/pull/4812 |
+| #4816 | 🟡 open | feat(serve): add /settings slash command for web-shell | +1103/-8 | 27 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4816 |
 | #4817 | ⬜ closed | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +443/-13 | 15 | 06-06 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4817 |
 | #4818 | 🟡 open | Revert "feat(cli): enable /remember, /forget, /dream in ACP mode" | +43/-278 | 6 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4818 |
 | #4819 | ✅ merged | feat(cli): enable /remember, /forget, /dream in ACP mode | +302/-43 | 6 | 06-06 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4819 |
 | #4820 | 🟡 open | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +474/-14 | 16 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4820 |
-| #4822 | 🟡 open | feat(serve): add hooks diagnostic HTTP/ACP surface (issue #4514 T3.9) | +600/-3 | 12 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4822 |
+| #4822 | 🟡 open | feat(serve): add hooks diagnostic HTTP/ACP surface (issue #4514 T3.9) | +593/-4 | 15 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4822 |
 
-_更新于 2026-06-06_
+_W23 最终版 · 更新于 2026-06-07_
