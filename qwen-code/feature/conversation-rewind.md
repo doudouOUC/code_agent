@@ -474,3 +474,46 @@ sequenceDiagram
 6. **作用域局限**。rewind 文件恢复只覆盖 `edit`/`write_file` 工具的写入；`run_shell_command` 与工具外手改不在追踪范围（设计取舍，对齐 upstream）。用户若混用 shell 命令改盘，rewind 给出的「已恢复 N 个文件」可能与其心理预期的「完整回退」不符。
 
 7. **大文件/二进制/超量文件的降级**。`getTurnDiff`/`computeTurnFileDiff` 对 `> MAX_DIFF_SIZE_BYTES` 的文件只给行数粗估（`oversized`）、对含 NUL 的内容按二进制处理（`isBinary`），单轮文件数超 `MAX_TURN_DIFF_FILES = 500` 时截断并仅在 debug 日志告警。这些降级对恢复正确性无影响，但 diff 预览可能不完整，UI 需明确标注以免误导。
+
+---
+
+## 8. 各 PR 代码贡献
+
+### #3441 — rewind 首发（对话回退）
+
+- **双 ESC 检测**：新增 `useDoublePress.ts:useDoublePress` hook，800ms 超时窗口 + pending 状态驱动 footer 提示。`AppContainer.tsx` 中 ESC handler 在 `Idle && !dialogsVisible` 时分派给 `handleDoubleEscRewind`，与「取消请求」路径互斥。
+- **选择器组件**：新建 `RewindSelector.tsx:RewindSelector`，`getUserTurns = filter(isRealUserTurn)` 过滤可回退轮；`MAX_VISIBLE_ITEMS=7` + `scrollOffset` 实现窗口滚动；两阶段 UI（pick-list → Y/N 确认）。
+- **历史截断算法**：新建 `historyMapping.ts:computeApiTruncationIndex`，遍历 UI history 数 `isRealUserTurn` 得 `uiUserTurnCount`，再从 API history 中跳过 startup-context 对（`hasStartupContext` 判定 `STARTUP_CONTEXT_MODEL_ACK`）和 `functionResponse` 条目（`isUserTextContent` 排除），返回第 N+1 个用户文本轮的下标作为截断点，找不到返回 -1（已压缩）。
+- **录制分叉**：`chatRecordingService.ts:rewindRecording(targetTurnIndex, payload)` 把 `lastRecordUuid` 指回目标轮之前、裁剪 `turnParentUuids`、追加 `{type:'system', subtype:'rewind'}` 记录，使废弃分支在 `/resume` 时被跳过。
+- **命令与接线**：`rewindCommand.ts` 注册 `name:'rewind'`/`altNames:['rollback']`，action 返回 `{dialog:'rewind'}`；`DialogManager.tsx` 在 `isRewindSelectorOpen` 时渲染 `RewindSelector`；`slashCommandActions` 经 `openRewindSelectorRef` ref 桥接。
+
+### #4064 — 文件恢复支持
+
+- **FileHistoryService 核心**：新建 `fileHistoryService.ts:FileHistoryService`，数据结构 `FileHistorySnapshot`（`promptId + trackedFileBackups: Record<path, FileHistoryBackup>`）。备份路径 `~/.qwen/file-history/{sessionId}/{sha256(path).slice(0,16)}@v{version}`，`MAX_SNAPSHOTS=100` + `cleanupOrphanedBackups` 孤儿清理。
+- **trackEdit / makeSnapshot / rewind**：`trackEdit(filePath)` 在工具写前备份 pre-edit 内容（同轮幂等）；`makeSnapshot(promptId)` 在轮边界做全量快照，未变文件复用上轮备份（`checkOriginFileChanged`）；`rewind(promptId)` → `applySnapshot` 按 `backupFileName` 恢复/`null`→unlink/`undefined`→skip。
+- **RewindSelector 三阶段重写**：`handleRewindConfirm` 签名改为 `(userItem, option: RestoreOption)`，支持 `both/conversation/code` 三选项；引入 `getRestoreOptions(diffStats)` 动态构造选项并通过 `fileHistoryService.getDiffStats(promptId)` 异步加载 `+N -N in M file(s)` 统计。
+- **事务化编排**：`AppContainer.tsx:handleRewindConfirm` 对 `both` 模式先算 `computeApiTruncationIndex`（< 0 整体放弃），再文件恢复，若 `hasRestoreFailure` 则跳过对话截断，避免半完成状态。
+- **接线**：`edit.ts`/`write-file.ts` 中调用 `trackEdit`（初版放在 `checkPriorRead` 之后）；`client.ts:1488` 在轮边界调用 `makeSnapshot`；`config.ts:1166` 新增 `fileCheckpointingEnabled`（交互模式默认 true）。
+
+### #4216 — TOCTOU 顺序修复 + sticky failed heal
+
+- **trackEdit 前移**：`edit.ts`（约 500）和 `write-file.ts`（约 392）将 `await trackEdit(file)` 从 `checkPriorRead` 与 `writeTextFile` 之间移至 `checkPriorRead` **之前**，收窄 stat-then-write 竞态窗口。移植自 upstream `claude-code` 的注释约定（「These awaits must stay OUTSIDE the critical section below」）。
+- **sticky failed 允许重试**：`fileHistoryService.ts:trackEdit` 入口守卫改为 `if (existing && !existing.failed) return;`（约 543），让 `failed` 标记的条目允许重试备份；异步后复检改为 `if (!current || current.failed)` 才覆写（约 562）；`makeSnapshot` 复用分支增加 `!latestBackup.failed` 条件（约 601），`failed` 条目 fall through 到 `createBackup` 重试。
+- **测试**：`fileHistoryService.test.ts` 新增 `heals a failed entry on the next trackEdit attempt` 用例（先制造 failed、再验证 trackEdit 能 heal）；`edit.test.ts`/`write-file.test.ts` 各增 `backs up before the pre-write freshness check (TOCTOU ordering)` 用例（mock trackEdit 改 mtime → 断言 checkPriorRead 拒写 → 证明顺序正确）。
+
+### #4122 — IDE 模式禁用
+
+- **双守卫**：`AppContainer.tsx` 中 ESC handler 增加 `!config.getIdeMode()` 条件（约 2947），键盘路径直接跳过 rewind；`openRewindSelector` 增加 `config.getIdeMode()` 分支（约 2412），调用 `historyManager.addItem({type:'info', text:'Rewind is disabled in IDE mode.'})` 给出可见提示，拦截 `/rewind` 命令路径。
+- **两道守卫不冗余**：键盘路径拦截 double-ESC 触发；命令路径拦截 `/rewind` slash command（绕过键盘 handler），并显示 info 消息避免「Press Esc again to rewind」与「disabled」矛盾。
+- **测试**：`AppContainer.test.tsx` 新增 `IDE mode rewind guard` 套件，验证 `getIdeMode()=true` 时 `openRewindSelector` 追加 info 且不打开选择器、`false` 时正常打开。
+
+### #3622 — E2E 测试修正
+
+- **断言更新**：`test-rewind-e2e.sh` Test 1 中，原断言 `assert_screen "say exactly GAMMA3"` 改为 `assert_screen "say exactly BETA2"`。原因是 `isRealUserTurn` 修复后 `/rewind` 命令本身不再计入可回退轮，从初始选中的最后一轮（GAMMA3）按 Up 一次实际落在 BETA2，回退目标为 BETA2 而非 GAMMA3。
+
+### #4580 — compressed-turn 误报修复（NOTIFICATION 类型）
+
+- **枚举新增**：`types.ts:MessageType` 新增 `NOTIFICATION = 'notification'`，用于 mid-turn 用户消息的 UI 表示。
+- **live 路径**：`useGeminiStream.ts:2354` 将 mid-turn drain 的 `addItem` 类型从 `MessageType.USER` 改为 `MessageType.NOTIFICATION`，使 `isRealUserTurn` 首行 `item.type !== 'user'` 即排除，消除 UI/API 计数错配。
+- **resume 路径**：`resumeHistoryUtils.ts:290` 将 `mid_turn_user_message` 子类型对应的 `items.push` 类型从 `'user'` 改为 `'notification'`，保持 live/resume 一致。
+- **测试**：`historyMapping.test.ts` 新增 `skips notification items so btw merged into functionResponse does not cause mismatch` 用例，构造含 `notification` 类型的 UI history + 含 `functionResponse` 合并的 API history，验证 `computeApiTruncationIndex` 返回正确下标。`useGeminiStream.test.tsx`/`resumeHistoryUtils.test.ts` 断言更新为 `NOTIFICATION` 类型。

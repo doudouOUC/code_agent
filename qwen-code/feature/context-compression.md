@@ -436,3 +436,26 @@ Copilot review 指出：当 `fileDiff <= 50_000` 且两份内容各 `<= 16_000` 
 
 ### 7.5 latch 语义随 main 演进
 #3985 的单布尔 `hasFailedCompressionAttempt` 在 `main` 已升级为 `consecutiveFailures` 计数 + `MAX_CONSECUTIVE_FAILURES=3` 熔断，并新增 hard-tier rescue 与 `COMPRESSION_FAILED_OUTPUT_TRUNCATED` 状态。本文 §3.2 以 PR 原始实现为主、标注了 main 现状；阅读源码时以 `geminiChat.ts:isCompressionFailureStatus`、`chatCompressionService.ts:MAX_CONSECUTIVE_FAILURES` 为准。
+
+---
+
+## 8. 各 PR 代码贡献
+
+### PR #3879 — reactive compression
+
+- `contextLengthError.ts:getContextLengthExceededInfo`：溢出分类器——`TIMEOUT_PATTERNS` 优先排除超时；`CONTEXT_LENGTH_PATTERNS` 逐 fragment 匹配溢出文案；`parseTokenCounts` 四种模板抽取 actual/limit token 数
+- `geminiChat.ts:sendMessageStream`（reactive 分支）：`reactiveCompressionAttempted` 单次护栏；溢出后 `tryCompress(force=true, trigger:'auto')`；COMPRESSED 则 `getHistory(true)` 重建请求体 + `yield RETRY` + `attempt--` 不占重试预算
+- `geminiChat.ts`：`suppressNextRetryEvent` 避免反应式 RETRY 与循环顶部 RETRY 重复；abort 信号 `isAbortError` 直接重抛
+- `chatCompressionService.ts:CompactTrigger`：新增 `'manual'|'auto'` 类型；`compactTrigger = trigger ?? (force ? 'manual' : 'auto')` 解耦 force 与 trigger 语义
+
+### PR #3985 — 加固 follow-up
+
+- `geminiChat.ts:sendMessageStream`（setup）：失败时 `if (userContentAdded) this.history.pop()` 回滚 + `streamDoneResolver!()` 释放 send-lock，防止后续 send 永久阻塞
+- `geminiChat.ts:isCompressionFailureStatus`：抽取模块级 helper，显式排除 `NOOP`；反应式失败分支补 `self.hasFailedCompressionAttempt = true`（main 演进为 `consecutiveFailures`）
+- `chatCompressionService.ts:compress`：摘要 `generateContent` 的 config 透传 `abortSignal`，使压缩 side-query 可被用户取消即时打断
+
+### PR #3872 — shrink file diff records
+
+- `chatRecordingService.ts:sanitizeToolCallResultForRecording`：落盘前入口，仅对 `isFileDiffDisplay` 校验通过的结果调用 `sanitizeFileDiffForRecording`
+- `chatRecordingService.ts:sanitizeFileDiffForRecording`：三档上限（`SESSION_FILE_DIFF_CHAR_LIMIT=50_000`、`SESSION_FILE_CONTENT_CHAR_LIMIT=16_000`、聚合 `100_000`）；超限 diff 替换为 `buildSyntheticDiffPreview` 合法占位；超限内容 `truncateMiddleForSession` 头60%+尾+marker 截断
+- `truncatedDiffPreview.ts:buildTruncatedDiffPreviewText`：共享文案构造器，ACP 回放（`ToolCallEmitter.ts`）与导出归一化（`normalize.ts`）复用，防措辞漂移

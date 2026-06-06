@@ -310,6 +310,31 @@ sequenceDiagram
 
 ---
 
+## 各 PR 代码贡献
+
+### #3404 /doctor 诊断命令
+- **实现模式**：代码命令（`CommandKind.BUILT_IN`），纯 TS 逻辑不经 LLM。`doctorCommand.ts:doctorCommand` 定义命令，交互态 `setPendingItem` → `runDoctorChecks(context)` → `addItem(HistoryItemDoctor)`；非交互态返回 `JSON.stringify({checks, summary})`。`supportedModes: ['interactive','non_interactive','acp']` 声明使其通过 `filterCommandsForMode` 在 `-p` 模式下可用。
+- **关键代码**：`doctorChecks.ts:runDoctorChecks()` 将 4 个异步检查（`checkNpmVersion`/`checkRipgrep`/`checkApiClient`/`checkGit`，各含子进程或 IO）用 `Promise.all` 并发，同步检查直接调用，最终按 System→Auth→Config→MCP→Tools→Git 固定顺序拼装 `DoctorCheckResult[]`。每个检查返回 `{category, name, status:'pass'|'warn'|'fail', message, detail?}`（类型 `types.ts:523`）。
+- **非交互健壮性**：`checkMcpServers` 在非交互态对每个 server 报 `"configured (not checked in non-interactive mode)"` 而非 `DISCONNECTED`（避免假失败）；`checkGit` 非交互态退回 `getGitVersion()` 探针（`systemInfo.ts:100`），不依赖交互态的 `services.git`。
+- **渲染**：`DoctorReport.tsx:DoctorReport` 按 `groupByCategory` 分组，状态图标 `✓/⚠/✗` 对应 `theme.status.success/warning/error`，圆角边框 + summary 统计。`HistoryItemDisplay.tsx` 通过 `type === 'doctor'` 接线。
+- **注册**：`BuiltinCommandLoader.ts` 导入 `doctorCommand` 加入命令数组；`nonInteractiveCliCommands.ts` 白名单新增 `'doctor'`。
+
+### #4133 /stuck 卡死诊断技能
+- **实现模式**：prompt 技能（`SKILL.md`），`bundled/stuck/SKILL.md` frontmatter 声明 `allowedTools: [run_shell_command, read_file]`，body 作为 LLM 的卡死诊断 SOP 注入执行。
+- **关键代码（prompt 内约束）**：参数校验用**纯数字白名单**——仅全由 `0-9` 组成的参数当 PID，否则视为自由文本 symptom **绝不**拼进 shell 命令。PID 快速路径双重 guard：`kill -0 <pid>` 验存活 + `ps -p ... | grep -qE` 验确为 qwen-code 进程。`RUNTIME_DIR` 按 `QWEN_RUNTIME_DIR` → `advanced.runtimeOutputDir` → `QWEN_HOME` → `~/.qwen` 优先级解析。
+- **跨平台分支**：不可中断睡眠 Linux `D` / macOS `U`；栈转储 macOS `sample <pid> 3` / Linux `cat /proc/<pid>/stack`（避 `strace` 需 `CAP_SYS_PTRACE`）；网络挂起 macOS `lsof -nP` / Linux `ss -tnp`；`timeout 15` 包裹防诊断工具自身卡死。
+- **安全**：多处要求 `--openai-api-key=sk-… → ***` 脱敏；`ps -u $(id -u)` 限当前用户避免暴露他人进程；报告声明 "Do not execute these actions yourself"，只建议不动手。
+- **进程识别**：因 Node CLI `comm` 列恒为 `node`/`bun`，靠 `command` 列正则匹配 `qwen-code/` 路径或 `/qwen` bin，锚定到 `/` 或行首避免 `analyze-qwen-code/` 误匹配。
+
+### #3079 /batch 批量编排技能
+- **实现模式**：prompt 技能（`SKILL.md`），`bundled/batch/SKILL.md` frontmatter 声明 `allowedTools: [task, glob, grep_search, read_file, edit, write_file, run_shell_command, ask_user_question]`。body 为 5 步编排 SOP。
+- **关键代码（prompt 内算法）**：`glob` 发现目标文件 + 自动排除 `node_modules/dist/build/.git/test/lock/min.js/>500KB` 等；按文件数查表分块（1-5→1 块，6-15→2 块，…，76-100→5 块），约束最小 3、最大 15 文件/块、最多 5 并行 agent。核心指令用 **CRITICAL** 标注 "All Agent tool calls MUST be in a single response"——在单条 assistant 消息里多次调用 `task`（Agent 工具，`general-purpose` 子类型）以触发运行时并行。
+- **聚合与容错**：worker prompt 模板要求逐文件报 `SUCCESS/FAILED/SKIPPED`，单文件失败不中断；agent 整体失败记块失败；Ctrl+C 优雅取消。汇总表含成功/失败/跳过统计 + 明细。
+- **dry-run 模式**：识别 "preview / 先看看 / dry run" 等意图 → 列文件 + 展示分块计划 → `ask_user_question` 确认 → 执行。
+- **测试护栏**：`bundled-skills.integration.test.ts`（新增）`readdirSync` 列出 `bundled/` 下所有目录，`it.each` 对每个 `SKILL.md` 跑真实 `parseSkillContent`，断言 `cfg.name === 目录名`、`description` 非空、`body.length > 0`、`allowedTools` 为数组——把 frontmatter 回归从"用户调用时才炸"前移到 CI。
+
+---
+
 ## 7. 已知限制 / 后续
 
 结合三个 PR 的 review 与现状：

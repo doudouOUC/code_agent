@@ -270,6 +270,41 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 
 ---
 
+## 各 PR 代码贡献
+
+### #3318 API preconnect
+- **实现模式**：fire-and-forget HEAD 请求 + 共享 undici dispatcher 缓存。`apiPreconnect.ts:preconnectApi()` 按 `preconnectFired` 布尔做单次守卫，依次跳过 disable 环境变量、sandbox、`NODE_EXTRA_CA_CERTS`、非 node 运行时，全部通过后调用 `getOrCreateSharedDispatcher(proxy)` 取缓存的 `ProxyAgent`/`Agent`，发 `fetch(url, {method:'HEAD', signal:AbortSignal.timeout(5_000), dispatcher})`，`.then/.catch` 仅打 debug 日志。
+- **关键代码**：`runtimeFetchOptions.ts:getOrCreateSharedDispatcher()` 新增 `dispatcherCache: Map<string|undefined, Dispatcher>`，以 proxyUrl 为 key 缓存实例（`keepAliveTimeout: 60_000`），并把原 `buildFetchOptionsWithDispatcher()` 内联创建改为取缓存——确保预连接与后续 SDK 请求共享同一连接池。`isDefaultBaseUrl()` 归一化后用 `=== || startsWith(default + '/')` 防子域伪造。
+- **装配点**：`gemini.tsx:main()` 在 `after_load_cli_config` 后 `try/catch` 调用，拿不到 authType 只跳过不阻塞。`core/index.ts` 新增 `detectRuntime`/`getOrCreateSharedDispatcher` 导出。
+- **测试**：`apiPreconnect.test.ts` 覆盖默认域、子域伪造、dashscope 区域端点、sentinel 回退、单次触发、sandbox 跳过等 17 个用例。`runtimeFetchOptions.test.ts` 新增共享 dispatcher 同一性断言。附 `scripts/benchmark-api-latency.mjs` 基准脚本。
+- **边界**：`!options.proxy → return`（不置 fired），无代理时不预连接——SDK 走内建 fetch 自有连接池，预热共享 dispatcher 无收益。
+
+### #3319 early input capture
+- **实现模式**：`earlyInputCapture.ts` 模块级 `inputBuffer = {chunks: Buffer[], totalBytes, captured}` 分块收集、读取时 `Buffer.concat` 避免 O(n^2)；`MAX_BUFFER_SIZE = 64*1024` 上限，超限 `stopEarlyInputCapture()` + warn。
+- **关键代码**：`captureHandler` 对每个 chunk 调 `filterTerminalResponses()` —— `classifyEscapeSequence(data, idx)` 三分类（`terminal`/`user`/`incomplete`）：`ESC P/_/^/]` 判 terminal，`ESC [ ?`/`ESC [ >` 判 terminal（DEC 私有 / DA2），`ESC [ A/B/C/D`、`ESC O P/Q/R/S` 判 user（方向键 / 功能键），不完整留 `pendingTerminalResponse` 到下一 chunk。`skipTerminalResponse()` 按 OSC 的 `BEL`/`ST`、DCS/APC/PM 的 `ST`、CSI `0x40–0x7E` 终止符跳过。
+- **排空与回放**：`stopAndGetCapturedInput()` 原子操作在 `gemini.tsx:startInteractiveUI()` 的 `render()` **之前**（React 组件外）执行，返回值作 `initialCapturedInput` prop 传入 `<KeypressProvider>`。`KeypressContext.tsx` 中 `capturedInput = initialCapturedInput ?? Buffer.alloc(0)`，非空时 `replayPending=true` + `setImmediate(() => stdin.emit('data', capturedInput))`；cleanup 把 `replayPending=false`，StrictMode 假挂载不重复回放。
+- **装配点**：`gemini.tsx:main()` 在 `setRawMode(true)` 后立即 `startEarlyInputCapture()`，`registerCleanup(() => stopAndGetCapturedInput())`。
+- **测试**：`earlyInputCapture.test.ts` 用 `PassThrough` mock stdin，覆盖生命周期、DEC/DA2/OSC/DCS 过滤、跨 chunk 拆分、UTF-8 多字节、64KB 上限等约 25 个用例。
+
+### #3297 lazy tool registration
+- **实现模式**：`ToolRegistry` 新增三张表——`tools: Map<name, tool>`、`factories: Map<name, ToolFactory>`（`ToolFactory = () => Promise<AnyDeclarativeTool>`）、`inflight: Map<name, Promise<tool>>`。`registerFactory(name, factory)` 仅写 `factories`，不触发 `import()`。
+- **关键代码**：`tool-registry.ts:ensureTool(name)` —— (1) `tools` 命中 → 顺手 `factories.delete` 清残留后返回；(2) `inflight` 命中 → 返回同一 promise（并发去重核心）；(3) 取 factory 执行，promise 存入 `inflight`，resolve 后写 `tools`/删 `factory`/删 `inflight`，reject 时仅删 `inflight` 允许重试。`warmAll({strict})` 用 `Promise.allSettled(pending.map(ensureTool))` 并行加载，`strict:true` 时 rethrow 首个失败。
+- **`stop()` 修复**：先 `await Promise.allSettled(this.inflight.values())` 等所有在途工厂落定，再统一 `dispose()`——防止 `stop()` 后加载完成的工具泄漏监听器。`getAllTools()`/`getFunctionDeclarationsFiltered()` 在 `factories.size > 0` 时打 warn。`getAllToolNames()` 合并 `tools.keys()` + `factories.keys()`。
+- **装配**：`Config.createToolRegistry()` 的 `registerLazy()` 经 `permissionManager.isToolEnabled()` 鉴权后 `registry.registerFactory(toolName, factory)`；`Config.initialize()` 末尾 `await this.toolRegistry.warmAll({strict:true})` 全量预热。
+- **现实**：esbuild 单文件 bundle 下 `dynamic import()` 仅从内存取引用、不推迟模块求值，加之 `warmAll` 急加载，启动路径上零时间收益；收益要等 #3226 code splitting。
+
+### #3232 startup profiler
+- **实现模式**：`startupProfiler.ts` 模块级状态 `enabled/t0/processUptimeAtT0Ms/checkpoints[]/finalized`。`initStartupProfiler()` 先 `resetStartupProfiler()` 幂等，仅 `QWEN_CODE_PROFILE_STARTUP==='1'` + `process.env['SANDBOX']` 时启用，记录 `t0 = performance.now()` 与 `processUptimeAtT0Ms = process.uptime()*1000`（量出 module-load 耗时）。
+- **关键代码**：`profileCheckpoint(name)` 记录 `{name, timestamp: performance.now()}`；`getStartupReport()` 用相邻 checkpoint 差值算各相位 `durationMs`，返回含 `processUptimeAtT0Ms`/`totalMs`/`phases[]`/`nodeVersion`/`platform`/`arch` 的 JSON。`finalizeStartupProfile(sessionId)` 写 `~/.qwen/startup-perf/<timestamp>-<sessionId>.json` + stderr 打印路径，`finalized` 标志防二次写入。
+- **装配点**：`packages/cli/index.ts` 顶部 `initStartupProfiler()` **先于** `import './src/gemini.js'`（注释 "Must run before any other imports to capture the earliest possible T0"）。`gemini.tsx:main()` 内 `profileCheckpoint('main_entry')`/`after_parse_arguments`/`after_load_settings`/`after_sandbox_check`/`after_load_cli_config`/`after_initialize_app`/`before_render`，`finalizeStartupProfile(config.getSessionId())` 在 `before_render` 之后调用。
+- **测试**：`startupProfiler.test.ts` 覆盖关闭/sandbox 外/启用三态，验证 checkpoint 收集、`durationMs >= 0`、JSON 落盘路径含 sessionId、幂等 finalize、write 失败不抛异常。
+- **边界**：默认仅 sandbox 子进程采集（避免外层 + 子进程重复报告），普通运行需 `SANDBOX=1` 或 `QWEN_CODE_PROFILE_STARTUP_OUTER=1`；零开销原则——未启用时仅一次环境变量比较。
+
+### #3085（CLOSED，已拆分）
+- 为 #3318 + #3319 的合并版 PR，已关闭。原始 `isDefaultBaseUrl` 使用裸 `startsWith` 存在子域伪造缺陷（`dashscope.aliyuncs.com.evil.com` 误命中），在 #3318 修正为 `=== || startsWith(default + '/')`。
+
+---
+
 ## 7. 已知限制 / 后续
 
 - **#3085 的 `isDefaultBaseUrl` 子域伪造（已在 #3318 修）**：#3085 原始实现为 `Object.values(DEFAULT_BASE_URLS).some(url => normalized.startsWith(url.toLowerCase()))`，裸 `startsWith` 会让 `dashscope.aliyuncs.com.evil.com` 命中 `dashscope.aliyuncs.com`，把预连接打到伪造域。当前代码改为 `=== || startsWith(default + '/')`，要求默认域后紧跟 `/`，缺陷已闭合。
