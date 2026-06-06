@@ -523,3 +523,41 @@ sequenceDiagram
 | `runQwenServe.test.ts`（264 行） | budget 整数校验、`enforce` 需 budget、`childEnvOverrides` per-handle 隔离、`inheritedNoPool → mcpPoolActive=false`。 |
 
 > 注：`mcp-pool-entry.test.ts` 在 `daemon_mode_b_main` 上为空（0 行）；`PoolEntry` 的生命周期/终态/sweep 行为通过 `mcp-transport-pool.test.ts` 的集成路径覆盖，而非独立单测。
+
+---
+
+## 各 PR 代码贡献
+
+### #4247 — per-session 预算基座（@doudouOUC）
+
+- `mcp-client-manager.ts:tryReserveSlot`：同步 check+add 消除 TOCTOU，三态返回 `reserved|already_held|refused`；`weReservedSlot` 区分"本次新占"与"off 模式 no-op"防泄漏。
+- `mcp-client-manager.ts:discoverAllMcpTools` / `discoverMcpToolsForServerInternal` / `readResource`：3 处 refuse 点；`BudgetExhaustedError` + `refuseAndLog`。
+- `status.ts` 新增 `McpBudgetConfig` 类型 + `scope:'session'` 诚实标注；`runQwenServe.ts` 透传 `--mcp-client-budget`/`--mcp-budget-mode` CLI 选项。
+- `mcp-client-manager.test.ts` 覆盖 tryReserveSlot/weReservedSlot/3 处 refuse/stop drain。
+
+### #4336 — workspace 共享传输池 F2（@doudouOUC）
+
+- 新增 `mcp-transport-pool.ts:McpTransportPool`（主索引 `entries`、`spawnInFlight` 去重、`sessionToEntries` 反向索引、`draining` 互斥）；`mcp-pool-entry.ts:PoolEntry`（状态机 spawning→active⇄draining→closed|failed、`statusChangeListener` 全终态移除、drain timer + maxIdle 硬顶）。
+- 新增 `mcp-workspace-budget.ts:WorkspaceMcpBudget`（按名封顶 `reservedSlots: Set<string>`、75%/37.5% 迟滞、`beginBulkPass`/`endBulkPass` 合批门）；`mcp-pool-key.ts:fingerprint`（截断 SHA-256，OAuth 全字段哈希含 W88 修复）。
+- 新增 `session-mcp-view.ts:SessionMcpView`（per-session trust 拷贝 `withTrust` + include/exclude 过滤 + `compileNameFilter`）；`pid-descendants.ts:listDescendantPids`（跨平台单快照 BFS + `MAX_DESCENDANTS=256`）。
+- `acpAgent.ts` 装配 `QwenAgent.mcpPool` + `skipPerSessionBudgetCallback` 互斥；`mcp-client-manager.ts:discoverAllMcpToolsViaPool` 池路径委派。
+- 6 个新测试文件、32 条 review fold-in；保留 `QWEN_SERVE_NO_MCP_POOL=1` kill switch。
+
+### #4552 — 运行时 MCP 增删（@doudouOUC）
+
+- `mcp-client-manager.ts:addRuntimeMcpServer`：同名同指纹幂等快路径（只更新 Config overlay 不 churn 传输）；spawn 失败回滚 Config overlay + budget。
+- `mcp-client-manager.ts:removeRuntimeMcpServer`：释放池连接用 identity-check 防并发 add 竞争；`config.ts` 新增 runtime overlay 机制。
+- `server.ts` / `bridge.ts` 新增 `POST /workspace/mcp/servers` 与 `DELETE` 路由；`capabilities.ts` 注册 `mcp_runtime_add_remove`。
+- `mcp-client-manager.test.ts` + `bridge.test.ts` + SDK 类型锁覆盖幂等/回滚/并发。
+
+### #4460 — 自愈可观测性（@doudouOUC）
+
+- `mcp-client.ts:lastTransportError`：在 `onerror` 内、`updateStatus(DISCONNECTED)` **之前**捕获，保证 silent-drop listener 同步读取时字段已就绪。
+- `mcp-pool-entry.ts` silent-drop 块透传 `lastError` 到 `'failed'` 事件，保留 `"silent transport drop"` marker 向后兼容 log-grep。
+- `mcp-pool-entry.ts:SweepResult`（internal 不导出）：`pidSweepError`/`descendantsFound`/`descendantsSignaled` 结构化 warn；count undefined 打 `'unknown'` 区分"0 found"与"not measured"。
+
+### #4535 — 持久化 MCP 移除（@Jerry2003826）
+
+- `settings.ts` 新增 `persistMcpServerRemoval`：把运行时 `removeRuntimeMcpServer` 的删除动作写入 `settings.json`，使 daemon 重启后不复活被移除的 server。
+- `commentJson.ts` 新增 comment-preserving JSON 写入工具，在编辑 settings 时保留用户注释。
+- `settings.test.ts` + `commentJson.test.ts` 覆盖持久化 round-trip 与注释保留。

@@ -475,3 +475,22 @@ sequenceDiagram
 | getOutboundCorrelationPropagateTraceContext defaults | `config.test.ts`（提交 `c0352fd5b`） | getter 默认 `false` |
 
 `[CLOSED #4393 · 未合入]` 的测试（仅存在于 #4393 diff，`main` 无）：`llm-correlation-fetch.test.ts` 覆盖 `wrapFetchWithCorrelation` 的 telemetry-on/off、空 sid 跳过、**session reset 后读到新 id（staleness regression guard）**、baseFetch reject 透传；各 provider `*.test.ts` 断言构造时 `fetch` 是 wrapped 版本（OpenAI/Anthropic）/ `httpOptions.headers` 含 `X-Qwen-Code-Session-Id`（Gemini）。这些测试随 #4393 一同未合入。
+
+---
+
+## 各 PR 代码贡献
+
+### #4390 — client HTTP span + opt-in traceparent
+
+- `sdk.ts:NOOP_PROPAGATOR`：`inject()` 空操作的 `TextMapPropagator`，默认装入 NodeSDK 阻止 `traceparent` 上 wire。
+- `sdk.ts:UndiciInstrumentation`：注册出站 HTTP client span（patch `globalThis.fetch` / undici），`ignoreRequestHook` 经 `matchesOtlpPrefix` 排除 OTLP 自请求。
+- `sdk.ts:normalizeOtlpPrefix` / `matchesOtlpPrefix`：origin+path 精确匹配反馈环守卫，封堵 port / host / path 三类前缀碰撞；不可解析 URL fail-open + `diag.warn`。
+- `config.ts:getOutboundCorrelationPropagateTraceContext` / `settingsSchema.ts:outboundCorrelation`：独立于 `telemetry.*` 的顶级安全命名空间，opt-in 时 NodeSDK 回退到 W3C composite propagator。
+- `loggingContentGenerator.ts`：`context.with(spanContext, fn)` 把 `llm_request` span 设为 active context，使出站 HTTP span 正确 parent 到 `llm_request`。
+
+### #4393 — session-id 透传（CLOSED，未合入，补记）
+
+- `llm-correlation-fetch.ts:wrapFetchWithCorrelation`：per-request fetch 包装器，从 `Config.getSessionId()` 实时读取 session id 写入 `X-Qwen-Code-Session-Id` header。
+- `llm-correlation-fetch.ts:staticCorrelationHeaders`：给无 `fetch` hook 的 SDK（Gemini）提供 static header 注入。
+- 4 个 provider 集成点（`default.ts` / `dashscope.ts` / `anthropicContentGenerator.ts` / `geminiContentGenerator/index.ts`）各自接入 wrapped fetch 或 static headers。
+- **致命缺陷**：仅以 `getTelemetryEnabled()` 门控、无 host allowlist → 明文 session id 广播给所有第三方 provider → 被 CLOSED。

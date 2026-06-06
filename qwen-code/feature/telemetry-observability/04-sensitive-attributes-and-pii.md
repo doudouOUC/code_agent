@@ -445,3 +445,29 @@ sequenceDiagram
 | `loggingContentGenerator.test.ts` | `extractResponseText` 行为：thought 排除（L331 `normalizes thought parts`，L412 断言 `response_text='ok'` 不含 thought）+ 4096 截断（L806 `truncates long response text`，L830–831）+ internal/thought-only 省略 response_text（L840–866 `omits response_text for %s`，L1953/L2021 internal 路径 `response_text` undefined） |
 
 **覆盖缺口**：没有用例验证「**直连 logs endpoint（不经桥接）时 response_text 是否应被门控**」——因为现状就是「不门控」，测试只固化了现状（`loggers.test.ts:339`）。若按「已知限制 1」修复，需新增「`logPrompts=false`（或新开关关）→ api_response 不含 response_text」的回归用例。
+
+---
+
+## 各 PR 代码贡献
+
+### #3893 — opt-in gate
+- `telemetry/config.ts:resolveTelemetrySettings` — 新增 `includeSensitiveSpanAttributes` 三段解析（env `QWEN_TELEMETRY_INCLUDE_SENSITIVE_SPAN_ATTRIBUTES` > settings > false）
+- `config.ts:TelemetrySettings` — 新增 `includeSensitiveSpanAttributes` 字段 + `Config.getTelemetryIncludeSensitiveSpanAttributes()` getter（`?? false`）
+- `log-to-span-processor.ts:SENSITIVE_ATTRIBUTE_KEYS` — 新增 `Set(['error','error.message','error_message','prompt','function_args','response_text'])`；`onEmit` 按开关过滤
+- `docs/` — 配置表新增 `includeSensitiveSpanAttributes` 行 + `settingsSchema` 默认 false + 警告文案
+
+### #4097 — detailed-span-attributes
+- `telemetry/detailed-span-attributes.ts` — 新增文件：`isEnabled`（双闸门）+ `truncateContent`（60KB）+ `shortHash`（SHA-256[:12]）+ 6 个 helper（`addUserPrompt`/`addSystemPrompt`/`addToolSchema`/`addModelOutput`/`addToolInput`/`addToolResult`）
+- `client.ts` — 新增双守卫：`getTelemetryIncludeSensitiveSpanAttributes?.()` 包裹 `addUserPromptAttributes`（跳过 `partToString` 序列化）
+- `coreToolScheduler.ts` — 新增双守卫包裹 `addToolInputAttributes`/`addToolResultAttributes`（跳过 `safeJsonStringify` 大 Part[]）
+- `loggingContentGenerator.ts` — 接入 `addSystemPromptAttributes`/`addToolSchemaAttributes`/`addModelOutputAttributes`
+
+### #3847 — traceId/spanId in logs（trace correlation）
+- `config.ts:startNewSession` — 新增 `refreshSessionContext(this.sessionId)` 调用，确保 `/clear`/`/resume` 后 session context 刷新
+- `client.ts:generateContent` — 用 `withSpan('client.generateContent', ...)` 包裹 + `safeSetStatus` 区分 aborted vs failed 错误（泛化 status message 不泄露原始错误）
+- `client.test.ts` — 新增 span status 断言（ERROR + aborted 区分、不含 raw error 敏感信息）
+
+### #4660 — clear seenHashes
+- `detailed-span-attributes.ts:seenHashes` — 注释从「intentionally never cleared in production」改为「Cleared on chat compression」
+- `geminiChat.ts:tryCompressChat` — 压缩成功后调用 `clearDetailedSpanState()` 清理 `seenHashes`（修复压缩后 system_prompt 全量丢失）
+- `detailed-span-attributes.test.ts` — 新增 tool schema 去重重置测试（`clearDetailedSpanState` 后 re-emit 全文）

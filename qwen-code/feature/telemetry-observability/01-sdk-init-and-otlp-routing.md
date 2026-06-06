@@ -565,3 +565,32 @@ vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');   // sdk.t
 | `refreshSessionContext` | L1244-1305（更新/未初始化 no-op/抛错不崩） | session 切换重建 context |
 
 **测试盲区**：限制 1 决定了「桥接 / grpc 跳过」两条分支 **无法在不 mock getter 的前提下被覆盖**——现有用例靠 `mockReturnValue('')` 制造一个生产中不存在的输入。这是「测试通过但分支默认死」的典型背离，应在修复限制 1 时一并补「默认配置确实不接桥 / 接桥确实可达」的对照用例。
+
+---
+
+## 各 PR 代码贡献
+
+### #3779 — OTLP routing + shutdown
+- `sdk.ts:resolveHttpOtlpUrl` — 新增 HTTP signal 路径追加逻辑（`OTLP_SIGNAL_PATHS` 常量 + 尾斜杠/全路径检测）
+- `sdk.ts:initializeTelemetry` — HTTP 分支增加 per-signal endpoint override、`LogToSpanProcessor` 自动接桥（含 `diagnosticsSink` 注入）
+- `telemetry/config.ts:resolveTelemetrySettings` — 新增 per-signal endpoint 与标准 `OTEL_EXPORTER_OTLP_*` 环境变量解析
+- `docs/developers/development/telemetry.md` — 新增 per-signal endpoint 配置表项与 HTTP 路由说明
+
+### #3807 — autoDetectResources:false
+- `sdk.ts:initializeTelemetry` — `NodeSDK` 构造新增 `autoDetectResources: false`，关闭 host/process 异步 detector
+- `sdk.test.ts` — 三处断言 `NodeSDK` 调用参数包含 `autoDetectResources: false`
+
+### #3813 — bounded shutdown timeout + service.version
+- `sdk.ts:SHUTDOWN_TIMEOUT_MS` — 新增 10s 常量；`shutdownTelemetry` 改为 `Promise.race` 超时 fail-open + 预挂 `.catch` 吸收迟到 reject + `timer.unref()`
+- `sdk.ts:initializeTelemetry` — `service.version` 从 `process.version` 改为 `config.getCliVersion() || 'unknown'`
+- `sdk.test.ts` — 新增 shutdown 超时/正常完成/reject 三组测试 + `service.version` 回填与 undefined 回退测试
+
+### #3986 — suppress diag from UI
+- `sdk.ts:createTelemetryDiagLogger` — 新增函数，将 OTel `DiagLogger` 五个级别全部改道到 `createDebugLogger('OTEL')`
+- `sdk.ts` 模块顶层 — `diag.setLogger(createTelemetryDiagLogger(), DiagLogLevel.WARN)` 替换原 `DiagConsoleLogger`
+- `sdk.test.ts` — 新增诊断路由测试（验证 `console.error`/`console.warn` 无输出、`fs.appendFile` 写入 debug 文件）
+
+### #4061 — remove dead useCollector/QWEN
+- `telemetry/index.ts:TelemetryTarget` — 删除 `QWEN` 枚举值，仅余 `GCP`/`LOCAL`
+- `config.ts:TelemetrySettings` — 删除 `useCollector` 字段；`Config` 删除 `getTelemetryUseCollector()` 方法
+- `telemetry/config.ts:resolveTelemetrySettings` — 删除 `useCollector` 解析；`docs/` 与 `settings.md` 同步清理

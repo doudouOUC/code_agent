@@ -412,3 +412,51 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 | `eventBus.test.ts` / `inMemoryChannel.test.ts` / `status.test.ts` / `spawnChannel.test.ts` / `bridgeClient.test.ts` | 740 / 224 / 240 / 243 / 446 | 抽包随附测试：ring replay/背压/eviction、in-memory 双流 `abort()`、状态线协议类型 + `mapDomainErrorToErrorKind`、`scrubChildEnv` + kill 级联、BridgeClient first-responder 流 + fs 代理。 |
 
 > PR #4335 body 自报的测试规模：35 mediator 单测、10 audit ring 测、55 SDK reducer 测（8 个新 partial_vote/forbidden + ordering + 前向兼容）、3 bridge 集成测；pre-existing `httpAcpBridge.test.ts` 快照套件保持绿（first-responder byte-for-byte 保留）。
+
+---
+
+## 各 PR 代码贡献
+
+### #4295 — acp-bridge 骨架 22a（@doudouOUC）
+
+- 新建 `packages/acp-bridge/` 包骨架（`package.json` + `tsconfig.json` + `vitest.config.ts`）；抬升 `eventBus.ts:EventBus` + `inMemoryChannel.ts:createInMemoryChannel` + `channel.ts:AcpChannel` 类型到包内。
+- `permission.ts` 冻结 `PermissionMediator` type-only 契约：`PermissionPolicy` 4 字面量、`PermissionRequestRecord`、`PermissionVote`、`PermissionVoteOutcome`、`PermissionResolution`。
+- `serve/eventBus.ts` 退化为 re-export shim `export * from '@qwen-code/acp-bridge/eventBus'`；`serve/httpAcpBridge.ts` 同步调整 import。
+
+### #4298 — lift status/paths/errors 22b/1（@doudouOUC）
+
+- 抬升 `status.ts`（状态线协议类型 + `mapDomainErrorToErrorKind`）、`workspacePaths.ts:canonicalizeWorkspace`（realpathSync.native + ENOENT 回落 + `MAX_WORKSPACE_PATH_LENGTH`）、`bridgeErrors.ts`（11+ typed error 子类）、`bridgeTypes.ts` 到 `packages/acp-bridge/src/`。
+- `serve/fs/paths.ts` 新增 re-export 保留旧导入路径；`serve/httpAcpBridge.ts` 更新为从 `@qwen-code/acp-bridge` 导入。
+- `status.test.ts` 随迁；行为零变化。
+
+### #4300 — typed errors for channel-closed/missing-cli-entry（@doudouOUC）
+
+- `status.ts:mapDomainErrorToErrorKind`：把 channel-closed / missing-cli-entry 从 regex 匹配改为 typed `instanceof`（`BridgeChannelClosedError → 'protocol_error'`、`MissingCliEntryError → 'missing_binary'`）。
+- 跨包类（如 `SkillError`）刻意 match `.name` 而非 `instanceof`（防 bundle 重复 class instance 返回 false）。
+- `serve/httpAcpBridge.ts` 同步移除旧 regex 匹配分支。
+
+### #4304 — BridgeOptions + DaemonStatusProvider 22b/2（@doudouOUC）
+
+- 新增 `bridgeOptions.ts:BridgeOptions`（工厂构造契约：必填 `boundWorkspace`、旋钮 `maxSessions`/`eventRingSize`/`permissionResponseTimeoutMs`、注入回调 `persistApprovalMode`/`childEnvOverrides`）。
+- 新增 `bridgeOptions.ts:DaemonStatusProvider` 窄 seam（`getEnvStatus`/`getDaemonPreflightCells`）；生产实现 `daemonStatusProvider.ts:createDaemonStatusProvider`。
+- `runQwenServe.ts` / `server.ts` 装配改造：工厂参数从散落 args 收拢到 `BridgeOptions` 对象。
+
+### #4319 — F1 自给自足（@doudouOUC）
+
+- 抬升 `bridge.ts:createHttpAcpBridge` 工厂闭包 + `bridgeClient.ts:BridgeClient` + `spawnChannel.ts:defaultSpawnChannelFactory` 到 `packages/acp-bridge/src/`。
+- 新增 `bridgeFileSystem.ts:BridgeFileSystem` seam（`readText`/`writeText`，签名镜像 ACP SDK 形状）；`bridgeOptions.ts` 增加 `fileSystem` 注入点 + `BridgeClient` early-return 委托。
+- `serve/httpAcpBridge.ts` 退化为 ~97 行 re-export shim 转发全部导出符号；内部 import 零改动。
+- `bridgeClient.test.ts` + `spawnChannel.test.ts` 随迁。
+
+### #4335 — F3 多客户端权限协调（@doudouOUC）
+
+- 新增 `permissionMediator.ts:MultiClientPermissionMediator`（1318 行）：四策略 `first-responder`/`designated`/`consensus`/`local-only` 实现；并发不变量 N1（同步注册）、N2（`resolveEntry` 双解析守卫 + 6 步清理梯）、O5（`CANCEL_VOTE_SENTINEL` 跨策略逃逸 + 双碰撞防御）。
+- consensus 用 `Set<clientId>` 记票防灌票 + `consensusQuorumFor` quorum 判定；`safeEmit`/`safeAudit`/`writeForbiddenStderr` 三层 try/catch 保证 Promise 必 settle。
+- 新增 `bridgeErrors.ts:CancelSentinelCollisionError`/`PermissionForbiddenError`/`PermissionPolicyNotImplementedError`（映射 500/403/501）；`server.ts:sendPermissionVoteErrorImpl` + `detectFromLoopback` fail-closed。
+- `permissionMediator.test.ts`（1219 行）含 48-case 投票交错枚举 + N2 清理梯 emit/audit throw 仍 settle。
+
+### #4445 — 测试抬升（@doudouOUC）
+
+- 把 `bridge.test.ts`（6861 行，`daemon_mode_b_main` 上增长至 8386 行）从 `packages/cli/src/serve/` 抬到 `packages/acp-bridge/src/`。
+- 新增 `internal/testUtils.ts` 提供包内测试公共工具；`daemonStatusProvider.test.ts` 留在 cli 侧。
+- `cli/vitest.config.ts` 移除已迁测试路径；行为零变化。

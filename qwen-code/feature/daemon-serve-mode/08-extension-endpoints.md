@@ -496,3 +496,55 @@ flowchart TD
 | `channels/base/src/ChannelBase.test.ts` / `DaemonChannelBridge.test.ts` | `ChannelBase` 调度（bang 块当前未单测「接通」路径——潜伏 bug 无回归守卫）；`DaemonChannelBridge.shellCommand` 单测里以**正常 `this`** 调用（`new` 后 `bridge.shellCommand(...)`），故测不到 `ChannelBase` 那条 unbound 调用的 TypeError。 |
 
 > 最后一行是「为什么这个 latent bug 没被测试抓到」的根因：`DaemonChannelBridge.test.ts` 测的是 `bridge.shellCommand(...)`（带绑定），而出事的是 `ChannelBase.ts:279` 的 unbound 自由变量调用——两条路径无交叉测试，且 `ChannelBase` 在生产用 `AcpBridge`（哑火）故 e2e 也碰不到。
+
+---
+
+## 各 PR 代码贡献
+
+### #4504 — recap 端点（@doudouOUC）
+
+- `server.ts` 新增 `POST /session/:id/recap` 路由（`mutate()` 非 strict）；`bridge.ts:generateSessionRecap`（`SESSION_RECAP_TIMEOUT_MS=60s` + `getTransportClosedReject` race）。
+- `acpAgent.ts` 新增 `case SERVE_CONTROL_EXT_METHODS.sessionRecap` 分派；核心侧调 `sessionRecap.ts:generateSessionRecap`（侧查询 + `filterToDialog` 剔 tool/thought + `extractRecap` tag 抽取）。
+- `capabilities.ts` 注册 `session_recap` 能力标签；SDK 新增 `DaemonSessionClient.recap` + `DaemonSessionRecapResult` 类型。
+- v1 无取消（路由无 `res.once('close')`、bridge 无 signal 形参）。
+
+### #4559 — daemon 文件日志（@doudouOUC）
+
+- 新增 `daemonLogger.ts`：`computeDaemonId`（`serve-<pid>-<sha256[:8]>`）、boot 同步探针（写不了即 `NOOP_LOGGER`）、`enqueueAppend` 串行 promise 队列、`degraded` 一次性降级。
+- `spawnChannel.ts:createStderrForwarder`：子进程 stderr 逐行转发 + `STDERR_LINE_CAP_CHARS=64KiB` 截断 + `onDiagnosticLine` tee。
+- `bridgeOptions.ts` 新增 `onDiagnosticLine` 回调 seam；`runQwenServe.ts` 装配 `diagnosticSink` + `channelFactory` + `createHttpAcpBridge`。
+- 21 个 `daemonLogger.test.ts` 用例覆盖格式、opt-out、degrade-only-once、symlink 更新。
+
+### #4576 — server-side shell（@doudouOUC）
+
+- `bridge.ts:executeShellCommand`：daemon 本进程内执行（`ShellExecutionService.execute`）、cwd 服务端固定 `entry.workspaceCwd`、流式 `session_update{shell_output}` SSE 推送、`SHELL_COMMAND_TIMEOUT_MS=120s` 硬超时。
+- `acpAgent.ts` 新增 `case sessionShellHistory`：`geminiClient.addHistory` 注入命令+输出（`MAX_SHELL_OUTPUT_FOR_HISTORY=10_000` 截断）。
+- `ChannelBase.ts` 新增 bang 块（L273-313）：当前 inert（`AcpBridge` 无 `shellCommand`）+ 潜伏 `this`-binding 隐患（unbound 自由变量调用）。
+- SDK 新增 `DaemonSessionClient.shellCommand` + `DaemonShellCommandResult` 类型；web-shell `useDaemonSession` 接入。
+
+### #4578 — tasks 快照端点（@doudouOUC）
+
+- `server.ts` 新增 `GET /session/:id/tasks`（仅全局 bearer，无 `mutate`）；`bridge.ts:getSessionTasksStatus` 经 `requestSessionStatus` 绕过 prompt FIFO。
+- 新增 `tasksSnapshot.ts:buildSessionTasksStatus`：合并 3 个 registry（agent/shell/monitor）、whitelist 序列化逐字段列举、`STATUS_SCHEMA_VERSION` 版本号。
+- `capabilities.ts` 注册 `session_tasks`；SDK 新增 `DaemonSessionClient.tasks`；web-shell `tasksCommand.ts` 本地拦截 `/tasks`。
+- `bridge.test.ts` 钉死"绕 FIFO"不变式。
+
+### #4606 — request 级访问日志（@doudouOUC）
+
+- `server.ts` 注册 access-log 中间件（在 `bearerAuth`/`json` **之前**，使 401/400 也被记录）；排除 `GET /health`、heartbeat、成功 SSE。
+- `bridge.ts` 关键路由（spawn/attach、prompt enqueue、cancel、recap/shell 完成、SSE open/close）新增 inline 业务日志。
+- `sessionRecap.ts` 新增 recap 生成长度日志行。
+
+### #4610 — btw 端点（@doudouOUC）
+
+- `server.ts` 新增 `POST /session/:id/btw`（`question` 必填 `<=4096` 字符、`res.once('close')` abort）；`bridge.ts:generateSessionBtw`（三路 `Promise.race` + `SESSION_BTW_TIMEOUT_MS=60s`）。
+- 新增 `core/utils/btwUtils.ts:buildBtwPrompt`（`<system-reminder>` 钉死无工具单轮直答）+ `buildBtwCacheSafeParams`（复用主 session prompt-cache slot）。
+- `acpAgent.ts:case sessionBtw`：`runForkedAgent` + `BTW_CHILD_TIMEOUT_MS=55s`（子进程自守 < bridge backstop）。
+- `capabilities.ts` 注册 `session_btw`；SDK 暂未暴露（待 F4 公开）。
+
+### #4666 — btw 修复：泄漏+超时+上限（@doudouOUC）
+
+- `acpAgent.ts`：移除 `getCacheSafeParams()` 回退（防跨 session 历史泄漏）；超时判断从 DOMException 改为 `childSignal.aborted`（原判断永不匹配）。
+- `btwUtils.ts`：`getHistoryTail(40, false)` 改浅拷贝；`buildBtwCacheSafeParams` 异常全吞为 `null`。
+- `btwCommand.ts`：斜杠命令补 `BTW_MAX_INPUT_LENGTH=4096` 守卫。
+- `server.ts`：permission `requestId` 基数修复。

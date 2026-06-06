@@ -471,3 +471,48 @@ sequenceDiagram
 - **tombstone/early-events**：`tombstones closed sessionIds so late notifications cannot leak into a future load`（`:6781`）、`purges buffered guardrail events when restore fails so retry-success does not replay stale frames`（`:6876`）。
 
 配套：`bridgeClient.test.ts`（demux/early-events/tombstone）、`HistoryReplayer.test.ts` / `Session.test.ts`（agent 侧回放）、`server.test.ts`（路由层 `res.writable` reaper、状态码映射、`/sessions/delete` 批量）。
+
+---
+
+## 各 PR 代码贡献
+
+### #4209 — sessionScope override
+
+- `bridge.ts:spawnOrAttach`：新增 `effectiveScope = req.sessionScope ?? defaultSessionScope` 决策；非法值抛 `InvalidSessionScopeError`。
+- `bridge.ts:doSpawn`：`thread` scope 的会话**绝不**赋给 `defaultEntry`，防 mixed-scope 隔离泄漏。
+- `bridgeErrors.ts:InvalidSessionScopeError`：类定义 + 路由映射 `400 invalid_session_scope`。
+- 双向测试 `bridge.test.ts`：`thread-scope first call does NOT pollute single-scope attach slot` + 反向。
+
+### #4222 — load / resume
+
+- `bridge.ts:restoreSession`：共用入口，按 `action` 分叉到 `connection.loadSession`（回放）/ `connection.unstable_resumeSession`（不回放）。
+- `bridge.ts:pendingRestoreEvents`：`Map<sessionId, EventBus>` 临时 bus，承接 ACP 回放帧并在 settle 后提升进正式 entry。
+- `bridge.ts:inFlightRestores` / `RestoreInProgressError`：跨动作并发硬拒 409（保护 resume 的 no-replay 契约）；同动作 coalesce 合并（`coalesceState.count` 同步预留）。
+- `bridgeClient.ts:markRestoreInFlight` / `markSessionClosed`：tombstone 协同——allow-list restore id + 60s TTL 防 late notification 泄漏。
+
+### #4235 — heartbeat
+
+- `bridge.ts:recordHeartbeat`：同步方法——`resolveTrustedClientId` 校验在前、`sessionLastSeenAt` / `clientLastSeenAt` 写在后，无 TOCTOU 窗口。
+- `bridge.ts:getHeartbeatState`：返回快照副本（`new Map(entry.clientLastSeenAt)`）防外部改写 live map。
+- `bridgeTypes.ts:BridgeHeartbeatResult` / `BridgeHeartbeatState`：心跳结果/状态类型定义。
+- `server.ts`：路由 `POST /session/:id/heartbeat`（`mutate()` 非 strict）。
+
+### #4240 — metadata + close / delete
+
+- `bridge.ts:closeSession`：同步前缀清 `defaultEntry` → `channelInfoForEntry` → `sessionIds.delete` → 首个 await `notifyAgentSessionClose` → `byId.delete` → `markSessionClosed` → 发 `session_closed` → `events.close()`。
+- `bridge.ts:updateSessionMetadata`：校验 `displayName` 长度/控制字符 → 发 `session_metadata_updated`（仅真变化时）。
+- `server.ts`：路由 `DELETE /session/:id`（204/404）、`POST /sessions/delete`（批量 ≤100，`Promise.allSettled`）、`PATCH /session/:id/metadata`。
+- SDK `DaemonClient.closeSession`：吸收 204 与 404 都视为成功。
+
+### #4694 — compacted replay
+
+- `compactionEngine.ts:TurnBoundaryCompactionEngine`：per-EventBus 压缩引擎，`ingest()` 每帧（try/catch 隔离），`turn_complete` / `turn_error` 时折叠连续 chunk / 同 toolCallId 序列 / 仅保留最新状态帧。
+- `compactionEngine.ts:snapshot()`：同步返回 `SessionReplaySnapshot`——`compactedTurns` + `liveJournal` + `lastEventId`（典型 3h 重度会话 ~50MB raw → ~2MB）。
+- `bridge.ts:restoreSession`：返回新增字段 `compactedReplay` / `liveJournal` / `lastEventId`（`BridgeRestoredSession`，所有字段 optional 保持向后兼容）。
+- 与 ring replay 正交：ring 服务 SSE 短期追赶，compaction engine 提供全会话恢复路径。
+
+### #4751 — ACP lifecycle 优化
+
+- `bridge.ts:preheat()`：daemon 启动时预热 ACP child（首 session 延迟降 0-0.5s）。
+- `bridge.ts`：新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活，避免频繁冷启。
+- ACP 子进程跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn——直传 `--max-old-space-size` + cgroup 感知。
