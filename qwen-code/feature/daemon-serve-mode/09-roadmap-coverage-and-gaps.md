@@ -309,7 +309,8 @@ Stage 1.5 是**增量迁移，非大重写**：
 | #4472 #4504 #4527 #4530 #4552 #4559 #4576 #4578 #4606 #4610 #4630 | PR | ✅ MERGED | daemon_mode_b_main（Stage2 partial + 扩展端点）|
 | #4469 #4500 | PR | ✅ MERGED | daemon_mode_b_main（sync main→dmbm）|
 | #4490 | PR | 🔧 OPEN / DRAFT / CONFLICTING | base main（反向集成）|
-| #4412 #4563 | PR | 🔧 OPEN | #4412 base main(draft, deep-dive docs)；#4563 base dmbm(DaemonWorkspaceService)|
+| #4412 | PR | 🔧 OPEN | #4412 base main(draft, deep-dive docs)|
+| #4563 | PR | ✅ MERGED | #4563 base dmbm(DaemonWorkspaceService refactor，06-06 合入)|
 | #4515 #4516 | PR | ❌ CLOSED 未合入 | dmbm（stats/export、compress/_meta 砍了）|
 | #4296 | PR | ❌ CLOSED | web-first pivot（已 superseded）|
 | #3929 #3930 #3931 | PR(draft) | ❌ CLOSED 未合入 | remote-control（2026-05-15 关）|

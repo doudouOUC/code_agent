@@ -33,6 +33,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：一个 `qwen serve` 进�
 | [#3889](https://github.com/QwenLM/qwen-code/pull/3889) | review BQ9tV/BkwQP | reaper 语义 | attach-after-spawn 计数 + tombstone 延迟拆除方案来源 |
 | [#4243](https://github.com/QwenLM/qwen-code/pull/4243) | merged | @tanzhenxin | preserve read-before-write |
 | [#4522](https://github.com/QwenLM/qwen-code/pull/4522) | merged | @Jerry2003826 | session channel closing |
+| [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 
 ---
 

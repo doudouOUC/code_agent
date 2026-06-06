@@ -120,7 +120,7 @@ qwen-code.interaction                         ← 一次用户「回合」(turn)
 │   ├─ qwen-code.tool.blocked_on_user         ← 等待用户审批的时间窗
 │   ├─ qwen-code.hook                          ← PreToolUse / PostToolUse / PostToolUseFailure
 │   └─ qwen-code.tool.execution                ← 工具实际执行子 span
-└─ qwen-code.subagent (规划中, #4410, 未合入)  ← 子 agent 子树；fork/background 用 Link 另起 trace
+└─ qwen-code.subagent (规划中, #4410, 已合入 main)  ← 子 agent 子树；fork/background 用 Link 另起 trace
 ```
 
 - ~~session 根**不是真实 span**，而是一个由 `tracer.ts:createSessionRootContext(sessionId)` 构造的、`traceId = SHA-256(sessionId)[:32]` 的合成根 context（`session-context.ts` 持有）。同一 session 内所有 span 与 log 桥接 span 共享同一 traceId。~~ **#4661 后已取代**：每次 interaction 以 `ROOT_CONTEXT` 为 parent，获得独立 traceId；跨 prompt 关联改用 `session.id` span 属性查询（由 `SessionIdSpanProcessor` 全 span 自动附加）。详见 [02-span-tree-and-creation.md § per-prompt traceId](02-span-tree-and-creation.md#per-prompt-traceid每次交互独立-trace4661)。
@@ -196,8 +196,8 @@ const toolContext        = new AsyncLocalStorage<SpanContext | undefined>();
 > 对比：`startInteractionSpan` / `endInteractionSpan` 用的是 `interactionContext.enterWith(...)`（L313/L345）。这是因为 interaction 是「回合边界」、由 client 串行驱动，`enterWith` 的进程级粘性可接受；而 tool 天然并发，必须用 `run`。这一取舍见第 5 节。
 
 > **注意（与任务描述的差异）**：`main` 的 `session-tracing.ts` **只有 `interactionContext` 与 `toolContext` 两个 ALS**，并**不存在** `subagentContext` / `retryContext`。
-> - 子 agent 的并发隔离 span（`qwen-code.subagent` + `runInSubagentSpanContext`）属于 **Phase 3 / PR #4410**，目前 **OPEN 未合入**（详见第 7 节）。`main` 现状的「子 agent 归属」只能靠 `utils/subagentNameContext.ts` 这个**另一套 ALS**（`subagentNameContext`，承载子 agent 名字字符串）在 `loggingContentGenerator` 里把名字打到 api_* 事件上，并非 span 级隔离。
-> - retry 上下文（`requestSetupMs`/`attempt`/`retryTotalDelayMs`）属于 **Phase 4b / PR #4432**，目前 **OPEN 未合入**——这些字段在 `LLMRequestMetadata`（L46）已**前向声明**但 Phase 4a 下恒为 `undefined`。
+> - 子 agent 的并发隔离 span（`qwen-code.subagent` + `runInSubagentSpanContext`）属于 **Phase 3 / PR #4410**，目前 **MERGED**（详见第 7 节）。`main` 现状的「子 agent 归属」只能靠 `utils/subagentNameContext.ts` 这个**另一套 ALS**（`subagentNameContext`，承载子 agent 名字字符串）在 `loggingContentGenerator` 里把名字打到 api_* 事件上，并非 span 级隔离。
+> - retry 上下文（`requestSetupMs`/`attempt`/`retryTotalDelayMs`）属于 **Phase 4b / PR #4432**，目前 **MERGED**——这些字段在 `LLMRequestMetadata`（L46）已**前向声明**但 Phase 4a 下恒为 `undefined`。
 
 ### 3.4 敏感属性 opt-in 与 PII
 
@@ -282,7 +282,7 @@ getActiveSpanTraceContext()  // 优先取当前 active span 的 traceId/spanId
 
 **stream span 防泄漏**：`loggingStreamWrapper` 装了 `STREAM_IDLE_TIMEOUT_MS = 5min` 空闲计时器，每个 chunk 重置；消费者放弃迭代而未 `.return()` 时，超时会 `endLLMRequestSpan({success:false, error:'Stream span timed out (idle)'})` 并置 `stream.timed_out`，且后续成功/错误日志被 `spanEndedByTimeout` 闸住，避免出现「span 已超时失败」与「api_response success」自相矛盾的记录（`#4212`/`#4302`）。
 
-**retry 可见性**：`requestSetupMs`/`attempt`/`retryTotalDelayMs` 由 retry 层在 **Phase 4b（#4432，未合入）** 填充；Phase 4a 下恒 `undefined`，但 `endLLMRequestSpan` 的派生公式已对 `requestSetupMs ?? 0` 做了兼容，合入后无需改派生逻辑。
+**retry 可见性**：`requestSetupMs`/`attempt`/`retryTotalDelayMs` 由 retry 层在 **Phase 4b（#4432，已合入）** 填充；Phase 4a 下恒 `undefined`，但 `endLLMRequestSpan` 的派生公式已对 `requestSetupMs ?? 0` 做了兼容，合入后无需改派生逻辑。
 
 ### 3.8 资源属性与基数控制
 
@@ -361,7 +361,7 @@ flowchart TB
   EA -. 若用 enterWith .-x XB["会被 B 覆盖 → 串属 ✘"]
 ```
 
-要点：`enterWith` 修改的是「当前及后续」执行上下文（进程级粘性），并发 tool 之间会相互覆盖 store；`run` 把 store 绑定到回调内的整棵异步树（基于 async_hooks），并发树互不可见，因此 `startToolExecutionSpan`/`startHookSpan` 从 `toolContext.getStore()` 拿到的永远是本树父 span。子 agent 的同类隔离（`runInSubagentSpanContext`）在 #4410 中沿用此模式，但**尚未合入 main**。
+要点：`enterWith` 修改的是「当前及后续」执行上下文（进程级粘性），并发 tool 之间会相互覆盖 store；`run` 把 store 绑定到回调内的整棵异步树（基于 async_hooks），并发树互不可见，因此 `startToolExecutionSpan`/`startHookSpan` 从 `toolContext.getStore()` 拿到的永远是本树父 span。子 agent 的同类隔离（`runInSubagentSpanContext`）在 #4410 中沿用此模式，但**已合入 main（2026-06-05）**。
 
 ### 4.3 daemon 路由 span + W3C traceparent 注入/提取（`daemon_mode_b_main`）
 
@@ -439,7 +439,7 @@ sequenceDiagram
 | #4499 | interaction 归属 | interaction span 直接 pin 到 session 根 context | 1.5 |
 | #4661 | per-prompt traceId | interaction 改为 trace root（`ROOT_CONTEXT`）；`SessionIdSpanProcessor` 全 span 附加 `session.id`；移除 session 根回落 | 1.5 |
 | #4321 | blocked + hook span | `tool.blocked_on_user` + `hook` span + TTL 哨兵属性 | 2 |
-| #4410 | subagent span | `qwen-code.subagent` + 并发隔离 + fork/Link + 4h TTL（**OPEN 未合入**） | 3 |
+| #4410 | subagent span | `qwen-code.subagent` + 并发隔离 + fork/Link + 4h TTL（**MERGED**） | 3 |
 
 ### 6.3 敏感属性 / GenAI / retry
 
@@ -447,7 +447,7 @@ sequenceDiagram
 |---|---|---|---|
 | #3893 | 敏感属性 opt-in | 引入 `includeSensitiveSpanAttributes` 开关 | 1 |
 | #4417 | TTFT + GenAI 双发 | 流式 TTFT 采集 + `gen_ai.*` 语义双发 | 4a |
-| #4432 | retry 可见性 | `requestSetupMs`/`attempt`/`retryTotalDelayMs`（**OPEN 未合入**） | 4b |
+| #4432 | retry 可见性 | `requestSetupMs`/`attempt`/`retryTotalDelayMs`（**MERGED**） | 4b |
 
 ### 6.4 出站关联（#4384）
 
@@ -476,9 +476,9 @@ sequenceDiagram
 
 4. **`#4390` 声称 Closes #4384 但仅完成一半**：#4384 要求 traceparent **与** `X-Qwen-Code-Session-Id` 双传播；#4390 只落地了 traceparent（且默认关），承载 session-id header 的 #4393 已 **CLOSED 未合入**。因此跨进程的 session 级关联目前仍需 collector 侧用 traceId 反查，缺少直接的 session header。
 
-5. **subagent span（Phase 3 / #4410）未合入 → 并发子 agent 串属**：`main` 不存在 `qwen-code.subagent` span 与 `subagentContext`/`runInSubagentSpanContext`。多个并发 AGENT 工具调用产生的 llm_request/tool 子 span 会平铺挂在共享的 interaction span 下，**无法区分属于哪个子 agent**；现状只能靠 `subagentNameContext`（名字字符串）在 api_* 事件上做弱归属。#4410 的设计还包含「fork/background 子 agent 用 OTel `Link` 另起 trace（T1）+ 4h 长 TTL」——其中 **fork 子 agent 的 4h TTL 空洞**值得注意：fork 出去的后台子 agent 可能数小时后才结束，若在 4h 内未结束会被 TTL 扫描强制收尾并打 `ttl_swept`，长任务的真实终态会丢失。
+5. **subagent span（Phase 3 / #4410）已合入 → 并发子 agent 串属**：`main` 不存在 `qwen-code.subagent` span 与 `subagentContext`/`runInSubagentSpanContext`。多个并发 AGENT 工具调用产生的 llm_request/tool 子 span 会平铺挂在共享的 interaction span 下，**无法区分属于哪个子 agent**；现状只能靠 `subagentNameContext`（名字字符串）在 api_* 事件上做弱归属。#4410 的设计还包含「fork/background 子 agent 用 OTel `Link` 另起 trace（T1）+ 4h 长 TTL」——其中 **fork 子 agent 的 4h TTL 空洞**值得注意：fork 出去的后台子 agent 可能数小时后才结束，若在 4h 内未结束会被 TTL 扫描强制收尾并打 `ttl_swept`，长任务的真实终态会丢失。
 
-6. **retry 可见性（Phase 4b / #4432）未合入**：`LLMRequestMetadata` 的 `requestSetupMs`/`attempt`/`retryTotalDelayMs` 已前向声明但恒 `undefined`；当前 trace 无法体现「一次 llm_request 内部重试了几次、退避总耗时多少」。派生的 `sampling_ms` 在有重试时会偏大（因为 setup 时间未被扣除）。
+6. **retry 可见性（Phase 4b / #4432）**已合入（2026-06-05）****：`LLMRequestMetadata` 的 `requestSetupMs`/`attempt`/`retryTotalDelayMs` 已前向声明但恒 `undefined`；当前 trace 无法体现「一次 llm_request 内部重试了几次、退避总耗时多少」。派生的 `sampling_ms` 在有重试时会偏大（因为 setup 时间未被扣除）。
 
 7. **`shouldForceSampled` 基于环境变量的启发式**：`tracer.ts:shouldForceSampled` 仅读 `OTEL_TRACES_SAMPLER` 环境变量推断采样器类型；若采样器是经 NodeSDK 构造函数以编程方式配置（未设环境变量），该启发式会失效，可能导致合成 session 根的 SAMPLED 标志与实际采样器不匹配（要么全采、要么零采）。
 

@@ -1,33 +1,33 @@
 # qwen-code PRs · 2026-06-01 ~ 2026-06-07  (W23)
 
-**主题**: daemon 修复（btw 泄漏/transcript 隔离/resync 恢复/压缩重放）、telemetry（路由覆盖/span 补强/per-prompt traceId/dedup 清理）、core（stream:false/bodyTimeout）
+**主题**: daemon（btw泄漏/transcript隔离/resync/压缩重放/DaemonWorkspaceService抽取/lifecycle优化/重构精简）、telemetry（路由覆盖/span补强/per-prompt traceId/dedup/Phase3 subagent/Phase4b retry/OTel metrics）、core（stream:false/ACP remember·forget·dream）
 
-**统计**: 13 PRs — 10 merged / 1 open / 2 closed  
-**代码量**: +2,521 / -6,405，50 个文件变更
+**统计**: 23 PRs — 15 merged / 5 open / 3 closed
 
-| PR | 状态 | 类型 | 标题 | 变更 | 文件 | 创建 | 合并/关闭 | 链接 |
-|---|---|---|---|---|---|---|---|---|
-| #4666 | ✅ merged | fix(daemon) | fix(daemon): btw cross-session leak + timeout + input cap + permission requestId cardinality | +67/-45 | 5 | 06-01 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4666 |
-| #4667 | ⬜ closed | fix(core) | fix(core): add configurable bodyTimeout to prevent streaming timeout with local models | +255/-100 | 12 | 06-01 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4667 |
-| #4682 | ✅ merged | feat(telemetry) | feat(telemetry): expand daemon telemetry route coverage | +52/-11 | 1 | 06-01 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4682 |
-| #4683 | ⬜ closed | chore(integration) | chore(integration): mark main merged for PR 4490 | +0/-0 | 0 | 06-01 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4683 |
-| #4689 | ✅ merged | fix(daemon) | fix(daemon): isolate parallel subAgent text streams in transcript reducer | +798/-18 | 8 | 06-02 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4689 |
-| #4693 | ✅ merged | feat(telemetry) | feat(telemetry): enrich llm_request span with response metadata and error details _[type/feature-request]_ | +213/-4 | 3 | 06-02 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4693 |
-| #4694 | ✅ merged | fix(daemon) | fix(daemon): compacted session replay for long-session recovery | +1084/-35 | 11 | 06-02 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4694 |
-| #4702 | ✅ merged | fix(daemon) | fix(daemon): auto-recover transcript on ring_evicted resync | +29/-7 | 3 | 06-02 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4702 |
-| #4703 | ✅ merged | fix(core) | fix(core): explicitly set stream: false in non-streaming requests | +6/-1 | 2 | 06-02 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4703 |
-| #4730 | ✅ merged | fix | fix: add missing TelemetryRuntimeConfig methods and remove obsolete test | +4/-6184 | 3 | 06-03 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4730 |
-| #4731 | ✅ merged | fix | fix: add missing isForkSubagentEnabled from main merge | +13/-0 | 2 | 06-03 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4731 |
-| #4765 | ✅ merged | fix(daemon) | fix(daemon): preserve parentToolCallId in compaction engine for parallel subagent streams | +537/-31 | 2 | 06-04 | — | https://github.com/QwenLM/qwen-code/pull/4765 |
-| #4774 | 🟡 open | refactor(daemon) | refactor(daemon): simplify code and strip PR/commit references from comments | +2763/-4952 | 81 | 06-04 | — | https://github.com/QwenLM/qwen-code/pull/4774 |
+| PR | 状态 | 标题 | 变更 | 文件 | 创建 | 合并/关闭 | 链接 |
+|---|---|---|---|---|---|---|---|
+| #4666 | ✅ merged | fix(daemon): btw cross-session leak + timeout + input cap + permission | +67/-45 | 5 | 06-01 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4666 |
+| #4667 | ⬜ closed | fix(core): add configurable bodyTimeout to prevent streaming timeout w | +255/-100 | 12 | 06-01 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4667 |
+| #4682 | ✅ merged | feat(telemetry): expand daemon telemetry route coverage | +52/-11 | 1 | 06-01 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4682 |
+| #4683 | ⬜ closed | chore(integration): mark main merged for PR 4490 | +0/-0 | 0 | 06-01 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4683 |
+| #4689 | ✅ merged | fix(daemon): isolate parallel subAgent text streams in transcript redu | +798/-18 | 8 | 06-02 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4689 |
+| #4693 | ✅ merged | feat(telemetry): enrich llm_request span with response metadata and er | +213/-4 | 3 | 06-02 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4693 |
+| #4694 | ✅ merged | fix(daemon): compacted session replay for long-session recovery | +1084/-35 | 11 | 06-02 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4694 |
+| #4702 | ✅ merged | fix(daemon): auto-recover transcript on ring_evicted resync | +29/-7 | 3 | 06-02 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4702 |
+| #4703 | ✅ merged | fix(core): explicitly set stream: false in non-streaming requests | +6/-1 | 2 | 06-02 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4703 |
+| #4730 | ✅ merged | fix: add missing TelemetryRuntimeConfig methods and remove obsolete te | +4/-6184 | 3 | 06-03 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4730 |
+| #4731 | ✅ merged | fix: add missing isForkSubagentEnabled from main merge | +13/-0 | 2 | 06-03 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4731 |
+| #4749 | ✅ merged | feat(telemetry): add daemon OTel metrics and structured log records | +837/-66 | 9 | 06-03 | 06-05 | https://github.com/QwenLM/qwen-code/pull/4749 |
+| #4751 | ✅ merged | feat(daemon): optimize ACP child lifecycle — skip relaunch, preheat, i | +2224/-21 | 15 | 06-03 | 06-05 | https://github.com/QwenLM/qwen-code/pull/4751 |
+| #4765 | ✅ merged | fix(daemon): preserve parentToolCallId in compaction engine for parall | +569/-29 | 2 | 06-04 | 06-04 | https://github.com/QwenLM/qwen-code/pull/4765 |
+| #4774 | ✅ merged | refactor(daemon): simplify code and strip PR/commit references from co | +2775/-4969 | 81 | 06-04 | 06-05 | https://github.com/QwenLM/qwen-code/pull/4774 |
+| #4811 | ✅ merged | feat(cli): enable /remember, /forget, /dream in ACP mode | +278/-43 | 6 | 06-05 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4811 |
+| #4812 | 🟡 open | feat(serve): add POST /session/:id/branch for session forking | +347/-3 | 14 | 06-05 | — | https://github.com/QwenLM/qwen-code/pull/4812 |
+| #4816 | 🟡 open | feat(serve): add /settings slash command for web-shell | +1092/-5 | 25 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4816 |
+| #4817 | ⬜ closed | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +443/-13 | 15 | 06-06 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4817 |
+| #4818 | 🟡 open | Revert "feat(cli): enable /remember, /forget, /dream in ACP mode" | +43/-278 | 6 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4818 |
+| #4819 | ✅ merged | feat(cli): enable /remember, /forget, /dream in ACP mode | +302/-43 | 6 | 06-06 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4819 |
+| #4820 | 🟡 open | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +474/-14 | 16 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4820 |
+| #4822 | 🟡 open | feat(serve): add hooks diagnostic HTTP/ACP surface (issue #4514 T3.9) | +600/-3 | 12 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4822 |
 
-### W22 漏收补录（创建于 05-31）
-
-| PR | 状态 | 类型 | 标题 | 变更 | 文件 | 创建 | 合并/关闭 | 链接 |
-|---|---|---|---|---|---|---|---|---|
-| #4658 | ✅ merged | fix(infra) | fix(infra): enforce SDK/server MCP-restart timeout coupling (#4330) | +48/-39 | 7 | 05-31 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4658 |
-| #4659 | ⬜ closed | feat(telemetry) | feat(telemetry): per-prompt traceId for bounded, renderable traces | +26291/-2413 | 200 | 05-31 | 05-31 | https://github.com/QwenLM/qwen-code/pull/4659 |
-| #4660 | ✅ merged | fix(telemetry) | fix(telemetry): clear span dedup state after chat compression (#3731) | +28/-2 | 4 | 05-31 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4660 |
-| #4661 | ✅ merged | feat(telemetry) | feat(telemetry): per-prompt traceId for bounded, renderable traces | +107/-144 | 8 | 05-31 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4661 |
-
-_更新于 2026-06-04_
+_更新于 2026-06-06_

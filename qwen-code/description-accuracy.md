@@ -30,7 +30,7 @@
 | [#4071](https://github.com/QwenLM/qwen-code/pull/4071) | merged | "concurrent-safe"夸大（模块全局 `lastInteractionCtx` 非并发安全）；`startLLMRequestSpan`/`startToolSpan` 等导出但未接线（死代码） | 注明：仅 interaction span 接线，其余 span API 暂未使用；并发声明仅适用顺序路径。 |
 | [#4247](https://github.com/QwenLM/qwen-code/pull/4247) | merged | "guardrail/配额"实为 **per-session**，总量 = N×budget，不限守护进程总量 | 已在 R3 改述为 per-session；可补：workspace 级封顶由 #4336 共享池提供。 |
 | [#4556](https://github.com/QwenLM/qwen-code/pull/4556) | merged | "Closes #4554" 乐观——issue 第 6 区（daemon metrics）未交付 | 改为 "addresses part of #4554"；metrics 待后续。 |
-| [#4563](https://github.com/QwenLM/qwen-code/pull/4563) | open | "initWorkspace fixes FIXME（改用 fsFactory+trust+audit）"实为逐字搬运、仍用 `node:fs` 并删了 FIXME 注释 | 更正：initWorkspace 为纯搬运，未接 fsFactory/trust/audit；preflight 的 acp-locality 过滤是行为变更需声明。 |
+| [#4563](https://github.com/QwenLM/qwen-code/pull/4563) | merged | "initWorkspace fixes FIXME（改用 fsFactory+trust+audit）"实为逐字搬运、仍用 `node:fs` 并删了 FIXME 注释 | 更正：initWorkspace 为纯搬运，未接 fsFactory/trust/audit；preflight 的 acp-locality 过滤是行为变更需声明。 |
 | [#4576](https://github.com/QwenLM/qwen-code/pull/4576) | merged | "频道(Telegram/钉钉/微信) ! 直执行" | 实测不生效（`ChannelBase.bridge` 是 AcpBridge 无 shellCommand，inert；且 `this`-binding 隐患）。改为：仅 web-shell/HTTP/SDK 路径生效；channels 路径当前未接通。 |
 
 ---

@@ -5,10 +5,10 @@
 > 代码基线：`QwenLM/qwen-code@main`（`c699738f9`, v0.17.0 线）。所有 **MERGED** 符号均给出 `main` 上的 `file:symbol(+line)`。
 >
 > **重要标注**：`main` 当前**只有** `interactionContext` 与 `toolContext` 两个 ALS。
-> - `subagentContext` + `runInSubagentSpanContext` + `qwen-code.subagent` span 来自 **PR #4410（OPEN，未合入）**；
-> - `retryContext` 来自 **PR #4432（OPEN，未合入）**，且**不在** `session-tracing.ts`，而在新文件 `packages/core/src/utils/retryContext.ts`。
+> - `subagentContext` + `runInSubagentSpanContext` + `qwen-code.subagent` span 来自 **PR #4410（MERGED 2026-06-05）**；
+> - `retryContext` 来自 **PR #4432（MERGED 2026-06-05）**，且**不在** `session-tracing.ts`，而在新文件 `packages/core/src/utils/retryContext.ts`。
 >
-> 本文凡引用 OPEN-PR 代码，均在代码块标题或行内显式写 `【OPEN #4410】`/`【OPEN #4432】`。未标注者即 `main` 现状。
+> 本文凡引用 OPEN-PR 代码，均在代码块标题或行内显式写 `【#4410 已合入 main】`/`【OPEN #4432】`。未标注者即 `main` 现状。
 
 ---
 
@@ -41,8 +41,8 @@ qwen-code 的解法是 **AsyncLocalStorage（ALS）+ OTel `Context` 双轨**：
 | #4321 | Phase 2：blocked_on_user + hook span + TTL 哨兵 | `startToolBlockedOnUserSpan` / `startHookSpan` / `sweepStaleSpans` | **MERGED** |
 | #4486 / #4499 | interaction 直接 pin 到 session 根 | `startInteractionSpan` 用 `getSessionContext()` 显式 parent | **MERGED** |
 | #4367 | Resource + 基数控制；`session.id` 始终上 span/log | `getCommonAttributes` | **MERGED** |
-| **#4410** | **Phase 3：subagent span + 并发隔离 + fork hybrid traceId + 4h TTL** | **`subagentContext` / `runInSubagentSpanContext` / `startSubagentSpan` / `ttlFor`** | **OPEN（未合入）** |
-| **#4432** | **Phase 4b：retry 可见性（per-attempt span）** | **`utils/retryContext.ts:retryContext`** | **OPEN（未合入）** |
+| **#4410** | **Phase 3：subagent span + 并发隔离 + fork hybrid traceId + 4h TTL** | **`subagentContext` / `runInSubagentSpanContext` / `startSubagentSpan` / `ttlFor`** | MERGED（2026-06-05） |
+| **#4432** | **Phase 4b：retry 可见性（per-attempt span）** | **`utils/retryContext.ts:retryContext`** | MERGED（2026-06-05） |
 
 > `getParentContext`（`tracer.ts`）与 `resolveParentContext`（`session-tracing.ts`）是一对**手工同步的镜像实现**，二者用 `// SYNC:` 注释互相约束（见下文）。
 
@@ -104,10 +104,10 @@ export function runInToolSpanContext<T>(span: Span, fn: () => T): T {
 |---|---|---|---|---|
 | `interactionContext` | `SpanContext \| undefined` | `session-tracing.ts:152` | `enterWith` | **MERGED** |
 | `toolContext` | `SpanContext \| undefined` | `session-tracing.ts:153` | `run`（`runInToolSpanContext`） | **MERGED** |
-| `subagentContext` | `SpanContext \| undefined` | `session-tracing.ts`（#4410 在 `toolContext` 后新增） | `run`（`runInSubagentSpanContext`） | **【OPEN #4410】** |
+| `subagentContext` | `SpanContext \| undefined` | `session-tracing.ts`（#4410 在 `toolContext` 后新增） | `run`（`runInSubagentSpanContext`） | **【#4410 已合入 main】** |
 | `retryContext` | `RetryAttemptContext` | **`utils/retryContext.ts:retryContext`**（非 session-tracing.ts） | `run`（`retry.ts:retryWithBackoff`） | **【OPEN #4432】** |
 | `subagentNameContext` | 子 agent 名字字符串 | `utils/subagentNameContext.ts` | `run` | MERGED（弱归属兜底，非 span 级） |
-| `agentContextStorage` | `AgentContext`（含 `agentId` / `depth`） | `agents/runtime/agent-context.ts:38` | `run`（`runWithAgentContext`） | MERGED；`depth` 字段为 **【OPEN #4410】** |
+| `agentContextStorage` | `AgentContext`（含 `agentId` / `depth`） | `agents/runtime/agent-context.ts:38` | `run`（`runWithAgentContext`） | MERGED；`depth` 字段为 **【#4410 已合入 main】** |
 
 辅助的非 ALS 单例（session 根上下文）：
 
@@ -118,10 +118,10 @@ export function runInToolSpanContext<T>(span: Span, fn: () => T): T {
 | `getSessionContext()` | 读 `sessionRootContext` | `session-context.ts:20` |
 | `getCurrentSessionId()` | 读 `currentSessionId`（**仅作 log 桥接的兜底**） | `session-context.ts:29` |
 
-### `subagentContext` 的定义与注释【OPEN #4410】
+### `subagentContext` 的定义与注释【#4410 已合入 main】
 
 ```ts
-// session-tracing.ts（#4410，紧跟 toolContext 之后）【OPEN #4410】
+// session-tracing.ts（#4410，紧跟 toolContext 之后）【#4410 已合入 main】
 const subagentContext = new AsyncLocalStorage<SpanContext | undefined>();
 // 注释（原文要点）：Child LLM/tool/hook spans created inside a subagent body
 // read this BEFORE interactionContext so they parent under the subagent
@@ -270,23 +270,23 @@ if (parentSpanContext) {
 
 `coreToolScheduler.ts:728` 把 AGENT 工具标记为 `concurrent: true`，`runConcurrently`（`coreToolScheduler.ts:2512`）用 `Promise.all` 并发跑（上限 10）。每个 AGENT 调用都开自己的 `qwen-code.tool` span。但 subagent **内部**的 `llm_request` / `tool` / `hook` span 在 `main` 上只会读 `interactionContext`（`startLLMRequestSpan:355`）——而并发的 A、B、C 三个 subagent 共享同一个外层 `interaction`，于是它们的子 span 全部平铺挂在那一个 interaction 下，trace 浏览器**无法区分某个 llm_request 属于 A 还是 B**。
 
-### 解法三件套【OPEN #4410】
+### 解法三件套【#4410 已合入 main】
 
 #### (1) `subagentContext` 在优先级上压过 `interactionContext`
 
 `startLLMRequestSpan` / `startToolSpan` 的 parent 入口改为「先读 subagent，再读 interaction」：
 
 ```ts
-// startLLMRequestSpan（#4410 改）【OPEN #4410】
+// startLLMRequestSpan（#4410 改）【#4410 已合入 main】
 const parentCtx = subagentContext.getStore() ?? interactionContext.getStore();
-// startToolSpan 同样改法【OPEN #4410】
+// startToolSpan 同样改法【#4410 已合入 main】
 const parentCtx = subagentContext.getStore() ?? interactionContext.getStore();
 ```
 
 `startHookSpan` 则插在 tool 与 interaction 之间（`tool > subagent > interaction`）：
 
 ```ts
-// startHookSpan（#4410 改）【OPEN #4410】
+// startHookSpan（#4410 改）【#4410 已合入 main】
 const parentCtx =
   toolContext.getStore() ??
   subagentContext.getStore() ??
@@ -301,7 +301,7 @@ const parentCtx =
 这是与设计文档最不同、最关键的一处。设计文档原案只写了 `otelContext.with(ctx, fn)`；**实际实现**（经 wenshao review）做了三件事：
 
 ```ts
-// session-tracing.ts（#4410 实际实现）【OPEN #4410】
+// session-tracing.ts（#4410 实际实现）【#4410 已合入 main】
 export function runInSubagentSpanContext<T>(span: Span, fn: () => Promise<T>): Promise<T> {
   const spanId = getSpanId(span);
   const spanCtx = activeSpans.get(spanId)?.deref();
@@ -322,7 +322,7 @@ export function runInSubagentSpanContext<T>(span: Span, fn: () => Promise<T>): P
 `startSubagentSpan` 按 `invocationKind` 分叉（`session-tracing.ts`，#4410）：
 
 ```ts
-// startSubagentSpan（#4410）【OPEN #4410】
+// startSubagentSpan（#4410）【#4410 已合入 main】
 if (opts.invocationKind === 'foreground') {
   // 不传显式 context → 用 context.active()（= 外层 AGENT tool span）作 parent
   span = tracer.startSpan(SPAN_SUBAGENT, { kind: SpanKind.INTERNAL, attributes });
@@ -347,12 +347,12 @@ if (opts.invocationKind === 'foreground') {
 
 跨 trace 可查：所有 subagent span（含 linked-root）都带 `gen_ai.conversation.id = sessionId`，按 `session.id` 查 ARMS 同时返回 T0 与 T1；T1 根上的 Link（`qwen-code.link.kind: 'invoker'`）在父 trace UI 里显示为「Spawned: subagent X (other trace)」可点击跳转。
 
-### agent.ts 实际接线：`runWithSubagentSpan`【OPEN #4410】
+### agent.ts 实际接线：`runWithSubagentSpan`【#4410 已合入 main】
 
 3 条调用路径（foreground / fork / background）经 `buildSubagentSpanSpec` 归一后，统一进 `runWithSubagentSpan`（`tools/agent/agent.ts`，#4410）。要点：
 
 ```ts
-// agent.ts:runWithSubagentSpan（#4410，节选）【OPEN #4410】
+// agent.ts:runWithSubagentSpan（#4410，节选）【#4410 已合入 main】
 const invokerSpanContext =
   spec.invocationKind === 'foreground'
     ? undefined                                                   // foreground 不需要 Link
@@ -415,7 +415,7 @@ function snapshotRetryMetadata() {
 
 ## 时序图与上下文栈图
 
-### 并发两个 subagent 的隔离（headline）【OPEN #4410】
+### 并发两个 subagent 的隔离（headline）【#4410 已合入 main】
 
 ```mermaid
 sequenceDiagram
@@ -443,7 +443,7 @@ sequenceDiagram
     Note over ST: A 的 llm_request 永不挂到 spanB，反之亦然 —— run 的 fiber 隔离
 ```
 
-### 上下文栈图（foreground subagent 内部，单 fiber 视角）【OPEN #4410】
+### 上下文栈图（foreground subagent 内部，单 fiber 视角）【#4410 已合入 main】
 
 ```mermaid
 flowchart TB
@@ -526,9 +526,9 @@ flowchart LR
 
 ## 已知限制 / 后续
 
-1. **`subagentContext` / `qwen-code.subagent` span 未合入 main（#4410 OPEN）**：`main` 上并发 subagent 的 llm_request/tool 子 span 仍平铺挂在共享 interaction 下，**无法区分属于哪个子 agent**；现状只能靠 `subagentNameContext`（名字字符串）在 api_* 事件上做弱归属。
+1. **`subagentContext` / `qwen-code.subagent` span 未合入 main（#4410 已合入）**：`main` 上并发 subagent 的 llm_request/tool 子 span 仍平铺挂在共享 interaction 下，**无法区分属于哪个子 agent**；现状只能靠 `subagentNameContext`（名字字符串）在 api_* 事件上做弱归属。
 
-2. **`retryContext` / retry 可见性未合入 main（#4432 OPEN）**：`LLMRequestMetadata.requestSetupMs`/`attempt`/`retryTotalDelayMs`（`session-tracing.ts:77-88`）已**前向声明但恒 `undefined`**；trace 看不到「一次请求内部重试了几次」。注意该 PR 也带了 Phase 4a 的 `sampling_ms` 公式 bug 修复（去掉重复扣 setup）。`retryContext` 实际位于 `utils/retryContext.ts`，非 `session-tracing.ts`。
+2. **`retryContext` / retry 可见性未合入 main（#4432 已合入）**：`LLMRequestMetadata.requestSetupMs`/`attempt`/`retryTotalDelayMs`（`session-tracing.ts:77-88`）已**前向声明但恒 `undefined`**；trace 看不到「一次请求内部重试了几次」。注意该 PR 也带了 Phase 4a 的 `sampling_ms` 公式 bug 修复（去掉重复扣 setup）。`retryContext` 实际位于 `utils/retryContext.ts`，非 `session-tracing.ts`。
 
 3. **fork 子 span 的 4h vs 30min TTL 空洞（#4410 设计内已知，deferred）**：`ttlFor` 只给 **subagent span 本身** 4h TTL（`SPAN_TTL_MS_LONG`）；fork/background 内部的 llm_request/tool/hook **子 span 仍用 30min 默认 TTL**（`SPAN_TTL_MS_DEFAULT`）。后果：一个 2 小时的 background agent，其早期子 span 会在 30min 被 sweep 强制 `end()`（打 `ttl_expired`），晚期子 span 正常 —— trace 出现**空洞**。彻底修需把「long-TTL bucket」经 ALS 传进 `resolveParentContext`，或 sweep 时做 TTL 继承遍历，留待后续 PR。
 
