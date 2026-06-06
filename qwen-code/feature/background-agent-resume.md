@@ -372,3 +372,23 @@ sequenceDiagram
 4. **PR #3739 夹带 `shell.ts` 后台操作符解析（略偏题）。** #3739 还改了 `packages/core/src/tools/shell.ts` 的 `stripTrailingBackgroundAmp`（剥离命令尾部裸 `&` 后台操作符，区分 `&&`/`\&`），与背景 **agent** 恢复主题关系不大，属于同 PR 夹带的 shell 后台执行相关清理，review/读者需注意它不在本方案主线内。
 
 5. **legacy fork 不可安全恢复（#3739）。** 早于 transcript-first 设计的 fork transcript 缺 `agent_bootstrap` 记录（或缺 `systemInstruction`/`tools`），只能以 paused 可见并 abandon，resume 被 `LEGACY_FORK_RESUME_BLOCKED_REASON` / `LEGACY_FORK_CAPABILITIES_BLOCKED_REASON` 阻断——这是为「不以错误能力边界恢复」付出的兼容性代价。
+
+---
+
+## 9. 各 PR 代码贡献
+
+### PR #3739 — background agent resume
+
+- `background-agent-resume.ts:recoverTranscript`：`reconstructHistory` 沿 parentUuid 链回溯主干，裁剪悬挂 tool-call（`extractFunctionCallIds`），提取 `forkBootstrap`（history/systemInstruction/tools/taskPrompt）
+- `background-agent-resume.ts:resumeBackgroundAgent`：`resumeOperations` Map 同步 get/set 并发合并；续跑消息双落点（`continuationMessages` 暂存 + `registry.queueMessage`）
+- `background-tasks.ts:BackgroundTaskRegistry`：新增 `paused` 一等状态 + `abandon`；`pendingMessages` 从 `string[]` 改为 `AgentExternalInput[]`；新增 `queueExternalInput`/`waitForMessages`/`wakeExternalInputWaiters`
+- `agent-transcript.ts:attachJsonlTranscriptWriter`：`appendToExisting` + `initialParentUuid` 参数，支持续写时绕开中断尾巴另起分支
+- `background-agent-resume.ts:reconcileResumedApprovalMode`：非信任目录降级 `auto-edit/auto/yolo` 到父模式或 `default`
+
+### PR #4222 — daemon session load/resume
+
+- `httpAcpBridge.ts:restoreSession`：`pendingRestoreEvents` EventBus 缓冲重放帧（ACP 返回前帧无处可投），成功后把缓冲 ring 作为新 entry 的 `events` 无缝衔接
+- `httpAcpBridge.ts:inFlightRestores`：跨动作（load vs resume）抛 `RestoreInProgressError` → HTTP 409 + `Retry-After:5`；同动作 coalesce 复用 promise + 同步预占 `attachCount`
+- `acpAgent.ts:loadSession` / `unstable_resumeSession`：load 传 `conversation` → `replayHistory()`；resume 不传，不重放
+- `server.ts`：注册 `POST /session/:id/load` 和 `/resume` 路由 + `restoreSessionHandler` 统一入口
+- `bridgeErrors.ts:RestoreInProgressError`：携带 `sessionId`/`activeAction`/`requestedAction`，映射 409

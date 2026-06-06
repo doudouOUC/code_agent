@@ -435,3 +435,31 @@ stateDiagram-v2
 4. **`designated_mismatch` reason 码被重载。** 它同时表示 designated 策略的"非 originator"与 consensus 策略的"不在 voter set"，wire 上同一字符串、审计同一 reason（`voteConsensus` TODO L805-814）。待有 SDK 消费方需要区分时，再拆成 `not_originator` / `voter_not_eligible`，以避免过早的协议 churn。
 
 5. **`PermissionPolicyNotImplementedError`(501) 当前不可达。** 四种策略均已实现，该类与 501 映射作为前向兼容基建保留：未来新增第 5 种 policy 且跨多 commit 落地时，中间构建可抛它返回干净的 501（"daemon 比 settings 旧，请升级"）而非泛化 500。
+
+---
+
+## 8. 各 PR 代码贡献
+
+### #3467 — 畸形规则守卫
+
+- `types.ts:PermissionRule`：新增 `invalid?: boolean` 字段（L63），标记括号不配对的畸形规则，保留 `raw` 供诊断。
+- `rule-parser.ts:parseRule`：检测 `normalized.endsWith(')')` 失败时返回 `{ raw, toolName, invalid: true }`（L270-273）；`parseRules` 批量解析对 invalid 项 `debugLogger.warn`。
+- `rule-parser.ts:matchesRule`：函数体第一行 `if (rule.invalid) return false;`（L986），兜底保证畸形规则永不命中。
+- `permission-manager.ts:addSessionAllowRule` / `addSessionDenyRule` / `addSessionAskRule` / `addPersistentRule`：入表前 `if (rule.invalid) { warn; return; }` 拒绝畸形规则进内存规则集；`listRules` 内部 `!rule.invalid` 过滤。
+- `PermissionsDialog.tsx:handleAddRuleSubmit`：`parseRule` 后若 `rule.invalid` 立即 `setRuleInputError("Malformed rule: unbalanced parentheses...")` 并 return，从源头拦截手输畸形规则（L477-484）。
+
+### #3726 — Monitor 命名空间
+
+- `rule-parser.ts:TOOL_NAME_ALIASES`：新增 `Monitor`/`monitor`/`MonitorTool` → `'monitor'` 别名（L126-129）。
+- `rule-parser.ts:SHELL_TOOL_NAMES`：从 `{'run_shell_command'}` 扩展为 `{'run_shell_command', 'monitor'}`（L138），使 monitor specifier 走 shell glob 匹配。
+- `rule-parser.ts:CANONICAL_TO_RULE_DISPLAY` / `DISPLAY_NAME_TO_VERB`：新增 `monitor→'Monitor'`（L329-331）和 `Monitor→'monitor commands'`（L447）；`buildPermissionRules` 对 monitor 调用生成 `Monitor(...)` 而非 `Bash(...)`。
+- `permission-manager.ts:SHELL_LIKE_TOOLS`（原 `SHELL_TOOL_NAMES` 引用）：`evaluate`/`evaluateShellVirtualOps`/`hasRelevantRules`/`hasMatchingAskRule` 等处的 `toolName === 'run_shell_command'` 全部替换为 `SHELL_LIKE_TOOLS.has(toolName)`。
+- `monitor.ts:MonitorToolInvocation.getConfirmationDetails`：`permissionRules` 从 `` `Bash(${rule})` `` 改为 `` `Monitor(${rule})` ``，使 "Always Allow" 对 monitor 自洽生效。
+
+### #4335 — 多客户端权限协调
+
+- `permissionMediator.ts:MultiClientPermissionMediator`（L347）：实现 `PermissionMediator` 契约，`request()` N1 同步注册（Promise executor 内无 `await`）、`vote()` 按 `pending.policy` 分派到 `voteFirstResponder`/`voteDesignated`/`voteConsensus`/`voteLocalOnly` 四策略。
+- `permissionMediator.ts:resolveEntry`（L1116）：唯一结算入口，对象身份比较幂等守卫（`pending.get(requestId) !== pending`）；N2 顺序：clearTimeout → 删 pending → emit → 写 resolved → audit → resolve Promise。
+- `permissionMediator.ts:voteConsensus`（L797）+ `consensusQuorumFor`（L1027）：资格闸（`votersAtIssue` 发起时刻快照）、幂等重投（保留原始投票）、quorum 计票 `floor(M/2)+1`；`CANCEL_VOTE_SENTINEL = '__cancelled__'`（L64）跨策略取消 + `CancelSentinelCollisionError` 碰撞防御。
+- `server.ts:detectFromLoopback`（L3381）：只读内核 `req.socket.remoteAddress` 判定 `127.*` / `::1` / `::ffff:127.*`，不解析 XFF header，fail-closed 返回 `false`。
+- `bridgeErrors.ts`：4 个 typed error —— `InvalidPermissionOptionError`(400) / `PermissionForbiddenError`(403) / `CancelSentinelCollisionError`(500) / `PermissionPolicyNotImplementedError`(501)；`server.ts:sendPermissionVoteErrorImpl` 做 HTTP 状态码映射。

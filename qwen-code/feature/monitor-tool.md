@@ -415,3 +415,34 @@ sequenceDiagram
 - **per-monitor 文件 writer**：`getMonitorOutputPath`（`monitorRegistry.ts:65`）为每个 monitor 预留了 `monitors/<session>/monitor-<id>.log` 路径并写入 `outputFile`，但**当前无 writer**——事件只通过通知回调流入对话记录。该路径为满足 `TaskBase` 契约（每个 task 都有「若产出主流则写入的路径」）及未来落盘 writer 预留。
 - **注册表统一**：`MonitorRegistry` 刻意沿用 `BackgroundTaskRegistry` 的结构模式，待 #3488 落地后两者可合并为单一注册表。
 - **#3684 明确未做**：footer pill / dialog 集成、`send_message` 集成（后者已由 #3933 的外部输入通道部分打通）。
+
+---
+
+## 8. 各 PR 代码贡献
+
+### PR #3684 — event monitor tool Phase C
+
+- `monitor.ts:throttledEmit`：token-bucket 节流（burst=5、refill 1/s），超额丢弃并累计 `droppedLines`
+- `monitor.ts:processLines`：行缓冲 + `PARTIAL_LINE_BUFFER_CAP=4096` 防无界增长；无换行长流强制截断为 `...` 结尾事件
+- `shell.ts:detectBlockedSleepPattern`：前台 `sleep N`（N≥2）拦截，先 `trimTrailingShellComment` 去尾注释再匹配
+- `monitorRegistry.ts:MonitorRegistry`：生命周期管理（register/emitEvent/settle）、idle_timeout + maxEvents 自停、`emitNotification`/`emitTerminalNotification` XML 组装
+
+### PR #3726 — Monitor 权限命名空间
+
+- `rule-parser.ts:TOOL_NAME_ALIASES`：注册 `Monitor`/`monitor`/`MonitorTool` → `'monitor'`；`SHELL_TOOL_NAMES` 从 `['run_shell_command']` 扩展为含 `monitor`
+- `permission-manager.ts:SHELL_LIKE_TOOLS`：新建 `Set(['run_shell_command','monitor'])`，统一 `evaluate`/`hasRelevantRules`/`hasMatchingAskRule` 的 shell-like 评估路径
+- `monitor.ts:getConfirmationDetails`：规则从 `Bash(...)` 改发 `Monitor(...)`，不调用 `isCommandAllowed` 避免 Bash allow 规则缩小 monitor 确认范围
+- `rule-parser.ts:CANONICAL_TO_RULE_DISPLAY` / `DISPLAY_NAME_TO_VERB`：添加 `monitor → 'Monitor'` 和 `Monitor: 'monitor commands'`
+
+### PR #3792 — post-merge 修复
+
+- `monitor.ts:throttledEmit`：时钟回拨守卫——`elapsed < 0` 时 `lastRefill = now`，防止 NTP/挂起恢复后 bucket 饿死
+- `backgroundWorkUtils.ts:hasBlockingBackgroundWork` / `resetBackgroundStateForSessionSwitch`：从 `clearCommand.ts` 和 `useResumeCommand.ts` 抽取统一导出
+- `routing.ts`：抽取 `getToolCallComponent` 统一工具视图路由，补 `web_search` 别名
+
+### PR #3933 — subagent notifications
+
+- `monitorRegistry.ts:dispatchNotification`：按 `entry.ownerAgentId` 路由——有 owner 走 `agentNotificationCallbacks[ownerAgentId]`，无 owner 走全局回调
+- `monitorRegistry.ts:cancelRunningForOwner`：遍历并取消指定 owner 的所有 running monitor；`notify:false` 时先 settle 再 abort
+- `background-agent-resume.ts`：resume 路径注册 `setAgentNotificationCallback` + `setAgentLifecycleCallback` + cleanup 闭包
+- `agent-core.ts:ReasoningLoopOptions`：新增 `waitForExternalMessages` + `shouldWaitForExternalMessages`，支持 subagent 回合间 idle-wait 消费异步 monitor 输出

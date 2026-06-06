@@ -329,10 +329,37 @@ sequenceDiagram
    - #4333 `NativeLspService.applyTextEdits` 对 `chmod 0444` 文件先 `access(W_OK)` 检查再写，恢复 pre-Phase-2 的 EACCES。
    两者都把“原子 rename 静默绕过文件级写权限”这一隐性提权行为改成显式失败，但对依赖旧行为的脚本是 breaking change。
 
-4. **EXDEV 回退实为死代码**。`tmpPath = ${targetPath}.<hex>.tmp` 与 `targetPath` **永远同目录**（`atomicFileWrite.ts:125`），同目录的 rename 必然同文件系统，内核不会返回 `EXDEV`。因此 `L172` / #4333 的 O_EXCL 回退分支在当前 tmp 放置策略下不可达——除非未来把 tmp 改放到独立的 `$TMPDIR`。这是一段“防御性但当前走不到”的代码。
+4. **EXDEV 回退实为死代码**。`tmpPath = ${targetPath}.<hex>.tmp` 与 `targetPath` **永远同目录**（`atomicFileWrite.ts:125`），同目录的 rename 必然同文件系统，内核不会返回 `EXDEV`。因此 `L172` / #4333 的 O_EXCL 回退分支在当前 tmp 放置策略下不可达——除非未来把 tmp 改放到独立的 `$TMPDIR`。这是一段”防御性但当前走不到”的代码。
 
-5. **#4333 `debugLogger` 的 flush 描述与代码不符**。PR commit #5 描述写的是“`debugLogger.ts` appendFile gets `flush: true`”，但实际 diff 里 `debugLogger.ts:148` 的 `fs.appendFile(logFilePath, line, 'utf8')` **没有** 加 `flush`，反而新增了一段注释解释“debug 日志故意不 fsync”（见 §5）。即代码是正确的（不 flush），但 commit message 误述。文档/提交信息需更正以免误导后续维护者。
+5. **#4333 `debugLogger` 的 flush 描述与代码不符**。PR commit #5 描述写的是”`debugLogger.ts` appendFile gets `flush: true`”，但实际 diff 里 `debugLogger.ts:148` 的 `fs.appendFile(logFilePath, line, 'utf8')` **没有** 加 `flush`，反而新增了一段注释解释”debug 日志故意不 fsync”（见 §5）。即代码是正确的（不 flush），但 commit message 误述。文档/提交信息需更正以免误导后续维护者。
 
-6. **`writeLineSync` / `write()` 无锁**。`jsonl-utils.ts` 的 `writeLine`（async）用 per-file `Mutex` 串行化并发写者，但 `writeLineSync` 和全量重写 `write()` 绕过该锁（#4333 已在 JSDoc 显式标注 "this function is unsynchronized"）。与 `writeLine` 共享同一 JSONL 文件的同步调用方需自行外部串行化，否则 `flush:true` 只保证单条记录落盘、不保证多写者间不交错。
+6. **`writeLineSync` / `write()` 无锁**。`jsonl-utils.ts` 的 `writeLine`（async）用 per-file `Mutex` 串行化并发写者，但 `writeLineSync` 和全量重写 `write()` 绕过该锁（#4333 已在 JSDoc 显式标注 “this function is unsynchronized”）。与 `writeLine` 共享同一 JSONL 文件的同步调用方需自行外部串行化，否则 `flush:true` 只保证单条记录落盘、不保证多写者间不交错。
 
-7. **后续可收编的裸写点**（#4333 "Deliberately not in scope" 审计结论）：`httpAcpBridge.ts:1274`（已是手写 wx+rename，值得折进共享助手）、`settings.ts:875` 恢复写回（有自带 backup 机制，迁移有 settings-migration 回归风险）、以及 lock 文件（`flag:'wx'` 的独占创建语义，**不能**原子化）等。`qwenOAuth2.ts` 的 `cacheQwenCredentials` 因上游 #4255 引入了 `AbortSignal` 取消语义、而 `atomicWriteFile` 不接受 signal（rename 不可中断），故刻意保留手写原子写、接受较弱保证（无 EPERM 重试 / EXDEV 回退）换正确的取消语义。
+7. **后续可收编的裸写点**（#4333 “Deliberately not in scope” 审计结论）：`httpAcpBridge.ts:1274`（已是手写 wx+rename，值得折进共享助手）、`settings.ts:875` 恢复写回（有自带 backup 机制，迁移有 settings-migration 回归风险）、以及 lock 文件（`flag:'wx'` 的独占创建语义，**不能**原子化）等。`qwenOAuth2.ts` 的 `cacheQwenCredentials` 因上游 #4255 引入了 `AbortSignal` 取消语义、而 `atomicWriteFile` 不接受 signal（rename 不可中断），故刻意保留手写原子写、接受较弱保证（无 EPERM 重试 / EXDEV 回退）换正确的取消语义。
+
+---
+
+## 8. 各 PR 代码贡献
+
+### #4096 — atomicWriteFile 原语 + Write/Edit 接线
+
+- `atomicFileWrite.ts:atomicWriteFile`：新增核心原语，实现 temp+rename 原子写、`flush:true` fsync、mode 保留（`existingMode = stat.mode & 0o7777`）、`renameWithRetry` EPERM/EACCES 指数退避重试。
+- `atomicFileWrite.ts:resolveSymlinkChain`：逐跳跟随符号链接至真实目标，支持坏链（ENOENT 返回当前路径）、40 跳 ELOOP 上限、相对链接用内核 realpath 父目录 resolve。
+- `atomicFileWrite.ts:atomicWriteJSON`：重构为委托 `atomicWriteFile`，补回之前缺失的 fsync。
+- `fileSystemService.ts:StandardFileSystemService.writeTextFile`：内部调 `atomicWriteFile`，使 Write/Edit 工具全部原子化；按 `Buffer.isBuffer` 分流编码/Buffer 路径。
+- `runtimeStatus.ts:writeRuntimeStatus`：去重独立的 `renameWithRetry` 实现，改为经 `atomicWriteJSON` 统一写入。
+
+### #4333 — rollout credentials/memory/config/JSONL
+
+- `atomicFileWrite.ts:atomicWriteFileSync`：新增同步原语镜像，退避用 `blockingSleep`（基于 `Atomics.wait`）；`renameWithRetrySync` 增加 `_renameImpl` 测试缝。
+- `atomicFileWrite.ts:forceMode` / `noFollow` 选项：`forceMode` 忽略目标既有权限强制 `options.mode`（credentials 治愈 0o644 回 0o600）；`noFollow` 跳过 `resolveSymlinkChain` 防共享主机 symlink 重定向。
+- `atomicFileWrite.ts:tryChmod` 收窄 + EXDEV noFollow O_EXCL 分支：chmod 只吞 `ENOSYS`/`ENOTSUP`；EXDEV 下 noFollow 用 `unlink` → `O_WRONLY|O_CREAT|O_EXCL` → `fchmod(fd)` 保安全语义。
+- `logger.ts:Logger`：`initialize`/`logMessage`/`removeLastUserMessage`/`saveCheckpoint` 四处 `fs.writeFile` 全部替换为 `atomicWriteFile`。
+- `trustedFolders.ts:saveTrustedFolders` / `tipHistory.ts:TipHistory.save` / `extensionManager.ts:writeEnablementConfig` + `installExtension`：裸 `writeFileSync`/`writeFile` 迁移到 `atomicWriteFileSync`/`atomicWriteFile`，credentials 站点加 `forceMode:true, noFollow:true, mode:0o600`。
+
+### #4431 — uid/gid 保留
+
+- `atomicFileWrite.ts:ownershipWouldChange`：检测 `existingStat.uid !== process.geteuid()`，只比 uid 不比 gid（macOS 新文件继承父目录 GID 致 false positive）；Windows 和 `geteuid` 不可用时返回 false。
+- `atomicFileWrite.ts`：uid 不匹配且 `existingStat.isFile()` 时回退原地 `fs.writeFile(targetPath)` 保 inode/uid；FIFO/特殊文件不走回退（`open(O_WRONLY|O_TRUNC)` 会阻塞）。
+- `atomicFileWrite.test.ts`：新增 5 个测试——同属主 rename 换 inode、异属主原地保 inode、FIFO 跳过回退、symlink 穿透+原地、只读文件 EACCES。
+- `worktreeSessionService.ts:writeWorktreeSession` / `runtimeStatus.ts:writeRuntimeStatus`：JSDoc 精简，移除过时的”tmp+rename”措辞，改引 `atomicWriteJSON`（含 ownership 回退）。

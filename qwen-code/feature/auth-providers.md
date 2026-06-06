@@ -425,3 +425,42 @@ sequenceDiagram
 
 6. **当前 main 已移除 `qwen auth` CLI**
    - §3.3/§3.4 描述的 `handler.ts:showAuthStatus`/`runInteractiveAuth`/`handleApiKeyAuth` 在 commit `4ac9ec07`/`f0e8601` 时点有效；当前 `main` 上 `packages/cli/src/commands/auth.ts` 已是 `buildRemovalNotice`，引导改用会话内 `/auth` 与 `/doctor`。本文相关章节应结合该迁移阅读。
+
+---
+
+## 8. 各 PR 代码贡献
+
+### #3212 — Gemini baseUrl 透传
+
+- **修复点**：`geminiContentGenerator/index.ts:createGeminiContentGenerator` 中 `httpOptions` 构造从 `{ headers }` 改为 `config.baseUrl ? { headers, baseUrl: config.baseUrl } : { headers }`，使 `modelProviders` 中配置的自定义 Gemini 网关/代理 baseUrl 经 `@google/genai` 的 `httpOptions.baseUrl` 透传到请求端点。
+- **向后兼容**：`baseUrl` 缺省时保持旧对象形状（仅 `headers`），不引入 `undefined` 键。
+- **测试**：`index.test.ts` 新增两条用例——「有 baseUrl 时 httpOptions 含 baseUrl」和「无 baseUrl 时 httpOptions 不含 baseUrl」，通过 `GeminiContentGenerator` mock 的 `calls[0][0]` 断言。
+
+### #3495 — apiKey 跨重启保留
+
+- **save/restore 机制**：`modelsConfig.ts:syncAfterAuthRefresh` 在调用 `applyResolvedModelDefaults` 前保存当前 `apiKey` 和 `generationConfigSources['apiKey']`，apply 后若被清空则恢复。三层守卫——`isUnchanged = (previousAuthType===authType && model===modelId && !isProviderChanged)`；`hasBeenApplied = baseUrl.source==='modelProviders'`；`isProviderChanged = hasBeenApplied && (apiKeyEnvKey!==resolved.envKey || baseUrl!==resolved.baseUrl)`。
+- **防跨 provider 泄漏**：切换 modelId → `isUnchanged=false`（不恢复）；同 modelId 但 envKey/baseUrl 变更 → `isProviderChanged=true`（不恢复）；冷启动 `previousAuthType=undefined` → `isUnchanged=false`（不复用陈旧 key）。
+- **source-kind 无关**：恢复时不做 kind 白名单过滤，靠四维比较保证「同 provider 即安全」。
+- **测试**：`modelsConfig.test.ts` 新增 11 条用例，覆盖 restart 场景（settings/CLI/env/programmatic key 保留）、cross-provider 阻断（不同 modelId/envKey 变更/baseUrl 变更/无 envKey+baseUrl 变更）、冷启动不保留。
+
+### #3623 — OpenAI-compat auth status 识别
+
+- **四路分类**：`handler.ts:showAuthStatus` 在 `AuthType.USE_OPENAI` 分支下依次判定 `isActiveOpenRouter`/`detectedCodingPlanRegion`/`isActiveStandard`/通用 `activeConfig`，互斥 `else if`。活动 provider 由 `activeConfig = modelName ? openAiProviders.find(c => c.id === modelName) : openAiProviders[0]` 确定。
+- **通用 OpenAI-compat 分支**：无 `envKey` 时兜底检测 `OPENAI_API_KEY` / `settings.env['OPENAI_API_KEY']` / `settings.security.auth.apiKey`（新增 BYOK 兜底）；有 key → 打印 `OpenAI-compatible Provider` + baseUrl；无 key → `(Incomplete)`。
+- **接口补齐**：`MergedSettingsWithCodingPlan` 新增 `security.auth.apiKey/baseUrl` 字段。防陈旧误报：`hasCodingPlanMetadata` 增加 `!modelName` 守卫。
+- **测试**：`status.test.ts` 新增 14 条用例，涵盖 `OPENAI_API_KEY`/自定义 envKey/settings BYOK/envKey 缺失 Incomplete/无关 provider baseUrl 不泄漏/陈旧 Coding Plan 元数据不干扰等场景。
+
+### #3624 — 交互菜单 API Key/BYOK
+
+- **菜单扩展**：`handler.ts:runInteractiveAuth` 的 `InteractiveSelector` 选项新增 `{value:'api-key', label:'API Key', description:'Bring your own API key'}`；`auth.ts` 注册 `apiKeyCommand`（`command:'api-key'`）子命令。
+- **handleApiKeyAuth 二级菜单**：`Alibaba Cloud ModelStudio Standard` → `handleAlibabaStandardApiKeyAuth()`：`promptForStandardRegion`（4 个 `ALIBABA_STANDARD_API_KEY_ENDPOINTS` 区域）→ `promptForKey`（掩码输入）→ `promptForModelIds`（逗号分隔、去重、默认 `qwen3.5-plus,glm-5,kimi-k2.5`）→ 持久化 `env.DASHSCOPE_STANDARD_API_KEY` + `modelProviders.openai`（过滤旧 Standard/Coding Plan）+ 清理陈旧 Coding Plan 状态。`Custom API Key` → 打印 model-providers 文档链接。
+- **输入原语重构**：`promptForAuthKey` 泛化为 `promptForInput(promptText, {mask?, defaultValue?})`（raw-mode 逐字符；`mask` 控制回显 `*`；空输入回落 `defaultValue`）；`promptForKey` = 掩码版包装。
+- **工具函数提取**：`createMinimalArgv` 和 `loadAuthConfig` 抽为顶层函数，消除 `handleQwenAuth` 中的重复代码。
+
+### #4255 — daemon 设备流（device-flow PKCE）
+
+- **PKCE S256**：`qwenOAuth2.ts:generateCodeVerifier` = `crypto.randomBytes(32).toString('base64url')`；`generateCodeChallenge` = `sha256(verifier).digest('base64url')`；`generatePKCEPair` 组合二者。`QwenOAuthDeviceFlowProvider.start` 以 `code_challenge + S256` 调 `requestDeviceAuthorization`，返回含 `BrandedSecret` 包裹的 `deviceCode/pkceVerifier`。
+- **BrandedSecret 令牌脱敏**：`deviceFlow.ts` 中 `SECRET_BRAND: unique symbol` + `Object.freeze({toString/toJSON/[Symbol.toPrimitive] → '[redacted]'})` + `WeakMap` 存真值，唯一取回路径 `unsafeRevealSecret`。6 条 leak-path 测试守护（`JSON.stringify`/`String()`/模板字符串/`+`/`.length`/`Number()`）。
+- **DeviceFlowRegistry 状态机**：per-providerId 单例 + `inFlightStarts` Promise map 并发合并；daemon 自驱轮询（间隔 `intervalMs`，`slow_down` 自动 ×1.5）；`transitionTerminal` 收口所有终态转换；`toPublicView` 终态丢弃 `userCode`；`TERMINAL_GRACE=5min` 窗口后清理。
+- **凭据原子落盘**：`cacheQwenCredentials` 先写 `temp(0o600)` → `chmod(0o600)`（POSIX 失败即硬错误）→ `rename` 原子替换 → `clearCache()`。`signal` 从 registry 透传到 `fs.writeFile`，配合 `DEVICE_FLOW_PERSIST_TIMEOUT_MS=30_000`。
+- **4 路由门控**：`POST/GET/:id/DELETE` 均 `mutate({strict:true})`；`GET /workspace/auth/status` bearer-only（不含 userCode）。`GET /:id` 叠加 `callerIsDeviceFlowInitiator` 按 `X-Qwen-Client-Id` 脱敏非发起者。`sanitizeForStderr` 覆盖 ASCII C0/C1 + Unicode 仿冒控制符（`U+200B-200F/2028-2029/202A-202E/2066-2069/FEFF`）。
