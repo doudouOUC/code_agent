@@ -28,6 +28,7 @@
 | #4556 | MERGED | daemon prompt 生命周期 | `daemon-tracing.ts` route/bridge span + `_meta` traceparent 注入/提取；`channel.spawn` / `channel.initialize` / `session.new` / `prompt.dispatch` / `session.cancel` / `session.close` | `daemon_mode_b_main` |
 | #4628 | MERGED | client_id + 权限 span | `qwen-code.client_id` 属性 + 校验 + permission route span | `daemon_mode_b_main` |
 | #4682 | MERGED | daemon 路由覆盖扩展 | 扩展 `resolveDaemonTelemetryRoute` 覆盖所有写路由（除 heartbeat）；修复尾部斜杠不匹配 + workspace sessions regex 过度匹配 | `daemon_mode_b_main` |
+| #4749 | MERGED | daemon OTel metrics + structured log | 11 个 OTel metric instruments（Counter/Histogram/ObservableGauge）覆盖 HTTP 请求、session/channel 生命周期、prompt 队列等待与执行时长、bridge 错误、SSE 活跃连接、堆内存；扩展 `BridgeTelemetry` 接口增加 `metrics` 子对象；`emitDaemonLog` 泛化支持自定义事件名与 severity；`service.instance.id` Resource 属性 + `forceFlushMetrics()` 预关闭快照 | `daemon_mode_b_main` |
 
 ---
 
