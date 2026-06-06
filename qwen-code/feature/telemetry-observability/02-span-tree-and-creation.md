@@ -540,3 +540,50 @@ sequenceDiagram
 `tracer.test.ts`：`withSpan`（L142，含 autoOkOnSuccess、Proxy 不覆盖 caller-set ERROR、span end 失败不掩盖原异常）、`createSessionRootContext`（L389，确定性 traceId + `shouldForceSampled` 各采样器矩阵）、`parent context selection`（L526，session vs active span 优先级、`startSpanWithContext` 同逻辑）。
 
 `coreToolScheduler.test.ts`：mock `session-tracing.js` 全套 helper（L150+），断言 `runInToolSpanContext`/`startToolExecutionSpan`/`startToolBlockedOnUserSpan`/`startHookSpan` 的调用与 metadata；L2290 验证 cancelled 时 `tool.execution` 子 span 与 parent 一致地记成 not-success。
+
+---
+
+## 各 PR 代码贡献
+
+### #4071 — hierarchical session spans（初版）
+- `session-tracing.ts` — 新增文件，定义 `startInteractionSpan`/`endInteractionSpan`/`startLLMRequestSpan` 等首批 helper + `interactionContext` ALS
+- `client.ts:sendMessageStream` — 接入 `startInteractionSpan`/`endInteractionSpan`，包裹回合生命周期并在 10+ 个 return/throw 路径显式调 `endInteractionSpan`
+- `client.test.ts` — 删除旧 `withSpan('client.generateContent')` 相关 span 断言，适配新 session-tracing helper
+
+### #4126 — 统一 span 创建路径（ALS）
+- `session-tracing.ts:runInToolSpanContext` — 新增：`toolContext.run(spanCtx, () => otelContext.with(otelCtxWithSpan, fn))` 双轨并发隔离
+- `coreToolScheduler.ts:executeSingleToolCall` — 接入 `startToolSpan`/`endToolSpan`/`runInToolSpanContext`/`startToolExecutionSpan`；抽出 `_executeToolCallBody`
+- `loggingContentGenerator.ts` — 流式与非流式路径接入 `startLLMRequestSpan`/`endLLMRequestSpan`（替代旧 `withSpan`）
+- `tracer.ts:getParentContext` — 与 `resolveParentContext` 同步镜像（`// SYNC:` 注释约束）
+- `docs/design/workflow-tracing-gaps.md` — 新增 376 行设计文档，分析 claude-code tracing 复用方案与实施路径
+
+### #4302 — Phase 1.5 打磨
+- `coreToolScheduler.ts:_executeToolCallBody` — `signal.aborted` 时传 `cancelled:true` 给 `endToolExecutionSpan`，使子 span 保持 UNSET
+- `loggingContentGenerator.ts` — 新增 `STREAM_IDLE_TIMEOUT_MS` 5min 空闲计时器 + `spanEndedByTimeout` 闸门（#4212 修复 span/log 矛盾）
+- `coreToolScheduler.ts:setToolSpanCancelled` — 删除显式 `safeSetStatus(UNSET)`，改由 `autoOkOnSuccess:false` + 默认 UNSET 保留
+
+### #4321 — Phase 2 blocked_on_user + hook
+- `session-tracing.ts:startToolBlockedOnUserSpan`/`endToolBlockedOnUserSpan` — 新增 blocked 子 span（显式传入 toolSpan 作 parent）+ `startHookSpan`/`endHookSpan`
+- `session-tracing.ts:sweepStaleSpans` — 30min TTL 安全网 + `ttl_expired`/`duration_ms` 哨兵属性；`truncateSpanError` UTF-16 截断 + 代理位回退
+- `coreToolScheduler.ts:_schedule` — tool span 前移到 validate 阶段创建 + `BatchAbortState` drain/release + `withHookSpan` 6 个 fire site
+- `coreToolScheduler.test.ts` — 新增 1580+ 行 Phase 2 测试（blocked/hook/drain/truncate/leak guard）
+
+### #4058 — trace 关联跟进
+- `log-to-span-processor.ts` — 引入 `getCurrentSessionId` 兜底 traceId 优先级链（parent span > 本记录 `session.id` > 全局 > 随机）
+- `log-to-span-processor.test.ts` — 新增 `session.id` 优先于全局 / 全局兜底两组测试
+
+### #4499 — interaction 归属
+- `session-tracing.ts:startInteractionSpan` — 改用 `getSessionContext() ?? otelContext.active()` 显式 pin 到 session 根（不走 `resolveParentContext`）
+- `session-tracing.test.ts` — 新增 trace context #4486 测试（session 根锚定、不被 active span 抢 parent）
+- `session-tracing.ts:clearSessionTracingForTesting` — 新增 `setSessionContext(undefined)` 防跨测试泄漏
+
+### #4661 — per-prompt traceId
+- `session-tracing.ts:startInteractionSpan` — 改用 `ROOT_CONTEXT` 作 parent，每次 prompt 获得独立 traceId
+- `sdk.ts:SessionIdSpanProcessor` — 新增 `SpanProcessor`，`onStart` 自动附加 `session.id` 属性（含 auto-instrumented span）
+- `session-tracing.ts:resolveParentContext` — 简化为两级（显式 ALS parent → `otelContext.active()`），移除 session 根回落
+- `tracer.ts:getParentContext` — 简化为 `context.active()`；`createSessionRootContext` 标记 `@deprecated`
+
+### #4693 — response metadata & error enrichment
+- `session-tracing.ts:LLMRequestMetadata` — 新增 6 字段：`responseId`/`finishReason`/`thoughtsTokenCount`/`subagentName`/`errorType`/`errorStatusCode`
+- `session-tracing.ts:endLLMRequestSpan` — 双发 GenAI semconv（`gen_ai.response.id`/`gen_ai.response.finish_reasons[]`/`gen_ai.usage.reasoning_tokens`/`error.type`）
+- `loggingContentGenerator.ts` — 流式与非流式路径透传新字段（含 idle-timeout 路径的 `responseId`/`subagentName`）

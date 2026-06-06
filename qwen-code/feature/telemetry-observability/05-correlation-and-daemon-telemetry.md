@@ -319,3 +319,40 @@ sequenceDiagram
 | addDaemonRequestAttribute is a no-op without an active span（L183） | 无 active span 时静默 no-op |
 
 `getTraceContext` 的回退序 / ZERO_TRACE_ID 守卫 / 无 span 省略，对应 `main` 的 `packages/core/src/utils/debugLogger.test.ts`（#3847 / #4058 引入）。
+
+---
+
+## 各 PR 代码贡献
+
+### #3847 — traceId in debug logs
+
+- `debugLogger.ts:getTraceContext` / `getActiveSpanTraceContext` / `getSessionRootTraceContext`：三级回退序，逐行注入 `trace_id` / `span_id`。
+- `debugLogger.ts:buildLogLine`：格式化 `[trace_id=xxx span_id=yyy]` 段，`null` 时省略。
+- `debugLogger.ts:ZERO_TRACE_ID`：全 0 守卫常量，拒绝写出无效 traceId。
+- 配套测试 `debugLogger.test.ts`：回退序 / 无 span 省略 / ZERO 守卫。
+
+### #4556 — daemon prompt lifecycle spans
+
+- `daemon-tracing.ts:withDaemonBridgeSpan` / `createDaemonBridgeTelemetry`：bridge 侧 span 工厂，封装 `channel.spawn` / `channel.initialize` / `session.new` / `prompt.dispatch` / `session.cancel` / `session.close` 六类 operation。
+- `daemon-tracing.ts:injectDaemonTraceContext` / `extractDaemonTraceContext`：W3C `traceparent` 经 `_meta` 保留键的注入与提取（含手工兜底解析）。
+- `daemon-tracing.ts:stripReservedTraceMeta`：反伪造——总先剥掉客户端自带保留键再 inject。
+- `daemon-tracing.ts:captureDaemonTelemetryContext` / `runWithDaemonTelemetryContext`：FIFO 上下文捕获/还原，解决 prompt 队列延迟执行后 active context 丢失。
+
+### #4628 — client_id + permission spans
+
+- `server.ts:CLIENT_ID_HEADER` / `CLIENT_ID_RE` / `MAX_CLIENT_ID_LENGTH`：`x-qwen-client-id` 常量与双层校验（软校验用于 span 属性、硬校验用于业务 400）。
+- `daemon-tracing.ts:withDaemonRequestSpan`：route span 新增 `qwen-code.client_id` 与 `qwen-code.daemon.permission.request_id` 属性。
+- `server.ts:resolveDaemonTelemetryRoute`：识别 `POST /session/:id/permission/:requestId` 与 `POST /permission/:requestId` 两条权限路由。
+
+### #4682 — expand route coverage
+
+- `server.ts:resolveDaemonTelemetryRoute`：扩展路由白名单覆盖所有写路由（`POST /workspace/init`、`POST /workspace/mcp/servers`、`DELETE /workspace/mcp/servers/:name`、`POST /workspace/auth/device-flow`、`POST /workspace/tools/:name/enable` 等）。
+- 修复尾部斜杠归一化（`req.path.replace(/\/$/, '')`），防止 `/session/abc/prompt/` 静默不匹配。
+- 修复 `GET /workspace/:id/sessions` regex 从 `.+` 收紧为 `[^/]+`，防跨路径段过度匹配。
+
+### #4749 — OTel metrics + structured log
+
+- `daemon-tracing.ts`：新增 11 个 OTel metric instruments（Counter / Histogram / ObservableGauge），覆盖 HTTP 请求、session/channel 生命周期、prompt 队列等待与执行时长、bridge 错误、SSE 活跃连接、堆内存。
+- `daemon-tracing.ts:BridgeTelemetry`：接口扩展 `metrics` 子对象，供 bridge 层按需记录 counter/histogram。
+- `daemon-tracing.ts:emitDaemonLog`：泛化支持自定义事件名与 severity 级别。
+- `sdk.ts:initializeTelemetry`：新增 `service.instance.id` Resource 属性 + `forceFlushMetrics()` 预关闭快照。

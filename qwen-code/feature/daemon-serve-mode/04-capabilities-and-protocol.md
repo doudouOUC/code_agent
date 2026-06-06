@@ -425,3 +425,29 @@ sequenceDiagram
 | `sdk-typescript/test/unit/daemon-public-surface.test.ts` | 公共面 re-export 围栏（type-only import 编译失败即红）+ `DAEMON_ERROR_KINDS`/`mcp_server_added/removed` drift insurance。 |
 | `sdk-typescript/test/unit/daemonEvents.test.ts` | `asKnownDaemonEvent` 各 type 判别式 + 畸形 data 回落 `undefined`。 |
 | `acp-bridge/src/eventBus.test.ts` | `state_resync_required`（epoch_reset/ring_evicted）+ `replay_complete` 顺序（与 `qwen-serve-baseline.test.ts` 的 SSE 背压帧序镜像，#4245 一并修过）。 |
+
+---
+
+## 各 PR 代码贡献
+
+### #4191 — capability registry
+
+- `capabilities.ts:SERVE_CAPABILITY_REGISTRY`：`as const satisfies Record<string, ServeCapabilityDescriptor>` 声明的单一事实源，每条 `{ since, modes? }`。
+- `capabilities.ts:getRegisteredServeFeatures` / `getAdvertisedServeFeatures`：registered（全集，每次 fresh copy）vs advertised（运行时 `since` + 条件谓词双层过滤）。
+- `capabilities.ts:CONDITIONAL_SERVE_FEATURES`：`ReadonlyMap<tag, predicate>` 把"是否广告"与 tag key 并置，从 4 处改动降到 2 处。
+- `capabilities.ts:getServeProtocolVersions`：返回 `{current:'v1', supported:['v1']}` 拷贝；`isFeatureAvailableInProtocol` 按 `since` 序号裁剪。
+- `serve/types.ts:CapabilitiesEnvelope`：新增 `protocolVersions?` additive optional 字段。
+
+### #4226 — typed_event_schema + public surface
+
+- `capabilities.ts`：注册 `typed_event_schema: { since:'v1' }` 能力 tag（纯信息性，SDK 行为不依赖它）。
+- `sdk-typescript/src/daemon/events.ts:DAEMON_KNOWN_EVENT_TYPE_VALUES`：`as const` 元组列出全部已知 event type；`asKnownDaemonEvent` 运行时收窄器。
+- `sdk-typescript/test/unit/daemon-public-surface.test.ts`：type-only import 编译围栏 + runtime `typeof` 断言，防 re-export 漏缺；drift insurance 子套件钉死 `DAEMON_ERROR_KINDS` / `mcp_server_added` 等镜像。
+
+### #4360 — protocol completion
+
+- `server.ts:formatSseFrame`：wire 边界 stamp `_meta.serverTimestamp = Date.now()`，内存 `BridgeEvent` 类型零改动。
+- `ToolCallEmitter.ts:resolveToolProvenance`：`subagent` / `mcp`（带 `serverId`）/ `builtin` 三路分类，stamp `_meta.provenance`。
+- `status.ts:mapDomainErrorToErrorKind` / `SERVE_ERROR_KINDS`：14 类错误码闭集；`instanceof` + `.name` 双保险防跨包 bundle 破坏 identity。
+- `eventBus.ts:subscribe`：`state_resync_required`——`epoch_reset`（`lastEventId >= nextId`，`replayFrom=0`）与 `ring_evicted`（`earliestInRing > lastEventId+1`）两条 gap 检测。
+- SDK `events.ts:reduceDaemonSessionEvent`：`awaitingResync` 一向闩 + `RESYNC_PASSTHROUGH_TYPES` 白名单。

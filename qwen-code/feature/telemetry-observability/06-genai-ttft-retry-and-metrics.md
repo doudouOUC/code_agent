@@ -652,4 +652,30 @@ flowchart TB
 | `loggers.test.ts`【#4432】 | `logApiRetry` 三汇 fan-out（QwenLogger / `logger.emit` body+attrs / `recordApiRetry{model}`）；带 `subagent_name`；SDK 未初始化仅 QwenLogger |
 | `resource-attributes.test.ts`（#4367，隐含） | `parseOtelResourceAttributes` 容错/percent-decode/坏 pair；`stripReservedResourceAttributes` 剥保留字；`coerceStringResourceAttributes` 非 string drop |
 
+---
+
+## 各 PR 代码贡献
+
+### #4417 — Phase 4a TTFT + GenAI 双发
+
+- `loggingContentGenerator.ts:loggingStreamWrapper`：引入方法内闭包变量 `ttftMs`，在首个 `hasUserVisibleContent(chunk)` 处捕获墙钟时延。
+- `streamContentDetection.ts:hasUserVisibleContent` / `isUserVisiblePart`：集中判定首 token 可见性，含 `thought === true` 严格匹配修复。
+- `session-tracing.ts:startLLMRequestSpan` / `endLLMRequestSpan`：GenAI 语义双发——`gen_ai.request.model` / `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.server.time_to_first_token`（秒，`/1000`）写入 span attribute。
+- `session-tracing.ts:endLLMRequestSpan`：派生 `sampling_ms = max(0, duration - ttft)` 与 `output_tokens_per_second`（除零守卫）。
+
+### #4432 — Phase 4b retry 可见性
+
+- `utils/retryContext.ts`：新增 `RetryAttemptContext` 接口 + `retryContext` ALS 实例，携带 `attempt` / `retryTotalDelayMs` / `requestSetupMs` 三字段。
+- `utils/retry.ts:retryWithBackoff`：新增单调 `iterationCount`（与 clamp 后 `attempt` 解耦）、`onRetry` 回调（先于 sleep、`!signal?.aborted` 守卫、try/catch 吞错）、`retryContext.run()` ALS 注入。
+- `loggingContentGenerator.ts:snapshotRetryMetadata`：在 `generateContentStream` 同步前导读 ALS 快照，穿线到所有 `endLLMRequestSpan` 调用点（含 idle 超时路径）。
+- `loggers.ts:logApiRetry`：三汇 fan-out（QwenLogger RUM / OTel log → LogToSpan 桥接 / `recordApiRetry` counter）。
+- `session-tracing.ts:endLLMRequestSpan`：修复 `sampling_ms` 公式从 `duration - ttft - setup` 改为 `duration - ttft`（setup 不应双扣）。
+
+### #4367 — resource attrs + 基数控制
+
+- `resource-attributes.ts:parseOtelResourceAttributes`：W3C Baggage 格式解析，key/value 双 `decodeURIComponent` 防 `service%2Eversion` 绕过保留字过滤。
+- `resource-attributes.ts:RESERVED_RESOURCE_ATTRIBUTE_KEYS`：`{ 'service.version', 'session.id' }` 保留集，`stripReservedResourceAttributes` 剥离。
+- `metrics.ts:baseMetricDefinition.getCommonAttributes`：`session.id` 默认移出 metrics，受 `QWEN_TELEMETRY_METRICS_INCLUDE_SESSION_ID` opt-in 控制。
+- `sdk.ts:initializeTelemetry`：纵深防御——构造 Resource 时再 destructure 剥离 `service.name` / `service.version` / `session.id`，用 runtime 值重注入。
+
 > 【#4432 已合入】标注的测试均来自 PR diff，尚未进入 `main`。

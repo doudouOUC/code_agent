@@ -561,3 +561,24 @@ flowchart LR
 | **log 桥接 skip-list** | `qwen-code.subagent_execution` 不再桥接成 span，但 RUM/metric 仍收 LogRecord；`tool_call` 等仍正常桥接 | `log-to-span-processor.test.ts`（#4410 新增 `bridge skip-list`）【#4410】 |
 | **retry per-attempt 元数据** | `500→429→success` 产 3 个 llm_request span；成功 span 带 `attempt:3`/`request_setup_ms`/`retry_total_delay_ms` | `loggingContentGenerator.test.ts` / `retry.test.ts`【#4432】 |
 | **`onRetry` 不读 ALS、抛错不破坏循环** | 数据只走 `RetryAttemptInfo` 参数；回调抛错被吞 | `retry.test.ts`【#4432】 |
+
+---
+
+## 各 PR 代码贡献
+
+### #4126 — ALS toolContext + 统一 span 创建
+- `session-tracing.ts:toolContext` — 新增 `AsyncLocalStorage<SpanContext>`；`runInToolSpanContext` 实现 `toolContext.run` + `otelContext.with` 双轨绑定
+- `session-tracing.ts:resolveParentContext` — 定义四级优先级（显式 ALS parent → active OTel span → session 根 → 兜底）
+- `coreToolScheduler.ts:executeSingleToolCall` — 用 `runInToolSpanContext` 包裹 `_executeToolCallBody`，并发 tool call 各持独立 ALS
+
+### #4410 — subagentContext Phase 3
+- `session-tracing.ts:subagentContext` — 新增 `AsyncLocalStorage<SpanContext>`；`runInSubagentSpanContext` 做三件事：`subagentContext.run` + `toolContext.run(undefined)` 清空外层 + `otelContext.with`
+- `session-tracing.ts:startSubagentSpan` — hybrid traceId：foreground 继承父 traceId 作子 span；fork/background 用 `root:true` + Link 指回 invoker
+- `session-tracing.ts:startLLMRequestSpan`/`startToolSpan`/`startHookSpan` — parent 入口改为 `subagentContext ?? interactionContext`（subagent 优先级压过 interaction）
+- `tools/agent/agent.ts:runWithSubagentSpan` — 3 路径归一 + `recordOutcome` first-write-wins（`??=`）+ `depth` 消歧 + wiring_bug 哨兵
+
+### #4432 — retryContext Phase 4b
+- `utils/retryContext.ts` — 新增文件：`RetryAttemptContext`（`attempt`/`retryTotalDelayMs`/`requestSetupMs`）+ `retryContext` ALS
+- `utils/retry.ts:retryWithBackoff` — 每 attempt `retryContext.run({ attempt, requestSetupMs, retryTotalDelayMs }, fn)`
+- `loggingContentGenerator.ts:snapshotRetryMetadata` — 同步 prelude 快照 ALS → 闭包传递到 success/error/idle-timeout/abort 4 条 `endLLMRequestSpan` 路径
+- `client.ts`/`baseLlmClient.ts`/`geminiChat.ts` — 4 个 `retryWithBackoff` 调用点新增 `onRetry` → `logApiRetry(ApiRetryEvent)`

@@ -455,3 +455,40 @@ sequenceDiagram
 | `packages/cli/src/serve/bridgeFileSystemAdapter.test.ts` | 18 | ACP write/read 命中工作区内磁盘（happy path）+ 信任门（`trusted:false` factory 使 ACP 写以与 HTTP `POST /file` 同姿态 reject）+ line/limit null 丢弃。 |
 
 > 合计 ~163 个用例集中在文件子系统四层 + adapter。`workspaceFileSystem.test.ts` 的 75 例是密度最高的安全回归套件，逐一覆盖 §"写/编辑路由" 列出的每道守卫。
+
+---
+
+## 各 PR 代码贡献
+
+### #4250 — FileSystemService boundary（@doudouOUC）
+
+- 新增 `paths.ts:resolveWithinWorkspace`（反穿越核心）+ `ResolvedPath` branded type，含 `hasSuspiciousPathPattern` 全平台检测、`findExistingAncestor` 悬挂符号链接逐跳守卫。
+- 新增 `workspaceFileSystem.ts:WorkspaceFileSystem`，含 `atomicWriteTextResolvedFile`（tmp+rename 原子写）、`PathMutexRegistry:runExclusive`（per-path 锁）、`assertSameFile`（dev/ino TOCTOU 探测）。
+- 新增 `policy.ts:assertTrustedForIntent`（信任门）+ `enforceWriteSize`（5 MiB 门）；`errors.ts:FsError` 类 + `DEFAULT_STATUS_BY_KIND` errno→kind 映射。
+- 29 个 `paths.test.ts` 用例 + 75 个 `workspaceFileSystem.test.ts` 用例覆盖全分支。
+
+### #4269 — 安全读路由（@doudouOUC）
+
+- 新增 `routes/workspaceFileRead.ts:registerWorkspaceFileReadRoutes`，注册 `GET /file|/stat|/list|/glob`；`applyReadHeaders`（`Cache-Control: no-store` + `nosniff`）；`sendFsError` 统一错误 envelope。
+- 实现 `parseIntInRange` fail-closed 数值闸（三态 `undefined|null|number`）；`workspaceRelative` POSIX 归一化（防 Windows `\` 泄漏）。
+- `glob` 四层防御：pattern 前置拒绝、cwd 重验（realpath 而非 resolve）、walk-time ignore 剪枝、per-hit realpath + containment + 聚合审计。
+- 在 `capabilities.ts` 注册 `workspace_file_read` 能力标签；31 个 `workspaceFileRead.test.ts` 用例。
+
+### #4279 — Windows 路径归一化 follow-up（@doudouOUC）
+
+- 修复 `routes/workspaceFileRead.ts:workspaceRelative`：Windows 上 `path.relative` 产出 `\` 分隔符，统一 `split`+`join('/')` 成 POSIX 格式。
+- 单文件变更，保证读路由响应中的路径对跨平台 SDK 消费一致。
+
+### #4280 — write/edit 路由 + CAS（@doudouOUC）
+
+- 新增 `routes/workspaceFileWrite.ts:registerWorkspaceFileWriteRoutes`，注册 `POST /file/write|/file/edit`；`mutate({strict:true})` 门控 + `resolveOriginatorClientId` 客户端校验。
+- 实现 `workspaceFileSystem.ts:editAtomic`（单匹配 + `expectedHash` CAS + `countOccurrences` 歧义拒绝）；新增 `readBytesWindow`（二进制窗口 + open-fd 双 stat）。
+- `errors.ts` 增加 `text_not_found`/`ambiguous_text_match`/`file_already_exists` kind；`publishCreateNoClobber` 用 `link()` 替代 `rename()` 兑现 no-clobber。
+- 在 `capabilities.ts` 注册 `workspace_file_write`/`workspace_file_bytes`；10 个 `workspaceFileWrite.test.ts` + SDK 类型锁。
+
+### #4334 — BridgeFileSystem 接线（@doudouOUC）
+
+- 新增 `bridgeFileSystemAdapter.ts:createBridgeFileSystemAdapter`，把 ACP `readTextFile`/`writeTextFile` 路由到同一 `WorkspaceFileSystemFactory`，选 `writeTextOverwrite`（原子 + mode 保留）。
+- `bridge.ts` 接线：`fileSystem: createBridgeFileSystemAdapter(fsFactory)` 统一 HTTP 与 ACP 审计流；`server.ts` 把 `fsFactory`/`boundWorkspace` 挂 `app.locals`。
+- `bridgeFileSystem.ts` 契约：符号链接拒绝（对 pre-F1 内联 proxy 的刻意 divergence）、新文件 `0o600`。
+- 18 个 `bridgeFileSystemAdapter.test.ts` 用例覆盖信任门 + line/limit null 丢弃。
