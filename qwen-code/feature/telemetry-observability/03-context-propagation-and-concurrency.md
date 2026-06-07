@@ -8,7 +8,7 @@
 > - `subagentContext` + `runInSubagentSpanContext` + `qwen-code.subagent` span 来自 **PR #4410（MERGED 2026-06-05）**；
 > - `retryContext` 来自 **PR #4432（MERGED 2026-06-05）**，且**不在** `session-tracing.ts`，而在新文件 `packages/core/src/utils/retryContext.ts`。
 >
-> 本文凡引用 OPEN-PR 代码，均在代码块标题或行内显式写 `【#4410 已合入 main】`/`【OPEN #4432】`。未标注者即 `main` 现状。
+> 本文凡引用 PR 代码，均在代码块标题或行内显式写 `【#4410 已合入 main】`/`【#4432 已合入 main】`。未标注者即 `main` 现状。
 
 ---
 
@@ -105,7 +105,7 @@ export function runInToolSpanContext<T>(span: Span, fn: () => T): T {
 | `interactionContext` | `SpanContext \| undefined` | `session-tracing.ts:152` | `enterWith` | **MERGED** |
 | `toolContext` | `SpanContext \| undefined` | `session-tracing.ts:153` | `run`（`runInToolSpanContext`） | **MERGED** |
 | `subagentContext` | `SpanContext \| undefined` | `session-tracing.ts`（#4410 在 `toolContext` 后新增） | `run`（`runInSubagentSpanContext`） | **【#4410 已合入 main】** |
-| `retryContext` | `RetryAttemptContext` | **`utils/retryContext.ts:retryContext`**（非 session-tracing.ts） | `run`（`retry.ts:retryWithBackoff`） | **【OPEN #4432】** |
+| `retryContext` | `RetryAttemptContext` | **`utils/retryContext.ts:retryContext`**（非 session-tracing.ts） | `run`（`retry.ts:retryWithBackoff`） | **【#4432 已合入 main】** |
 | `subagentNameContext` | 子 agent 名字字符串 | `utils/subagentNameContext.ts` | `run` | MERGED（弱归属兜底，非 span 级） |
 | `agentContextStorage` | `AgentContext`（含 `agentId` / `depth`） | `agents/runtime/agent-context.ts:38` | `run`（`runWithAgentContext`） | MERGED；`depth` 字段为 **【#4410 已合入 main】** |
 
@@ -134,10 +134,10 @@ const subagentContext = new AsyncLocalStorage<SpanContext | undefined>();
 
 这段注释点出了**并发隔离的核心矛盾**：foreground subagent 执行期间 `interactionContext` 永远非空（外层 interaction 还活着），若 `startLLMRequestSpan` 仍按 `main` 的逻辑只读 `interactionContext`，则 subagent 内部的 llm_request 会全部挂回外层 interaction，subagent span 变成空壳。解法见「并发隔离」节。
 
-### `retryContext` 的定义【OPEN #4432】
+### `retryContext` 的定义【#4432 已合入 main】
 
 ```ts
-// utils/retryContext.ts（新文件）【OPEN #4432】
+// utils/retryContext.ts（新文件）【#4432 已合入 main】
 export interface RetryAttemptContext {
   readonly attempt: number;           // 1-based 单调迭代计数（不受 persistent 模式 clamp 影响）
   readonly retryTotalDelayMs: number; // 本次 attempt 之前所有 backoff 之和（attempt 1 为 0）
@@ -385,12 +385,12 @@ try {
 - **`depth` 计算**：`getCurrentAgentDepth()` 返回 0 同时表示「无 agent frame」与「顶层 frame@depth0」，故用 `getCurrentAgentId() !== null` 消歧——有 parent frame 才 `+1`。`runWithAgentContext`（`agent-context.ts:48`，#4410 改）内部自增 `depth = (current.depth ?? -1) + 1`，调用方无感知。
 - **`finally` 默认 `failed` + `wiring_bug_record_outcome_not_called` 哨兵**：body 既没 `recordOutcome` 也没抛错 → 判定为接线 bug，主动暴露为 `status=failed` 而非静默成功。
 
-### retry 上下文如何并发安全地传播【OPEN #4432】
+### retry 上下文如何并发安全地传播【#4432 已合入 main】
 
 Phase 4b 发现 qwen-code 的 `retryWithBackoff` 位于 `LoggingContentGenerator` **之上**——每次重试都会创建一个全新的 `llm_request` span（而非 claude-code 的「一个 span 包住整个重试循环」）。因此无法用「LCG 内累加器」，改用 ALS 把 per-attempt 元数据从 retry 层下传给 LCG：
 
 ```ts
-// retry.ts:retryWithBackoff（#4432，节选）【OPEN #4432】
+// retry.ts:retryWithBackoff（#4432，节选）【#4432 已合入 main】
 while (attempt < maxAttempts) {
   attempt++; iterationCount++;
   const requestSetupMs = Date.now() - requestEntryTime;
@@ -402,7 +402,7 @@ while (attempt < maxAttempts) {
 ```
 
 ```ts
-// loggingContentGenerator.ts:snapshotRetryMetadata（#4432）【OPEN #4432】
+// loggingContentGenerator.ts:snapshotRetryMetadata（#4432）【#4432 已合入 main】
 function snapshotRetryMetadata() {
   const ctx = retryContext.getStore();      // 在「同步 prelude」读，即第一个 await 之前
   return { attempt: ctx?.attempt ?? 1, requestSetupMs: ctx?.requestSetupMs, /* ... */ };
@@ -526,9 +526,9 @@ flowchart LR
 
 ## 已知限制 / 后续
 
-1. **`subagentContext` / `qwen-code.subagent` span 未合入 main（#4410 已合入）**：`main` 上并发 subagent 的 llm_request/tool 子 span 仍平铺挂在共享 interaction 下，**无法区分属于哪个子 agent**；现状只能靠 `subagentNameContext`（名字字符串）在 api_* 事件上做弱归属。
+1. **`subagentContext` / `qwen-code.subagent` span 已合入 main（#4410，2026-06-05）**：subagent 的 llm_request/tool 子 span 现已正确挂在 `qwen-code.subagent` span 下，可区分属于哪个子 agent。`subagentNameContext`（名字字符串）仍作为 api_* 事件的弱归属兜底保留。
 
-2. **`retryContext` / retry 可见性未合入 main（#4432 已合入）**：`LLMRequestMetadata.requestSetupMs`/`attempt`/`retryTotalDelayMs`（`session-tracing.ts:77-88`）已**前向声明但恒 `undefined`**；trace 看不到「一次请求内部重试了几次」。注意该 PR 也带了 Phase 4a 的 `sampling_ms` 公式 bug 修复（去掉重复扣 setup）。`retryContext` 实际位于 `utils/retryContext.ts`，非 `session-tracing.ts`。
+2. **`retryContext` / retry 可见性已合入 main（#4432，2026-06-05）**：`LLMRequestMetadata.requestSetupMs`/`attempt`/`retryTotalDelayMs` 现已由 `retryContext` ALS 填充（位于 `utils/retryContext.ts`，非 `session-tracing.ts`）。该 PR 同时修复了 Phase 4a 的 `sampling_ms` 公式 bug（去掉重复扣 setup）。
 
 3. **fork 子 span 的 4h vs 30min TTL 空洞（#4410 设计内已知，deferred）**：`ttlFor` 只给 **subagent span 本身** 4h TTL（`SPAN_TTL_MS_LONG`）；fork/background 内部的 llm_request/tool/hook **子 span 仍用 30min 默认 TTL**（`SPAN_TTL_MS_DEFAULT`）。后果：一个 2 小时的 background agent，其早期子 span 会在 30min 被 sweep 强制 `end()`（打 `ttl_expired`），晚期子 span 正常 —— trace 出现**空洞**。彻底修需把「long-TTL bucket」经 ALS 传进 `resolveParentContext`，或 sweep 时做 TTL 继承遍历，留待后续 PR。
 

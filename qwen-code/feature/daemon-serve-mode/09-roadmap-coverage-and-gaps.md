@@ -3,6 +3,8 @@
 > 以 [#3803](https://github.com/QwenLM/qwen-code/issues/3803)（设计提案 + 6 章设计系列）与 [#4175](https://github.com/QwenLM/qwen-code/issues/4175)（F1-F5 wave 计划）为 spec，盘点已建设 / 已文档化 / 仍缺失。
 >
 > 核对基准：所有 PR / issue 状态在 **2026-05-31** 用 `gh pr view` / `gh issue view` 实测；状态图例：✅ merged、🔧 open/in-progress、⏳ pending（roadmap 无实现）、🅿️ parked、❌ closed/dropped/superseded。**分支后缀**标注 `→main`（已落 main）或 `→dmbm`（仅落集成分支 `daemon_mode_b_main`，尚未进 main）。
+>
+> **⚠️ 本文截止 2026-05-31，未反映 6 月合入的 PR**（如 #4820 rewind 端点、#4822 hooks 诊断、#4826 /directory ACP、#4819 /remember ACP 等）。覆盖矩阵和缺口分析需结合 08-extension-endpoints.md 的最新 PR 表格阅读。
 
 ---
 

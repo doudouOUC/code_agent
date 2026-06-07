@@ -39,6 +39,7 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 | [#4507](https://github.com/QwenLM/qwen-code/pull/4507) | — | server-pushed `followup_suggestion` 事件（走同一 per-session bus）。 |
 | [#4689](https://github.com/QwenLM/qwen-code/pull/4689) | — | 并行 subAgent 文本流已通过 per-parentToolCallId keyed map 隔离：`transcript.ts` reducer 用 `activeAssistantBlockByParent` 按 `parentToolCallId` 维护独立 active block pointer，scoped `clearActiveText` 不打断其他 subAgent，`finishAssistant` 遍历 map 清 streaming。 |
 | [#4702](https://github.com/QwenLM/qwen-code/pull/4702) | — | WebUI `DaemonSessionProvider` 对所有 resync reason（含 `ring_evicted`）统一提前调 `store.reset()`，自动恢复 transcript；移除误导性 "Reload the session to recover." 提示文案。 |
+| [#4820](https://github.com/QwenLM/qwen-code/pull/4820) | — | 新增 `session_rewound` SSE 事件——rewind 成功后 `entry.events.publish({type:'session_rewound', data:{sessionId, promptId, targetTurnIndex, filesChanged, filesFailed}})` 走 per-session EventBus 推送，使其他已附着客户端实时感知回退操作。 |
 
 > 注：`forced`/`liveCount` 重写、`slow_client_warning` 滞回均在 #4237；`epoch_reset` 与 `replay_complete` 字段名是 #4360 合并后由 #4484 post-merge review 补强；二者都已在 `daemon_mode_b_main` 上。
 

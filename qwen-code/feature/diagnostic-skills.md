@@ -1,7 +1,7 @@
 # 诊断 skills 与命令技术方案
 
 > 适用范围：`/doctor`（代码命令）、`/stuck`（prompt 技能）、`/batch`（prompt 技能）三个自助诊断 / 编排能力。
-> 涉及 PR：#3404（`/doctor`）、#4133（`/stuck`）、#3079（`/batch`），分别 Close #3018 / #3043。
+> 涉及 PR：#3404（`/doctor`，Close #3018）、#4133（`/stuck`）、#3079（`/batch`，Close #3043）。
 > 代码基线：`QwenLM/qwen-code` `main`（已合并）。
 
 ---
