@@ -65,7 +65,7 @@
 
 | feature doc | 本周新增 PR |
 |---|---|
-| daemon/08-extension-endpoints | #4666 #4646 #4820 #4822 #4826 #4819 |
+| daemon/08-extension-endpoints | #4666 #4820 #4822 #4826 #4819（+ #4646 补录，合并于 05-31） |
 | daemon/04-capabilities-and-protocol | session_rewind / workspace_hooks / session_hooks 三个新能力标签 |
 | daemon/02-sse-event-bus | #4820 session_rewound SSE 事件 |
 | daemon/03-session-lifecycle | #4694 compacted replay + #4751 ACP lifecycle |

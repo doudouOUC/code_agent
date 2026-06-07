@@ -25,7 +25,7 @@ qwen-code 的解法是 **AsyncLocalStorage（ALS）+ OTel `Context` 双轨**：
 - **ALS 轨**（`interactionContext` / `toolContext` / `subagentContext`）承载 qwen-code 私有的 `SpanContext` 包装对象，供 `start*Span` helper 查 parent；
 - **OTel `Context` 轨**（`otelContext.with` / `trace.setSpan`）承载标准 OTel active span，供 `UndiciInstrumentation`、log 桥接、`tracer.ts:withSpan` 等「不认识 qwen-code ALS」的下游识别 parent。
 
-两轨在 `runInToolSpanContext`（MERGED）与 `runInSubagentSpanContext`（OPEN #4410）里被**同一个 `run`-style 调用同时设置**，从而把「逻辑归属」与「OTel 归属」绑定到同一棵异步调用树上，实现并发隔离。
+两轨在 `runInToolSpanContext`（MERGED）与 `runInSubagentSpanContext`（#4410 已合入 main）里被**同一个 `run`-style 调用同时设置**，从而把「逻辑归属」与「OTel 归属」绑定到同一棵异步调用树上，实现并发隔离。
 
 本文的核心论点：**并发安全来自 `run`（绑定到单棵异步树）而非 `enterWith`（进程级粘性）**；**多 session / 并发 subagent 的 traceId 归属来自「优先读每条记录 / 每个 span 自带的 `session.id` 属性，全局 `getCurrentSessionId()` 仅兜底」**；**子 agent 不串属来自 `subagentContext` 在优先级上压过 `interactionContext`，并在 body 入口清空 `toolContext`**。
 
@@ -264,7 +264,7 @@ if (parentSpanContext) {
 
 ## 并发隔离 ← 重点
 
-这是本文核心。`main` 已能隔离**并发 tool**（靠 `runInToolSpanContext` 的 `toolContext.run`）；**并发 subagent** 的隔离是 #4410 的新增能力（OPEN）。
+这是本文核心。`main` 已能隔离**并发 tool**（靠 `runInToolSpanContext` 的 `toolContext.run`）；**并发 subagent** 的隔离是 #4410 的新增能力（已合入 main）。
 
 ### 问题：为什么并发 subagent 会串属
 
