@@ -583,6 +583,14 @@ sequenceDiagram
 - `session-tracing.ts:resolveParentContext` — 简化为两级（显式 ALS parent → `otelContext.active()`），移除 session 根回落
 - `tracer.ts:getParentContext` — 简化为 `context.active()`；`createSessionRootContext` 标记 `@deprecated`
 
+### #4097 — interaction span + detailed sensitive attributes
+
+- 新增 `detailed-span-attributes.ts`：6 个属性 helper（`addUserPromptAttributes`/`addSystemPromptAttributes`/`addToolSchemaAttributes`/`addToolInputAttributes`/`addToolResultAttributes`/`addModelOutputAttributes`），60 KB 截断 + SHA-256 hash 去重（system prompts/tool schemas）。
+- `session-tracing.ts`：新增 `startInteractionSpan()`/`endInteractionSpan()`/`getActiveInteractionSpan()`——per-user-turn 的 `qwen-code.interaction` 顶层 span。
+- `client.ts`：prompt 流程中 `startInteractionSpan` 后调 `addUserPromptAttributes`。
+- `loggingContentGenerator.ts`：LLM span 上调 `addSystemPromptAttributes`/`addToolSchemaAttributes`/`addModelOutputAttributes`。
+- `coreToolScheduler.ts`：tool span 成功/失败路径调 `addToolInputAttributes`/`addToolResultAttributes`。
+
 ### #4693 — response metadata & error enrichment
 - `session-tracing.ts:LLMRequestMetadata` — 新增 6 字段：`responseId`/`finishReason`/`thoughtsTokenCount`/`subagentName`/`errorType`/`errorStatusCode`
 - `session-tracing.ts:endLLMRequestSpan` — 双发 GenAI semconv（`gen_ai.response.id`/`gen_ai.response.finish_reasons[]`/`gen_ai.usage.reasoning_tokens`/`error.type`）

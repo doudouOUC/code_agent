@@ -2,7 +2,7 @@
 
 **主题**: serve 路由密集开发、acp-bridge 大重构、telemetry Phase 1.5–4、原子写、F1/F2/F3
 
-**统计**: 43 PRs — 33 merged / 6 open / 4 closed  
+**统计**: 43 PRs — 36 merged / 3 open / 4 closed  
 **代码量**: +120,272 / -20,559，920 个文件变更  
 **类型**: feat ×18, fix ×15, refactor ×5, docs ×3, perf ×1, chore ×1  
 **范围 (scope)**: serve ×18, telemetry ×9, acp-bridge ×6, core ×5, sdk ×1, developers ×1, cli ×1, build ×1, integration ×1, deploy ×1

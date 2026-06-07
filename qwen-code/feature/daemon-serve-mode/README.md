@@ -345,7 +345,7 @@ sequenceDiagram
 | PR 22b/2 | #4304 | `BridgeOptions` + 新 `DaemonStatusProvider` 注入 seam |
 | F1 | #4319/#4334 | `defaultSpawnChannelFactory` + `BridgeClient` + `createHttpAcpBridge` 工厂闭包 + `BridgeFileSystem` seam |
 | F1 测试拆分 | #4445 | 把 6861 行的 `bridge.test.ts` 抬到 acp-bridge |
-| F3 PR 24 | （计划） | 实现四种 `PermissionMediator` 策略 + pair-token 撤销 + 审计 |
+| F3 PR 24 | #4335 | 实现四种 `PermissionMediator` 策略（first-responder / designated / consensus / local-only）+ pair-token 撤销 + 审计。已合入。 |
 
 抽包后 serve 侧 `httpAcpBridge.ts` / `eventBus.ts` 退化为 re-export shim，所有相对导入零改造。`#4300` 顺带把 channel-closed / missing-cli-entry 从 regex 匹配改为 typed `instanceof` 异常。包对外注入 seam（`DaemonStatusProvider` / `BridgeFileSystem` / `ChannelFactory`）让 serve 之外的宿主（IDE 自 spawn）也能装配 bridge。
 
@@ -540,7 +540,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4826 | /directory | `/directory` 命令启用 ACP 模式（show + add）。 |
 | #4819 | /remember | `/remember`、`/forget`、`/dream` 启用 ACP 模式（v2，含 revert #4818）。 |
 
-> F3（permission mediation 四策略实现，README 标记的 PR 24）在 epic 计划内但未列入本批 PR 清单；类型契约已随 acp-bridge 抽包（#4295）就位。
+> F3（#4335，permission mediation 四策略实现）已合入 `daemon_mode_b_main`（2026-05-20）。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 
 ---
 

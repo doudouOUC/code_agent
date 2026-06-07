@@ -3,7 +3,7 @@
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）。
 
 **时间范围**: 2026-04-06 ~ 2026-06-07（持续更新）  
-**总计**: 153+ PRs（W15–W23，含 W22 漏收补录 4 个）  
+**总计**: 168 PRs（W15–W23，含 W22 漏收补录 4 个）  
 **代码量**: +361,180 / -61,411，2,721 个文件变更 _(W15–W22；W23 见对应周目录)_
 
 ## 按周
@@ -16,9 +16,9 @@
 | [2026-04-27 ~ 2026-05-03](2026-04-27_2026-05-03/) (W18) | 11 | 10/0/1 | +14,853/-698 | monitor 工具 / Monitor 权限、background agent、telemetry OTLP 起步、sdk-python 发布 CI |
 | [2026-05-04 ~ 2026-05-10](2026-05-04_2026-05-10/) (W19) | 14 | 13/0/1 | +10,277/-1,242 | sdk-python 发布工具链、telemetry trace 关联、reactive compression |
 | [2026-05-11 ~ 2026-05-17](2026-05-11_2026-05-17/) (W20) | 29 | 29/0/0 | +39,561/-2,486 | telemetry 层级 span、atomicWrite、rewind 文件恢复、/stuck，daemon/serve Wave 1–4 大爆发 |
-| [2026-05-18 ~ 2026-05-24](2026-05-18_2026-05-24/) (W21) | 43 | 33/6/4 | +120,272/-20,559 | serve 路由密集开发、acp-bridge 大重构、telemetry Phase 1.5–4、原子写、F1/F2/F3 |
+| [2026-05-18 ~ 2026-05-24](2026-05-18_2026-05-24/) (W21) | 43 | 36/3/4 | +120,272/-20,559 | serve 路由密集开发、acp-bridge 大重构、telemetry Phase 1.5–4、原子写、F1/F2/F3 |
 | [2026-05-25 ~ 2026-05-31](2026-05-25_2026-05-31/) (W22) | 22+4 | 13/6/3 | +152,911/-35,150 | daemon 新端点（recap/btw/tasks/shell）、serve T2.x、daemon prompt 链路追踪、集成合并；+4 漏收补录 |
-| [2026-06-01 ~ 2026-06-07](2026-06-01_2026-06-07/) (W23 最终) | 23 | 15/5/3 | 见周目录 | daemon 修复（btw 泄漏/transcript/resync/stream）、telemetry 路由覆盖 + 响应元数据、core 流式超时 |
+| [2026-06-01 ~ 2026-06-07](2026-06-01_2026-06-07/) (W23 最终) | 24 | 19/2/3 | 见周目录 | daemon 修复（btw 泄漏/transcript/resync/stream）、telemetry 路由覆盖 + 响应元数据、ACP 命令扩展（rewind/hooks/directory/remember） |
 
 ## 类型分布
 

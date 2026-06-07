@@ -54,7 +54,8 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #4578 | feat(daemon): add session tasks snapshot endpoint | 2026-05-28 | tasks 快照端点 + `tasksSnapshot.ts` whitelist 序列化 + status 路径绕 FIFO。 |
 | #4606 | feat(daemon): add request-level logging for serve routes | 2026-05-29 | access-log 中间件（bearer/json 之前）+ 关键路由 inline 业务日志。 |
 | #4610 | feat(daemon): add POST /session/:id/btw endpoint for side questions | 2026-05-30 | btw 端点 + `core/btwUtils.ts`（`buildBtwPrompt`/`buildBtwCacheSafeParams`）+ `runForkedAgent` cache 路径 + 超时分层。 |
-| [#4646](https://github.com/QwenLM/qwen-code/pull/4646) | merged | @doudouOUC | clamp oversized inline media |
+| #4646 | feat(daemon): clamp oversized inline media on the prompt path | 2026-05-31 | `inlineMediaLimit.ts`（`clampInlineMediaPart` / `approxBase64Bytes` / 可配置字节上限）+ prompt 路径接线。 |
+| #4666 | fix(daemon): btw cross-session leak + timeout + input cap + permission requestId | 2026-06-01 | btw 跨 session 泄漏修复 + 超时判断修复 + 输入上限 + `requestId` 基数防护。 |
 | #4820 | feat(serve): add HTTP rewind endpoints | 2026-06-07 | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind`；`session_rewind` 能力；`session_rewound` SSE 事件；`SessionBusyError`(409) / `InvalidRewindTargetError`(400) 错误类。 |
 | #4822 | feat(serve): add hooks diagnostic HTTP/ACP surface | 2026-06-07 | `GET /workspace/hooks` + `GET /session/:id/hooks`；`workspace_hooks` / `session_hooks` 能力；`/hooks` 命令扩展 non_interactive/acp 模式。 |
 | #4826 | feat(cli): enable /directory command in ACP mode | 2026-06-07 | `/directory`（show + add）启用 ACP 模式；输出改 `MessageActionReturn`；path 分割改逗号；usage hint。 |
@@ -545,6 +546,13 @@ flowchart TD
 - 新增 `core/utils/btwUtils.ts:buildBtwPrompt`（`<system-reminder>` 钉死无工具单轮直答）+ `buildBtwCacheSafeParams`（复用主 session prompt-cache slot）。
 - `acpAgent.ts:case sessionBtw`：`runForkedAgent` + `BTW_CHILD_TIMEOUT_MS=55s`（子进程自守 < bridge backstop）。
 - `capabilities.ts` 注册 `session_btw`；SDK 暂未暴露（待 F4 公开）。
+
+### #4646 — oversized inline media clamp（@doudouOUC）
+
+- 新增 `core/inlineMediaLimit.ts`：`clampInlineMediaPart()`（替换超限 inline image/audio 为文本占位符）、`approxBase64Bytes()`、`getMaxInlineMediaBytes()`（`QWEN_CODE_MAX_INLINE_MEDIA_BYTES` 环境变量，默认 10 MB）、`oversizedMediaPlaceholder()`。
+- `Session.ts:#resolvePrompt`：prompt 路径的 inline-data 和 embedded-context 两条分支均接入 `clampInlineMediaPart()`。
+- `dispatch.ts`：HTTP daemon `promptCapabilities` 广告 `audio: true`。
+- 新增 `inlineMediaLimit.test.ts`：覆盖 base64/buffer 阈值、audio/image/blob 类型、环境变量覆盖。
 
 ### #4666 — btw 修复：泄漏+超时+上限（@doudouOUC）
 

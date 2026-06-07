@@ -516,3 +516,32 @@ sequenceDiagram
 - `bridge.ts:preheat()`：daemon 启动时预热 ACP child（首 session 延迟降 0-0.5s）。
 - `bridge.ts`：新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活，避免频繁冷启。
 - ACP 子进程跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn——直传 `--max-old-space-size` + cgroup 感知。
+
+### #3889 — Stage 1 daemon 骨架（@wenshao）
+
+- `server.ts`：Express 5 HTTP 服务器 + bearer auth + Host allowlist，Stage 1 全路由（health/capabilities/session CRUD/prompt/cancel/events SSE/set-model/permission vote）。
+- `httpAcpBridge.ts`：ACP NDJSON over HTTP+SSE 桥接；per-session `qwen --acp` 子进程管理、FIFO prompt 队列、cancel-to-permission 映射、shutdown drain。
+- `eventBus.ts`：有界订阅者队列 + `client_evicted` 溢出 + replay ring + `AsyncIterable` abort。
+- `DaemonClient.ts`：TS SDK 客户端，驱动所有 Stage 1 路由 + SSE 事件解析（`parseSseStream`）。
+
+### #4214 — sessionScope 集成测试对齐（@doudouOUC）
+
+- `qwen-serve-routes.test.ts`：能力断言 9→10，插入 `session_scope_override`。
+- `docs/users/qwen-serve.md`：移除已上线的"per-request sessionScope override"blocker 条目，重编号后续条目。
+
+### #4334 — F1 follow-up：BridgeFileSystem + channelInfo 修复（@doudouOUC）
+
+- 新增 `bridgeFileSystemAdapter.ts`：ACP `writeTextFile`/`readTextFile` → `WorkspaceFileSystem` 适配层（信任门控 + symlink 解析 + 原子 temp-file 写 + line/limit 窗口 + 统一审计）。
+- `workspaceFileSystem.ts`：新增 `writeTextOverwrite()` 方法（mode 保留 + `0o600` 默认 + 原子 temp+rename）；`WriteMode` 扩展 `'overwrite'` 变体。
+- `bridge.ts:closeSession/killSession`：module-scoped `channelInfo` 改为 `channelInfoForEntry(entry)`，修复 channel-overlap 窗口下的 bookkeeping 错误（#4325）。
+
+### #4243 — idle microcompaction 后 read-before-write 保留（@tanzhenxin）
+
+- `fileReadCache.ts`：新增 `markReadEvictedFromHistory(filePath)` 方法，仅解除 fast-path 但保留 proof-of-prior-read 和磁盘指纹，避免 edit-after-idle 强制冗余重读。
+- `client.ts:sendMessageStream`：microcompaction 后以逐文件 `markReadEvictedFromHistory()` 替代 blanket `fileReadCache.clear()`，仅失效被裁剪路径。
+- `microcompact.ts`：返回被 blank 的 `read_file` function-call 路径元数据，供调用方做定向缓存失效。
+
+### #4522 — session channel closing 修复（@Jerry2003826）
+
+- `httpAcpBridge.ts`：抽出 `findChannelInfoForEntry()` / `detachSessionIdFromEntryChannel()` helper；`closeSession`/`killSession` 改用 entry 所属 channel 而非 module-scoped 最新 attach 目标。
+- `httpAcpBridge.test.ts`：新增 3 测试——helper 级 overlap channel 选择、detach during overlap、集成级 shared-channel close 生命周期（3 session 共享 1 channel，逐个关闭，最后一个离开时 kill channel）。

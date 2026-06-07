@@ -16,12 +16,12 @@
 | conversation rewind | [conversation-rewind.md](conversation-rewind.md) | #3441 #4064 #4216 #4122 #3622 #4580 #4820 | double-ESC/`/rewind` 回退历史 + 文件恢复 + TOCTOU 顺序 + HTTP rewind 端点 |
 | 原子文件写 | [atomic-file-write.md](atomic-file-write.md) | #4096 #4333 #4431 | temp+rename+fsync 原子写，铺开到 credentials/memory/config/JSONL |
 | CLI 启动性能 | [cli-startup-performance.md](cli-startup-performance.md) | #3318 #3319 #3297 #3232 | API 预连接 + 早期输入捕获 + 工具懒注册 + 启动 profiler |
-| SDK (Python/TS) | [sdk.md](sdk.md) | #3494 #3685 #3832-3835 #4226 #4360 | Python SDK(子进程+控制协议) + TS daemon SDK + PyPI 发布工具链 |
+| SDK (Python/TS) | [sdk.md](sdk.md) | #3494 #3685 #3832-3835 #4217 #4226 #4353 #4360 | Python SDK(子进程+控制协议) + TS daemon SDK + PyPI 发布工具链 |
 | monitor 事件工具 | [monitor-tool.md](monitor-tool.md) | #3684 #3726 #3792 #3933 | 长任务节流流式监控 + MonitorRegistry owner-scoped 通知 |
 | 后台 agent/会话恢复 | [background-agent-resume.md](background-agent-resume.md) | #3739 #4222 | 背景 agent paused/resume(transcript-fork) + daemon session load/resume |
 | 上下文压缩 | [context-compression.md](context-compression.md) | #3879 #3985 #3872 | 反应式溢出压缩(单次重试护栏) + 会话记录瘦身 |
 | 诊断 skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 | /doctor 代码命令 + /stuck /batch prompt 技能 |
-| auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 | provider 配置/apiKey 保留/auth status 识别 + daemon 设备流(PKCE) |
+| auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 #4291 #4305 | provider 配置/apiKey 保留/auth status 识别 + daemon 设备流(PKCE) |
 | 权限系统 | [permission-system.md](permission-system.md) | #3467 #3726 #4335 | 规则解析+畸形规则守卫 + 工具命名空间 + 多客户端权限协调 |
 
 ## 备注
