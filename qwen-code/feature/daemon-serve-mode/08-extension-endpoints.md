@@ -55,8 +55,12 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #4606 | feat(daemon): add request-level logging for serve routes | 2026-05-29 | access-log 中间件（bearer/json 之前）+ 关键路由 inline 业务日志。 |
 | #4610 | feat(daemon): add POST /session/:id/btw endpoint for side questions | 2026-05-30 | btw 端点 + `core/btwUtils.ts`（`buildBtwPrompt`/`buildBtwCacheSafeParams`）+ `runForkedAgent` cache 路径 + 超时分层。 |
 | [#4646](https://github.com/QwenLM/qwen-code/pull/4646) | merged | @doudouOUC | clamp oversized inline media |
+| #4820 | feat(serve): add HTTP rewind endpoints | 2026-06-07 | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind`；`session_rewind` 能力；`session_rewound` SSE 事件；`SessionBusyError`(409) / `InvalidRewindTargetError`(400) 错误类。 |
+| #4822 | feat(serve): add hooks diagnostic HTTP/ACP surface | 2026-06-07 | `GET /workspace/hooks` + `GET /session/:id/hooks`；`workspace_hooks` / `session_hooks` 能力；`/hooks` 命令扩展 non_interactive/acp 模式。 |
+| #4826 | feat(cli): enable /directory command in ACP mode | 2026-06-07 | `/directory`（show + add）启用 ACP 模式；输出改 `MessageActionReturn`；path 分割改逗号；usage hint。 |
+| #4819 | feat(cli): enable /remember, /forget, /dream in ACP mode | 2026-06-06 | 三命令启用 ACP 模式；输出改 `MessageActionReturn`；v2 修复 #4811 回归。 |
 
-> 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
+> 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
 ---
 
@@ -548,3 +552,34 @@ flowchart TD
 - `btwUtils.ts`：`getHistoryTail(40, false)` 改浅拷贝；`buildBtwCacheSafeParams` 异常全吞为 `null`。
 - `btwCommand.ts`：斜杠命令补 `BTW_MAX_INPUT_LENGTH=4096` 守卫。
 - `server.ts`：permission `requestId` 基数修复。
+
+### #4820 — HTTP rewind 端点（@doudouOUC）
+
+- `server.ts` 新增 `GET /session/:id/rewind/snapshots`（列出可回退快照，含 `promptId`/`turnIndex`/`timestamp`/`diffStats`）+ `POST /session/:id/rewind`（按 `promptId` 回退，截断对话+恢复文件）。
+- `bridgeErrors.ts` 新增 `SessionBusyError`（HTTP 409 + `Retry-After: 5`，prompt 执行中拒回退）+ `InvalidRewindTargetError`（HTTP 400，无效/已压缩的目标）。
+- `status.ts` 新增 ACP ext-method `qwen/status/session/rewind_snapshots`（只读）+ `qwen/control/session/rewind`（副作用）。
+- `capabilities.ts` 注册 `session_rewind: { since: 'v1' }` 能力标签。
+- `eventBus` 发布 `session_rewound` SSE 事件（跨客户端通知）。
+- SDK 新增 `DaemonClient.getRewindSnapshots` / `rewindSession` + `DaemonSessionClient.getRewindSnapshots` / `rewind`；类型 `DaemonRewindSnapshotInfo` / `DaemonRewindResult`；reducer 新增 `rewindCount` / `lastRewind` 状态。
+- `rewindCommand.ts` 收窄 `supportedModes: ['interactive']`（daemon 客户端应用 HTTP 端点替代）。
+
+### #4822 — hooks 诊断端点（@doudouOUC）
+
+- `server.ts` 新增 `GET /workspace/hooks`（返回 workspace 级 hook 配置：`initialized`/`disabled`/`hooks[]`/`events{}`）+ `GET /session/:id/hooks`（返回 session 运行时注册的 hooks，404 未知 session）。
+- `status.ts` 新增类型 `ServeHookConfig`/`ServeHookEntry`/`ServeHookEventMeta`/`ServeHookMatcherKind`/`ServeHookSource`/`ServeWorkspaceHooksStatus`/`ServeSessionHooksStatus`；静态 `IDLE_HOOK_EVENTS` 映射 18 个 hook 事件名 + 描述；`createIdleWorkspaceHooksStatus()` 工厂。
+- `capabilities.ts` 注册 `workspace_hooks` / `session_hooks: { since: 'v1' }`。
+- ACP ext-method `qwen/status/workspace/hooks` + `qwen/status/session/hooks`。
+- `/hooks` 斜杠命令（`list` 子命令）扩展 `supportedModes: ['interactive', 'non_interactive', 'acp']`，启用 ACP 文本输出。
+- SDK 新增 `DaemonClient.workspaceHooks` / `sessionHooks`；类型 `DaemonWorkspaceHooksStatus`/`DaemonSessionHooksStatus`/`DaemonHookEntry` 等（`DaemonHookEventName` 用 `(string & {})` 前向兼容）。
+
+### #4826 — /directory ACP 模式（@doudouOUC）
+
+- `directoryCommand.tsx`：`/directory`（show + add）`supportedModes` 从 `['interactive']` 扩展为 `['interactive', 'acp']`。
+- 输出机制重构：`context.ui.addItem()`（TUI-only）→ `MessageActionReturn`（`{type:'message', messageType, content}`）兼容 ACP 消息管线。
+- `add` 子命令 path 分割修复：`args.split(' ')` → `args.split(',').filter(p => p.trim())`，正确处理含空格路径。
+- 混合结果用 `messageType: 'warning'`（部分成功+部分失败）；新增 top-level 错误处理；无参调用返回 usage hint。
+
+### #4819 — /remember /forget /dream ACP 模式 v2（@doudouOUC）
+
+- `rememberCommand.tsx` / `forgetCommand.tsx` / `dreamCommand.tsx`：三命令 `supportedModes` 扩展为 `['interactive', 'acp']`。
+- 输出改 `MessageActionReturn`；v2 修复 #4811 中因 `context.ui` 在 ACP 模式下缺失导致的回归（#4818 revert + #4819 重做）。

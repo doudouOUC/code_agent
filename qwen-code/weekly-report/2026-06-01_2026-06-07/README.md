@@ -1,6 +1,6 @@
 # qwen-code PRs · 2026-06-01 ~ 2026-06-07  (W23 最终版)
 
-**统计**: 23 PRs — 15 merged / 5 open / 3 closed
+**统计**: 24 PRs — 19 merged / 2 open / 3 closed
 
 | PR | 状态 | 标题 | 变更 | 文件 | 创建 | 合并/关闭 | 链接 |
 |---|---|---|---|---|---|---|---|
@@ -23,9 +23,10 @@
 | #4812 | 🟡 open | feat(serve): add POST /session/:id/branch for session forking | +345/-3 | 14 | 06-05 | — | https://github.com/QwenLM/qwen-code/pull/4812 |
 | #4816 | 🟡 open | feat(serve): add /settings slash command for web-shell | +1103/-8 | 27 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4816 |
 | #4817 | ⬜ closed | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +443/-13 | 15 | 06-06 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4817 |
-| #4818 | 🟡 open | Revert "feat(cli): enable /remember, /forget, /dream in ACP mode" | +43/-278 | 6 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4818 |
+| #4818 | ✅ merged | Revert "feat(cli): enable /remember, /forget, /dream in ACP mode" | +43/-278 | 6 | 06-06 | 06-07 | https://github.com/QwenLM/qwen-code/pull/4818 |
 | #4819 | ✅ merged | feat(cli): enable /remember, /forget, /dream in ACP mode | +302/-43 | 6 | 06-06 | 06-06 | https://github.com/QwenLM/qwen-code/pull/4819 |
-| #4820 | 🟡 open | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +474/-14 | 16 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4820 |
-| #4822 | 🟡 open | feat(serve): add hooks diagnostic HTTP/ACP surface (issue #4514 T3.9) | +593/-4 | 15 | 06-06 | — | https://github.com/QwenLM/qwen-code/pull/4822 |
+| #4820 | ✅ merged | feat(serve): add HTTP rewind endpoints for daemon/web-shell (issue #45 | +474/-14 | 16 | 06-06 | 06-07 | https://github.com/QwenLM/qwen-code/pull/4820 |
+| #4822 | ✅ merged | feat(serve): add hooks diagnostic HTTP/ACP surface (issue #4514 T3.9) | +681/-4 | 15 | 06-06 | 06-07 | https://github.com/QwenLM/qwen-code/pull/4822 |
+| #4826 | ✅ merged | feat(cli): enable /directory command in ACP mode | +350/-267 | 2 | 06-06 | 06-07 | https://github.com/QwenLM/qwen-code/pull/4826 |
 
 _W23 最终版 · 更新于 2026-06-07_

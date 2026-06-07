@@ -456,6 +456,7 @@ sequenceDiagram
 | **#4122** | IDE 模式禁用提示 | `/rewind` 在 IDE 模式给可见 info 提示；double-ESC 在 IDE 模式整体跳过，消除矛盾 UX |
 | **#3622** | E2E 断言修复 | `isRealUserTurn` 修复后 `/rewind` 不再进入轮列表，更新 `test-rewind-e2e.sh` Test 1 断言（GAMMA3→BETA2） |
 | **#4580** | compressed-turn 误报修复 | mid-turn 用户消息 UI 类型 `user`→`notification`（`NOTIFICATION` 枚举），消除 UI/API 计数错配导致的假「已压缩」错误 |
+| **#4820** | HTTP rewind 端点（daemon） | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind`；`session_rewind` 能力；`session_rewound` SSE 事件；`SessionBusyError`(409) / `InvalidRewindTargetError`(400)；SDK `DaemonClient.rewindSession` / `DaemonSessionClient.rewind` |
 
 ---
 
@@ -517,3 +518,13 @@ sequenceDiagram
 - **live 路径**：`useGeminiStream.ts:2354` 将 mid-turn drain 的 `addItem` 类型从 `MessageType.USER` 改为 `MessageType.NOTIFICATION`，使 `isRealUserTurn` 首行 `item.type !== 'user'` 即排除，消除 UI/API 计数错配。
 - **resume 路径**：`resumeHistoryUtils.ts:290` 将 `mid_turn_user_message` 子类型对应的 `items.push` 类型从 `'user'` 改为 `'notification'`，保持 live/resume 一致。
 - **测试**：`historyMapping.test.ts` 新增 `skips notification items so btw merged into functionResponse does not cause mismatch` 用例，构造含 `notification` 类型的 UI history + 含 `functionResponse` 合并的 API history，验证 `computeApiTruncationIndex` 返回正确下标。`useGeminiStream.test.tsx`/`resumeHistoryUtils.test.ts` 断言更新为 `NOTIFICATION` 类型。
+
+### #4820 — HTTP rewind 端点（daemon 暴露）
+
+- `server.ts` 新增 `GET /session/:id/rewind/snapshots`（列出可回退快照：`promptId`/`turnIndex`/`timestamp`/`diffStats`）+ `POST /session/:id/rewind`（按 `promptId` 回退，截断对话+文件恢复）。
+- `bridgeErrors.ts` 新增 `SessionBusyError`（HTTP 409 + `Retry-After: 5`）+ `InvalidRewindTargetError`（HTTP 400）。
+- ACP ext-method：`qwen/status/session/rewind_snapshots`（只读）+ `qwen/control/session/rewind`（副作用）。
+- `capabilities.ts` 注册 `session_rewind: { since: 'v1' }`；`eventBus` 发布 `session_rewound` SSE 事件（跨客户端通知）。
+- `acpAgent.ts` 扩展 `rewindSession` handler，接受 `promptId`（新）或 `targetTurnIndex`（旧），向后兼容。
+- SDK 新增 `DaemonClient.getRewindSnapshots`/`rewindSession` + `DaemonSessionClient.getRewindSnapshots`/`rewind`；类型 `DaemonRewindSnapshotInfo`/`DaemonRewindResult`；reducer 新增 `rewindCount`/`lastRewind` 视图状态。
+- `rewindCommand.ts` 收窄 `supportedModes: ['interactive']`——daemon 客户端应用 HTTP 端点替代 TUI 对话框。

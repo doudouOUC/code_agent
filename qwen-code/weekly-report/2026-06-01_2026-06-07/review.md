@@ -2,7 +2,7 @@
 
 **审查方法**：逐个 PR 拉取 _关联 issue + PR 描述 + 代码 diff_，核对 (1) 描述↔实现 **一致性**；(2) 描述 **准确性**；(3) 代码 **正确性**。评级：✅ 良好 / ⚠️ 有出入或小隐患 / ❌ 明显不符。
 
-> 说明：含 W22 漏收补录（#4658/#4661，创建于 05-31）。本周仍在进行中。
+> 说明：含 W22 漏收补录（#4658/#4661，创建于 05-31）。全部 23 PR 已审查完毕（首批 11 + 补充 12）。
 
 ---
 
@@ -22,7 +22,26 @@
 | [#4693](https://github.com/QwenLM/qwen-code/pull/4693) | merged | ✅ | ✅ | llm_request span 补响应元数据，无 PII/secret 泄漏 |
 | [#4694](https://github.com/QwenLM/qwen-code/pull/4694) | merged | ✅ | ⚠️ | 压缩重放设计合理；resume 后环淘汰间隙未覆盖 + O(turns) 无界增长 |
 
-**一致性**：✅8 / ⚠️2 / ❌0　　**正确性**：✅8 / ⚠️2 / ❌0
+**一致性**（首批 11 PR）：✅8 / ⚠️2 / ❌0　　**正确性**：✅8 / ⚠️2 / ❌0
+
+### 补充审查（#4730-#4826，12 PR）
+
+| PR | 状态 | 一致性 | 正确性 | 一句话 |
+|---|---|---|---|---|
+| [#4730](https://github.com/QwenLM/qwen-code/pull/4730) | merged | ✅ | ✅ | 补回合并丢失的 TelemetryRuntimeConfig 方法；删除已迁移的 6k 行旧测试 |
+| [#4731](https://github.com/QwenLM/qwen-code/pull/4731) | merged | ✅ | ✅ | 补回合并丢失的 isForkSubagentEnabled；13 行 additive 修复 |
+| [#4749](https://github.com/QwenLM/qwen-code/pull/4749) | merged | ✅ | ✅ | 11 个 OTel metric 仪表盘，基数有界（~200 max）；17 测试 |
+| [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | ✅ | ⚠️ | ACP 子进程生命周期优化（skip relaunch+preheat+idle）；**1852 行 benchmark 测试维护面大 + POSIX-only** |
+| [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | ✅ | ✅ | compaction 引擎 parentToolCallId 保留；双路径 merge 设计正确；9 测试含 9-subagent 压力 |
+| [#4774](https://github.com/QwenLM/qwen-code/pull/4774) | merged | ✅ | ✅ | net -2194 行；提取共享 helper + 剥离 PR/commit 引用注释 |
+| [#4811](https://github.com/QwenLM/qwen-code/pull/4811) | merged | ✅ | ⚠️ | /remember /forget /dream ACP 实现正确，**但合入错误分支 main**（已 revert） |
+| [#4818](https://github.com/QwenLM/qwen-code/pull/4818) | merged | ✅ | ✅ | GitHub 生成的 #4811 revert，diff 完全互逆 |
+| [#4819](https://github.com/QwenLM/qwen-code/pull/4819) | merged | ✅ | ✅ | v2 re-land：ACP 模式 fire-and-forget + argumentHint + try-catch；15 测试 |
+| [#4820](https://github.com/QwenLM/qwen-code/pull/4820) | merged | ✅ | ✅ | HTTP rewind 端点；结构化错误 409/400；`session_rewound` SSE 事件；向后兼容 targetTurnIndex |
+| [#4822](https://github.com/QwenLM/qwen-code/pull/4822) | merged | ✅ | ✅ | hooks 诊断端点（只读）；`Record<HookEventName>` 编译期穷举；/hooks ACP 模式 |
+| [#4826](https://github.com/QwenLM/qwen-code/pull/4826) | merged | ✅ | ✅ | /directory ACP 重构；MessageActionReturn 输出；path 逗号分割修复；41 测试 |
+
+**补充批一致性**：✅12 / ⚠️0 / ❌0　　**正确性**：✅10 / ⚠️2 / ❌0
 
 ---
 
@@ -102,6 +121,67 @@
 - **正确性**: ⚠️ — 核心压缩逻辑（文本合并、tool 折叠、slot 排序、transient 过滤）正确；但 (1) **resume 路径仅返回 `lastEventId`**，若 ring 淘汰了上一完整 turn 与 resume 之间的事件，客户端丢失该段状态；(2) 压缩引擎 per-session、O(turns) 无上限增长，超长 session（数百 turn）可能显著。22 compaction + 20 EventBus + 19 SDK 测试覆盖。
 - **结论**: 25-30× 体积缩减的设计权衡合理；resume 后环淘汰间隙 + 无界增长是已知的 v1 权衡。
 
+### #4730 fix: add missing TelemetryRuntimeConfig methods
+- **状态**: merged | **关联 issue**: 无（#4490 合并回归）
+- **一致性**: ✅ — 补回 2 个 `TelemetryRuntimeConfig` 接口方法 + 删除已迁移至 `acp-bridge/bridge.test.ts` 的 6184 行旧测试文件。
+- **正确性**: ✅ — 纯恢复性修复，无新逻辑。
+
+### #4731 fix: add missing isForkSubagentEnabled
+- **状态**: merged | **关联 issue**: 无（#4490 合并回归）
+- **一致性**: ✅ — 补回 `isForkSubagentEnabled()` 到 Config 接口 + 环境变量门控 + re-export。
+- **正确性**: ✅ — 13 行 additive 修复，完全匹配描述。
+
+### #4749 feat(telemetry): add daemon OTel metrics and structured log records
+- **状态**: merged | **关联 issue**: 无
+- **一致性**: ✅ — 11 个 OTel metric 仪表（counter/histogram/observable gauge）全部在 diff 中。bridge 经 optional `metrics` 子对象解耦。
+- **正确性**: ✅ — 基数有界（~200 max time-series）；shutdown 路径 `forceFlushMetrics()` → `bridge.shutdown()` 链式正确。17 单测覆盖。
+
+### #4751 feat(daemon): optimize ACP child lifecycle
+- **状态**: merged | **关联 issue**: 无
+- **一致性**: ✅ — skip relaunch + preheat + idle keep-alive 三项优化全落地；描述含架构图。
+- **正确性**: ⚠️ — 核心逻辑（`getAcpMemoryArgs` cgroup 感知内存分配 + 16GB cap）正确；但 1852 行 benchmark 测试文件（`qwen-daemon-vs-cli-benchmark.test.ts`）虽有 `QWEN_BENCHMARK_ENABLED=1` 门控，维护面大且 POSIX-only（`ps`/`pgrep`/`/usr/bin/time`）。
+
+### #4765 fix(daemon): preserve parentToolCallId in compaction engine
+- **状态**: merged | **关联 issue**: 无
+- **一致性**: ✅ — `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引，top-level 按连续同 kind。
+- **正确性**: ✅ — tool call eviction 保留段边界；`seed()` 清除 in-flight 状态。9 新测试含 9-subagent 并发压力测试。本批最高质量修复。
+
+### #4774 refactor(daemon): simplify code and strip PR/commit references
+- **状态**: merged | **关联 issue**: 无
+- **一致性**: ✅ — net -2194 行；两类改动：(1) 提取共享 helper（`resolveWithVote`/`requireSessionId`/`optionalField` 等）消除跨 ~20 文件重复；(2) 剥离所有 PR/issue/commit 引用注释、保留技术 WHY（约束/不变量/spec 引用如 `RFD #721`）。
+- **正确性**: ✅ — 机械重构，无行为变更。
+
+### #4811 feat(cli): enable /remember, /forget, /dream in ACP mode (v1)
+- **状态**: merged | **关联 issue**: 无
+- **一致性**: ✅ — 三命令 ACP 模式实现完整。
+- **正确性**: ⚠️ — 实现正确但**合入错误分支 `main`**（应入 `daemon_mode_b_main`）；#4818 revert + #4819 re-land 修正。
+
+### #4818 Revert /remember /forget /dream ACP
+- **状态**: merged | **关联 issue**: #4811 回退
+- **一致性**: ✅ — GitHub 生成的 revert，diff 完全互逆。
+- **正确性**: ✅。
+
+### #4819 feat(cli): enable /remember, /forget, /dream in ACP mode (v2)
+- **状态**: merged | **关联 issue**: 无
+- **一致性**: ✅ — re-land + 改进：ACP 模式 `recordDream().catch(() => {})` fire-and-forget；`/forget` 加 `argumentHint`；`/dream` 和 `/forget` 加 try-catch。
+- **正确性**: ✅ — 15 单测覆盖三个命令文件。
+
+### #4820 feat(serve): add HTTP rewind endpoints
+- **状态**: merged | **关联 issue**: #4514 T3.2
+- **一致性**: ✅ — `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind` 全落地；结构化错误 `SessionBusyError`(409) / `InvalidRewindTargetError`(400)；ACP `errorKind` → typed bridge 错误映射；`session_rewound` SSE 事件。
+- **正确性**: ✅ — 向后兼容（同时接受 `promptId` 和 legacy `targetTurnIndex`）；SDK 类型+客户端方法完整。
+
+### #4822 feat(serve): add hooks diagnostic HTTP/ACP surface
+- **状态**: merged | **关联 issue**: #4514 T3.9
+- **一致性**: ✅ — `GET /workspace/hooks` + `GET /session/:id/hooks` 只读端点；hook 类型层次（Command/Http/Function/Prompt/Unknown）；`HOOK_EVENT_DESCRIPTIONS` 用 `Record<HookEventName, ...>` 编译期穷举；`/hooks` 命令 ACP 模式。
+- **正确性**: ✅ — 无变更、无副作用；`workspace_hooks`/`session_hooks` 能力注册。12 文件跨 4 包。
+
+### #4826 feat(cli): enable /directory command in ACP mode
+- **状态**: merged | **关联 issue**: #4514 T3.10
+- **一致性**: ✅ — `/directory`（show + add）`supportedModes` 扩展 ACP；输出 `addItem` → `MessageActionReturn`；path 逗号分割修复。
+- **正确性**: ✅ — config-null 守卫 + 沙箱拒绝 + 空参 usage hint。41 测试全绿。
+- **已知权衡**: 混合成功+失败结果用 `messageType: 'error'`——单 `MessageActionReturn` 无法表达混合严重级。
+
 ---
 
 ## 重点跟进清单
@@ -112,7 +192,9 @@
 ### 📝 建议
 2. **#4661**：`SessionIdSpanProcessor.onStart` 的 `getCurrentSessionId()` 全局读在 daemon 多 session 下可能误归因——可考虑 ALS 化（如已有 `interactionContext`），或接受 best-effort。
 3. **#4694**（已合并）：resume 路径不返 compactedReplay——若 ring eviction 发生在上一完整 turn 与 resume 之间，客户端有盲区。per-session 压缩引擎无 turn 上限——超长 session 的内存需关注。
+4. **#4751**（已合并）：1852 行 benchmark 测试（`qwen-daemon-vs-cli-benchmark.test.ts`）仅 POSIX 可用（`ps`/`pgrep`/`/usr/bin/time`）、维护面大——考虑标记 `@platform posix` 或瘦身。
+5. **#4811→#4818→#4819 分支靶错误**：#4811 误入 `main` → revert → re-land。建议 CI 或 PR 模板增加 branch-target 验证。
 
 ---
 
-_审查于 2026-06-03（明细段状态 2026-06-05 更新）；方法：3 个并行只读子代理逐 PR 拉取 issue+描述+diff。_
+_审查于 2026-06-03（明细段状态 2026-06-05 更新；补充审查 #4730-#4826 于 2026-06-07）；方法：并行只读子代理逐 PR 拉取 issue+描述+diff。_

@@ -409,6 +409,8 @@ sequenceDiagram
 
 6. **`protocolVersions` 仅 `'v1'`，多版本路径未经实战**。`isFeatureAvailableInProtocol` 的版本裁剪逻辑当前恒真，`'v2'` 引入前其正确性只有单测覆盖、无线上验证。
 
+7. **W23 新增 3 个能力标签**（#4820/#4822）。`session_rewind`（rewind HTTP 端点）、`workspace_hooks`（hook 配置诊断）、`session_hooks`（session 运行时 hooks）三者均注册 `since: 'v1'`，进一步扩展 advertised feature 列表。集成测试 baseline 需同步更新（第 N+1 次漂移）。
+
 ---
 
 ## 测试覆盖

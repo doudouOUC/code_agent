@@ -535,6 +535,10 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4559 #4606 | 日志 | daemon 文件 logger + request 级日志。 |
 | #4563 | 重构 | 抽 `DaemonWorkspaceService`（方案 C）。 |
 | #4630 | telemetry | daemon/ACP 路径补 tool span + session.id。 |
+| #4820 | rewind | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind` HTTP 端点。 |
+| #4822 | hooks | `GET /workspace/hooks` + `GET /session/:id/hooks` 诊断端点。 |
+| #4826 | /directory | `/directory` 命令启用 ACP 模式（show + add）。 |
+| #4819 | /remember | `/remember`、`/forget`、`/dream` 启用 ACP 模式（v2，含 revert #4818）。 |
 
 > F3（permission mediation 四策略实现，README 标记的 PR 24）在 epic 计划内但未列入本批 PR 清单；类型契约已随 acp-bridge 抽包（#4295）就位。
 
