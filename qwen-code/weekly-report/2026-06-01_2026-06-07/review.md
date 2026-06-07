@@ -175,7 +175,7 @@
 
 ### #4822 feat(serve): add hooks diagnostic HTTP/ACP surface
 - **状态**: merged | **关联 issue**: #4514 T3.9
-- **一致性**: ✅ — `GET /workspace/hooks` + `GET /session/:id/hooks` 只读端点；hook 类型层次（Command/Http/Function/Prompt/Unknown）；`HOOK_EVENT_DESCRIPTIONS` 用 `Record<HookEventName, ...>` 编译期穷举；`/hooks` 命令 ACP 模式。
+- **一致性**: ✅ — `GET /workspace/hooks` + `GET /session/:id/hooks` 只读端点；hook 类型层次（Command/Http/Function/Prompt/Unknown）；`IDLE_HOOK_EVENTS` 用 `Record<HookEventName, ...>` 编译期穷举；`/hooks` 命令 ACP 模式。
 - **正确性**: ✅ — 无变更、无副作用；`workspace_hooks`/`session_hooks` 能力注册。12 文件跨 4 包。
 
 ### #4826 feat(cli): enable /directory command in ACP mode
