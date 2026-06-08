@@ -14,11 +14,11 @@
 | 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、deadline / access log |
 | 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、state_resync、协议帧 serverTimestamp/provenance/errorKind |
 | 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume |
-| 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全 |
+| 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵 |
 | 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写 |
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
 | 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量 |
-| 08 | [扩展端点 recap/btw/tasks/shell/logger](08-extension-endpoints.md) | 控制面端点、绕过 prompt FIFO、shell `this`-binding 隐患 |
+| 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、绕过 prompt FIFO、shell `this`-binding 隐患 |
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（**#4490 mainline 合并仍 CONFLICTING——F1–F5 等 ~40 PR 目前只在 `daemon_mode_b_main`、未进 main/npm**） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、跨客户端协调 |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport |
@@ -372,10 +372,15 @@ sequenceDiagram
 | `POST /session/:id/btw` | #4610 | session 上下文的旁路问题（单轮、无工具、`runForkedAgent` cache 路径），带 `res.once('close')` abort。 |
 | `POST /session/:id/shell` | #4576 | server-side `!`（bang）shell 执行，返回 `{exitCode,...}`，socket close abort。 |
 | `GET /session/:id/tasks` | #4578 | 任务快照（agent/monitor/process/shell 各类 task 状态）。 |
+| `GET /session/:id/stats` | #4515 follow-up | 会话统计快照：模型请求/token 累计、工具调用/决策累计、文件增删行。`/export` 仍未落地。 |
+| `GET /session/:id/rewind/snapshots` / `POST /session/:id/rewind` | #4820 | HTTP rewind：列可回退 prompt 快照，按 `promptId` 截断会话并恢复文件，成功后发 `session_rewound` SSE。 |
+| `GET /workspace/hooks` / `GET /session/:id/hooks` | #4822 / #4834 | hook 配置/运行时诊断；workspace 级返回静态 hook 事件元信息，session 级返回 runtime hooks。#4834 将 focused daemon hooks 暴露给 webui。 |
+| `GET /workspace/extensions` | #4832 | extension 诊断：列已加载 extension、安装元信息、MCP/skill/agent/hook/command/context/settings 能力计数。 |
+| `GET /workspace/settings` / `POST /workspace/settings` | #4816 | web-shell 设置面；只暴露非 TUI-only、非安全敏感 key，写入仅 workspace scope，strict mutation gate，并发 `settings_changed` 事件。 |
 | daemon 文件日志 | #4559 | `daemonLogger.ts`，结构化落盘（SSE open/close、recap、shell、cancel 等）。 |
 | request 级日志 | #4606 | 路由访问日志中间件（bearer 与 json parser 之前）。 |
 | `POST /session/:id/compress` / `_meta` | #4516 | 上下文压缩 + 会话元信息（**#4516 已关闭未合入**，daemon_mode_b_main 无此路由/能力标签）。 |
-| `GET /session/:id/stats` / `/export` | #4515 | 会话统计与导出（**#4515 已关闭未合入**，daemon_mode_b_main 无此路由/能力标签）。 |
+| `/export` | #4515 | 导出端点未落地；`session_stats` 已落地但 export 仍无路由/能力标签。 |
 | `followup_suggestion` 事件 | #4507 | server-pushed 后续建议（webui）。 |
 | telemetry tool spans + session.id | #4630 | daemon/ACP 路径补 tool span 与 session.id（见 telemetry 方案）。 |
 
@@ -485,7 +490,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4241 | 状态路由 | 只读 workspace/session 状态路由。 |
 | #4251 | 状态路由 | preflight + env 诊断路由（Wave 3 PR 13）。 |
 | #4516 | 会话 | `POST /session/:id/compress` + `_meta`（T1.3/T1.4）。**已关闭未合入 daemon_mode_b_main**。 |
-| #4515 | 会话 | `GET /session/:id/stats` + `/export`（T2.5/T2.6）。**已关闭未合入 daemon_mode_b_main**。 |
+| #4515 | 会话 | 原 `stats/export` PR 已关闭未合入；`GET /session/:id/stats` 后续已在 daemon_mode_b_main 落地，`/export` 仍未落地。 |
 
 ### SSE / SDK 协议
 

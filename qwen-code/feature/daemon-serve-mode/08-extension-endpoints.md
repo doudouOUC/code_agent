@@ -1,16 +1,21 @@
-# 扩展端点（recap / btw / tasks / shell / logger）（深入）
+# 扩展端点（recap / btw / tasks / shell / rewind / hooks / extensions / settings / logger）（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.10）。本文在 file/symbol/line 级别**取代**总览的 §3.10「扩展端点」段落，深入到每个端点的控制面调用链、ACP ext-method 往返、绕开 prompt FIFO 的机理、HTTP shell 的安全面、`ChannelBase.ts` 的 `this`-binding 隐患，以及 daemon 文件日志的异步队列/降级/截断/symlink。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.10）。本文在 file/symbol/line 级别**取代**总览的 §3.10「扩展端点」段落，深入到每个端点的控制面调用链、ACP ext-method 往返、绕开 prompt FIFO 的机理、HTTP shell 的安全面、rewind/hooks/extensions/settings 诊断与变更面、`ChannelBase.ts` 的 `this`-binding 隐患，以及 daemon 文件日志的异步队列/降级/截断/symlink。
 >
-> 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。注意：`btw`（#4610）虽对 `main` 仍标记为 open，但其实现**已在 `daemon_mode_b_main` 落地**，本文按集成分支实况描述。
+> 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。本文已对齐到 `origin/daemon_mode_b_main@18e848f32`。
 >
-> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）。
+> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions）。
 
 ---
 
 ## 概述
 
-本文覆盖的五个端点属于 daemon 的**控制面（control plane）**——它们不是「驱动一轮 agent 交互」（那是 `/session/:id/prompt`，走 SSE 流式主循环），而是「在不打断主对话的前提下，对一个活跃 session 做一次旁路读取或旁路计算」。它们共享同一套四层管线：
+本文覆盖两类 daemon 扩展面：
+
+1. **控制面（control plane）**：`recap` / `btw` / `shell` / `rewind` / `settings` 这类端点会计算或变更状态，但不等价于驱动一轮主 prompt。
+2. **诊断面（diagnostic snapshot）**：`tasks` / `stats` / `hooks` / `extensions` 这类端点只读当前 daemon / session 状态，帮助 web-shell、IDE 和 SDK UI 渲染控制台。
+
+其中跨进程 control/status 端点共享同一套四层管线：
 
 ```
 HTTP route (server.ts)
@@ -22,12 +27,12 @@ HTTP route (server.ts)
 
 这套「route → bridge → ACP ext-method → core」复用自 Wave 4 PR 17 的 `setSessionApprovalMode`（#4504 PR body 明确称「Reuses the existing ext-method roundtrip pattern … so no new infrastructure」）。它有两个细分变体：
 
-1. **status 路径（只读）**：`bridge.requestSessionStatus<T>(sessionId, method, params)`（`bridge.ts:1553`）是统一入口，被 `getSessionTasksStatus`（tasks）、`getSessionContextStatus`、`getSessionContextUsageStatus`、`getSessionSupportedCommandsStatus` 共用。method 取自 `SERVE_STATUS_EXT_METHODS`（`status.ts:96`）。
-2. **control 路径（计算/副作用）**：`recap` / `btw` / `shell` 各有专属 bridge 方法（`generateSessionRecap` / `generateSessionBtw` / `executeShellCommand`），method 取自 `SERVE_CONTROL_EXT_METHODS`（`status.ts:118`）。
+1. **status 路径（只读）**：`bridge.requestSessionStatus<T>(sessionId, method, params)` 是统一入口，被 `getSessionTasksStatus`、`getSessionContextStatus`、`getSessionContextUsageStatus`、`getSessionSupportedCommandsStatus`、`getSessionStatsStatus`、`getSessionHooksStatus` 共用。method 取自 `SERVE_STATUS_EXT_METHODS`。
+2. **control 路径（计算/副作用）**：`recap` / `btw` / `rewind` 走 ACP ext-method；`shell` 在 daemon 本进程执行再把 shell history 写回 ACP 子进程；`workspace/settings` 是 daemon host 直接持久化 settings 文件。
 
 ### 为什么这些端点不会阻塞 prompt FIFO
 
-bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.test.ts:2669`「FIFO-serializes concurrent prompts on the same session」）。但 recap/btw/tasks/shell **不进这个队列**：它们直接调用 ACP 连接的 `extMethod(...)`——这是 ACP JSON-RPC 之上的一条独立 request 通道，与 `session/prompt` 通知并行。因此即使主对话正在流式输出，客户端也能并发拉一次 tasks 快照、问一句 btw、或要一句 recap，而无需等当前 turn 结束。`bridge.test.ts:526`「requests session tasks status **without waiting for the prompt queue**」就是钉死这条不变式的测试。
+bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.test.ts:2669`「FIFO-serializes concurrent prompts on the same session」）。但这里的状态/控制端点 **不进这个队列**：tasks/stats/hooks 等 status 路径和 recap/btw/rewind 控制路径走 ACP `extMethod(...)`，shell 在 daemon 本进程执行，settings 由 host 直接持久化，二者也不经 `session/prompt` FIFO。因此即使主对话正在流式输出，客户端也能并发拉一次 tasks/stats/hooks 快照、问一句 btw、或要一句 recap，而无需等当前 turn 结束。`bridge.test.ts:526`「requests session tasks status **without waiting for the prompt queue**」就是钉死 status 路径不排队的不变式测试。
 
 代价是：这些 ext-method 在 ACP 子进程里与主 prompt 共享同一个事件循环；它们若触发 LLM 调用（recap/btw），是在子进程里另起一次**侧查询/分叉**，不复用主 turn 的 streaming，但也**不污染主对话历史**（详见各端点小节）。
 
@@ -36,9 +41,14 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | 端点 | 方法 | 门控 | 说明 |
 | --- | --- | --- | --- |
 | `/session/:id/tasks` | GET | 仅全局 bearer（无 `mutate`） | 只读快照，与其他 `GET /workspace/*` 状态路由同级。 |
+| `/session/:id/stats` | GET | 仅全局 bearer | 模型/token/工具/文件统计快照。 |
+| `/workspace/hooks` / `/session/:id/hooks` | GET | 仅全局 bearer | hook 配置与运行时诊断，可能暴露 hook command/url，按敏感诊断面对待。 |
+| `/workspace/extensions` | GET | 仅全局 bearer | extension 安装元信息与能力计数。 |
 | `/session/:id/recap` | POST | `mutate()`（非 strict） | 与 `/prompt` 同 posture：花 token、不改状态。 |
 | `/session/:id/btw` | POST | `mutate()`（非 strict） | 同上。 |
 | `/session/:id/shell` | POST | `mutate()`（非 strict） | 同上；真正的安全边界是 cwd 服务端固定 + bearer（见 shell 小节）。 |
+| `/session/:id/rewind` | POST | `mutate(strict)` | 会截断 session + 恢复文件，按危险变更处理。 |
+| `/workspace/settings` | GET/POST | 读 bearer / 写 `mutate(strict)` | 仅在 host 注入 `persistSetting` 时注册；写只允许 workspace scope。 |
 
 四者都先过中间件链（Origin-strip → CORS → hostAllowlist → bearerAuth → json）。`mutate()`（非 strict）在「配了 token / `--require-auth`」时由全局 bearer 兜底；在「loopback 无 token 开发态」时 passthrough（保留零配置体验）。**没有任何一个用 `mutate({strict:true})`**——它们都被归类为「token 成本而非状态变更」，与写文件/改 MCP/device-flow 那批 strict 路由刻意区分。
 
@@ -56,10 +66,13 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #4610 | feat(daemon): add POST /session/:id/btw endpoint for side questions | 2026-05-30 | btw 端点 + `core/btwUtils.ts`（`buildBtwPrompt`/`buildBtwCacheSafeParams`）+ `runForkedAgent` cache 路径 + 超时分层。 |
 | #4646 | feat(daemon): clamp oversized inline media on the prompt path | 2026-05-31 | `inlineMediaLimit.ts`（`clampInlineMediaPart` / `approxBase64Bytes` / 可配置字节上限）+ prompt 路径接线。 |
 | #4666 | fix(daemon): btw cross-session leak + timeout + input cap + permission requestId | 2026-06-01 | btw 跨 session 泄漏修复 + 超时判断修复 + 输入上限 + `requestId` 基数防护。 |
+| #4816 | feat(serve): add `/settings` slash command for web-shell | 2026-06-07 | `/workspace/settings` 路由 + `workspace_settings` 条件能力 + `settings_changed` 事件。 |
 | #4820 | feat(serve): add HTTP rewind endpoints | 2026-06-07 | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind`；`session_rewind` 能力；`session_rewound` SSE 事件；`SessionBusyError`(409) / `InvalidRewindTargetError`(400) 错误类。 |
 | #4822 | feat(serve): add hooks diagnostic HTTP/ACP surface | 2026-06-07 | `GET /workspace/hooks` + `GET /session/:id/hooks`；`workspace_hooks` / `session_hooks` 能力；`/hooks` 命令扩展 non_interactive/acp 模式。 |
 | #4826 | feat(cli): enable /directory command in ACP mode | 2026-06-07 | `/directory`（show + add）启用 ACP 模式；输出改 `MessageActionReturn`；path 分割改逗号；usage hint。 |
 | #4819 | feat(cli): enable /remember, /forget, /dream in ACP mode | 2026-06-06 | 三命令启用 ACP 模式；输出改 `MessageActionReturn`；v2 修复 #4811 回归。 |
+| #4832 | feat(serve): add extensions diagnostic HTTP/ACP surface | 2026-06-08 | `GET /workspace/extensions` + `workspace_extensions` 能力；extension 元信息与能力计数。 |
+| #4834 | feat(webui): expose focused daemon hooks | 2026-06-08 | webui 消费 focused hooks 状态；不新增 wire tag，但把 #4822 的 hooks 诊断面接入 UI。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -196,6 +209,99 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 ### v1 局限
 
 #4578 PR body 自陈：「V1 is **snapshot-only**; task stop, output tailing, and live SSE updates are intentionally not included.」即 tasks 端点只能拉一次性快照，不能 stop 任务、不能 tail 输出、没有 SSE 增量推送。
+
+---
+
+## stats / context-usage（只读 session 观测）
+
+`GET /session/:id/context-usage` 与 `GET /session/:id/stats` 都是 status 路径：HTTP route 校验 sessionId 后直接调 bridge 的 status helper，再由 ACP ext-method 在子进程里读取当前 session 的内存状态。
+
+`context-usage` 返回 `ServeSessionContextUsageStatus`：
+
+- `usage.modelName` / `totalTokens` / `contextWindowSize`
+- `breakdown`：system prompt、builtin tools、MCP tools、memory files、skills、messages、free space、autocompact buffer
+- `builtinTools` / `mcpTools` / `memoryFiles` / `skills` 详细项
+- `formattedText`：给 TUI/web-shell 直接展示的文本
+- `?detail=true` 才要求详细展开；否则 UI 可只渲染聚合条
+
+`stats` 返回 `ServeSessionStatsStatus`：
+
+- `sessionStartTimeMs` / `durationMs` / `promptCount`
+- `models[modelName].api`：请求数、错误数、总延迟
+- `models[modelName].tokens`：prompt/candidates/total/cached/thoughts
+- `tools.totalCalls/totalSuccess/totalFail/totalDurationMs`
+- `tools.byName[name].decisions`：accept/reject/modify/auto_accept
+- `files.totalLinesAdded/totalLinesRemoved`
+
+这两个端点没有 SSE delta；它们是 dashboard snapshot。`session_stats` 已经是能力标签，早期 README 把 `stats/export` 作为未落地整体描述已经过期：**stats 已落地，export 仍未落地**。
+
+---
+
+## rewind（HTTP 会话回退）
+
+#4820 把交互式 `/rewind` 的核心能力提升为 daemon HTTP surface：
+
+| Route | 门控 | 作用 |
+|---|---|---|
+| `GET /session/:id/rewind/snapshots` | bearer | 返回可回退目标列表，包含 `promptId` / `turnIndex` / `timestamp` / `diffStats` 等。 |
+| `POST /session/:id/rewind` | `mutate(strict)` | body `{promptId}`；按目标 prompt 截断会话历史并恢复文件。 |
+
+严格门控是必须的：rewind 不是 cosmetic control，它会改内存会话、恢复工作区文件，并可能让多个客户端看到历史倒退。成功后 bridge 发布 `session_rewound` SSE，reducer 记录 `rewindCount` / `lastRewind`，其它客户端据此刷新 transcript、diff 和文件视图。
+
+错误面：
+
+- `SessionBusyError` → HTTP 409 + `Retry-After: 5`。当前 prompt 正在执行时拒绝 rewind，避免一边生成新事件一边截断历史。
+- `InvalidRewindTargetError` → HTTP 400。目标不存在、已被压缩/不可回退、或 promptId 不合法。
+
+---
+
+## hooks 诊断（workspace + session）
+
+#4822 新增两条只读诊断路由：
+
+| Route | 能力 | 数据源 | 说明 |
+|---|---|---|---|
+| `GET /workspace/hooks` | `workspace_hooks` | workspace 配置 / idle fallback | 返回 workspace 级 hook 配置、`disabled`、`initialized`、`hooks[]`、以及 `events{}` 静态事件元信息。 |
+| `GET /session/:id/hooks` | `session_hooks` | live session runtime config | 返回 session 内实际注册的 runtime hooks，source 可为 `project` / `user` / `system` / `extensions` / `session`。 |
+
+`ServeHookEntry` 是 whitelist 序列化：`eventName`、`source`、`matcher`、`enabled`、`hookId`、`skillRoot` 和一个按 type 分支的 `config`。`config.type` 支持 `command` / `http` / `function` / `prompt` / unknown forward-compatible slot；HTTP hook 的 url/header allowlist、command hook 的 shell/env/timeout 都会进入诊断结果。
+
+安全含义：这虽然是 GET，但不是低敏信息。hook command、HTTP URL、allowed env vars 都可能暴露本地自动化设计与内部服务地址；它只靠全局 bearer，不走 `mutate(strict)`。共享或远程部署应把它当敏感诊断面处理。
+
+#4834 没有新增 wire tag，而是把 focused daemon hooks 状态接入 webui：客户端仍 pre-flight `workspace_hooks` / `session_hooks`，再决定是否渲染 focused hooks 面板。
+
+---
+
+## workspace extensions 诊断
+
+#4832 新增 `GET /workspace/extensions` 与 `workspace_extensions` 能力标签。ACP 子进程从 `config.getExtensions()` 构造 `ServeWorkspaceExtensionsStatus`：
+
+- 顶层：`{v, workspaceCwd, initialized, extensions[], errors?}`
+- 每个 extension：`id`、`name`、`version`、`isActive`、`path`
+- 安装元信息：`source`（会 `redactUrlCredentials`）、`installType`、`originSource`、`ref`、`autoUpdate`
+- `capabilities` 计数：MCP server、skills、agents、hooks、commands、context files、channels、是否有 settings
+
+这条路由不执行安装/更新/启停，只给 dashboard/IDE 一个统一的「当前 daemon 真正加载了什么 extension」快照。它也解释了为什么 MCP/skills/agents/hooks 文档里会出现 `extension` level/source：extension 能把这些能力注入到同一 workspace runtime。
+
+---
+
+## workspace settings（web-shell 设置面）
+
+#4816 新增 `GET/POST /workspace/settings` 和条件能力 `workspace_settings`。它与其它 always-on tag 不同：只有 host 在 `createServeApp` 依赖里注入了 `persistSetting` 时才注册 route，并通过 `persistSettingAvailable` 让 `/capabilities` 广告该 tag。
+
+`GET /workspace/settings` 返回：
+
+- `v: 1`
+- `settings[]`：`key`、`type`、`label`、`category`、`description?`、`requiresRestart`、`default`、`options?`
+- `values.effective/user/workspace`
+- settings 文件损坏恢复时的 `warnings[]`
+
+可写 key 不是全量 settings。路由先从 `getDialogSettingKeys()` 拿 UI 可见 key，再剔除：
+
+- TUI-only：vim mode、terminal bell、preferred editor、output language、IDE toggle、UI render/compact/accessibility 等
+- 安全敏感：当前显式剔除 `tools.approvalMode`，因为 approval mode 已有专门的 session route 和语义
+
+`POST /workspace/settings` 是 strict mutation route。body `{scope, key, value}`，当前 `scope` 只允许 `workspace`；value 按 schema type 校验，string 限长 1024。写入成功后广播 `settings_changed {key,value,scope}` 到所有 session bus。`requiresRestart` 仍会返回给客户端：设置落盘不等于 live session 已经重新读取。
 
 ---
 
@@ -447,7 +553,7 @@ flowchart TD
 
 ## 关键设计决策与权衡
 
-1. **复用 ext-method 往返、零新基建**。recap/btw/tasks/shell 全部挂在既有的 `entry.connection.extMethod` 之上，method 字符串集中在 `SERVE_STATUS_EXT_METHODS` / `SERVE_CONTROL_EXT_METHODS`（`status.ts`），便于 reviewer 一处 grep 出全部「读」与「变更」面。代价是这些端点与主 prompt 共享子进程事件循环，但换来「不进 FIFO、可并发于流式 prompt」。
+1. **复用 ext-method 往返、少建新基建**。recap/btw/rewind 与 tasks/context/stats/hooks/extensions 等状态面挂在既有的 `entry.connection.extMethod` 之上，method 字符串集中在 `SERVE_STATUS_EXT_METHODS` / `SERVE_CONTROL_EXT_METHODS`（`status.ts`），便于 reviewer 一处 grep 出主要「读」与「变更」面。shell/settings 是例外：shell 在 daemon 本进程执行再同步 shell history，settings 由 host 直接持久化。代价是 ext-method 端点与主 prompt 共享子进程事件循环，但换来「不进 FIFO、可并发于流式 prompt」。
 
 2. **侧查询/分叉而非改主历史**。recap 用 `runSideQuery`（fast model、`maxOutputTokens:300`、`maxAttempts:1`）+ `filterToDialog`（剔 tool/thought）做**一次性 cosmetic 摘要**；btw 用 `runForkedAgent` 的 **cache 路径**（`buildBtwCacheSafeParams` 复用主 session 的 prompt-cache slot）做**无工具单轮分叉**。两者都**不写主对话历史**——保证「顺手问一句/看一眼」绝不污染正经上下文。唯一会回写历史的是 shell（`shell_history` 注入），因为 LLM 后续确实需要引用刚跑的命令输出。
 
@@ -488,7 +594,7 @@ flowchart TD
 | `acp-bridge/src/bridge.test.ts`（recap，#4504 +3） | recap ext-method 转发、`recap:null` 保留、未知 id → `SessionNotFoundError`。 |
 | `cli/src/serve/server.test.ts:2900`「POST /session/:id/recap」 | 200 happy path（forwards no body）、`recap:null` 也是 200、client-id context、404、malformed client-id、非 strict 门控 posture pin。 |
 | `cli/src/serve/server.test.ts:1703/1832`（`/session/s-1/tasks`、`/session/missing/tasks`） | tasks 200 快照 + 未知 session 404。 |
-| `cli/src/acp-integration/acpAgent.test.ts` | ext-method case 分派（含 recap/btw/tasks/shell_history）。 |
+| `cli/src/acp-integration/acpAgent.test.ts` | ext-method case 分派（含 recap/btw/tasks/context-usage/stats/rewind/hooks/extensions/shell_history）。 |
 | `cli/src/serve/daemonLogger.test.ts`（21 specs，L21-327） | `buildDaemonLogLine` 格式（fixed ctx 序、extra key 排序、含空格值引号化、err stack 续行、stack 缺失回落）；`QWEN_DAEMON_LOG_FILE` opt-out（0/false/off/no）；daemon-id 派生 + 建文件；mkdir 失败回落 NOOP；`raw` 仅文件不 tee；`info` tee stderr；`error` 续行；`flush` 等待全部 pending；append 失败**只告警一次**仍继续；`daemon/latest` symlink 建立 + 二次 init 更新。 |
 | `acp-bridge/src/spawnChannel.test.ts`（#4559 +6，`createStderrForwarder`） | 子进程 stderr 逐行转发 + 64KiB 单行截断 + `onDiagnosticLine` tee。 |
 | `acp-bridge/src/bridge.test.ts`（#4559 +2，`onDiagnosticLine` tee） | bridge 诊断行经 `raw` 落 logger。 |

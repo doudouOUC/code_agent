@@ -189,14 +189,14 @@ capability registry → DaemonSessionClient → typed events
 | 运行时 MCP server 增删（T2.8）| ✅ →dmbm | [#4552](https://github.com/QwenLM/qwen-code/pull/4552) | [06](06-mcp-guardrails-and-pool.md) |
 | acp-bridge 抽包 seam（F1）| ✅ →dmbm | #4295/#4298/#4304/#4319/#4334/#4445 | [07](07-acp-bridge-and-permission.md) |
 | 4 策略多客户端权限仲裁（F3）| ✅ →dmbm | [#4335](https://github.com/QwenLM/qwen-code/pull/4335) | [07](07-acp-bridge-and-permission.md) |
-| 扩展端点 recap/btw/shell/tasks + daemon logger | ✅ →dmbm | #4504/#4610/#4576/#4578/#4559/#4606 | [08](08-extension-endpoints.md) |
-| **read-only 状态路由**（`/workspace/{mcp,skills,providers}` + `/session/:id/{context,supported-commands}`）| ✅ →main | [#4241](https://github.com/QwenLM/qwen-code/pull/4241) | ⚠️ **部分未文档化**（01 路由表提及，无专章深入）|
+| 扩展端点 recap/btw/shell/tasks/stats/rewind/hooks/extensions/settings + daemon logger | ✅ →dmbm | #4504/#4610/#4576/#4578/#4559/#4606/#4816/#4820/#4822/#4832/#4834 | [08](08-extension-endpoints.md) |
+| **read-only 状态路由**（`/workspace/{mcp,skills,providers,extensions,hooks}` + `/session/:id/{context,context-usage,supported-commands,tasks,stats,hooks}`）| ✅ →main/→dmbm | [#4241](https://github.com/QwenLM/qwen-code/pull/4241) + follow-ups #4515/#4822/#4832 | [01](01-http-server-and-middleware.md) 路由表 + [04](04-capabilities-and-protocol.md) 覆盖矩阵 + [08](08-extension-endpoints.md) |
 | **preflight/env 诊断路由** + closed errorKind 分类 | ✅ →main | [#4251](https://github.com/QwenLM/qwen-code/pull/4251) | ⚠️ **未文档化** |
-| **workspace memory/agents CRUD** | ✅ →main | [#4249](https://github.com/QwenLM/qwen-code/pull/4249) | ⚠️ **未文档化**（control-plane state CRUD 无专章）|
+| **workspace memory/agents CRUD + generate** | ✅ →main/→dmbm | [#4249](https://github.com/QwenLM/qwen-code/pull/4249) + follow-up `workspace_agent_generate` | ⚠️ **部分未文档化**（01/04 提及，缺少单独 CRUD 深入）|
 | **OAuth 2.0 Device Grant 鉴权子系统**（DeviceFlowRegistry / BrandedSecret）| ✅ →main | #4255 / #4291 | ⚠️ **未文档化**（01 只讲 5 道闸，未讲 device-flow 路由）|
 | **`/acp` ACP Streamable HTTP 双传输**（RFD #721）| ✅ →dmbm | [#4472](https://github.com/QwenLM/qwen-code/pull/4472) | ⚠️ **未文档化**（README §3.1 仅一笔 `mountAcpHttp`）|
 | **daemon telemetry（tool spans + session.id）**| ✅ →dmbm | [#4630](https://github.com/QwenLM/qwen-code/pull/4630) | ⚠️ 交叉到 telemetry 方案，01-08 未覆盖 |
-| **chiga0 daemon-ui 库**（`@qwen-code/webui` + SDK `daemon/ui` reducer/store）| ✅ →dmbm | #4328 / #4353 / #4380 | ⚠️ **未文档化**（独立库 track，非 daemon 侧 01-08 范围）|
+| **chiga0 daemon-ui 库**（`@qwen-code/webui` + SDK `daemon/ui` reducer/store）| ✅ →dmbm | #4328 / #4353 / #4380 / #4834 | [11](11-webui-and-transport.md) 覆盖主线；#4834 focused hooks 接入见 [08](08-extension-endpoints.md) |
 | Mode A `qwen --serve` | 🅿️ parked | #4156（A1=#4160 ✅）| 未文档化（roadmap parked）|
 | F4 daemon-native client / remote-control | ⏳ pending / ❌ | #3929-3931 CLOSED | — |
 | Stage 2a 余下 / 2b / 2c Prometheus·mDNS / 2e | ⏳ pending | 无 PR | — |
@@ -222,7 +222,7 @@ capability registry → DaemonSessionClient → typed events
 
 ### 5.4 webui / daemon-ui 库（独立发布，非 daemon-hosted）
 
-[#4328](https://github.com/QwenLM/qwen-code/pull/4328) + [#4353](https://github.com/QwenLM/qwen-code/pull/4353) ✅ →dmbm，[#4380](https://github.com/QwenLM/qwen-code/pull/4380)（daemon-react-cli）✅ →dmbm。**2026-05-21 决策**：daemon **不** host 浏览器 UI（无 `/web` 端点 / 无 cookie BFF / 无 browser auth bridge，浏览器不能安全持有 daemon bearer token）。`@qwen-code/webui` React 组件库 + `@qwen-code/sdk/daemon/ui` reducer/store 改为**独立 npm 包**，由下游 embedder 自行 host。本仓 01-08 未覆盖此库。
+[#4328](https://github.com/QwenLM/qwen-code/pull/4328) + [#4353](https://github.com/QwenLM/qwen-code/pull/4353) ✅ →dmbm，[#4380](https://github.com/QwenLM/qwen-code/pull/4380)（daemon-react-cli）✅ →dmbm，[#4834](https://github.com/QwenLM/qwen-code/pull/4834) 把 focused daemon hooks 暴露给 webui。**2026-05-21 决策**：daemon **不** host 浏览器 UI（无 `/web` 端点 / 无 cookie BFF / 无 browser auth bridge，浏览器不能安全持有 daemon bearer token）。`@qwen-code/webui` React 组件库 + `@qwen-code/sdk/daemon/ui` reducer/store 改为**独立 npm 包**，由下游 embedder 自行 host。传输与组件主线见 [11](11-webui-and-transport.md)，daemon hooks 接入见 [08](08-extension-endpoints.md)。
 
 ### 5.5 typed SessionEvent 判别联合 + event reducer（1.5-prereq）落地状态
 
@@ -313,7 +313,8 @@ Stage 1.5 是**增量迁移，非大重写**：
 | #4490 | PR | 🔧 OPEN / DRAFT / CONFLICTING | base main（反向集成）|
 | #4412 | PR | 🔧 OPEN | #4412 base main(draft, deep-dive docs)|
 | #4563 | PR | ✅ MERGED | #4563 base dmbm(DaemonWorkspaceService refactor，06-06 合入)|
-| #4515 #4516 | PR | ❌ CLOSED 未合入 | dmbm（stats/export、compress/_meta 砍了）|
+| #4516 | PR | ❌ CLOSED 未合入 | dmbm（compress/_meta 砍了）|
+| #4515 | PR | ❌ CLOSED / 部分后续落地 | 原 stats/export PR 未合入；stats 后续已落地，export 仍未落地 |
 | #4296 | PR | ❌ CLOSED | web-first pivot（已 superseded）|
 | #3929 #3930 #3931 | PR(draft) | ❌ CLOSED 未合入 | remote-control（2026-05-15 关）|
 | #4156 #4554 | issue | 🔧 OPEN | Mode A 3-phase；OTel daemon e2e |

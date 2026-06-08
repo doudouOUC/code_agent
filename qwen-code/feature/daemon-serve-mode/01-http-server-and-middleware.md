@@ -133,6 +133,9 @@ flowchart TD
 | GET/POST/DELETE | `/workspace/agents[/:agentType]` | 读 bearer / 写 `mutate(strict)` | `workspace_agents` | L1072（工厂） | `mountWorkspaceAgentsRoutes` |
 | GET | `/workspace/env` | bearer | `workspace_env` | L1089 | 侦察面，PR24 才补 audit |
 | GET | `/workspace/preflight` | bearer | `workspace_preflight` | L1097 | |
+| GET | `/workspace/hooks` | bearer | `workspace_hooks` | L1060 | hook 配置诊断；返回静态事件元信息 + 已加载 workspace hook |
+| GET | `/workspace/extensions` | bearer | `workspace_extensions` | L1070 | extension 诊断；列安装元信息和能力计数 |
+| GET/POST | `/workspace/settings` | 读 bearer / 写 `mutate(strict)` | `workspace_settings`（条件） | L1079（工厂） | 仅当 host 注入 `persistSetting` 时注册；写仅 workspace scope |
 | GET | `/file` `/list` `/glob` `/stat` | bearer | `workspace_file_read` | L1112（工厂） | 只读文件面 |
 | GET | `/file/bytes` | bearer | `workspace_file_bytes` | L1112（工厂） | 字节窗口读 |
 | POST | `/file/write` `/file/edit` | `mutate(strict)` | `workspace_file_write` | L1115（工厂） | CAS + 原子写 |
@@ -145,8 +148,10 @@ flowchart TD
 | POST | `/session/:id/resume` | `mutate()` | `unstable_session_resume` | L1545 | ACP unstable_resumeSession |
 | GET | `/session/:id/context` | bearer | `session_context` | L1547 | |
 | GET | `/session/:id/context-usage` | bearer | `session_context_usage` | L1565 | |
+| GET | `/session/:id/stats` | bearer | `session_stats` | L1502 | 模型/token/工具/文件统计快照 |
 | GET | `/session/:id/supported-commands` | bearer | `session_supported_commands` | L1587 | |
 | GET | `/session/:id/tasks` | bearer | `session_tasks` | L1607 | |
+| GET | `/session/:id/hooks` | bearer | `session_hooks` | L1543 | session 运行时 hook 诊断 |
 | POST | `/session/:id/prompt` | `mutate()` | `session_prompt` | L1625 | **非阻塞 202**；deadline 见 §超时 |
 | POST | `/session/:id/heartbeat` | `mutate()` | `client_heartbeat` | L1742 | per-client 心跳 |
 | POST | `/session/:id/detach` | `mutate()` | `session_close` | L1773 | 仅减引用 |
@@ -159,6 +164,8 @@ flowchart TD
 | POST | `/session/:id/recap` | `mutate()` | `session_recap` | L2034 | **无路由侧 abort**（cosmetic） |
 | POST | `/session/:id/btw` | `mutate()` | `session_btw` | L2086 | `res.once('close')` abort（L2111） |
 | POST | `/session/:id/shell` | `mutate()` | — | L2142 | socket-close abort（L2156） |
+| GET | `/session/:id/rewind/snapshots` | bearer | `session_rewind` | L2078 | 列可回退 prompt 快照 |
+| POST | `/session/:id/rewind` | `mutate(strict)` | `session_rewind` | L2097 | 按 `promptId` 回退；忙碌 session 返回 409 |
 | POST | `/session/:id/approval-mode` | `mutate(strict)` | `session_approval_mode_control` | L2194 | 校验 `APPROVAL_MODES` |
 | POST | `/workspace/mcp/:server/restart` | `mutate(strict)` | `workspace_mcp_restart`/`mcp_pool_restart` | L2246 | `?entryIndex=N\|*` |
 | POST | `/workspace/mcp/servers` | `mutate(strict)` | `mcp_server_runtime_mutation` | L2329 | 运行时加 server |
@@ -170,7 +177,7 @@ flowchart TD
 | GET | `/session/:id/events` | bearer | `session_events` | L2653 | SSE；`?maxQueued=N`、`Last-Event-ID` |
 | ANY | `/acp` | （ACP transport 自带） | — | L3050 | 官方 Streamable HTTP |
 
-**条件能力标签**：`capabilities.ts:CONDITIONAL_SERVE_FEATURES`（L291-311）把"是否广告该 tag"与 tag key 并置成 `Map<feature, predicate>`：`require_auth`（`--require-auth`）、`mcp_workspace_pool`/`mcp_pool_restart`（池开）、`allow_origin`（配了 `--allow-origin`）、`prompt_absolute_deadline`/`writer_idle_timeout`（配了对应预算 >0）。`getAdvertisedServeFeatures`（L335）对无 Map 条目的 tag 无条件广告（baseline），有条目的跑 predicate。`server.test.ts` 迭代 Map keys 做不变式断言（L284-289 docstring）。
+**条件能力标签**：`capabilities.ts:CONDITIONAL_SERVE_FEATURES` 把"是否广告该 tag"与 tag key 并置成 `Map<feature, predicate>`：`require_auth`（`--require-auth`）、`mcp_workspace_pool`/`mcp_pool_restart`（池开）、`allow_origin`（配了 `--allow-origin`）、`prompt_absolute_deadline`/`writer_idle_timeout`（配了对应预算 >0）、`workspace_settings`（嵌入 host 注入 `persistSetting` 能力）。`getAdvertisedServeFeatures` 对无 Map 条目的 tag 无条件广告（baseline），有条目的跑 predicate。`server.test.ts` 迭代 Map keys 做不变式断言。
 
 ---
 
