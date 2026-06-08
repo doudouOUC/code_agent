@@ -3,7 +3,7 @@
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）。
 
 **时间范围**: 2026-04-06 ~ 2026-06-07（持续更新）  
-**总计**: 170 PRs（W15–W24 周报表格行数之和）  
+**总计**: 171 PRs（W15–W24 周报表格行数之和）  
 **代码量**: +361,180 / -61,411，2,721 个文件变更 _(W15–W22；W23 见对应周目录)_
 
 > 注：另有 3 个 PR（#4646/#4658/#4661）创建于 W22 末但未计入 W22 表格，已在 W23 review.md 中审查。
@@ -32,4 +32,4 @@ feat ×74, fix ×44, refactor ×10, docs ×6, other ×4, chore ×4, test ×1, pe
 serve ×42, telemetry ×27, cli ×17, core ×17, acp-bridge ×6, sdk-python ×5, daemon ×5, sdk ×3, rewind ×3, integration ×3, skills ×2, ci ×2, tool-registry ×1, i18n ×1, test ×1 _(W15–W22；W23: daemon ×7, serve ×5, cli ×4, telemetry ×3, core ×2)_
 
 
-_生成于 2026-05-31；W23 + 索引更新于 2026-06-07_
+_生成于 2026-05-31；W24 + 索引更新于 2026-06-08_

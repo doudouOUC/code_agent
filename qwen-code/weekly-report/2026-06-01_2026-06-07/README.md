@@ -59,7 +59,7 @@
 ### 本周关注
 
 - **分支靶错误**：#4811 误入 `main` → #4818 revert → #4819 re-land `daemon_mode_b_main`。建议 CI 增加 branch-target 验证。
-- **仍 open**：#4812（session forking）、#4816（/settings 命令），仍在开发中。
+- **周末合入**：#4812（session forking）、#4816（/settings 命令）、#4832（extensions diagnostic）于 06-08 合入。
 - **合并修复**：#4730/#4731 补回 #4490 大合并丢失的接口方法/配置项。
 
 ### 关联 feature 文档更新

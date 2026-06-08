@@ -1,6 +1,6 @@
 # qwen-code PRs · 2026-06-08 ~ 2026-06-14  (W24)
 
-**主题**: daemon rate limiting、stress test、session forking、/settings 命令、extensions 诊断
+**主题**: daemon rate limiting、connection stress test
 
 **统计**: 2 PRs — 2 merged / 0 open / 0 closed  
 **代码量**: +2,319 / -506，18 个文件变更  

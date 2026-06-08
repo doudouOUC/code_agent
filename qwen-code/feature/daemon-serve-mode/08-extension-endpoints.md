@@ -66,7 +66,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #4610 | feat(daemon): add POST /session/:id/btw endpoint for side questions | 2026-05-30 | btw 端点 + `core/btwUtils.ts`（`buildBtwPrompt`/`buildBtwCacheSafeParams`）+ `runForkedAgent` cache 路径 + 超时分层。 |
 | #4646 | feat(daemon): clamp oversized inline media on the prompt path | 2026-05-31 | `inlineMediaLimit.ts`（`clampInlineMediaPart` / `approxBase64Bytes` / 可配置字节上限）+ prompt 路径接线。 |
 | #4666 | fix(daemon): btw cross-session leak + timeout + input cap + permission requestId | 2026-06-01 | btw 跨 session 泄漏修复 + 超时判断修复 + 输入上限 + `requestId` 基数防护。 |
-| #4816 | feat(serve): add `/settings` slash command for web-shell | 2026-06-07 | `/workspace/settings` 路由 + `workspace_settings` 条件能力 + `settings_changed` 事件。 |
+| #4816 | feat(serve): add `/settings` slash command for web-shell | 2026-06-08 | `/workspace/settings` 路由 + `workspace_settings` 条件能力 + `settings_changed` 事件。 |
 | #4820 | feat(serve): add HTTP rewind endpoints | 2026-06-07 | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind`；`session_rewind` 能力；`session_rewound` SSE 事件；`SessionBusyError`(409) / `InvalidRewindTargetError`(400) 错误类。 |
 | #4822 | feat(serve): add hooks diagnostic HTTP/ACP surface | 2026-06-07 | `GET /workspace/hooks` + `GET /session/:id/hooks`；`workspace_hooks` / `session_hooks` 能力；`/hooks` 命令扩展 non_interactive/acp 模式。 |
 | #4826 | feat(cli): enable /directory command in ACP mode | 2026-06-07 | `/directory`（show + add）启用 ACP 模式；输出改 `MessageActionReturn`；path 分割改逗号；usage hint。 |

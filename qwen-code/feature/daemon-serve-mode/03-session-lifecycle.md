@@ -558,7 +558,8 @@ sequenceDiagram
 ### #4812 — session branching / forking（@doudouOUC）
 
 - `server.ts` 新增 `POST /session/:id/branch`（`mutate()` 非 strict）：校验 session 存在、`entry.promptActive` 为 false（否则 409 `SessionBusyError`）、session 数量上限检查。
-- `bridge.ts:branchSession`：序列化入 `entry.promptQueue`（防与 prompt 并发）；fork JSONL transcript → `restoreSession`（action=load）→ `renameSession` 设显示名。失败路径自动 `removeSession` / `sessionClose` 清理孤儿。
+- `bridge.ts:branchSession`：序列化入 `entry.promptQueue`（防与 prompt 并发）；fork JSONL transcript → `restoreSession`（action=resume，无 history replay）→ `renameSession` 设显示名。失败路径自动 `removeSession` / `sessionClose` 清理孤儿。
+- `capabilities.ts`：注册 `session_branch: { since: 'v1' }` 能力标签。
 - `bridge.ts:computeUniqueBranchTitle`：`${baseName} (branch)` → `${baseName} (branch 2)` → … 去重。
 - `bridgeTypes.ts:BranchSessionRequest`/`BranchSessionResponse` 类型 + SDK `DaemonClient.branchSession` / `DaemonSessionClient.branch`。
 - 连接断开保护：`res.writable` false 时 kill 新 session（防孤儿积累）。
