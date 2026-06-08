@@ -491,6 +491,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4251 | 状态路由 | preflight + env 诊断路由（Wave 3 PR 13）。 |
 | #4516 | 会话 | `POST /session/:id/compress` + `_meta`（T1.3/T1.4）。**已关闭未合入 daemon_mode_b_main**。 |
 | #4515 | 会话 | 原 `stats/export` PR 已关闭未合入；`GET /session/:id/stats` 后续已在 daemon_mode_b_main 落地，`/export` 仍未落地。 |
+| #4812 | 会话 | `POST /session/:id/branch` session forking（fork transcript → restore → rename）。 |
 
 ### SSE / SDK 协议
 
@@ -507,6 +508,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | --- | --- | --- |
 | #4236 | 鉴权 | mutation gating helper + `--require-auth`（PR 15）。 |
 | #4527 | CORS | `--allow-origin <pattern>` allowlist（T2.4）。 |
+| #4861 | rate limiting | per-tier token-bucket 限速（prompt/mutation/read），fail-open（T3.4）。 |
 | #4255 #4291 | auth | device-flow 路由 + follow-up（PR 21）。 |
 | #4530 | 超时 | prompt 绝对 deadline + SSE writer idle timeout（T2.9）。 |
 
