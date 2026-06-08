@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.10）。本文在 file/symbol/line 级别**取代**总览的 §3.10「扩展端点」段落，深入到每个端点的控制面调用链、ACP ext-method 往返、绕开 prompt FIFO 的机理、HTTP shell 的安全面、`ChannelBase.ts` 的 `this`-binding 隐患，以及 daemon 文件日志的异步队列/降级/截断/symlink。
 >
-> 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。注意：`btw`（#4610）虽对 `main` 仍标记为 open，但其实现**已在 `daemon_mode_b_main` 落地**（`server.ts:2086`），本文按集成分支实况描述。
+> 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。注意：`btw`（#4610）虽对 `main` 仍标记为 open，但其实现**已在 `daemon_mode_b_main` 落地**，本文按集成分支实况描述。
 >
 > 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）。
 
@@ -93,9 +93,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 
 ### v1 取消：**没有**（且与 PR body 矛盾）
 
-这是本端点最需要标注的事实。`server.ts:2034` 的路由注释（L2042-2061）写得很直白：
-
-> v1 cancellation: **NONE on the route side**. There is intentionally no `res.once('close')` listener and no `AbortSignal` plumbed into `bridge.generateSessionRecap`.
+这是本端点最需要标注的事实。recap 路由（`server.ts:generateSessionRecap` 附近）的行为：v1 无路由侧取消——没有 `res.once('close')` 监听器，也没有 `AbortSignal` 传入 bridge（原路由注释已被 #4774 剥离，但行为不变）。
 
 对照三处代码：
 
