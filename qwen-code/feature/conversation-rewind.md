@@ -476,6 +476,8 @@ sequenceDiagram
 
 7. **大文件/二进制/超量文件的降级**。`getTurnDiff`/`computeTurnFileDiff` 对 `> MAX_DIFF_SIZE_BYTES` 的文件只给行数粗估（`oversized`）、对含 NUL 的内容按二进制处理（`isBinary`），单轮文件数超 `MAX_TURN_DIFF_FILES = 500` 时截断并仅在 debug 日志告警。这些降级对恢复正确性无影响，但 diff 预览可能不完整，UI 需明确标注以免误导。
 
+8. **#4820 HTTP rewind 的 `turnIndex` 从数组下标派生而非 promptId 解析**。`getRewindSnapshots` 中 `turnIndex` 取自过滤后的数组 `idx`，若快照被过滤（不匹配前缀），`idx` 不再对应实际 turn 编号。`POST /rewind` 以 `promptId` 为准（不受影响），但 `GET /snapshots` 返回的 `turnIndex` 可能误导客户端展示。
+
 ---
 
 ## 8. 各 PR 代码贡献
