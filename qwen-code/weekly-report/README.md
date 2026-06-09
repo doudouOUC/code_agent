@@ -3,7 +3,7 @@
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）。
 
 **时间范围**: 2026-04-06 ~ 2026-06-07（持续更新）  
-**总计**: 171 PRs（W15–W24 周报表格行数之和）  
+**总计**: 175 PRs（W15–W24 周报表格行数之和）  
 **代码量**: +361,180 / -61,411，2,721 个文件变更 _(W15–W22；W23 见对应周目录)_
 
 > 注：另有 3 个 PR（#4646/#4658/#4661）创建于 W22 末但未计入 W22 表格，已在 W23 review.md 中审查。
@@ -21,7 +21,7 @@
 | [2026-05-18 ~ 2026-05-24](2026-05-18_2026-05-24/) (W21) | 43 | 36/3/4 | +120,272/-20,559 | serve 路由密集开发、acp-bridge 大重构、telemetry Phase 1.5–4、原子写、F1/F2/F3 |
 | [2026-05-25 ~ 2026-05-31](2026-05-25_2026-05-31/) (W22) | 22 | 13/6/3 | +152,911/-35,150 | daemon 新端点（recap/btw/tasks/shell）、serve T2.x、daemon prompt 链路追踪、集成合并 |
 | [2026-06-01 ~ 2026-06-07](2026-06-01_2026-06-07/) (W23 最终) | 25 | 22/0/3 | 见周目录 | daemon 修复（btw 泄漏/transcript/resync/stream）、telemetry 路由覆盖 + 响应元数据、ACP 命令扩展（rewind/hooks/directory/remember/settings/branch） |
-| [2026-06-08 ~ 2026-06-14](2026-06-08_2026-06-14/) (W24 进行中) | 2 | 2/0/0 | 见周目录 | daemon rate limiting、stress test |
+| [2026-06-08 ~ 2026-06-14](2026-06-08_2026-06-14/) (W24 进行中) | 6 | 3/2/1 | 见周目录 | rate limiting、stress test、GitService 移除、file history 持久化、TRACEPARENT |
 
 ## 类型分布
 
