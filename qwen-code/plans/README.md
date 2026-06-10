@@ -14,12 +14,12 @@ weekly-report/
 ├── 2026-05-18_2026-05-24/plans/   # W21 (21 plans)
 ├── 2026-05-25_2026-05-31/plans/   # W22 (24 plans)
 ├── 2026-06-01_2026-06-07/plans/   # W23 (17 plans)
-├── 2026-06-08_2026-06-14/plans/   # W24 (3 plans)
+├── 2026-06-08_2026-06-14/plans/   # W24 (6 plans)
 plans/
 └── misc/                          # 跨周 epic / issue 设计 / agent 子 plan (44 files)
 ```
 
-**总计**: 166 个 plan 文件，覆盖 ~140 个 PR。
+**总计**: 169 个 plan 文件，覆盖 ~145 个 PR。
 
 ## 命名规范
 
