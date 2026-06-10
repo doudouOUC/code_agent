@@ -3,8 +3,8 @@
 **主题**: daemon rate limiting、stress test、GitService 移除、file history 持久化、telemetry TRACEPARENT
 
 **统计**: 6 PRs — 3 merged / 2 open / 1 closed  
-**代码量**: +5,103 / -1,861，81 个文件变更  
-**类型**: feat ×3, refactor ×1, merge ×1 (closed)  
+**代码量**: +3,270 / -1,360，70 个文件变更 _(不含 closed #4886)_  
+**类型**: feat ×4, refactor ×1, merge ×1 (closed)  
 **范围 (scope)**: serve ×1, test ×1, core ×2, telemetry ×1
 
 | PR | 状态 | 标题 | 变更 | 文件 | 创建 | 合并/关闭 | 链接 |
