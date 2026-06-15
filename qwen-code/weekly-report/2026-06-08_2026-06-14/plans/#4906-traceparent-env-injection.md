@@ -1,6 +1,6 @@
 # feat(telemetry): inject TRACEPARENT env var into shell child processes
 
-PR: #4906 | OPEN | +463/-104 | 11 files
+PR: #4906 | MERGED: 2026-06-10 | +463/-104 | 11 files
 
 ## What it does
 
@@ -16,5 +16,5 @@ When `outboundCorrelation.propagateTraceContext` is enabled, injects a W3C `TRAC
 
 ## Final Implementation Status
 
-- **Status**: OPEN
+- **Status**: MERGED (2026-06-10)
 - **Outcome**: Extends distributed tracing coverage to shell child processes; enables end-to-end trace correlation for CLI tools and scripts spawned by qwen-code
