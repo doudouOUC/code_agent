@@ -1,6 +1,6 @@
 # daemon/serve 模式（Mode B）技术方案
 
-> 适用分支：大部分实现位于集成分支 `daemon_mode_b_main`，部分已合并到 `main`（合并 PR #4490）。文中所有 `file:symbol` 锚点若未特别说明均以 `daemon_mode_b_main` 为准。
+> 适用分支：daemon-mode feature batch 已随 #4490 于 2026-06-11 合入 `main`；#5144 于 2026-06-15 刷新 upstream daemon developer docs 并重新对齐当前 `main` 实现面。本文早期函数/行级锚点可能仍带 `daemon_mode_b_main` 历史语境，阅读时以当前 `main` 源码为准。
 > 关联 epic：[#4175](https://github.com/QwenLM/qwen-code/issues/4175)（Mode B daemon roadmap），上游设计 [#3803](https://github.com/QwenLM/qwen-code/issues/3803)。
 
 ---
@@ -11,7 +11,7 @@
 
 | # | 子文档 | 覆盖 |
 |---|---|---|
-| 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、deadline / access log |
+| 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、deadline / 权限响应超时 / access log |
 | 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、state_resync、协议帧 serverTimestamp/provenance/errorKind |
 | 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵 |
@@ -19,7 +19,7 @@
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
 | 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量 |
 | 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、绕过 prompt FIFO、shell `this`-binding 隐患 |
-| 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（**#4490 mainline 合并仍 CONFLICTING——F1–F5 等 ~40 PR 目前只在 `daemon_mode_b_main`、未进 main/npm**） |
+| 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、跨客户端协调 |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport |
 
@@ -360,6 +360,8 @@ sequenceDiagram
 
 `POST /session/:id/permission/:requestId`（per-session 投票）与 `POST /permission/:requestId`（daemon 级）。`CANCEL_VOTE_SENTINEL = '__cancelled__'` 是**跨策略逃逸**：voter 的 `{outcome:'cancelled'}` 在策略分派**之前**先路由（agent 侧 abort 路径，不受 policy 门控）；该 sentinel 不在 wire `allowedOptionIds` 集里，防 wire 客户端伪造。`resolved` map 是 bounded FIFO 做重复投票去重。`PermissionDecisionReason` 是 discriminated union（`first-responder`/`designated-originator`/`consensus-quorum`/`local-only-loopback`/`agent-cancelled`/`voter-cancelled`），审计经 `PermissionAuditPublisher`。runtime 活跃策略在 `/capabilities` 的 `policy.permission`（区别于能力 `modes` 的 build-supported 集）。
 
+近期 daemon/ACP follow-up 把这套权限面补到了可运维状态：#5085/#5105 保持 Agent 工具在线协议上仍是 ACP 合法的 `kind:'other'`，再通过 `_meta.toolName` 给 daemon web-shell / VS Code 显示专属 "Launch this agent?" 权限提示；#5218/#5258 将 cancelled 权限从一次工具错误提升为"停止当前 turn"语义，`ask_user_question`、普通工具权限取消、reject→Cancel 和权限请求通道失败都会记录被拒/跳过的 tool responses 并跳过同一模型响应的后续工具；#5260 把单次权限 / `ask_user_question` 响应超时暴露为 `qwen serve --permission-response-timeout-ms`，默认仍 5 分钟，`0` 表示无限等待。
+
 ### 3.10 SDK 协议补全与扩展端点
 
 **SDK 协议补全（F4 prereq / #4360）**：daemon 事件帧补齐 `serverTimestamp`（事件产生的服务端时间）、`provenance`（工具来源：builtin / mcp / ...）、`errorKind`（分类错误码，UI 据此渲染 typed 响应而非 regex 匹配人读字符串），及前述 `state_resync_required`。TS SDK `ui/normalizer.ts` 按 `serverTimestamp`（top-level）→ `_meta.serverTimestamp` → `data._meta.serverTimestamp` 三处回落抽取；`extractToolProvenance` 抽 `provenance`/`serverId`，未知回落 `'unknown'`。`mapDomainErrorToErrorKind`（acp-bridge `status.ts`）做分类。SDK：`DaemonClient`（workspace 级：capabilities/file/memory/agents/mcp 等）与 `DaemonSessionClient`（session 级：prompt/cancel/events/heartbeat）。
@@ -476,7 +478,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4334 | acp-bridge F1 | F1 follow-up：BridgeFileSystem wiring + channelInfo 修复。 |
 | #4445 | acp-bridge F1 | 抬升 6861 行 bridge.test.ts。 |
 | #4469 #4500 | 集成 | main → daemon_mode_b_main 同步。 |
-| #4490 | 集成 | daemon_mode_b_main → main 合并（F1/F2/F3/F4-prereq + F5 alpha 批）。 |
+| #4490 | 集成 | daemon_mode_b_main → main 合并（F1/F2/F3/F4-prereq + F5 alpha 批），2026-06-11 已合入 main。 |
 
 ### HTTP 服务 / 会话 / 能力
 
@@ -546,8 +548,59 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4822 | hooks | `GET /workspace/hooks` + `GET /session/:id/hooks` 诊断端点。 |
 | #4826 | /directory | `/directory` 命令启用 ACP 模式（show + add）。 |
 | #4819 | /remember | `/remember`、`/forget`、`/dream` 启用 ACP 模式（v2，含 revert #4818）。 |
+| #5144 | docs | daemon developer docs 英文化刷新，并按当前 main 核对 event schema、capabilities、startup flags、error taxonomy、resync、MCP pool 和 web UI wording。 |
+| #5174 | status API | `GET /daemon/status` 只读诊断面：summary/full detail、session/permission/SSE/ACP/rate-limit/runtime/capability 汇总，full 模式聚合 workspace 诊断并按 section 独立降级（merged 2026-06-16）。 |
+| #5260 | timeout flag | `qwen serve --permission-response-timeout-ms` 暴露 ACP 权限/`ask_user_question` 单次响应超时，`0` 无限等待，非法值启动失败，超大值 clamp 到 Node timer 上限（merged 2026-06-18）。 |
 
-> F3（#4335，permission mediation 四策略实现）已合入 `daemon_mode_b_main`（2026-05-20）。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
+### W24/W25 全作者近期补强
+
+范围：`QwenLM/qwen-code` 中 `merged:2026-06-08..2026-06-22`，全作者，筛选标准是实际改动 daemon / serve / ACP / web-shell / webui daemon SDK / serve integration 的 PR；泛 CLI/core/desktop 修复若未改变 daemon feature 面，不纳入本表。
+
+| PR | 子主题 | 一句话作用 |
+| --- | --- | --- |
+| #4862 | loadtest/perf harness | 抽出 daemon harness、benchmark/report helper 和 mock ACP child；重型连接/提示/恢复压力测试用 `QWEN_LOADTEST_ENABLED=1` 门控。 |
+| #4924 | reload-env | `POST /workspace/reload-env` 热加载 `.env` / `settings.env` 和 idle session auth，后续由 #4965 统一 reload 覆盖。 |
+| #4954 | per-session stats | `UiTelemetryService` 维护 per-session metrics，`/session/:id/stats` 不再返回进程全局统计。 |
+| #4965 | unified reload | `POST /workspace/reload` 统一 reload env、providers、model、credentials、tools、approval、memory、system instruction，并发 reload 事件。 |
+| #5006 | small follow-ups | session-delete stderr 单行脱敏；SDK/web-shell 适配 pooled MCP restart 的 `entryIndex` / `entries[]` 类型。 |
+| #5031 | session shell opt-in | direct session shell 必须显式 `--enable-session-shell` 且配置 bearer token；未启用时隐藏 capability 和 ACP method。 |
+| #5033 | prompt queue backpressure | bridge 按 session 维护 pending prompt 上限；REST 返回 `503 prompt_queue_full` + `Retry-After`，ACP 映射结构化 JSON-RPC 错误。 |
+| #5035 | session title updates | ACP child 记录自动标题后，经 `qwen/notify/session/title-update` side channel 转成 `session_metadata_updated` SSE，客户端无需轮询 session list。 |
+| #5040 | DaemonTransport + ACP compliance | SDK 增加 `DaemonTransport` 抽象（REST/SSE、ACP HTTP、ACP WS 可插拔）；`/acp` 补标准 `session/set_mode`、`session/set_model`、`session/fork` 并强制 `session/new` 隔离。 |
+| #5041 | serve integration unbreak | daemon batch 合入 main 后修复 `qwen serve` 集成测试，避免 feature batch 与 mainline 测试基线脱节。 |
+| #5047 | daemon telemetry context | daemon → ACP child 传播 trace context，保证 ACP 子进程 span 可串回 daemon prompt/request 链路。 |
+| #5066 | web-shell parity | web-shell 增加 token usage、设置面板/i18n、Ctrl+Y retry、CLI 对齐 streaming metrics、hidden slash commands、404/410 会话恢复等。 |
+| #5084 | web-shell timing | parallel-agents box 与 sub-agent tool 展示时间信息。 |
+| #5085/#5105 | Agent permission UI | `Kind.Agent` 仅作内部分类，ACP wire 仍用 `kind:'other'`；`_meta.toolName` 驱动 web-shell / VS Code 的 "Launch this agent?" 权限提示。 |
+| #5088 | tool detail UI | web-shell 展示完整 tool detail，并自动折叠已完成工具。 |
+| #5091 | webui lifecycle | 延后 `DaemonClient` dispose，避免 React StrictMode 下连接被过早关闭。 |
+| #5096 | shortcuts UI | web-shell input shortcuts 可发现且可点击。 |
+| #5098 | goal transcript events | `/goal` 状态进入 daemon transcript events，页面刷新与多端 attach 后仍可恢复/同步。 |
+| #5109 | TodoWrite history UI | web-shell TodoWrite 历史支持折叠与状态 diff。 |
+| #5108 | truncated diff replay | saved-session replay 对已截断 edit/write diff 只发 preview content，避免 web-shell 把 truncated raw diff 当完整 diff 渲染。 |
+| #5118 | completed todo metrics | web-shell completed todos 展示 per-task token 与 time detail。 |
+| #5125 | completed turn collapse | web-shell 将已完成 turn 折叠为 prompt + final answer，降低 transcript 噪声。 |
+| #5174 | daemon status API | 新增只读 `GET /daemon/status` 与 `daemon_status` capability；summary 不 spawn ACP child，full 聚合 session/ACP/auth/workspace 诊断。 |
+| #5175 | mid-turn injection | `POST /session/:id/mid-turn-message` + `mid_turn_message_injected` SSE，使 web-shell 运行中输入可注入当前 turn 且 exactly-once。 |
+| #5183 | mid-turn image messages | CLI/ACP/desktop mid-turn 路径保留结构化图片内容；缺 live base64 时留到下一轮而非提前 ack 丢失。 |
+| #5190 | web-shell execution display | polish web-shell execution display。 |
+| #5192 | prompt lifecycle race | 修复 completed prompt lifecycle race，避免完成态与前端状态恢复错位。 |
+| #5193 | transcript callback | web-shell 增加 transcript block change callback，并收紧 replay 下 prompt status 恢复。 |
+| #5211 | capability E2E guard | `daemon_status` 补进 serve capability 集成测试基线，并让 E2E 在同仓 PR 上运行以提前发现能力漂移。 |
+| #5216 | extension commands in daemon | ACP daemon session 不再传空 extension override，恢复正常 extension command 加载。 |
+| #5218 | cancelled question stop | ACP `ask_user_question` 取消/超时后停止当前 turn，记录 skipped follow-up tool responses，并向嵌套 Agent / sibling Agent 传播取消。 |
+| #5220 | localized tool names | TUI 与 web-shell badge 使用本地化 tool display name。 |
+| #5258 | cancelled permission stop | 将 stop-after-cancel 语义推广到普通工具权限取消、reject→Cancel 和权限请求通道失败，避免后续工具继续执行（merged 2026-06-19）。 |
+| #5260 | permission timeout flag | `--permission-response-timeout-ms` 配置权限/问题响应 deadline；默认 5 分钟，`0` 禁用，启动期校验非法值。 |
+| #5266 | mid-turn drain recovery | `mid_turn_message_injected` wire 字符串集中为共享常量；drain 响应超时后在下一批 tool 恢复注入，避免消息静默丢失。 |
+| #5392 | hosted Web Shell | release 版 `qwen serve` 默认同源托管 Web Shell SPA；`--open` 自动打开，`--no-web` 退回 API-only。 |
+| #5398 | extension management | daemon/web-shell 增加扩展安装、启停、更新、卸载、刷新 active sessions 的异步 mutation 面与 `extensions_changed` 事件。 |
+| #5484 | reaper timeout validation | `sessionReapIntervalMs` / `sessionIdleTimeoutMs` 启动期校验非法值，`0` 保持 disabled sentinel。 |
+| #5504 | ACP model-invocable commands | ACP command snapshot 同步注册 model-invocable command provider/executor，避免 snapshot 已知命令但 SkillTool 执行路径缺失。 |
+| #5541 | hosted Web Shell dotfiles | `sendFile` 对 Web Shell index 使用 `dotfiles:'allow'`，修复 nvm/volta/asdf 安装路径含 `.nvm` 时 `qwen serve --open` 加载失败。 |
+| #5544 | MCP resources/prompts | MCP prompt/resource discovery 改为宽松 list；resources 注册进 `ResourceRegistry`，支持 `/mcp` 计数与 `@server:uri` 注入。 |
+
+> F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 
 ---
 

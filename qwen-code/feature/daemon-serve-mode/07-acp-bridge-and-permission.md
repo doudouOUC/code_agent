@@ -1,8 +1,8 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
 >
-> 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由 + re-export shim）。
+> 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由 + re-export shim）。
 >
 > 注意一处**文档与代码的时间差**：`packages/acp-bridge/README.md` 仍把 `PermissionMediator` 描述为 "type-only stub / No implementation yet"——那是 F1 抬包时点的快照。本文以 `daemon_mode_b_main` 上**已落地**的 `permissionMediator.ts`（1318 行）为准，F3 已把四策略实现合入。
 
@@ -44,6 +44,10 @@
 | #4334 | F1 follow-up: BridgeFileSystem wiring | F1 | `BridgeFileSystem` 接线 + `channelInfo` 修复。 |
 | #4445 | lift `bridge.test.ts` | F1 | 把 6861 行 bridge 测试抬到 acp-bridge（`daemon_mode_b_main` 上已增长到 8386 行）。 |
 | **#4335** | **feat(acp-bridge): F3 — multi-client permission coordination** | **F3** | **本文重点**：四策略实现 + `PermissionAuditRing` + 2 个新 SSE 事件 + 3 个 typed error（403/501/500）+ 设置项 + 能力面 + SDK reducer。 |
+| #5085/#5105 | Agent permission prompt via `_meta.toolName` | 权限 UI follow-up | 保持 ACP wire `kind:'other'` 合法，同时用 `_meta.toolName` 让 Agent 工具在 daemon web-shell / VS Code 显示专属权限提示。 |
+| #5174 | daemon status API | 诊断面 | 通过 bridge / ACP registry snapshot helper 暴露 `GET /daemon/status`，让权限压力、SSE/ACP 连接和 capability 状态进入统一 JSON 诊断面。 |
+| #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
+| #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
 | [#4639](https://github.com/QwenLM/qwen-code/pull/4639) | merged | @he-yufeng | drop discontinued OAuth |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
@@ -68,6 +72,8 @@
 - **旋钮**：`maxSessions`（默认 20）、`eventRingSize`（默认 8000，`0`/`NaN`/负值 boot 抛错——fail-CLOSED）、`permissionResponseTimeoutMs`（默认 5min）、`maxPendingPermissionsPerSession`（默认 64）。
 - **注入回调**：`persistApprovalMode` / `persistDisabledTools`（写 settings）、`childEnvOverrides`（per-handle env 隔离——`defaultSpawnChannelFactory` 在 **spawn 时**快照 `process.env`，多个嵌入式 daemon 共享进程时靠它避免互相污染 MCP 预算 env）、`contextFilename`、`onDiagnosticLine`（tee 调试行到 daemon 日志）。
 - **seam 实现**：`channelFactory`、`statusProvider`、`fileSystem`、`telemetry`，外加 F3 的 `permissionPolicy` / `permissionConsensusQuorum` / `permissionAudit`。
+
+#5260 把原先只能由嵌入方传入的 `permissionResponseTimeoutMs` 暴露成 `qwen serve --permission-response-timeout-ms`。默认仍 5 分钟；`0` 表示无限等待；`runQwenServe` 在启动期拒绝非有限、负数、非整数；bridge 侧再把超大值 clamp 到 `2^31-1`，避免 Node timer overflow 把"很长超时"退化成 1ms 立即取消。
 
 **`DaemonStatusProvider`（`bridgeOptions.ts:DaemonStatusProvider`）** 是 22b/2（#4304）新增的窄 seam，只有两个方法：`getEnvStatus(boundWorkspace, acpChannelLive)` 与 `getDaemonPreflightCells(boundWorkspace)`。它把 daemon-host 专属的状态格（`process.versions`、运行时/sandbox/proxy 状态、Node 版本、CLI entry path、ripgrep/git/npm 探测）从 bridge 里剥出去。生产实现 `daemonStatusProvider.ts:createDaemonStatusProvider` 包了 `buildEnvStatusFromProcess` + `buildDaemonPreflightCells`；**省略 provider 时** bridge 回落 idle 占位符（空 `cells: []`），让 Mode A in-process 消费者（不跑独立 daemon、host env 格无意义）也能照常查询那些诊断路由。seam scope 刻意收窄到「当前 bridge 委派的两个 host 格」，注释明说**不是**通用 logger/metrics seam。
 
@@ -215,6 +221,16 @@ timer 回调里也有对称的身份检查（L512）：`if (this.pending.get(rec
 
 - **issue 时**（`request()` L418）：若 agent 声明的 `allowedOptionIds` 含哨兵，`request()` **在构造 Promise 之前同步抛** `CancelSentinelCollisionError`（路由映射 500）。同步抛是刻意的——「永不 settle 的 Promise + 抛出的错误」比干净 fail-fast 更糟。`bridgeClient.ts:353` 在 bridge 层有自己的同名预检（且在 publish `permission_request` **之前**，否则违规 agent 会留一个无结算的孤儿 SSE 事件）。
 - **wire 时**（`bridge.ts:2611`）：mediator 在校验 `allowedOptionIds` 之前就认哨兵，所以一个 wire 客户端发 `{outcome:'selected', optionId:'__cancelled__'}` 会短路所有 policy 分派。bridge 的 `respondToSessionPermission` 显式拦截这种情况（wenshao review #4335 / 3271185588 Critical）：`if (response.outcome.outcome === 'selected' && response.outcome.optionId === CANCEL_VOTE_SENTINEL) throw new InvalidPermissionOptionError(...)`。issue 时的碰撞防御挡住「agent 把哨兵当 option 广告」，这道挡住「wire 客户端伪造哨兵」，两者闭合唯一向量。
+
+#### W25：取消后停止 turn（#5218/#5258）
+
+F3 只定义了"权限请求如何结算"；#5218/#5258 把 `{kind:'cancelled'}` 的后果扩展到 ACP session turn loop。#5218 先修 `ask_user_question`：问题被取消或超时后，不再把它作为普通工具错误继续喂给模型，而是记录 skipped follow-up tool responses、等待 pending message rewrite、向当前 Agent 与同批 sibling Agent 传播取消，然后结束当前 turn。#5258 再把同样的 fail-closed 语义推广到所有权限化工具：普通权限 vote cancelled、reject option 映射到 `Cancel`、权限请求通道失败、嵌套 subagent 权限取消，都会让同一模型响应里的后续工具被跳过。
+
+这组变更没有新增 HTTP/SSE schema，也没有新增 capability tag。客户端仍看到既有的 `permission_request` / `permission_resolved` / tool result / `turn_complete` 帧，但语义从"取消是一次工具错误，turn 可继续"变成"取消代表缺少用户输入或用户拒绝，当前 turn 以 `end_turn` 收束"。这也是 #5260 timeout flag 的安全前提：deadline 到期后的自动 cancelled 不会再允许模型继续执行后续工具。
+
+#### Agent 工具权限提示（#5085/#5105）
+
+Agent/subagent 工具需要专属"Launch this agent?"权限提示，但 ACP 的 `ToolKind` 没有 `agent`。#5085 的修复是保留 core 内部 `Kind.Agent`，在 `ToolCallEmitter` 的 ACP wire 上仍映射为协议合法的 `kind:'other'`，避免 `ClientSideConnection` Zod 校验丢弃 `tool_call` / `request_permission` 帧。#5105 则把规范工具名通过 `_meta.toolName` 镜像到 `session/request_permission` 的 `toolCall` 上，daemon web-shell `ToolApproval` 和 VS Code `PermissionDrawer` 读取该字段做 Agent 专属 UI；缺少 `_meta.toolName` 时回退既有通用提示。
 
 #### 防灌票（consensus 的 Set-based tally）
 
@@ -382,6 +398,8 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 7. **runtime 活跃策略 vs build-supported 集**。`/capabilities.policy.permission` 暴露 runtime 活跃策略；能力 `permission_mediation.modes` 暴露 build 支持的四策略集。客户端 gate on features，再读 `policy.permission` 决定 UI。
 
+8. **timeout 是 operator 配置，不是协议能力**。`permissionResponseTimeoutMs` 决定 bridge 等人类响应多久，但客户端不需要按它 feature-detect；#5260 因此没有新增 capability tag。当前 #5174 的 `/daemon/status` 也尚未把它放进 `limits` snapshot，运维需要从启动参数或配置来源确认该值。
+
 ---
 
 ## 已知限制 / 后续
@@ -409,6 +427,9 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 | `permissionMediator.test.ts` | 1219 | 四策略 × happy/forbidden/timeout/forgetSession；N1 同步注册（L132）；O8 voter-clientId-as-originator（L145）+ 无 clientId 时双省略（L195）；duplicate-vote already_resolved re-emit（L210）；cross-session unknown_request（L251）；cancel 哨兵跨策略（L279/L342/L364）+ 不校验 allowedOptionIds（L319）+ issue 时碰撞拒绝（L393）；consensus quorum（L670）、幂等 re-vote 不改 tally + 审计记原始 optionId（L714/L742）、M=4 N=3 split 2-2 永不决并超时（L880）、override 封顶 M（L908）、**48-case 投票交错枚举**（property-style，L929）、partial_vote 在 resolved 之前（L997）；**N2 清理梯**——emit throw（L1077）/ audit 在 5 个调用点 throw（recordRequested+recordResolved L1103、recordVoted vote 路径 L1131、cancel 路径 L1159、recordTimeout L1190）Promise 仍 settle。 |
 | `bridge.test.ts` | 8386 | F1 抬升（#4445，抬时 6861 行）。policy accessor、quorum 校验、`respondToSessionPermission`/`respondToPermission` 的 oracle 守卫、cancel 哨兵 wire 拦截、first-responder bit-for-bit 快照。 |
 | `server.test.ts` | — | `detectFromLoopback` 参数化（L1010，含 `::1`/`127.`/`::ffff:127.` 真值 + forwarded-header 仍 false L1048）；`sendPermissionVoteError branches`（L7601，403/501/500/400 分支）。 |
+| `Session.test.ts` / `SubAgentTracker.test.ts` | — | #5218/#5258 的 stop-after-cancel：cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求失败、nested Agent cancel 均结束当前 turn 并跳过后续工具。 |
+| `commands/serve.test.ts` / `runQwenServe.test.ts` / `bridge.test.ts` | — | #5260 的 flag wiring、启动期非法值校验、`0` disabled 语义、超大值 timer clamp。 |
+| `ToolCallEmitter.test.ts` / `PermissionDrawer.test.tsx` / `transcriptAdapter.test.ts` | — | #5085/#5105：`Kind.Agent` 在线协议上保持 `kind:'other'`，`_meta.toolName` 驱动 daemon web-shell / VS Code 的 Agent 专属权限提示。 |
 | `eventBus.test.ts` / `inMemoryChannel.test.ts` / `status.test.ts` / `spawnChannel.test.ts` / `bridgeClient.test.ts` | 740 / 224 / 240 / 243 / 446 | 抽包随附测试：ring replay/背压/eviction、in-memory 双流 `abort()`、状态线协议类型 + `mapDomainErrorToErrorKind`、`scrubChildEnv` + kill 级联、BridgeClient first-responder 流 + fs 代理。 |
 
 > PR #4335 body 自报的测试规模：35 mediator 单测、10 audit ring 测、55 SDK reducer 测（8 个新 partial_vote/forbidden + ordering + 前向兼容）、3 bridge 集成测；pre-existing `httpAcpBridge.test.ts` 快照套件保持绿（first-responder byte-for-byte 保留）。
@@ -460,3 +481,33 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - 把 `bridge.test.ts`（6861 行，`daemon_mode_b_main` 上增长至 8386 行）从 `packages/cli/src/serve/` 抬到 `packages/acp-bridge/src/`。
 - 新增 `internal/testUtils.ts` 提供包内测试公共工具；`daemonStatusProvider.test.ts` 留在 cli 侧。
 - `cli/vitest.config.ts` 移除已迁测试路径；行为零变化。
+
+### #5085/#5105 — Agent 工具权限提示（@doudouOUC）
+
+- #5085 在 core 内部新增 `Kind.Agent`，但 `ToolCallEmitter` 在 ACP wire 上继续输出协议合法的 `kind:'other'`，避免 daemon `ClientSideConnection` 因 ACP SDK 没有 `agent` ToolKind 而丢帧。
+- #5105 把规范工具名写入 `session/request_permission` 的 `toolCall._meta.toolName`，让 daemon web-shell `ToolApproval` 和 VS Code `PermissionDrawer` 能显示 "Launch this agent?"。
+- 消费端缺少 `_meta.toolName` 时保持原通用权限提示；没有 wire schema 破坏性变更。
+
+### #5174 — daemon status API（@doudouOUC）
+
+- 新增 `GET /daemon/status` 与 `daemon_status` capability。summary 只读内存计数，full 聚合 session、ACP connection、auth device-flow 和 workspace 诊断。
+- bridge / ACP connection registry 增加 snapshot helper，将 pending permission、SSE/ACP transport、rate-limit、capability 等状态汇总进只读 JSON 面。
+- status route 走普通 bearer 鉴权；敏感值脱敏，full 模式 workspace section 独立超时/降级。
+
+### #5218 — stop after cancelled `ask_user_question`（@doudouOUC）
+
+- `Session.ts`：cancelled `ask_user_question` 结束当前 ACP turn，不再作为普通工具错误继续喂给模型。
+- 为同批未执行工具写 skipped responses，并保留 replay 需要的 pending tool-response history。
+- `SubAgentTracker`：使用 active Agent abort signal，把取消传播到当前 Agent 与 sibling Agent，避免 hooks/telemetry 误报成功。
+
+### #5258 — stop after cancelled permissions（@doudouOUC）
+
+- 将 #5218 的 stop-after-cancel 从 `ask_user_question` 推广到所有工具权限：vote cancelled、reject option→Cancel、权限请求通道失败都会停止当前 turn。
+- 嵌套 Agent 权限取消改为 fail-closed：subagent 取消会中止父 Agent turn，后续 sibling/subsequent 工具被记录为 skipped。
+- 不新增 API/schema；改变的是既有权限取消的执行语义。
+
+### #5260 — configurable ACP permission timeout（@doudouOUC）
+
+- `commands/serve.ts` / `serve/types.ts`：新增 `--permission-response-timeout-ms` 与 `ServeOptions.permissionResponseTimeoutMs`。
+- `runQwenServe.ts`：启动期拒绝非有限、负数、非整数，避免 `NaN` 静默关闭 deadline。
+- `bridge.ts`：超大 timeout clamp 到 `2^31-1`；默认仍 5 分钟，`0` 表示无限等待。

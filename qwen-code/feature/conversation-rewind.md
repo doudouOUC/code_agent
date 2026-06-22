@@ -1,6 +1,6 @@
 # conversation rewind 技术方案
 
-> 适用代码版本：`QwenLM/qwen-code` `main`（截至 v0.17.0，PR #3441/#4064/#4216/#4122/#3622/#4580 已合并）+ `daemon_mode_b_main`（#4820 HTTP rewind 端点）。
+> 适用代码版本：`QwenLM/qwen-code` `main`（截至 2026-06-19，PR #3441/#4064/#4216/#4122/#3622/#4580/#4820/#4871/#4897/#5044/#5057/#5141 已合并）。
 > 所有锚点格式为 `文件路径:符号`，行号可能随版本漂移，以符号为准。
 
 ---
@@ -21,7 +21,7 @@ issue #3186 提出的诉求是：**允许用户回退到历史中的某一个「
 conversation rewind 分两个阶段落地：
 
 1. **对话回退（#3441）**：截断 UI history 与 API history，回填 prompt。纯内存操作，不触碰磁盘文件。
-2. **文件回退（#4064）**：在对话回退基础上，叠加「把工作区文件恢复到目标轮开始前状态」的能力。通过 `FileHistoryService` 在每次 `edit`/`write_file` 工具写入前做文件快照备份实现。
+2. **文件回退（#4064）**：在对话回退基础上，叠加「把工作区文件恢复到目标轮开始前状态」的能力。通过 `FileHistoryService` 在每次 `edit`/`write_file` 工具写入前做文件快照备份实现；#5141 又把受支持的单文件 `sed -i` 替换命令模拟成 edit 路径，从而补上常见 shell 原地编辑的部分追踪缺口。
 
 ### 1.3 与 checkpointing 的关系
 
@@ -213,7 +213,7 @@ stateDiagram-v2
 
 ### 3.4 文件恢复（`FileHistoryService`）
 
-`packages/core/src/services/fileHistoryService.ts:FileHistoryService`。**作用域**（类注释约 471 行）：仅追踪经 `edit` 与 `write_file` 工具的写入；`run_shell_command`（`sed -i`/`cp`/`mv`/`git apply` 等）与任何工具外手改**不被捕获**，rewind 无法恢复。
+`packages/core/src/services/fileHistoryService.ts:FileHistoryService`。**作用域**：追踪经 `edit`、`write_file` 工具的写入，以及 #5141 覆盖的一小类 supported single-file `sed -i` 替换命令。其它 `run_shell_command` 副作用（`cp`/`mv`/`git apply`、多文件/复杂 sed、脚本等）与任何工具外手改仍**不被捕获**，rewind 无法保证恢复。
 
 #### 3.4.1 数据结构
 
@@ -256,7 +256,21 @@ flowchart TD
 - `checkOriginFileChanged`（约 233）：比较 mode/size/mtime/内容；备份文件 `stat` 失败（含 ENOENT）一律返回 `true`（视为已变，触发恢复尝试，由 `restoreBackup` 把缺失备份汇报到 `filesFailed`，而非静默报「未变」）。
 - 仅当 `truncateHistory && filesFailed.length === 0` 时才裁剪快照时间线（截掉目标轮之后的快照，重建 `trackedFiles`，清理孤儿备份）—— `code`-only 不裁剪，因为对话轮仍可见、其快照需保留供后续 rewind。
 
-#### 3.4.5 与编排层的事务性
+#### 3.4.5 session 记录里的 snapshot 持久化（#4897/#5057）
+
+#4897 将 `FileHistorySnapshot` 序列化为 session JSONL 中的 `file_history_snapshot` system record。`/resume` 或 daemon session load 后，`ChatRecordingService` 按 `promptId` last-wins 规则重建 snapshot，再注入 `FileHistoryService`，使 `/rewind` 不再只依赖当前进程内存。
+
+#5057 进一步把 snapshot 更新点前移到单轮 edit/write 后：`trackEdit` 真正新增或修复备份后立即追加最新 `file_history_snapshot`，避免「文件已写入，但进程在下一轮 `makeSnapshot` 前退出」导致最后一轮 file history 丢失。它仍保持 append-only 记录模型，不重写旧 JSONL；恢复时同一个 `promptId` 后写记录覆盖先写记录。
+
+#### 3.4.6 supported `sed -i` 模拟 edit（#5141）
+
+#5141 处理 issue #4204 B1：常见 agent 会用 `sed -i 's/foo/bar/g' file` 做原地编辑，而 opaque shell path 无法在文件被修改前调用 `trackEdit`。新路径只模拟保守子集：单文件 in-place substitution、无 compound operator、无 glob/多文件、无 command substitution、无 shell 变量展开、无 backup suffix、无平台敏感 flag。
+
+确认阶段会读取目标文件，在内存里应用 sed substitution，返回普通 `ToolEditConfirmationDetails` 文件 diff；执行阶段重新读取文件做 stale-content guard，若与确认时内容不同则以 `FILE_CHANGED_SINCE_READ` 拒绝写入。真正写盘前调用 `FileHistoryService.trackEdit(filePath)`，再通过 `FileSystemService.writeTextFile()` 保持 encoding/BOM/line-ending 行为与 Edit/WriteFile 工具一致。解析失败、预览失败或不在支持范围内的 sed 命令继续走原 shell path。
+
+由于 ShellTool 不是通用交互式编辑器，这类 shell-backed edit confirmation 会隐藏 edit-modification affordance；如果 host 在批准 diff 时返回 inline `newContent`，仍通过同一个 stale-content guard 写入批准内容。
+
+#### 3.4.7 与编排层的事务性
 
 `handleRewindConfirm`（`AppContainer.tsx:2432`）对 `both` 模式做了**先校验后写**的事务化处理：
 
@@ -436,7 +450,7 @@ sequenceDiagram
 
 2. **文件回退默认开、且独立于 Git checkpointing**。`fileCheckpointingEnabled` 默认 `!sdkMode && interactive`（`config.ts:1166`），交互模式开箱即用，SDK/非交互 `-p` 模式关闭（避免无人值守时意外改盘）。不复用 Git checkpointing 是为了在无 Git 仓库目录工作、并以 promptId 为索引。代价：维护了第二套快照系统（备份盘占用、孤儿清理、版本管理）。
 
-3. **文件恢复对用户后续手改的覆盖风险**。`applySnapshot` 通过 `checkOriginFileChanged`（比较 size/mtime/内容）决定是否恢复：只要 tracked 文件内容与目标备份不同就会 `restoreBackup` 覆写。这意味着**如果用户在工具编辑后又手改了同一个被追踪文件，rewind 会覆盖该手改**。`RewindSelector` 的提示语「Rewinding does not affect files edited manually or via shell commands.」仅对「从未被 `edit`/`write_file` 触碰过的文件」成立，对「先被工具改、后被手改」的文件是**误导**的（见 §7）。
+3. **文件恢复对用户后续手改的覆盖风险**。`applySnapshot` 通过 `checkOriginFileChanged`（比较 size/mtime/内容）决定是否恢复：只要 tracked 文件内容与目标备份不同就会 `restoreBackup` 覆写。这意味着**如果用户在工具编辑后又手改了同一个被追踪文件，rewind 会覆盖该手改**。`RewindSelector` 的提示语「Rewinding does not affect files edited manually or via shell commands.」在 #5141 后也不再能笼统成立：受支持的 `sed -i` 已被视为 tracked edit；未被工具触碰的纯手改/复杂 shell 改动才不受影响（见 §7）。
 
 4. **TOCTOU 顺序字面移植 upstream**。`trackEdit` 置于 `checkPriorRead` 之前，是 `claude-code` 维护者写明设计意图的顺序（注释直接引用上游原文）。选择字面移植而非自创，是因为该约束（备份耗时不得落入新鲜度校验临界区）微妙且易回归——#4064 正是因为没遵守而引入了 TOCTOU 扩窗。权衡：保留了 stat-then-write 的残余竞态（注释承认，根治需原子写，留待后续）。
 
@@ -457,12 +471,17 @@ sequenceDiagram
 | **#3622** | E2E 断言修复 | `isRealUserTurn` 修复后 `/rewind` 不再进入轮列表，更新 `test-rewind-e2e.sh` Test 1 断言（GAMMA3→BETA2） |
 | **#4580** | compressed-turn 误报修复 | mid-turn 用户消息 UI 类型 `user`→`notification`（`NOTIFICATION` 枚举），消除 UI/API 计数错配导致的假「已压缩」错误 |
 | **#4820** | HTTP rewind 端点（daemon） | `GET /session/:id/rewind/snapshots` + `POST /session/:id/rewind`；`session_rewind` 能力；`session_rewound` SSE 事件；`SessionBusyError`(409) / `InvalidRewindTargetError`(400)；SDK `DaemonClient.rewindSession` / `DaemonSessionClient.rewind` |
+| **#4871** | `/restore` 迁移到 FileHistoryService | 移除 shadow-git `GitService`，把 `/restore` 统一到 file history backend，并修正 edit 工具 checkpoint 使用 stale tool name 的问题 |
+| **#4897** | snapshot 跨 session 持久化 | 追加 `file_history_snapshot` JSONL system record；resume/load 时重建 `FileHistoryService` 状态，使 `/rewind` 可跨进程恢复 file history |
+| **#5044** | rewind selector / confirm 测试覆盖 | 补 selector 导航/取消、restore fallback、restoring 按键 guard，以及 code/conversation/both/no-client/compressed/file-restore-failure 等 confirm 分支测试 |
+| **#5057** | snapshot 更新即时持久化 | `trackEdit` 新增或修复备份后立即追加最新 snapshot record，避免进程在下一轮 snapshot 前退出丢最后一轮文件历史 |
+| **#5141** | supported `sed -i` file-history tracking | 把安全单文件 `sed -i` 替换命令模拟成 edit confirmation：预览 diff、写前 `trackEdit`、stale guard、`FileSystemService.writeTextFile()` 落盘；不支持的 sed 仍走 shell path |
 
 ---
 
 ## 7. 已知限制 / 后续
 
-1. **文件恢复会覆盖用户后续手改，且 `RewindSelector` 提示语误导**。如 §5.3 所述，`checkOriginFileChanged` 仅按内容判定，对「先工具改、后手改」的 tracked 文件会无差别 `restoreBackup` 覆盖；而 `RewindSelector.tsx:438` 的提示「Rewinding does not affect files edited manually or via shell commands.」只对「从未被工具触碰的文件」成立。建议：要么把提示改为「仅对从未经工具修改的文件成立」，要么在恢复前对「备份后又被外部修改」的文件给出二次确认/跳过选项。
+1. **文件恢复会覆盖用户后续手改，且 `RewindSelector` 提示语误导**。如 §5.3 所述，`checkOriginFileChanged` 仅按内容判定，对「先工具改、后手改」的 tracked 文件会无差别 `restoreBackup` 覆盖；而 `RewindSelector.tsx` 的提示「Rewinding does not affect files edited manually or via shell commands.」只对「从未被工具触碰、且不是 #5141 supported sed 模拟路径」的文件成立。建议：要么把提示改成「仅未被 tracked 工具修改的文件不受影响」，要么在恢复前对「备份后又被外部修改」的文件给出二次确认/跳过选项。
 
 2. **空态守卫与组件过滤不一致**。`openRewindSelector` 用宽松的 `history.some(h => h.type === 'user')`（`AppContainer.tsx:2422`）判定是否有可回退轮，而 `RewindSelector` 内部用严格的 `filter(isRealUserTurn)`（排除 slash 命令/`?`/`notification`）。后果：一段只含 slash-command `user` 项的历史会**通过**守卫、打开选择器，却立即显示「No user turns to rewind to.」。建议统一为 `isRealUserTurn`。
 
@@ -472,7 +491,7 @@ sequenceDiagram
 
 5. **stat-then-write 残余竞态未根治**。#4216 的注释明确：当前 TOCTOU 顺序只把窗口收窄到「两个相邻 syscall」，并未消除竞态；并发写仍可能在最后一次 `stat` 与 `writeTextFile` 之间落地被覆盖。根治需原子写（temp + rename）或写后内容哈希复检，留待后续 PR；强一致需求者应启用 `fileReadCacheDisabled` 并依赖应用层锁。
 
-6. **作用域局限**。rewind 文件恢复只覆盖 `edit`/`write_file` 工具的写入；`run_shell_command` 与工具外手改不在追踪范围（设计取舍，对齐 upstream）。用户若混用 shell 命令改盘，rewind 给出的「已恢复 N 个文件」可能与其心理预期的「完整回退」不符。
+6. **作用域局限**。rewind 文件恢复覆盖 `edit`/`write_file` 和 #5141 的 supported single-file `sed -i` 子集；其它 shell 命令与工具外手改不在追踪范围。用户若混用复杂 shell 命令改盘，rewind 给出的「已恢复 N 个文件」仍可能与其心理预期的「完整回退」不符。
 
 7. **大文件/二进制/超量文件的降级**。`getTurnDiff`/`computeTurnFileDiff` 对 `> MAX_DIFF_SIZE_BYTES` 的文件只给行数粗估（`oversized`）、对含 NUL 的内容按二进制处理（`isBinary`），单轮文件数超 `MAX_TURN_DIFF_FILES = 500` 时截断并仅在 debug 日志告警。这些降级对恢复正确性无影响，但 diff 预览可能不完整，UI 需明确标注以免误导。
 
@@ -530,3 +549,33 @@ sequenceDiagram
 - `acpAgent.ts` 扩展 `rewindSession` handler，接受 `promptId`（新）或 `targetTurnIndex`（旧），向后兼容。
 - SDK 新增 `DaemonClient.getRewindSnapshots`/`rewindSession` + `DaemonSessionClient.getRewindSnapshots`/`rewind`；类型 `DaemonRewindSnapshotInfo`/`DaemonRewindResult`；reducer 新增 `rewindCount`/`lastRewind` 视图状态。
 - `rewindCommand.ts` 收窄 `supportedModes: ['interactive']`——daemon 客户端应用 HTTP 端点替代 TUI 对话框。
+
+### #4871 — `/restore` 迁移到 FileHistoryService
+
+- 删除 shadow-git `GitService` 路径，把 `/restore` 统一到 `FileHistoryService` backend。
+- 移除 GitService 配置/注册/docs，并把相关测试迁到 file-history 口径。
+- 修正 edit 工具 checkpoint 使用 stale tool name 的问题，使 restore/rewind 的文件历史后端一致。
+
+### #4897 — persist file history snapshots across sessions
+
+- `ChatRecordingService` 新增 `file_history_snapshot` JSONL system record，序列化 `FileHistorySnapshot`。
+- resume/load 时按 `promptId` last-wins 重建 snapshot，并注入 `FileHistoryService`，让 `/rewind` 在 session resume 后仍能看到历史备份。
+- 覆盖旧日志兼容、空 snapshot、跨 session 恢复等路径，不改变既有 snapshot payload 语义。
+
+### #5044 — rewind selector and confirm flow test coverage
+
+- `RewindSelector` 测试补 selector 导航、取消、restore fallback 和 restoring 状态下的按键 guard。
+- confirm flow 测试覆盖 `both` / `conversation` / `code` / no-client / compressed history / file-restore-failure 等分支。
+- 该 PR 不改变运行时代码，但把过去主要依赖手工验证的 rewind UI 分支固化为回归测试。
+
+### #5057 — persist snapshot updates inside a turn
+
+- `FileHistoryService.trackEdit` 在真正新增或修复备份后立即记录最新 snapshot，避免进程在下一轮 `makeSnapshot` 前退出丢最后一轮文件历史。
+- `ChatRecordingService` 支持同一 `promptId` 多条 snapshot record，恢复时以后写记录为准。
+- core client/session/chat recording/ACP tests 覆盖单轮 edit/write 后立即持久化、duplicate non-mutating trackEdit 不重复记录、recorder failure best-effort。
+
+### #5141 — supported `sed -i` file-history tracking
+
+- 新增 sed edit parser，只支持保守的单文件 in-place substitution 子集；globs、多文件、backup suffix、shell 变量/命令替换、复杂 flags 等继续走 shell path。
+- `ShellTool` 确认阶段模拟 sed substitution 并展示普通文件 diff；执行阶段重新读取文件做 stale-content guard，写前调用 `FileHistoryService.trackEdit()`，再通过 `FileSystemService.writeTextFile()` 落盘。
+- CLI/TUI/non-interactive confirmation 隐藏这类 shell-backed edit 的修改入口；focused tests 覆盖 parser、shell path、stale file rejection、file-history best-effort 和 permission UI。

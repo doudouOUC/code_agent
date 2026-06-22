@@ -1,7 +1,7 @@
 # telemetry 可观测性技术方案
 
 > 适用代码库：`QwenLM/qwen-code`（TypeScript CLI agent）
-> 主分支：`main`（绝大多数 telemetry 代码）；daemon 端遥测位于 `daemon_mode_b_main`（文中凡涉及该分支的符号均显式标注）。
+> 主分支：`main`。早期 daemon 端遥测先落在 `daemon_mode_b_main`，已随 #4490 于 2026-06-11 合入 `main`；文中历史分支标注用于解释演进来源。
 > 关联 epic：[#3731 harden OpenTelemetry](https://github.com/QwenLM/qwen-code/issues/3731)、关联需求 [#4384 propagate W3C traceparent + X-Qwen-Code-Session-Id](https://github.com/QwenLM/qwen-code/issues/4384)。
 
 ---
@@ -454,6 +454,7 @@ sequenceDiagram
 | PR | 子主题 | 作用 | Phase |
 |---|---|---|---|
 | #4390 | client HTTP span + traceparent | UndiciInstrumentation 出站 span + opt-in W3C traceparent + 反馈环守卫 | Corr |
+| #4906 | shell child TRACEPARENT | 把当前 trace context 写入 shell / hook / monitor 子进程环境变量，扩展链路到外部进程 | Corr |
 | #4393 | session-id header | 出站透传 `X-Qwen-Code-Session-Id`（**CLOSED 未合入**） | Corr |
 
 ### 6.5 daemon 遥测（`daemon_mode_b_main`）
@@ -463,6 +464,7 @@ sequenceDiagram
 | #4556 | daemon prompt 生命周期 | `daemon-tracing.ts` route/bridge span + `_meta` traceparent 注入/提取 | Daemon |
 | #4628 | client_id + 权限 span | `qwen-code.client_id` 属性 + permission route span | Daemon |
 | #4630 | daemon/ACP tool span | 在 daemon/ACP 路径补 tool span + `session.id` | Daemon |
+| #5047 | daemon ACP trace continuity | 从 daemon bridge active span 派生 ACP prompt traceparent，修 deferred span 的 session 归因 | Daemon |
 
 ---
 
@@ -484,4 +486,4 @@ sequenceDiagram
 
 8. **`seenHashes` 永不清理**：`detailed-span-attributes.ts` 的去重集合进程级常驻、生产环境不清。虽然上界是「一个 session 的 unique system prompt + tool schema 数」，但对超长 daemon 常驻进程（多 session 复用同一进程）会单调增长，属潜在的慢内存增长点。
 
-9. **daemon 遥测仅在 `daemon_mode_b_main`**：`daemon-tracing.ts`、`withInteractionSpan`、`runtime-config.ts` 尚未并入 `main`；且该分支的 `sdk.ts` 基于较早的 main，**尚未合入 #4390 的出站传播改造**（其 sdk.ts 不含 `UndiciInstrumentation` / `NOOP_PROPAGATOR` 分支）。daemon 与主线遥测能力存在分叉，合并时需对齐 sdk.ts。
+9. **daemon 遥测分支标注为历史语境**：早期文档中的 `daemon_mode_b_main` 标注表示原始落地位置。#4490 已在 2026-06-11 将 daemon feature batch 合入 `main`，#5047 又补了 daemon ACP trace continuity；继续维护时应以当前 `main` 的 `daemon-tracing.ts` / `Session.ts` / `runtime-config.ts` 为准。

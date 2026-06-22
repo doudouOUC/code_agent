@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)。本篇**取代**总览 telemetry-observability.md 的 §3.5 / §3.6，下沉到函数与行级。
 >
-> **分支说明**：`getTraceContext` 及 debug log 注入位于 `main`（`packages/core/src/utils/debugLogger.ts`）；**daemon 端全部遥测**（`daemon-tracing.ts`、`withDaemonRequestSpan`、`daemonTelemetryMiddleware`、bridge 生命周期 span、`withInteractionSpan` 的 `parentContext` 支持）位于 **`daemon_mode_b_main`**，尚未并入 `main`。文中凡 daemon 符号均显式标注分支，读取方式 `git -C <qwen-code 仓库根> show daemon_mode_b_main:<path>`。
+> **分支说明**：`getTraceContext` 及 debug log 注入位于 `main`（`packages/core/src/utils/debugLogger.ts`）；daemon 端遥测最初落在 **`daemon_mode_b_main`**，已随 #4490 于 2026-06-11 合入 `main`。文中保留 `daemon_mode_b_main` 标注用于说明原始落地位置，阅读当前代码时以 `main` 为准。
 
 ---
 
@@ -74,7 +74,7 @@ function getTraceContext(): TraceContext | null {
 
 ---
 
-## daemon 路由 span（`daemon_mode_b_main`）
+## daemon 路由 span（原 `daemon_mode_b_main`，现 `main`）
 
 > 全部位于 `daemon_mode_b_main:packages/core/src/telemetry/daemon-tracing.ts`（358 行），并由 `telemetry/index.ts`（L173–186）re-export。
 
@@ -295,7 +295,7 @@ sequenceDiagram
 
 ## 已知限制 / 后续
 
-1. **daemon 遥测仅在 `daemon_mode_b_main`**：`daemon-tracing.ts` / `withInteractionSpan(parentContext)` / `daemonTelemetryMiddleware` 尚未并入 `main`；且该分支 `sdk.ts` 基于较早 main，**未含 #4390 的出站 `UndiciInstrumentation` / `NOOP_PROPAGATOR` 改造**——daemon 与主线遥测存在分叉，合并时需对齐 `sdk.ts`。
+1. **daemon 遥测分支标注是历史语境**：`daemon-tracing.ts` / `withInteractionSpan(parentContext)` / `daemonTelemetryMiddleware` 先在 `daemon_mode_b_main` 落地，已随 #4490 进入 `main`；#5047 又补齐 daemon ACP trace continuity。维护时应以当前 `main` 为准，旧分支锚点只用于追溯原始实现。
 2. **W3C 单向继承**：daemon 侧只**提取**客户端 traceparent 作为父；客户端侧是否注入取决于其 active span 是否有效。若客户端进程**自身**未起 telemetry（`activeSpanContextIsValid()` 假），则 `_meta` 不带 traceparent，daemon 侧 interaction 退回 session 根，跨进程父子链缺失（但同 sessionId 仍可经 traceId 在后端聚合）。
 3. **`recordDaemonHttpResponse` 不设 span status**：route span 成功路径 status 恒 UNSET、仅靠 `http.response.status_code`，依赖后端「无 status 即按 status_code 判定」的约定；不识此约定的后端可能把所有 daemon.request 视作 UNSET。
 4. **`session.id` 等专属属性的基数仍随 session 增长**：`http.route` 已模板化，但 `session.id` / `permission.request_id` 作为高基数属性写在 span 上（span 后端可接受），若被误用于 metric 维度仍会 fan-out（metric 侧另有 `includeSessionId` 开关约束，见总览 §3.8）。
@@ -337,6 +337,12 @@ sequenceDiagram
 - `daemon-tracing.ts:injectDaemonTraceContext` / `extractDaemonTraceContext`：W3C `traceparent` 经 `_meta` 保留键的注入与提取（含手工兜底解析）。
 - `daemon-tracing.ts:stripReservedTraceMeta`：反伪造——总先剥掉客户端自带保留键再 inject。
 - `daemon-tracing.ts:captureDaemonTelemetryContext` / `runWithDaemonTelemetryContext`：FIFO 上下文捕获/还原，解决 prompt 队列延迟执行后 active context 丢失。
+
+### #5047 — daemon ACP trace context continuity
+
+- daemon bridge 在 active `prompt.dispatch` span 下派生 ACP prompt metadata `traceparent`，让 HTTP route span → bridge span → ACP Session 的父子链不断裂。
+- request span 回填 `promptId`，deferred span 使用正确 session id 归因，避免排队/延迟执行后落到错误 session。
+- focused tests 覆盖 daemon tracing 和 ACP Session 提取路径，保证 `_meta` 中的 trace context 可被 agent 侧还原。
 
 ### #4628 — client_id + permission spans
 

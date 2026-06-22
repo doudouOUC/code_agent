@@ -1,10 +1,10 @@
-# 扩展端点（recap / btw / tasks / shell / rewind / hooks / extensions / settings / logger）（深入）
+# 扩展端点（recap / btw / tasks / shell / rewind / hooks / extensions management / settings / logger）（深入）
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.10）。本文在 file/symbol/line 级别**取代**总览的 §3.10「扩展端点」段落，深入到每个端点的控制面调用链、ACP ext-method 往返、绕开 prompt FIFO 的机理、HTTP shell 的安全面、rewind/hooks/extensions/settings 诊断与变更面、`ChannelBase.ts` 的 `this`-binding 隐患，以及 daemon 文件日志的异步队列/降级/截断/symlink。
 >
 > 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。本文已对齐到 `origin/daemon_mode_b_main@18e848f32`。
 >
-> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions）。
+> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）。
 
 ---
 
@@ -12,7 +12,7 @@
 
 本文覆盖两类 daemon 扩展面：
 
-1. **控制面（control plane）**：`recap` / `btw` / `shell` / `rewind` / `settings` 这类端点会计算或变更状态，但不等价于驱动一轮主 prompt。
+1. **控制面（control plane）**：`recap` / `btw` / `shell` / `rewind` / `settings` / extension mutation 这类端点会计算或变更状态，但不等价于驱动一轮主 prompt。
 2. **诊断面（diagnostic snapshot）**：`tasks` / `stats` / `hooks` / `extensions` 这类端点只读当前 daemon / session 状态，帮助 web-shell、IDE 和 SDK UI 渲染控制台。
 
 其中跨进程 control/status 端点共享同一套四层管线：
@@ -28,7 +28,7 @@ HTTP route (server.ts)
 这套「route → bridge → ACP ext-method → core」复用自 Wave 4 PR 17 的 `setSessionApprovalMode`（#4504 PR body 明确称「Reuses the existing ext-method roundtrip pattern … so no new infrastructure」）。它有两个细分变体：
 
 1. **status 路径（只读）**：`bridge.requestSessionStatus<T>(sessionId, method, params)` 是统一入口，被 `getSessionTasksStatus`、`getSessionContextStatus`、`getSessionContextUsageStatus`、`getSessionSupportedCommandsStatus`、`getSessionStatsStatus`、`getSessionHooksStatus` 共用。method 取自 `SERVE_STATUS_EXT_METHODS`。
-2. **control 路径（计算/副作用）**：`recap` / `btw` / `rewind` 走 ACP ext-method；`shell` 在 daemon 本进程执行再把 shell history 写回 ACP 子进程；`workspace/settings` 是 daemon host 直接持久化 settings 文件。
+2. **control 路径（计算/副作用）**：`recap` / `btw` / `rewind` 走 ACP ext-method；`shell` 在 daemon 本进程执行再把 shell history 写回 ACP 子进程；`workspace/settings` 是 daemon host 直接持久化 settings 文件；extension mutation 由 daemon 管理安装/启停/刷新队列并广播 workspace 变更。
 
 ### 为什么这些端点不会阻塞 prompt FIFO
 
@@ -44,6 +44,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | `/session/:id/stats` | GET | 仅全局 bearer | 模型/token/工具/文件统计快照。 |
 | `/workspace/hooks` / `/session/:id/hooks` | GET | 仅全局 bearer | hook 配置与运行时诊断，可能暴露 hook command/url，按敏感诊断面对待。 |
 | `/workspace/extensions` | GET | 仅全局 bearer | extension 安装元信息与能力计数。 |
+| `/workspace/extensions/*` | POST/DELETE 等 | `mutate(strict)` | #5398 的安装、启停、更新、卸载、刷新等 extension mutation；输入与来源校验比只读诊断更严格。 |
 | `/session/:id/recap` | POST | `mutate()`（非 strict） | 与 `/prompt` 同 posture：花 token、不改状态。 |
 | `/session/:id/btw` | POST | `mutate()`（非 strict） | 同上。 |
 | `/session/:id/shell` | POST | `mutate()`（非 strict） | 同上；真正的安全边界是 cwd 服务端固定 + bearer（见 shell 小节）。 |
@@ -73,6 +74,9 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #4819 | feat(cli): enable /remember, /forget, /dream in ACP mode | 2026-06-06 | 三命令启用 ACP 模式；输出改 `MessageActionReturn`；v2 修复 #4811 回归。 |
 | #4832 | feat(serve): add extensions diagnostic HTTP/ACP surface | 2026-06-08 | `GET /workspace/extensions` + `workspace_extensions` 能力；extension 元信息与能力计数。 |
 | #4834 | feat(webui): expose focused daemon hooks | 2026-06-08 | webui 消费 focused hooks 状态；不新增 wire tag，但把 #4822 的 hooks 诊断面接入 UI。 |
+| #5216 | fix(daemon): ACP daemon sessions load extension commands | 2026-06-17 | ACP daemon sessions 不再传空 extension override，恢复 extension-provided slash commands。 |
+| #5398 | feat(web-shell): manage extensions from web shell | 2026-06-20 | extension management endpoints / SDK / web-shell UI；异步 mutation、`extensions_changed` 事件、来源与 workspace client 校验。 |
+| #5504 | feat(acp): support model-invocable commands in daemon sessions | 2026-06-21 | `available_commands_update` 驱动 daemon ACP session 注册 model-invocable command provider/executor。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -272,7 +276,7 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 
 ---
 
-## workspace extensions 诊断
+## workspace extensions 诊断与管理
 
 #4832 新增 `GET /workspace/extensions` 与 `workspace_extensions` 能力标签。ACP 子进程从 `config.getExtensions()` 构造 `ServeWorkspaceExtensionsStatus`：
 
@@ -281,7 +285,16 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 - 安装元信息：`source`（会 `redactUrlCredentials`）、`installType`、`originSource`、`ref`、`autoUpdate`
 - `capabilities` 计数：MCP server、skills、agents、hooks、commands、context files、channels、是否有 settings
 
-这条路由不执行安装/更新/启停，只给 dashboard/IDE 一个统一的「当前 daemon 真正加载了什么 extension」快照。它也解释了为什么 MCP/skills/agents/hooks 文档里会出现 `extension` level/source：extension 能把这些能力注入到同一 workspace runtime。
+#4832 时这条路由不执行安装/更新/启停，只给 dashboard/IDE 一个统一的「当前 daemon 真正加载了什么 extension」快照。它也解释了为什么 MCP/skills/agents/hooks 文档里会出现 `extension` level/source：extension 能把这些能力注入到同一 workspace runtime。
+
+#5398 把同一 capability surface 扩展为管理面：web-shell 通过 SDK 调 daemon mutation endpoints 完成 install / enable / disable / update / uninstall / refresh。mutation 路由按写操作处理，走 strict gate，并额外做几类校验：
+
+- 只允许可信 workspace client 发起，避免任意 bearer 读者伪造 active UI 操作。
+- extension 来源需要经过 allowlist/URL 校验；拒绝 credentials、private network/local link 等高风险来源。
+- mutation 异步排队执行，HTTP 接受不等于 UI 立即可见；完成后广播 `extensions_changed`，workspace/provider hooks 重新拉取状态。
+- active sessions 会刷新 extension-derived commands/hooks/settings 视图，避免新装/禁用后 web-shell 和 ACP daemon session 看到不同 command set。
+
+#5216 修复了 ACP daemon session 的一个实际偏差：之前某些 daemon session 以空 extension override 启动，导致 extension-provided slash commands 没被加载；修复后 ACP daemon session 回到正常 extension command discovery。#5504 再把 `available_commands_update` 接到 model-invocable command provider/executor，使模型在 daemon/ACP 路径也能看到 extension 或 slash-command 侧提供的可调用命令，同时避免 disabled commands 和 stale timeout signal。
 
 ---
 
@@ -553,7 +566,7 @@ flowchart TD
 
 ## 关键设计决策与权衡
 
-1. **复用 ext-method 往返、少建新基建**。recap/btw/rewind 与 tasks/context/stats/hooks/extensions 等状态面挂在既有的 `entry.connection.extMethod` 之上，method 字符串集中在 `SERVE_STATUS_EXT_METHODS` / `SERVE_CONTROL_EXT_METHODS`（`status.ts`），便于 reviewer 一处 grep 出主要「读」与「变更」面。shell/settings 是例外：shell 在 daemon 本进程执行再同步 shell history，settings 由 host 直接持久化。代价是 ext-method 端点与主 prompt 共享子进程事件循环，但换来「不进 FIFO、可并发于流式 prompt」。
+1. **复用 ext-method 往返、少建新基建**。recap/btw/rewind 与 tasks/context/stats/hooks/extensions 等状态面挂在既有的 `entry.connection.extMethod` 之上，method 字符串集中在 `SERVE_STATUS_EXT_METHODS` / `SERVE_CONTROL_EXT_METHODS`（`status.ts`），便于 reviewer 一处 grep 出主要「读」与「变更」面。shell/settings/extension mutation 是例外：shell 在 daemon 本进程执行再同步 shell history，settings 由 host 直接持久化，extension mutation 由 daemon 管理安装/启停队列再通知 runtime 刷新。代价是 ext-method 端点与主 prompt 共享子进程事件循环，但换来「不进 FIFO、可并发于流式 prompt」。
 
 2. **侧查询/分叉而非改主历史**。recap 用 `runSideQuery`（fast model、`maxOutputTokens:300`、`maxAttempts:1`）+ `filterToDialog`（剔 tool/thought）做**一次性 cosmetic 摘要**；btw 用 `runForkedAgent` 的 **cache 路径**（`buildBtwCacheSafeParams` 复用主 session 的 prompt-cache slot）做**无工具单轮分叉**。两者都**不写主对话历史**——保证「顺手问一句/看一眼」绝不污染正经上下文。唯一会回写历史的是 shell（`shell_history` 注入），因为 LLM 后续确实需要引用刚跑的命令输出。
 
@@ -695,3 +708,37 @@ flowchart TD
 
 - `rememberCommand.tsx` / `forgetCommand.tsx` / `dreamCommand.tsx`：三命令 `supportedModes` 扩展为 `['interactive', 'acp']`。
 - 输出改 `MessageActionReturn`；v2 修复 #4811 中因 `context.ui` 在 ACP 模式下缺失导致的回归（#4818 revert + #4819 重做）。
+
+### #4816 — workspace settings（@ytahdn）
+
+- `server.ts` / settings route factory：新增 `GET/POST /workspace/settings`；只在 host 注入 `persistSetting` 时注册，并通过 `persistSettingAvailable` 广告条件能力 `workspace_settings`。
+- settings schema 只暴露 web-shell 可编辑 key，剔除 TUI-only 与安全敏感项；`POST` 仅允许 `scope:'workspace'`，按 schema 校验 value。
+- 成功写入后广播 `settings_changed`，让同一 daemon 下的其它 session/web-shell 刷新设置视图。
+
+### #4832 — extensions 诊断（@doudouOUC）
+
+- `server.ts` 新增 `GET /workspace/extensions`，仅全局 bearer；`capabilities.ts` 注册 `workspace_extensions`。
+- ACP status ext-method 从 `config.getExtensions()` 读取实际加载状态，构造 `ServeWorkspaceExtensionsStatus`。
+- status payload 做 whitelist 序列化：extension 基本信息、安装来源（凭证脱敏）、active 状态、能力计数，不把内部 runtime 对象透出到 HTTP。
+
+### #4834 — webui focused hooks（@doudouOUC）
+
+- webui 侧消费 #4822 的 focused hooks 状态，不新增 wire tag。
+- UI 仍 gate on `workspace_hooks` / `session_hooks`，再决定是否展示 hooks 诊断视图。
+
+### #5216 — ACP daemon sessions 加载 extension commands（@ytahdn）
+
+- ACP daemon session 创建路径不再传空 extension override，避免把 workspace 已安装 extension 的 slash commands 意外清空。
+- 修复后 extension-provided commands 与普通 daemon session command discovery 走同一配置来源。
+
+### #5398 — web-shell extension management（@ytahdn）
+
+- daemon 新增 extension mutation endpoints，覆盖 install / enable / disable / update / uninstall / refresh 等管理动作；写操作走 strict gate。
+- mutation 进入后台队列执行，完成后广播 `extensions_changed`；web-shell / SDK 监听该事件后刷新 workspace extensions、commands、hooks、settings 等资源。
+- 输入校验覆盖 workspace client、extension id/source、URL 凭证、private network/local link 等风险点，避免把管理面退化成任意安装入口。
+- active sessions 会刷新 extension-derived runtime view，减少“已安装但当前 daemon session 看不到命令/设置”的漂移。
+
+### #5504 — ACP model-invocable commands（@wenshao）
+
+- ACP daemon session 收到 `available_commands_update` 后，在 settings 可用时注册 model-invocable command provider/executor。
+- 过滤 disabled commands，并清理 stale timeout signal，避免模型拿到 UI 已禁用或已过期的可调用命令。

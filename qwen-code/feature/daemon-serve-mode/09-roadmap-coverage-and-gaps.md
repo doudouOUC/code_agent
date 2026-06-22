@@ -2,22 +2,17 @@
 
 > 以 [#3803](https://github.com/QwenLM/qwen-code/issues/3803)（设计提案 + 6 章设计系列）与 [#4175](https://github.com/QwenLM/qwen-code/issues/4175)（F1-F5 wave 计划）为 spec，盘点已建设 / 已文档化 / 仍缺失。
 >
-> 核对基准：所有 PR / issue 状态在 **2026-05-31** 用 `gh pr view` / `gh issue view` 实测；状态图例：✅ merged、🔧 open/in-progress、⏳ pending（roadmap 无实现）、🅿️ parked、❌ closed/dropped/superseded。**分支后缀**标注 `→main`（已落 main）或 `→dmbm`（仅落集成分支 `daemon_mode_b_main`，尚未进 main）。
+> 核对基准：本文原始矩阵在 **2026-05-31** 用 `gh pr view` / `gh issue view` 实测；2026-06-16 已回填 #4490 mainline 合入与 #5144 daemon docs refresh。状态图例：✅ merged、🔧 open/in-progress、⏳ pending（roadmap 无实现）、🅿️ parked、❌ closed/dropped/superseded。**分支后缀**标注 `→main`（已落 main）或 `→dmbm`（仅落集成分支 `daemon_mode_b_main`，尚未进 main）。
 >
-> **⚠️ 本文截止 2026-05-31，未反映 6 月合入的 PR**（如 #4820 rewind 端点、#4822 hooks 诊断、#4826 /directory ACP、#4819 /remember ACP 等）。覆盖矩阵和缺口分析需结合 08-extension-endpoints.md 的最新 PR 表格阅读。
+> **⚠️ 注意**：除 #4490/#5144 状态回填外，本文仍以 2026-05-31 的路线图矩阵为骨架；6 月新增端点和补强（如 #4820 rewind、#4822 hooks、#4826 /directory ACP、#4819 /remember ACP 等）需结合 [08-extension-endpoints.md](08-extension-endpoints.md) 和周报阅读。
 
 ---
 
 ## 0. 一句话结论（最重要的核对结果）
 
-**截至 2026-05-31，main 分支（本地实测 `v0.17.0`）只含 Stage 1 + Wave 1-4 + acp-bridge 骨架（22a/22b）。** 实测证据：
+**截至 2026-06-16，5 月 31 日的头号交付缺口已经关闭：[#4490](https://github.com/QwenLM/qwen-code/pull/4490) 已于 2026-06-11 合入 main。** 它把 daemon_mode feature batch 反向集成到 main，覆盖 ACP bridge、MCP transport pool、多客户端权限协调、daemon server 扩展端点、WebUI/SDK、telemetry 和 F5 alpha docs 等 487 个文件（GitHub 当前统计 +148639/-16017）。
 
-- `packages/acp-bridge/src/bridge.ts` **ABSENT on main**（F1 核心未上 main）。
-- `packages/acp-bridge/src/permissionMediator.ts` **ABSENT on main**（F3 实现未上 main）。
-- `packages/core/src/tools/mcp-transport-pool.ts` **ABSENT on main**（F2 池未上 main）。
-- `packages/cli/src/serve/httpAcpBridge.ts` 在 main 上仍是 **4318 行**（不是 F1 之后的 97 行 re-export shim）。
-
-→ **F1 / F2 / F3 / F4-prereq / F5 alpha docs / 全部扩展端点（recap/btw/shell/tasks/logger）/ Stage 2 的 `/acp` Streamable HTTP / `--allow-origin` / writer-idle / runtime MCP 增删** 这 40+ PR 全部只在 `daemon_mode_b_main` 上，**尚未进 main、也未进任何 npm release**。原因是反向集成合并 **[#4490](https://github.com/QwenLM/qwen-code/pull/4490) 仍是 DRAFT 且 CONFLICTING**（见 §7）。这是本盘点核对出的**头号"已实现但未交付"缺口**。
+因此，本文后续矩阵中大量 `→dmbm` 结论是**原始 2026-05-31 状态**，不再代表 mainline 交付状态。#5144（2026-06-15 merged）随后刷新 upstream daemon developer docs，并按当前 main 重新核对 daemon event schema、serve capabilities、startup flags、error taxonomy、resync behavior、MCP pool behavior 和 web UI wording。
 
 ---
 
@@ -205,9 +200,11 @@ capability registry → DaemonSessionClient → typed events
 
 ## 5. 当前缺口（未实现 或 已实现未文档化）
 
-### 5.1 头号缺口：F1-F5 整批未进 main（交付缺口，非实现缺口）
+### 5.1 已关闭的交付缺口：F1-F5 整批进入 main（#4490）
 
-如 §0 实测：F1/F2/F3/F4-prereq/F5/扩展端点/Stage-2 partial **全部只在 `daemon_mode_b_main`**。反向集成合并 [#4490](https://github.com/QwenLM/qwen-code/pull/4490)（**OPEN / DRAFT**）把这批合入 main，但状态 **CONFLICTING**（2026-05-24 #4469 sync 之后又有 5 个 main commit 落入，需先开一个 sibling sync PR 清冲突）。**后果**：main（v0.17.0）用户与未来 npm release 现在拿不到 F1-F5。这是"已实现但未交付"的最大缺口。
+原始 2026-05-31 结论是：F1/F2/F3/F4-prereq/F5/扩展端点/Stage-2 partial 全部只在 `daemon_mode_b_main`，#4490 仍 OPEN / DRAFT / CONFLICTING，因此属于"已实现但未交付"的最大缺口。
+
+2026-06-11 该缺口已由 [#4490](https://github.com/QwenLM/qwen-code/pull/4490) 关闭：daemon_mode_b_main → main feature batch 已合入 main。后续关注点从"是否进 main"转为"main 上的文档、测试、发布和实现面是否继续同步"。#5144 已在文档侧做了一轮英文 daemon developer docs refresh 和源码引用核对。
 
 ### 5.2 Mode A 余下（#4156，parked）
 
@@ -285,11 +282,11 @@ Stage 1.5 是**增量迁移，非大重写**：
 
 2026-05-19 maintainer guidance：Mode B feature PR **不再逐个直合 main**，而是合入长生命周期集成分支 [`daemon_mode_b_main`](https://github.com/QwenLM/qwen-code/tree/daemon_mode_b_main)（2026-05-19 从 `origin/main@68e3ec988` 建），再**周期性 feature-cohesive 批量反向并入 main**。
 
-- **反向集成合并 [#4490](https://github.com/QwenLM/qwen-code/pull/4490)**：`daemon_mode_b_main → main`，**OPEN / DRAFT / CONFLICTING**（见 §5.1）。含 14 个 feature PR（F1 #4319/#4334/#4445 + F2 #4336/#4411/#4460 + F3 #4335 + F4-prereq #4360 + F5 #4473/#4483 + daemon-ui #4328/#4353 + housekeeping #4297/#4305），536 files / +92322−16894。推荐 **merge commit**（保留 14 个 PR 边界），非 squash。gate 在 maintainer-only 决策（merge 策略/sync timing/CI dispatch/version tag）。
+- **反向集成合并 [#4490](https://github.com/QwenLM/qwen-code/pull/4490)**：`daemon_mode_b_main → main`，2026-06-11 **MERGED**。该 batch 汇总 ACP bridge、MCP transport pool、多客户端权限协调、daemon server、WebUI/SDK、telemetry 和 docs 等 feature 面；GitHub 当前统计 487 files / +148639−16017。merge 后文档口径由 #5144 再次按当前 main 校正。
 - **周期 sync `main → daemon_mode_b_main`**：[#4469](https://github.com/QwenLM/qwen-code/pull/4469)（2026-05-24 ✅）+ [#4500](https://github.com/QwenLM/qwen-code/pull/4500)（2026-05-25 ✅），把 main 的独立提交（worktree/Auto mode/telemetry/v0.16.x 等）折回集成分支，解 import-block 冲突。
 - **pre-F1 housekeeping**：[#4305](https://github.com/QwenLM/qwen-code/pull/4305) + [#4297](https://github.com/QwenLM/qwen-code/pull/4297) ✅（从 main re-target 到 dmbm，保留 review threads）。
 
-> 当前症结：#4490 DRAFT 期间，集成分支与 main 持续分叉（main 仍在收 v0.16.x 修复），每次 #4490 ready 前都要追加一个 sync PR 清冲突。这放大了"大批量反向合并"的 review 与回归负担（F2 自身即 36 commit + 168 review threads），依赖 baseline harness（#4205）与拆分测试套件（#4445）兜底。
+> 历史症结：#4490 DRAFT 期间，集成分支与 main 持续分叉，每次 ready 前都要追加 sync PR 清冲突。这放大了"大批量反向合并"的 review 与回归负担。该合并已完成，但"大 batch 回归面"仍是后续维护风险。
 
 ---
 
@@ -310,8 +307,9 @@ Stage 1.5 是**增量迁移，非大重写**：
 | #4328 #4353 #4380 | PR | ✅ MERGED | daemon_mode_b_main（daemon-ui 库）|
 | #4472 #4504 #4527 #4530 #4552 #4559 #4576 #4578 #4606 #4610 #4630 | PR | ✅ MERGED | daemon_mode_b_main（Stage2 partial + 扩展端点）|
 | #4469 #4500 | PR | ✅ MERGED | daemon_mode_b_main（sync main→dmbm）|
-| #4490 | PR | 🔧 OPEN / DRAFT / CONFLICTING | base main（反向集成）|
-| #4412 | PR | 🔧 OPEN | #4412 base main(draft, deep-dive docs)|
+| #4490 | PR | ✅ MERGED 2026-06-11 | base main（反向集成）|
+| #4412 | PR | ✅ MERGED | daemon deep-dive docs 初版 |
+| #5144 | PR | ✅ MERGED 2026-06-15 | daemon developer docs English refresh + main 实现面核对 |
 | #4563 | PR | ✅ MERGED | #4563 base dmbm(DaemonWorkspaceService refactor，06-06 合入)|
 | #4516 | PR | ❌ CLOSED 未合入 | dmbm（compress/_meta 砍了）|
 | #4515 | PR | ❌ CLOSED / 部分后续落地 | 原 stats/export PR 未合入；stats 后续已落地，export 仍未落地 |

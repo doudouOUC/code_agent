@@ -1,10 +1,8 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305)**。
-> 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别均在 `main`；
-> **daemon 设备流**（#4255 系列）位于分支 `daemon_mode_b_main`，本文凡引用设备流代码均以
-> `git -C <repo> show daemon_mode_b_main:<path>` 为准，并在锚点处标注 `@daemon_mode_b_main`。
+> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539**。
+> 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
 ---
@@ -24,6 +22,10 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 - **重启丢 key（#3417/#3495）**：用户把 key 写在 `settings.security.auth.apiKey`，但 registry model 声明了 `envKey`（如 `CODING_PLAN_KEY`）。启动时若 `process.env[envKey]` 不存在，`applyResolvedModelDefaults` 会**清空** apiKey 再尝试从环境读取，结果把用户在 settings 里的合法 key 冲掉，重启即掉登录。
 
 - **自定义 Gemini baseUrl 不生效（#3166/#3212）**：用户在 `modelProviders` 里给 Gemini 配了私有网关 `baseUrl`，但创建 Gemini content generator 时丢弃了它，请求仍打官方端点。
+
+- **重复 model id provider 选择丢失（#5173/#5179）**：多个 `modelProviders.openai[]` 条目可以共享同一个 `id` 但指向不同 `baseUrl` / `envKey`。早期模型选择器只持久化 `model.name`，重启时按 id 取第一个 provider，导致用户选中的非首个 endpoint 被静默替换。
+
+- **Requesty 只能手配通用 OpenAI-compatible（#5478/#5539）**：Requesty 是 OpenAI-compatible gateway，但没有一等 provider preset、归因 header、auth migration 或 model picker 分组。#5478 增加 Requesty provider；#5539 后续把 OpenRouter/Requesty 这类 provider-specific headers 收敛到 preset `customHeaders`，减少 provider class 分叉。
 
 - **`qwen auth status` 识别不全（#3612/#3623）**：OpenAI-compatible provider（尤其无 `envKey`、靠 `OPENAI_API_KEY` 或 `settings.security.auth.apiKey` 的）被误报为「未配置/不完整」。
 
@@ -129,6 +131,33 @@ const httpOptions = config.baseUrl
   : { headers };
 ```
 `@google/genai` 的 `GeminiContentGenerator` 读取 `httpOptions.baseUrl` 改写请求端点，自定义网关/代理生效。`baseUrl` 缺省时保持旧形状（仅 `headers`），向后兼容。两条单测覆盖「有 baseUrl 透传」「无 baseUrl 不变」。
+
+#### 3.1.1 重复 model id 的 provider 选择持久化（#5179）
+
+#5179 修的是 provider 解析的另一个 `baseUrl` 维度问题：同一个 model id（例如 `qwen3.7-max`）可能同时注册在 Token Plan、IdeaLab、BFF 等多个 OpenAI-compatible provider 上。选择器 live session 能选中非首个 provider，但持久化只写 `model.name`，下次启动按 id 匹配时会回到第一个 provider，`baseUrl`、`envKey`、`generationConfig` 都被静默替换。
+
+修复方式是把 `model.baseUrl` 作为 `model.name` 的 disambiguator 一起持久化：启动解析和 pre-flight auth 优先按 `id + baseUrl` 精确匹配；如果对应 provider 被改名/删除，再回退首个 id 匹配以保持向后兼容。所有 id-only 写入路径（`/model <id>`、ACP `setModel`、`qwen/settings/setCoreValue`、provider install）会用空字符串 tombstone 清掉旧 `model.baseUrl`，避免低优先级 scope 的 stale baseUrl 在 settings merge 后继续影响新选择。
+
+#### 3.1.2 custom provider install 与 baseUrl 透传（#5404）
+
+#5404 是 #5179 的 provider install follow-up：custom provider install 仍保留 custom provider ownership detection 给 UI/ACP discovery 使用，但合并安装结果时按 model identity 与 `baseUrl` 传递精确选择，避免同一个 model id 在不同 endpoint 上安装后又落回旧 endpoint。
+
+核心点：
+
+- provider install 持久化并透传 `model.baseUrl`，让新安装 endpoint 能被下一次解析选中。
+- custom provider merge 按 model identity 处理，不把用户自定义模型误删。
+- UI/ACP discovery 仍能识别 custom provider ownership，避免 install 路径修复反向破坏模型发现。
+
+#### 3.1.3 Requesty provider preset（#5478/#5539）
+
+#5478 把 Requesty 作为一等 OpenAI-compatible provider 接入，而不是让用户手动配置 generic endpoint。新增内容包括：
+
+- provider preset：`REQUESTY_API_KEY`、`https://router.requesty.ai/v1`、third-party UI group、`ownsModel` gate。
+- provider detection：按 URL hostname 精确匹配 `router.requesty.ai` 或 `.requesty.ai` 后缀，拒绝 `router.requesty.ai.evil.example` 这类伪造 host。
+- dispatch chain：`determineProvider` 能把 Requesty baseUrl 路由到 Requesty provider，并加 Requesty attribution headers。
+- docs / auth migration：用户可通过 Requesty key 获得与 OpenRouter 类似的一步式 provider 体验。
+
+#5539 随后把 OpenRouter/Requesty 的 provider-specific request headers 收敛到 preset `customHeaders`，减少“每个 gateway 一个 provider class”的重复。这样 Requesty 仍保持一等 preset 和 detection，但 header 注入不必长期复制 OpenRouter provider 类。
 
 ### 3.2 apiKey 跨重启保留（#3495）
 
@@ -403,6 +432,10 @@ sequenceDiagram
 | #4255 | merged | daemon 设备流主体 | RFC8628 设备流 registry + 4 路由 + 5 事件 + `BrandedSecret` + `cacheQwenCredentials` 导出/0o600/clearCache 折叠（#4175 Wave4 PR21） |
 | #4291 | merged | #4255 review 跟进 | poll 超时竞速、poll catch 写原始 err.message、GET clientId 门控、`cancellerClientId` first-writer-wins、`sanitizeForStderr` 上提 |
 | #4305 | merged | #4291 post-merge 跟进(7项) | late-poll 闭包解构防引用持有、`callerIsDeviceFlowInitiator` 抽公共 helper、`err.name` 脱敏、`isServeDebugMode()` 复用、late-rejection 改 name+length |
+| #5179 | merged | duplicate model id provider persistence | 模型选择器持久化 `model.baseUrl`；启动解析/auth 校验按 `id + baseUrl` 精确匹配；id-only 写入路径用空串 tombstone 清除旧 disambiguator |
+| #5404 | merged | custom provider install preservation | provider install 保留 custom provider models，并透传 `model.baseUrl` 让 same-id 不同 endpoint 的新安装 provider 被精确选中 |
+| #5478 | merged | Requesty provider | 新增 Requesty OpenAI-compatible provider preset、hostname detection、dispatch registration、auth migration 和用户文档 |
+| #5539 | merged | provider customHeaders refactor | 将 OpenRouter/Requesty provider-specific headers 收敛进 preset `customHeaders`，减少 provider class 重复 |
 
 ---
 
@@ -426,6 +459,9 @@ sequenceDiagram
 6. **当前 main 已移除 `qwen auth` CLI**
    - §3.3/§3.4 描述的 `handler.ts:showAuthStatus`/`runInteractiveAuth`/`handleApiKeyAuth` 在 commit `4ac9ec07`/`f0e8601` 时点有效；当前 `main` 上 `packages/cli/src/commands/auth.ts` 已是 `buildRemovalNotice`，引导改用会话内 `/auth` 与 `/doctor`。本文相关章节应结合该迁移阅读。
 
+7. **Requesty 当前只覆盖文本推理**
+   - #5478 明确图像、音频、embedding 等模态不在范围；provider detection 也必须继续使用 hostname 级别匹配，不能退回字符串 contains，否则会 over-claim 恶意 baseUrl。
+
 ---
 
 ## 8. 各 PR 代码贡献
@@ -435,6 +471,28 @@ sequenceDiagram
 - **修复点**：`geminiContentGenerator/index.ts:createGeminiContentGenerator` 中 `httpOptions` 构造从 `{ headers }` 改为 `config.baseUrl ? { headers, baseUrl: config.baseUrl } : { headers }`，使 `modelProviders` 中配置的自定义 Gemini 网关/代理 baseUrl 经 `@google/genai` 的 `httpOptions.baseUrl` 透传到请求端点。
 - **向后兼容**：`baseUrl` 缺省时保持旧对象形状（仅 `headers`），不引入 `undefined` 键。
 - **测试**：`index.test.ts` 新增两条用例——「有 baseUrl 时 httpOptions 含 baseUrl」和「无 baseUrl 时 httpOptions 不含 baseUrl」，通过 `GeminiContentGenerator` mock 的 `calls[0][0]` 断言。
+
+### #5179 — duplicate model id provider persistence
+
+- `ModelDialog`：选择 duplicate-id provider 时同时持久化 `model.name` 与 `model.baseUrl`。
+- `modelConfigUtils.ts:resolveCliGenerationConfig` / `auth.ts:validateAuthMethod`：优先按 `id + baseUrl` 精确解析 provider；精确项不存在时回退首个 id，保持旧配置兼容。
+- `/model <id>`、ACP `setModel`、`qwen/settings/setCoreValue`、provider install：id-only 写入 `model.name` 时同步写空字符串 tombstone 清除 `model.baseUrl`，防止 stale disambiguator 跨 settings scope 生效。
+- tests 覆盖 exact match、fallback、removed-provider、empty-string tombstone、argv 忽略 persisted baseUrl、pre-flight auth envKey、dialog/command/ACP/provider install 写入路径。
+
+### #5404 — preserve custom provider models on install
+
+- `providers/install.ts` / custom provider preset：custom provider install 合并时保留用户自定义 provider models，不因同 id provider install 覆盖掉已有 model entries。
+- provider install 写入并透传 `model.baseUrl`，与 #5179 的 duplicate-id disambiguator 对齐，使同 model id 的新 endpoint 能在 install 后立即被选中。
+- CLI UI / ACP provider updates 路径保持 custom provider ownership discovery，用于 model picker 和 daemon session provider refresh。
+- tests 覆盖 preserving custom provider models、baseUrl-specific sync、install regression 和 `modelsConfig` 解析。
+
+### #5478/#5539 — Requesty provider
+
+- `providers/presets/requesty.ts`：新增 Requesty preset，声明 `REQUESTY_API_KEY`、baseUrl、third-party 分组和 `ownsModel`。
+- `openaiContentGenerator/provider/requesty.ts`：按 hostname 识别 Requesty endpoint，给请求追加 Requesty attribution headers；#5539 后续把 header 注入迁到 preset `customHeaders`。
+- `providers/all-providers.ts` / `provider/index.ts`：注册 Requesty，使 dispatch chain 和 model picker 能把它当一等 provider。
+- docs：`docs/users/configuration/auth.md` 与 `model-providers.md` 增加 Requesty 配置说明。
+- tests：provider/preset suites 覆盖 hostname spoofing 拒绝、dispatch routing、OpenRouter 回归和 preset gate。
 
 ### #3495 — apiKey 跨重启保留
 

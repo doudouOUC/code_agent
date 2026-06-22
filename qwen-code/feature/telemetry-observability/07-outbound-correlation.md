@@ -448,7 +448,7 @@ sequenceDiagram
 
 5. **HttpInstrumentation 的 `req.host` 去 port fallback 当前不可达但保留**：`@opentelemetry/otlp-exporter-base` 总设 `hostname`，故 `sdk.ts:497-504` 的 host:port 剥离分支实际走不到——属防御性死代码，依赖未来 exporter 行为不变。
 
-6. **daemon 分支尚未合入 #4390 的出站改造**：`daemon_mode_b_main` 的 `sdk.ts` 基于较早 main，不含 `UndiciInstrumentation` / `NOOP_PROPAGATOR` / `matchesOtlpPrefix`。daemon 与主线在出站传播能力上存在分叉（见总览 §7 限制 9），合并时需对齐。
+6. **daemon 分支分叉是历史语境**：早期 `daemon_mode_b_main` 的 `sdk.ts` 基于较早 main，不含 #4390 的 `UndiciInstrumentation` / `NOOP_PROPAGATOR` / `matchesOtlpPrefix`。#4490 已将 daemon feature batch 合入 main，继续维护时以当前 `main` 的出站传播实现为准。
 
 ---
 
@@ -487,6 +487,12 @@ sequenceDiagram
 - `sdk.ts:normalizeOtlpPrefix` / `matchesOtlpPrefix`：origin+path 精确匹配反馈环守卫，封堵 port / host / path 三类前缀碰撞；不可解析 URL fail-open + `diag.warn`。
 - `config.ts:getOutboundCorrelationPropagateTraceContext` / `settingsSchema.ts:outboundCorrelation`：独立于 `telemetry.*` 的顶级安全命名空间，opt-in 时 NodeSDK 回退到 W3C composite propagator。
 - `loggingContentGenerator.ts`：`context.with(spanContext, fn)` 把 `llm_request` span 设为 active context，使出站 HTTP span 正确 parent 到 `llm_request`。
+
+### #4906 — TRACEPARENT env for shell child processes
+
+- 共享 `trace-context` helper 从当前 active span 构造 W3C `TRACEPARENT` 环境变量，供 shell / hook / monitor 子进程读取。
+- shell spawn env 受 `outboundCorrelation.propagateTraceContext` 门控；默认不传播，开启后把 trace context 带到外部进程边界。
+- sanitize / NOOP 守卫保证无效或未采样上下文不会产生伪造 `TRACEPARENT`，focused tests 覆盖 telemetry 与 shell 路径。
 
 ### #4393 — session-id 透传（CLOSED，未合入，补记）
 

@@ -1,7 +1,7 @@
 # 客户端适配器与 SDK（深入）
 
 > daemon/serve（Mode B）技术方案子文档；总览见 [`README.md`](README.md)。
-> 本文覆盖 **客户端适配层**（SDK `DaemonSessionClient`、typed event schema、client identity、TUI/channels/IDE adapter spike、跨客户端协调），填补 01-08 对服务端/桥接/基础设施覆盖后的客户端缺口。所有 `file:symbol`(+line) 锚点若未特别说明均以集成分支 **`daemon_mode_b_main`** 为准。
+> 本文覆盖 **客户端适配层**（SDK `DaemonSessionClient`、typed event schema、client identity、TUI/channels/IDE adapter spike、跨客户端协调），填补 01-08 对服务端/桥接/基础设施覆盖后的客户端缺口。早期 `file:symbol`(+line) 锚点保留集成分支 **`daemon_mode_b_main`** 语境；#4490 合入 main 后的 #5040 DaemonTransport 等近期 PR 以当前 `main` 实现为准。
 > 关键文件：`packages/sdk-typescript/src/daemon/DaemonSessionClient.ts`（530 行）、`DaemonClient.ts`（~2800 行）、`events.ts`（~2500 行）、`packages/cli/src/ui/daemon/DaemonTuiAdapter.ts`（905 行）、`packages/channels/base/src/DaemonChannelBridge.ts`（705 行）、`packages/vscode-ide-companion/src/services/daemonIdeConnection.ts`（631 行）。
 
 ---
@@ -52,6 +52,7 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | [#4201](https://github.com/QwenLM/qwen-code/pull/4201) | @chiga0 | merged | `DaemonSessionClient` skeleton：创建/attach、SSE replay、session-scoped 方法转发 |
 | [#4225](https://github.com/QwenLM/qwen-code/pull/4225) | @chiga0 | merged | `DaemonSessionClient` 硬化：replay cursor 校验、并发订阅 guard、abort/error 清理 |
 | [#4217](https://github.com/QwenLM/qwen-code/pull/4217) | @chiga0 | merged | typed daemon event schema v1 + `reduceDaemonSessionEvent` + `DaemonSessionViewState` |
+| [#5040](https://github.com/QwenLM/qwen-code/pull/5040) | @chiga0 | merged | `DaemonTransport` 抽象：默认 REST+SSE、ACP HTTP、ACP WebSocket、AutoReconnect 与 route table。 |
 
 ### 身份 / 权限
 
@@ -77,6 +78,10 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | [#4546](https://github.com/QwenLM/qwen-code/pull/4546) | @chiga0 | merged | in-session model switch 到达 bus（A1 — `/model` slash 命令或 plan-mode 切模型通知 peers） |
 | [#4557](https://github.com/QwenLM/qwen-code/pull/4557) | @chiga0 | merged | 移除 `model_switched` publish 周围的死代码 try/catch（BX9_p） |
 | [#4585](https://github.com/QwenLM/qwen-code/pull/4585) | @chiga0 | merged | non-blocking `POST /prompt` → 202 + `promptId`；`turn_complete` / `turn_error` SSE |
+| [#5035](https://github.com/QwenLM/qwen-code/pull/5035) | @chiga0 | merged | session title side channel → `session_metadata_updated`，session list 不再等轮询 |
+| [#5175](https://github.com/QwenLM/qwen-code/pull/5175) | @wenshao | merged | mid-turn text message queue + `mid_turn_message_injected` |
+| [#5266](https://github.com/QwenLM/qwen-code/pull/5266) | @wenshao | merged | mid-turn event 常量集中导出 + drain timeout recovery |
+| [#5398](https://github.com/QwenLM/qwen-code/pull/5398) | @ytahdn | merged | extension management SDK/UI + `extensions_changed` 消费 |
 
 ### 仍 open
 
@@ -95,6 +100,21 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 ### 定位
 
 `DaemonClient` 是**无状态 HTTP 层**——每次调用都要传 `sessionId`，1:1 映射 daemon REST 路由。`DaemonSessionClient` 是**有状态会话层**，所有 adapter 的直接消费面（`DaemonSessionClient.ts:76-82` 的 class JSDoc 明确声明了这一角色）。
+
+#5040 之后，`DaemonClient` 的"HTTP 层"被抽成可插拔 `DaemonTransport`：默认 `RestSseTransport` 仍保持原 REST + SSE 行为；`AcpHttpTransport` 通过 `/acp` 的 POST + session-scoped SSE 做 JSON-RPC request correlation；`AcpWsTransport` 面向后续 WebSocket 全双工；`AutoReconnectTransport` / `negotiateTransport` 提供 opt-in 自动探测与 fallback。上层 `DaemonSessionClient` / webui providers / transcript store 不感知 transport 选择，仍消费同一 `fetch()` 与 `subscribeEvents()` 形状。
+
+```mermaid
+flowchart LR
+    DC["DaemonClient"] --> DT["DaemonTransport<br/>fetch + subscribeEvents"]
+    DT --> REST["RestSseTransport<br/>REST + SSE (默认)"]
+    DT --> ACPHTTP["AcpHttpTransport<br/>POST /acp + session SSE"]
+    DT --> ACPWS["AcpWsTransport<br/>single duplex WS"]
+    ACPHTTP --> DENORM["AcpEventDenormalizer<br/>JSON-RPC notify → DaemonEvent"]
+    ACPWS --> DENORM
+    DC --> DSC["DaemonSessionClient / webui providers"]
+```
+
+服务端配套也在 #5040 落地：`/acp` 标准方法补 `session/set_mode`、`session/set_model`、`session/fork`，`session/new` 在 ACP 标准面强制创建隔离 session（不复用 daemon `single` attach 目标），并让 `session/new/load/resume` 响应带 `models`、`modes`、`configOptions`。
 
 ```
 DaemonClient (raw HTTP)                DaemonSessionClient (session-scoped)
@@ -170,15 +190,15 @@ PR #4585 让 `POST /prompt` 返回 `202 Accepted`（`server.ts:1815`），结果
 
 ### 事件类型注册表
 
-`events.ts:DAEMON_KNOWN_EVENT_TYPE_VALUES`（L14-111）定义了全部 ~40 种已知事件类型的字符串常量 tuple，包括：
+`events.ts:DAEMON_KNOWN_EVENT_TYPE_VALUES`（L14-111；#5266 之后 `mid_turn_message_injected` 这类跨包常量集中导出）定义了全部已知事件类型的字符串常量 tuple，包括：
 
 - **会话生命周期**：`session_update`、`session_died`、`session_closed`、`session_metadata_updated`
 - **权限协调**：`permission_request`、`permission_resolved`、`permission_already_resolved`、`permission_partial_vote`、`permission_forbidden`
 - **模型/审批**：`model_switched`、`model_switch_failed`、`approval_mode_changed`
 - **流控/重连**：`state_resync_required`、`replay_complete`、`client_evicted`、`slow_client_warning`、`stream_error`
-- **非阻塞 prompt**：`turn_complete`、`turn_error`
+- **非阻塞 / mid-turn prompt**：`turn_complete`、`turn_error`、`mid_turn_message_injected`
 - **MCP guardrail**：`mcp_budget_warning`、`mcp_child_refused_batch`、`mcp_server_added`、`mcp_server_removed`
-- **workspace 变更**：`memory_changed`、`agent_changed`、`tool_toggled`、`workspace_initialized`
+- **workspace 变更**：`memory_changed`、`agent_changed`、`tool_toggled`、`workspace_initialized`、`settings_changed`、`extensions_changed`
 - **auth device flow**：`auth_device_flow_started` / `throttled` / `authorized` / `failed` / `cancelled`
 - **assist**：`followup_suggestion`
 - **cross-client**：`prompt_cancelled`

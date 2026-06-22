@@ -538,7 +538,7 @@ vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');   // sdk.t
 
 - **限制 2**：桥接的 `SENSITIVE_ATTRIBUTE_KEYS` 二次脱敏（`log-to-span-processor.ts:39-46`）只在桥接路径生效；而桥接默认不可达，故直连 OTLP logs 时 `response_text` 等仍可能原样上行（详见总览 §7.2 与「敏感属性」子文档）。
 - **限制 3**：`shouldForceSampled`（`tracer.ts:245-253`）仅凭 `OTEL_TRACES_SAMPLER` 环境变量启发式推断采样器；以编程方式经 NodeSDK 构造器配置的采样器无法被检测到，合成 session 根的 SAMPLED 标志可能与实际采样器不匹配。
-- **限制 4（daemon 分叉）**：`daemon_mode_b_main` 的 `sdk.ts` 基于较早 main，尚未并入 #4390 的 `UndiciInstrumentation`/`NOOP_PROPAGATOR` 与本文描述的反馈环守卫；合并时需对齐本文件（详见「daemon 遥测」子文档）。
+- **限制 4（daemon 分叉，历史语境）**：早期 `daemon_mode_b_main` 的 `sdk.ts` 基于较早 main，尚未并入 #4390 的 `UndiciInstrumentation`/`NOOP_PROPAGATOR` 与本文描述的反馈环守卫；#4490 合入后以当前 `main` 为准（详见「daemon 遥测」子文档）。
 
 ---
 

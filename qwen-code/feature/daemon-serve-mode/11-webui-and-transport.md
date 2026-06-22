@@ -8,7 +8,7 @@
 
 本文覆盖两个并行演进的子系统：
 
-1. **@qwen-code/webui** -- 作为独立发布的 npm 库（非 daemon-hosted），向浏览器端消费者提供 daemon 会话管理、transcript 归约、权限处理和 React 绑定。该库输出两个 subpath：根 `@qwen-code/webui` 提供通用 UI 组件，`@qwen-code/webui/daemon-react-sdk` 提供 daemon-backed React Provider/Hooks 层。
+1. **@qwen-code/webui / web-shell** -- `@qwen-code/webui` 作为独立 npm 库提供 daemon 会话管理、transcript 归约、权限处理和 React 绑定；`packages/web-shell` 是浏览器终端应用。#5392 之后，release 版 `qwen serve` 会默认同源托管已构建的 Web Shell SPA，开发态仍可走 Vite `dev:daemon`。
 2. **ACP 传输层演进** -- 在 `qwen serve` 现有 bespoke REST + SSE 之上，增设官方 ACP Streamable HTTP 传输（`/acp` 端点），并规划 Phase 2 WebSocket 全双工升级。两套传输共享同一 `HttpAcpBridge` + `EventBus` 实例，零状态复制。
 
 设计目标是让多客户端（web-shell、IDE companion、TS/Java/Python SDK、ACP-native editor 如 Zed/Goose）均可按自身偏好的协议接入同一 daemon，且所有客户端通过共享 render contract（`daemonBlockToMarkdown` / `daemonBlockToHtml` / `daemonBlockToPlainText`）保证一致的 transcript 投影。
@@ -26,6 +26,15 @@
 | [#4132](https://github.com/QwenLM/qwen-code/pull/4132) | @jifeng | Merged | feat(serve): /demo debug page -- self-contained inline HTML |
 | [#4555](https://github.com/QwenLM/qwen-code/pull/4555) | @jifeng | Merged | feat(sdk): serve-bridge MCP server + rename mcp -> daemon-mcp |
 | [#4472](https://github.com/QwenLM/qwen-code/pull/4472) | @wenshao | Merged | feat(daemon): ACP Streamable HTTP transport at /acp [RFD #721] |
+| [#5040](https://github.com/QwenLM/qwen-code/pull/5040) | @chiga0 | Merged | feat(sdk,serve): DaemonTransport abstraction + ACP standard compliance |
+| [#5066](https://github.com/QwenLM/qwen-code/pull/5066) | @ytahdn | Merged | web-shell token usage、settings/i18n、retry、streaming metrics、hidden commands |
+| [#5098](https://github.com/QwenLM/qwen-code/pull/5098) | @ytahdn | Merged | `/goal` 状态持久化为 daemon transcript events |
+| [#5175](https://github.com/QwenLM/qwen-code/pull/5175) | @wenshao | Merged | web-shell mid-turn messages 注入当前 turn |
+| [#5193](https://github.com/QwenLM/qwen-code/pull/5193) | @ytahdn | Merged | web-shell transcript block change callback + replay prompt-status 恢复 |
+| [#5266](https://github.com/QwenLM/qwen-code/pull/5266) | @wenshao | Merged | `mid_turn_message_injected` 常量集中 + drain timeout recovery |
+| [#5392](https://github.com/QwenLM/qwen-code/pull/5392) | @wenshao | Merged | release `qwen serve` 默认同源托管 Web Shell SPA，新增 `--open` / `--no-web` |
+| [#5398](https://github.com/QwenLM/qwen-code/pull/5398) | @ytahdn | Merged | web-shell extension management + daemon extension mutation/events |
+| [#5541](https://github.com/QwenLM/qwen-code/pull/5541) | @wenshao | Merged | Web Shell static sendFile 允许 `.nvm` 等 dotfile 安装路径 |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -289,6 +298,51 @@ sequenceDiagram
 
 ---
 
+## DaemonTransport abstraction（#5040）
+
+#5040 把 SDK 侧对 daemon 的访问从"固定 REST + SSE"抽成 `DaemonTransport` 接口：`fetch()` 覆盖所有 HTTP-like 方法，`subscribeEvents()` 覆盖事件流，外加 `type` / `connected` / `supportsReplay` / `dispose()`。默认实例是 `RestSseTransport`，所以 `new DaemonClient({baseUrl, token})` 行为不变；需要 ACP transport 的集成可以传入 `AcpHttpTransport` / `AcpWsTransport` 或让 `negotiateTransport` 自动探测。
+
+服务端同时补齐 `/acp` 标准方法：`session/new` 不再复用 single-scope 会话而是强制 thread/isolated，`session/set_mode`、`session/set_model`、`session/fork` 映射到现有 bridge 能力，`session/new/load/resume` 的响应携带 `models` / `modes` / `configOptions`。这让 ACP-native clients 与 REST/web-shell clients 共享同一 bridge，但不必复制 webui provider 栈。
+
+---
+
+## Hosted Web Shell（#5392/#5541）
+
+#5392 之后，release 包内的 `qwen serve` 会在 daemon 根路径托管已构建的 Web Shell SPA：`GET /` / `/assets/*` / HTML navigation fallback 返回前端资源，API 路由如 `/capabilities`、`/session/*`、`/acp` 不被静态服务吞掉。两个 flag 控制行为：
+
+- `--open`：listener ready 后打开浏览器到 daemon URL。
+- `--no-web`：关闭静态 SPA，退回 API-only daemon。
+
+静态 shell 注册在 bearer 之前，因为浏览器地址栏和 `<script>` 子资源无法附带 bearer；shell 自身不含 token，所有 API 仍由前端显式带 token 调用并受 bearer/CORS/host allowlist 保护。非 loopback bind 时会输出 warning。#5541 修复了 nvm/volta/asdf 等安装路径包含 `.nvm` 这类 dotfile 段时 `sendFile` 默认 `dotfiles:'ignore'` 导致 `index.html` 404 的问题，Web Shell index 改用 `dotfiles:'allow'`。
+
+---
+
+## Web Shell W25 行为补齐
+
+近期全作者 web-shell PR 把浏览器端从"开发调试 UI"推进到 release 可用的 daemon 客户端：
+
+| PR | 作用 | 实现方式 |
+| --- | --- | --- |
+| #5035 | 会话标题自动刷新到 web-shell/SDK session list。 | ACP child 通过 `qwen/notify/session/title-update` side channel 上报标题，bridge 转成既有 `session_metadata_updated`。 |
+| #5066 | token usage、settings panel/i18n、theme/language picker、compact mode persistence、Ctrl+Y retry、CLI-aligned streaming metrics、hidden slash commands、404/410 recovery。 | 在 web-shell state/actions 层接入 context-usage/settings/session recovery；渲染层复用 CLI streaming metrics 文案并持久化紧凑模式。 |
+| #5084 | parallel agents/sub-agent tools 展示运行时间。 | tool/sub-agent block 记录 start/end timestamp，渲染时把 duration 合入 tool card metadata。 |
+| #5088 | tool detail 默认更稳，完成工具自动折叠。 | tool block 结束态触发 collapse state 更新；保留错误/活跃工具展开，减少长 transcript 噪音。 |
+| #5091 | WebUI dispose 生命周期更可靠。 | Provider/client teardown 明确调用 dispose/abort，避免切 session 或 unmount 后 SSE/subscription 残留。 |
+| #5096 | web-shell 快捷键补齐。 | 在输入与页面级 key handler 中接入常用编辑/发送/重试快捷键，并避开输入法与浏览器默认冲突。 |
+| #5098 | `/goal` 状态从前端内存迁入 transcript status blocks，刷新页面或第二个 tab attach 后仍能恢复 active goal。 | daemon transcript block 写入 `_meta.goalStatus`，web-shell reducer 从 replay/live blocks 重建 goal 状态。 |
+| #5109 | TodoWrite 历史 UI。 | 从 tool result / transcript block 中解析 todo 状态，按历史 turn 渲染任务列表变化。 |
+| #5118 | 每个任务显示 token/time 明细。 | 将 per-task usage/runtime metadata 汇总到 task card，和 session 级 token usage 区分展示。 |
+| #5125 | 已完成 turn 可折叠。 | turn boundary reducer 记录完成态，UI 对 finished turn 提供 collapse state，活跃 turn 保持展开。 |
+| #5175/#5266 | 纯文本 mid-turn 输入进入当前 turn；wire 常量集中，drain 超时可恢复。 | `POST /session/:id/mid-turn-message` 入 daemon queue，ACP child `craft/drainMidTurnQueue` 拉取，成功后发 `mid_turn_message_injected`；#5266 集中事件常量并处理迟到 drain response。 |
+| #5183 | mid-turn image message 不丢。 | 对 mid-turn rich content 做能力分流：当前 turn 只注入 text，可保留 image payload 到下一轮普通 prompt。 |
+| #5190 | 执行展示 polish。 | 调整 running/completed/error tool states 的文案、间距和状态展示，降低 streaming 中的跳动。 |
+| #5192 | 修复 completed prompt 生命周期竞态。 | prompt status reducer 在 replay/live 交错时以终止事件为准，避免完成 prompt 被误判为仍运行。 |
+| #5193 | `onEventChange` 回调暴露完整 transcript blocks；replay prompt-status 恢复更保守。 | 回调参数从事件增量升级为 transcript blocks；只有存在 user message 且缺终止事件时才推断 prompt in-flight。 |
+| #5220 | TUI/web-shell tool badge 名称本地化。 | tool display-name helper 统一生成 badge label，web-shell 与 TUI 共享本地化后的展示名。 |
+| #5398 | `/extensions` 管理 UI 与 daemon extension mutation 面。 | web-shell 调 daemon install/enable/disable/update/uninstall/refresh endpoints，监听 `extensions_changed` 后刷新 active sessions 与 workspace resources。 |
+
+---
+
 ## ACP WebSocket transport（#4773，open）
 
 PR #4773 为 `/acp` 端点增加 WebSocket 升级支持，实现 ACP RFD 的 Phase 2。
@@ -436,13 +490,9 @@ PR #4555 在 `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` 新增 `qwen
 
 ## 已知限制 / v0.16-alpha scope
 
-### browser/webui daemon-hosted 被砍 -> 独立发布
+### browser/webui hosting
 
-最初设计中 daemon 会 host 一个内置 webui（`/web` route serving SPA），v0.16-alpha 阶段该方案被砍。当前架构：
-
-- **@qwen-code/webui** 作为独立 npm 包发布，消费者自行构建和部署
-- **packages/web-shell** 是独立的 Vite SPA 应用，通过 Vite dev proxy 连接 daemon API
-- **`/demo`** 是轻量级 inline HTML 调试页，非生产 UI
+早期 v0.16-alpha 曾砍掉 daemon-hosted browser UI，只保留独立 Vite web-shell 和 `/demo` 调试页。#5392 已把 release Web Shell 托管面重新落地到 `qwen serve` 根路径；`@qwen-code/webui` 仍作为独立 npm 库发布，供外部宿主复用 daemon providers/components。
 
 ### SDK daemon UI 剩余 ~5% 缺口
 
@@ -480,6 +530,7 @@ PR #4555 在 `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` 新增 `qwen
 | webui daemon providers | `packages/webui/src/daemon/` |
 | webui daemon-react-sdk | `packages/webui/src/daemon-react-sdk.ts` |
 | web-shell | `packages/web-shell/client/` |
+| Web Shell static hosting | `packages/cli/src/serve/webShellStatic.ts` |
 | /demo 调试页 | `packages/cli/src/serve/demo.ts` |
 | ACP HTTP 传输 | `packages/cli/src/serve/acpHttp/` |
 | ACP HTTP 设计文档 | `docs/design/daemon-acp-http/README.md` |
