@@ -388,6 +388,19 @@ sequenceDiagram
 
 `recap`/`btw`/`shell` 都用 `mutate()`（非 strict，与 `/prompt` 同 posture：token 成本而非状态变更）。`DaemonWorkspaceService`（#4563）从 `AcpSessionBridge` 抽出 workspace 级状态读取（方案 C）。
 
+### 3.11 2026-06-22/23 daemon / serve follow-up
+
+这两天的 daemon 相关 PR 主要补齐远程客户端能力、Web Shell session control 和 workspace 级管理面：
+
+| PR | 子主题 | 一句话作用 |
+|---|---|---|
+| #5613 | Web Shell branch / fork | daemon-backed Web Shell 增加 `/branch` / `/fork`，经 bridge/SDK/web-shell command 调用 session fork，transcript adapter 输出 branch/fork 通知，并处理 fork 失败、rewind fallback、父分支摘要截断等边界。 |
+| #5638 | workspace provider defaults | `GET /workspace/providers` 改为 daemon 侧 fresh workspace settings/env 的视图，表示“下一次新建 session”的 provider catalog/default；已有 session 仍以 session context model 为准，避免把 workspace default 误当 live session config。 |
+| #5741 | remote LSP status | 增加只读 remote LSP status route，并贯通 REST、ACP HTTP/WS、ACP child status extension 和 TS SDK；返回 per-session LSP 详情，但不改变 CLI `/lsp` Markdown 输出。 |
+| #5743 | workspace permissions API | 增加 `GET /workspace/permissions` 与 `POST /workspace/permissions`，返回 user/workspace/merged/trust-state 视图；写入优先走 live ACP child 同步 active PermissionManager，无 child 时回退 daemon settings persistence。 |
+| #5753 | extension operation polling | extension mutation 不再只靠最终 `extensions_changed`，而是返回 operationId；`GET /workspace/extensions/operations/:operationId` 查询 queued/running/succeeded/failed/succeeded_with_refresh_error，内存保留 capped history。 |
+| #5784 | prompt client admission | prompt 入队前校验 clientId 是否仍有效；stale / invalid client 直接 `400 invalid_client_id` 且不分配 promptId，避免 `202 Accepted` 后客户端永远等不到 terminal event。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -599,6 +612,12 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #5504 | ACP model-invocable commands | ACP command snapshot 同步注册 model-invocable command provider/executor，避免 snapshot 已知命令但 SkillTool 执行路径缺失。 |
 | #5541 | hosted Web Shell dotfiles | `sendFile` 对 Web Shell index 使用 `dotfiles:'allow'`，修复 nvm/volta/asdf 安装路径含 `.nvm` 时 `qwen serve --open` 加载失败。 |
 | #5544 | MCP resources/prompts | MCP prompt/resource discovery 改为宽松 list；resources 注册进 `ResourceRegistry`，支持 `/mcp` 计数与 `@server:uri` 注入。 |
+| #5613 | Web Shell branch/fork | daemon-backed Web Shell `/branch` / `/fork` session branching/forking surface。 |
+| #5638 | workspace provider defaults | workspace providers route 返回 fresh workspace settings/env default，而非 live session provider。 |
+| #5741 | remote LSP status | REST/ACP/SDK remote LSP status route。 |
+| #5743 | workspace permissions | workspace persistent permission rules REST/ACP/SDK API。 |
+| #5753 | extension operations | extension mutation operationId + polling endpoint。 |
+| #5784 | prompt client admission | stale prompt client id 在 admission 阶段 fail-fast。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 

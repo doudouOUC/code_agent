@@ -1,7 +1,57 @@
 # 近期 PR → feature 文档覆盖矩阵
 
-> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-15..2026-06-21`，全作者，全状态。统计以 2026-06-23 `gh pr list/view` 查询为准；06-21 创建但 06-22 合入的 #5502/#5556/#5557 按创建周纳入。
-> 说明：本文件用于把周报里的 PR 归到 feature 文档。不是所有 PR 都需要单开专题；release/CI/test-only、小修、closed/wrong-base PR 只登记归属判断。
+> 说明：本文件用于把周报里的 PR 归到 feature 文档。不是所有 PR 都需要单开专题；release/CI/test-only、小修、closed/wrong-base PR 只登记归属判断。open PR 只登记后续观察，不按已落地实现写入专题正文。
+
+---
+
+## 2026-06-22 ~ 2026-06-23（昨天 + 前天，全作者）
+
+> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-23`，全作者，全状态。统计以 2026-06-24 `gh pr list/view` 查询为准，共 127 个 PR：84 merged / 24 open / 19 closed。#5743 等 06-23 创建但 06-24 合入的 PR 仍按创建日期纳入。
+
+### 已落地且需要更新 feature 文档
+
+| PR | 状态 | feature 归属判断 | 文档动作 |
+|---|---|---|---|
+| #5600 | merged | Dynamic Workflows 的主体完工：nested `workflow()`, stall watchdog/retry, JSONL journal resume, run snapshot, saved slash workflow, keyword trigger, notification, telemetry。 | 已补 [workflow-token-budget.md](workflow-token-budget.md)，并在标题/正文中把它从单点 token budget 扩展为 Dynamic Workflows。 |
+| #5679 | merged | agent/workflow integer env var 严格解析，覆盖 `QWEN_CODE_MAX_TOKENS_PER_WORKFLOW`、workflow agent/concurrency 和 background agent 上限。 | 已补 [workflow-token-budget.md](workflow-token-budget.md) 与 [background-agent-resume.md](background-agent-resume.md)。 |
+| #5740 | merged | workflow snapshot pruning 防路径穿越：递归删除 journal dir 前验证 runId 形态，恶意 `.json` 只能被 unlink，不能驱动越界 rm。 | 已补 [workflow-token-budget.md](workflow-token-budget.md) 的安全边界。 |
+| #5589 | merged | MCP OAuth guidance / runtime recovery：把失效凭据与错误恢复入口指向 `/mcp`，清理过期 `/mcp auth` 文档。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md) 的 OAuth/诊断边界。 |
+| #5635 | merged | `/mcp` dialog 新增 resource browser：server resource 列表、detail view、`@server:uri` reference。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)。 |
+| #5733 | merged | `@server:uri` 补全支持按 friendly name/title、大小写不敏感匹配，并在冒号前发现 resource server。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)。 |
+| #5774 | merged | 裸 `@<partial>` 跨 server 全局匹配 resource URI/name，dropdown 保留完整 `server:uri` 引用。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)。 |
+| #5613 | merged | daemon-backed Web Shell `/branch` / `/fork`：REST/SDK/web-shell 命令、transcript adapter、branch/fork 通知与失败文案。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md) 与 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #5638 | merged | `GET /workspace/providers` 变为 daemon 侧 fresh workspace settings/env，表达下一个新 session 的 workspace provider defaults。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md) 与 [auth-providers.md](auth-providers.md)。 |
+| #5741 | merged | 远程 LSP status route：REST、ACP HTTP/WS、ACP child status extension、TS SDK 只读状态。 | 已补 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md)。 |
+| #5743 | merged | workspace permissions API：`GET/POST /workspace/permissions`、ACP ext methods、SDK helpers、malformed rule 校验。 | 已补 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md) 与 [permission-system.md](permission-system.md)。 |
+| #5753 | merged | extension mutation 返回 operationId，新增 operation polling，覆盖 queued/running/succeeded/failed/refresh-error 状态。 | 已补 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md)。 |
+| #5784 | merged | stale prompt client admission fail-fast：无效 clientId 在 prompt admission 阶段直接 400，不再先 202 后无终态事件。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5605/#5609/#5628/#5632 | merged | voice native recorder fallback 日志、stop-error 后释放 active state、standalone archive 打包 audio addon、`fastOnly`/`voiceOnly` 模型旗标。 | 已补 [voice-dictation.md](voice-dictation.md)；#5632 同时补 [auth-providers.md](auth-providers.md)。 |
+| #5615/#5617 | merged | Artifact host/OSS 发布确认文案说明会离开本机、取消语义、`artifact.autoOpen` settings/schema。 | 已补 [artifact-tool.md](artifact-tool.md)。 |
+| #5622/#5754 | merged | `ask_user_question` answer index 严格校验；AUTO 模式对破坏性 git/IaC 命令加 deterministic Layer 0 hard block。 | 已补 [permission-system.md](permission-system.md)。 |
+| #5624 | merged | 历史 replay 中 dangling tool call 补合成 failed terminal update，避免恢复 UI 永远 processing。 | 已补 [tool-call-id-integrity.md](tool-call-id-integrity.md)。 |
+| #5637/#5654/#5729/#5769 | merged | DashScope `preserve_thinking` 默认开启；auth wizard 恢复自定义模型；configured model list 保留 active runtime model；重复 model display name 按 baseUrl 消歧。 | 已补 [auth-providers.md](auth-providers.md)。 |
+
+### 已看过但暂不新增专题的 merged PR
+
+| PR | 归属判断 |
+|---|---|
+| #5577 #5578 #5592 #5604 #5607 #5618 #5639 #5646 #5652 #5671 #5676 #5684 #5685 #5688 #5689 #5709 #5711 #5714 #5716 #5718 #5719 #5720 #5724 #5731 #5735 #5737 #5745 #5746 #5764 #5767 #5772 #5788 | CLI completion、命名/大小写 refactor、测试 smoke、整数校验、迁移幂等、ACP/VS Code/extension 小边界、release gate、theme/render 小修等。它们有对应周报归类，但没有改变 feature 目录里的长期技术方案合约，故不单开或大幅改专题。 |
+| #5593 #5595 #5599 #5627 #5730 #5751 #5757 #5775 | docs / plan-mode / model adapter / TUI viewer / desktop preview / VS Code view / web-shell UI restructure 等用户体验面补强。现阶段进入周报或 daemon/web-shell 后续观察，不新增单独 feature 文档。 |
+| #5739 #5762 | release PR。只反映版本发布，不作为 feature 实现统计。 |
+
+### open PR 后续观察
+
+| PR | 当前归属判断 |
+|---|---|
+| #5616 #5629 | memory auto-generated skill confirmation、PreToolUse hook ask TUI confirmation，若合入后归入权限/skills/hook 交互。 |
+| #5650 #5657 #5661 #5666 #5668 #5773 #5778 | web-shell markdown tables、provider duplicate response、TUI tool display partition、TUI transcript view、thinking intent、`/config key=value`、`/model --vision`，若合入后分别归 daemon/web-shell、auth/provider、TUI/UX、模型配置专题。 |
+| #5727 #5747 #5752 #5755 #5765 #5777 #5780 #5781 #5783 #5785 #5786 | docs drift、audio packaging、MCP budget strict parse、daemon voice/control API、browser extension daemon-direct、update command、MCP resource read tool、WebFetch userinfo URL 拒绝、serve startup perf、review suggestion findings。已记录观察点，待合入后再写入对应 feature。 |
+
+### closed / superseded / wrong-base
+
+| PR | 原因 |
+|---|---|
+| #5598 #5606 #5608 #5625 #5651 #5658 #5662 #5674 #5678 #5681 #5691 #5693 #5696 #5699 #5701 #5703 #5705 #5707 #5776 | closed / superseded / wrong-base / draft no-merge。只登记归属判断，不作为已落地 feature。 |
 
 ---
 
@@ -96,4 +146,4 @@
 | release / version bump PRs | merged | v0.18.x release、desktop release、VS Code companion publish 等只反映发布动作，不单独进入 feature 技术方案。 |
 | 大量 path/URL/schema/i18n/desktop/parser 小修 | merged | 归入对应周报主题分组；除改变 feature 合约或安全边界者外，不单开专题。 |
 
-_更新于 2026-06-23_
+_更新于 2026-06-24_

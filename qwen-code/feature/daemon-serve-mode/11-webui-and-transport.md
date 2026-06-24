@@ -35,6 +35,7 @@
 | [#5392](https://github.com/QwenLM/qwen-code/pull/5392) | @wenshao | Merged | release `qwen serve` 默认同源托管 Web Shell SPA，新增 `--open` / `--no-web` |
 | [#5398](https://github.com/QwenLM/qwen-code/pull/5398) | @ytahdn | Merged | web-shell extension management + daemon extension mutation/events |
 | [#5541](https://github.com/QwenLM/qwen-code/pull/5541) | @wenshao | Merged | Web Shell static sendFile 允许 `.nvm` 等 dotfile 安装路径 |
+| [#5613](https://github.com/QwenLM/qwen-code/pull/5613) | @ytahdn | Merged | daemon-backed Web Shell `/branch` / `/fork` session branching |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -340,6 +341,21 @@ sequenceDiagram
 | #5193 | `onEventChange` 回调暴露完整 transcript blocks；replay prompt-status 恢复更保守。 | 回调参数从事件增量升级为 transcript blocks；只有存在 user message 且缺终止事件时才推断 prompt in-flight。 |
 | #5220 | TUI/web-shell tool badge 名称本地化。 | tool display-name helper 统一生成 badge label，web-shell 与 TUI 共享本地化后的展示名。 |
 | #5398 | `/extensions` 管理 UI 与 daemon extension mutation 面。 | web-shell 调 daemon install/enable/disable/update/uninstall/refresh endpoints，监听 `extensions_changed` 后刷新 active sessions 与 workspace resources。 |
+
+---
+
+## Web Shell W26 session branching / fork
+
+#5613 把 daemon 的 session branching 能力接到 Web Shell 和 SDK：
+
+| 能力 | 实现方式 |
+|---|---|
+| `/branch` | Web Shell 命令经 SDK 调 daemon branch/fork API，从当前 transcript 创建新 session，并在 UI 中显示 branch notification。 |
+| `/fork` | 在 Web Shell 中发起 fork session，支持复制父会话摘要、处理 fork 失败和 rewind fallback。 |
+| transcript adapter | normalizer / transcript adapter 识别 branch/fork 事件，渲染为 status block，而不是把控制面消息混入普通 assistant 文本。 |
+| SDK / bridge | TS daemon SDK 暴露 session branching helper，serve bridge 负责把 fork/branch 请求路由到 ACP child 并返回新 session identity。 |
+
+这个 PR 的边界是“Web Shell 通过 daemon 复用已有 session fork 能力”。它不把 fork 语义改成本地前端复制，也不绕过 daemon 的 workspace/session 权限边界；失败时通过 daemon 返回的错误和 transcript notification 告诉用户，而不是在前端猜测状态。
 
 ---
 

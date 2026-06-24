@@ -1,7 +1,7 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539**。
+> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769**。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
@@ -158,6 +158,18 @@ const httpOptions = config.baseUrl
 - docs / auth migration：用户可通过 Requesty key 获得与 OpenRouter 类似的一步式 provider 体验。
 
 #5539 随后把 OpenRouter/Requesty 的 provider-specific request headers 收敛到 preset `customHeaders`，减少“每个 gateway 一个 provider class”的重复。这样 Requesty 仍保持一等 preset 和 detection，但 header 注入不必长期复制 OpenRouter provider 类。
+
+#### 3.1.4 模型用途旗标、thinking 和 display name follow-up（#5632/#5637/#5654/#5729/#5769）
+
+#5632 给 model config 增加 `fastOnly` / `voiceOnly` 用途旗标。主模型选择列表会过滤掉专用模型，`/model --voice` 只看 `voiceOnly` ASR 模型，fast-model 解析只看 `fastOnly`。这把“能作为对话主模型”和“只服务某个系统路径”的模型从 UI 层分开，避免用户把语音模型或快模型误选成主模型。
+
+#5637 调整 DashScope `preserve_thinking` 默认值。对支持 thinking 的 DashScope 路径，默认保留 thinking intent / summary 所需的 provider 配置，避免用户不显式配置时丢失推理相关输出。该改动属于 provider preset/generation config 默认值，不改变通用 OpenAI-compatible provider。
+
+#5654 修复 auth wizard 中自定义模型 ID 的恢复：重新进入 `/auth` 时，wizard 会从现有 provider 中拆出用户添加的 custom model IDs，并与默认 model IDs 一起预填。provider update detector 只比较 built-in defaults，不再把 custom model 误判为“被上游移除”，避免每次启动都出现噪音 diff，也避免完成 wizard 后覆盖掉用户自定义模型。
+
+#5729 修复 configured models listing：默认 `getAllConfiguredModels` 会保留 active runtime model，即便它不是当前静态 defaults 中的第一类条目。这样 `/model`/provider 状态不会因为 active model 只存在于运行态或 settings merge 结果中而丢项。
+
+#5769 修复重复 model display name：当多个 OpenAI-compatible provider 使用同一个 model id 时，header/status line 根据当前 resolved baseUrl 精确匹配 provider entry，再回退 id-only lookup。这样重启后显示的 provider label 与 `/about` 的 Base URL、实际请求 endpoint 保持一致，不再看起来“跳回第一个 provider”。
 
 ### 3.2 apiKey 跨重启保留（#3495）
 
@@ -436,6 +448,11 @@ sequenceDiagram
 | #5404 | merged | custom provider install preservation | provider install 保留 custom provider models，并透传 `model.baseUrl` 让 same-id 不同 endpoint 的新安装 provider 被精确选中 |
 | #5478 | merged | Requesty provider | 新增 Requesty OpenAI-compatible provider preset、hostname detection、dispatch registration、auth migration 和用户文档 |
 | #5539 | merged | provider customHeaders refactor | 将 OpenRouter/Requesty provider-specific headers 收敛进 preset `customHeaders`，减少 provider class 重复 |
+| #5632 | merged | model purpose flags | 新增 `fastOnly` / `voiceOnly`，主模型列表过滤专用模型，`/model --voice` 只展示语音模型 |
+| #5637 | merged | DashScope preserve thinking default | 调整 DashScope thinking 相关默认值，避免默认路径丢失 thinking intent/summary 所需配置 |
+| #5654 | merged | auth wizard custom models | 重新进入 `/auth` 时恢复用户自定义 model IDs，并让 provider update detector 只比较 built-in defaults |
+| #5729 | merged | active runtime model listing | configured models 默认保留 active runtime model，避免当前会话模型从列表中消失 |
+| #5769 | merged | duplicate display name disambiguation | active model display 按 resolved baseUrl 匹配重复 model id provider，再回退 id-only lookup |
 
 ---
 
@@ -461,6 +478,9 @@ sequenceDiagram
 
 7. **Requesty 当前只覆盖文本推理**
    - #5478 明确图像、音频、embedding 等模态不在范围；provider detection 也必须继续使用 hostname 级别匹配，不能退回字符串 contains，否则会 over-claim 恶意 baseUrl。
+
+8. **provider identity 仍需沿 baseUrl/envKey 继续收敛**
+   - #5179/#5769 已分别修复“选择持久化”和“显示名”两个 same-id provider 问题，但 ACP/OpenWork 等外部 provider identity 仍可能有自己的 display/selection surface；后续 PR 若改 provider identity，应同时检查 persisted `model.baseUrl`、runtime resolved baseUrl、display name 和 request route 四者是否一致。
 
 ---
 
@@ -493,6 +513,14 @@ sequenceDiagram
 - `providers/all-providers.ts` / `provider/index.ts`：注册 Requesty，使 dispatch chain 和 model picker 能把它当一等 provider。
 - docs：`docs/users/configuration/auth.md` 与 `model-providers.md` 增加 Requesty 配置说明。
 - tests：provider/preset suites 覆盖 hostname spoofing 拒绝、dispatch routing、OpenRouter 回归和 preset gate。
+
+### #5632/#5637/#5654/#5729/#5769 — provider/model follow-ups
+
+- #5632：model config schema / resolver 增加 `fastOnly`、`voiceOnly`；主 `/model` 列表过滤专用模型，`/model --voice` 使用 voice-only filter。
+- #5637：DashScope provider preset / generation config 默认保留 thinking 相关配置，降低用户无显式设置时的行为漂移。
+- #5654：`AuthDialog.getExistingModelIds` 只把 saved provider 中非 built-in defaults 的项作为 custom IDs 传回 wizard；`useProviderSetupFlow` 用 `[...defaults, ...customIds]` 预填；`useProviderUpdates` 只用 built-in IDs 做 update diff。
+- #5729：configured models 聚合默认包含 active runtime model，避免 UI/命令列表与当前实际 session model 不一致。
+- #5769：`getModelDisplayName` 先按 active resolved baseUrl 在 duplicate id provider entries 中匹配，再回退旧的 id-only lookup；tests 覆盖 same id/different baseUrl 的 header/status label。
 
 ### #3495 — apiKey 跨重启保留
 

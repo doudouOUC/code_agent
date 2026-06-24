@@ -13,10 +13,10 @@
 |---|---|---|---|
 | daemon/serve 模式 | [daemon-serve-mode/](daemon-serve-mode/) 📁 | epic #4175 / #3803（~47 PR） | Mode B：agent core 常驻 HTTP daemon，多客户端经 REST+SSE 并发附着，ACP bridge 解耦（README + 8 篇深入 + 09 路线图 + 10 客户端/SDK + 11 WebUI/传输） |
 | telemetry 可观测性 | [telemetry-observability/](telemetry-observability/) 📁 | epic #3731 / #4384（~25 PR） | 层级 span 树 + 上下文传播 + OTLP 路由 + 敏感属性门控 + daemon 端到端追踪（README + 7 篇深入） |
-| voice dictation | [voice-dictation.md](voice-dictation.md) | #5502 | CLI 输入框语音听写：native/fallback 采集 + batch/realtime ASR + `/voice`/`/model --voice` |
-| Artifact 工具 | [artifact-tool.md](artifact-tool.md) | #5557 | opt-in HTML artifact 发布：本地 file URL 优先，可选 host/OSS publisher，带自包含校验和权限门控 |
-| Workflow token budget | [workflow-token-budget.md](workflow-token-budget.md) | #5231 | Workflow per-run output-token 软预算 + `/workflows`/后台任务 UI 显示 |
-| MCP resources / prompts | [mcp-resources-prompts.md](mcp-resources-prompts.md) | #5544 | 宽松发现 MCP prompts/resources，`ResourceRegistry` + `@server:uri` 注入 |
+| voice dictation | [voice-dictation.md](voice-dictation.md) | #5502 #5605 #5609 #5628 #5632 | CLI 输入框语音听写：native/fallback 采集 + batch/realtime ASR + `/voice`/`/model --voice` + 独立打包与 voice-only 模型 |
+| Artifact 工具 | [artifact-tool.md](artifact-tool.md) | #5557 #5615 #5617 | opt-in HTML artifact 发布：本地 file URL 优先，可选 host/OSS publisher，带自包含校验、权限门控、托管提示与 auto-open 设置 |
+| Workflow token budget / Dynamic Workflows | [workflow-token-budget.md](workflow-token-budget.md) | #5231 #5600 #5679 #5740 | Workflow per-run output-token 软预算 + saved workflows / resume / journal / snapshot / `/workflows` UI + snapshot prune 防穿越 |
+| MCP resources / prompts | [mcp-resources-prompts.md](mcp-resources-prompts.md) | #5544 #5589 #5635 #5733 #5774 | 宽松发现 MCP prompts/resources，`ResourceRegistry` + `/mcp` resource browser + `@server:uri`/裸 `@` 补全注入 |
 | loop wakeup | [loop-wakeup.md](loop-wakeup.md) | #5182 #5197 | prompt-only `/loop` 改成 self-paced wakeup，秒级单次唤醒 + 24h session budget |
 | Channel adapters | [channel-adapters.md](channel-adapters.md) | #5202 #5414-#5417 | QQ Bot channel adapter + token refresh / gateway reconnect / timer / backup path 稳定性修复 |
 | conversation rewind | [conversation-rewind.md](conversation-rewind.md) | #3441 #4064 #4216 #4122 #3622 #4580 #4820 #4897 #5057 #5141 | double-ESC/`/rewind` 回退历史 + 文件恢复 + snapshot 持久化 + supported `sed -i` tracking + HTTP rewind 端点 |
@@ -24,12 +24,29 @@
 | CLI 启动性能 | [cli-startup-performance.md](cli-startup-performance.md) | #3318 #3319 #3297 #3232 | API 预连接 + 早期输入捕获 + 工具懒注册 + 启动 profiler |
 | SDK (Python/TS) | [sdk.md](sdk.md) | #3494 #3685 #3832-3835 #4217 #4226 #4353 #4360 | Python SDK(子进程+控制协议) + TS daemon SDK + PyPI 发布工具链 |
 | monitor 事件工具 | [monitor-tool.md](monitor-tool.md) | #3684 #3726 #3792 #3933 #5165 | 长任务节流流式监控 + MonitorRegistry owner-scoped 通知 + batch drain 降 token waste |
-| 后台 agent/会话恢复 | [background-agent-resume.md](background-agent-resume.md) | #3739 #4222 #5556 | 背景 agent paused/resume(transcript-fork) + daemon session load/resume + completed agent revive / transcript TTL |
+| 后台 agent/会话恢复 | [background-agent-resume.md](background-agent-resume.md) | #3739 #4222 #5556 #5679 | 背景 agent paused/resume(transcript-fork) + daemon session load/resume + completed agent revive / transcript TTL + background agent cap 严格解析 |
 | 上下文压缩 | [context-compression.md](context-compression.md) | #3879 #3985 #3872 #5042 #5111 | 反应式溢出压缩 + 会话记录瘦身 + 大工具结果外置 + active tool result history 预算 |
-| 工具调用 ID 完整性 | [tool-call-id-integrity.md](tool-call-id-integrity.md) | #5107 | OpenAI-compatible provider 的 `tool_call.id` 规范化、去重执行、跨轮复用 suffix 和出站 payload 清理 |
+| 工具调用 ID 完整性 | [tool-call-id-integrity.md](tool-call-id-integrity.md) | #5107 #5624 | OpenAI-compatible provider 的 `tool_call.id` 规范化、去重执行、跨轮复用 suffix、出站 payload 清理，以及 dangling replay tool call 终止化 |
 | 诊断 skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 | /doctor 代码命令 + /stuck /batch prompt 技能 |
-| auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 #4291 #4305 #5179 #5404 #5478 #5539 | provider 配置/apiKey 保留/auth status 识别 + daemon 设备流(PKCE) + Requesty/custom provider |
-| 权限系统 | [permission-system.md](permission-system.md) | #3467 #3726 #4335 #5085 #5105 #5196 #5218 #5258 #5260 | 规则解析+畸形规则守卫 + 工具命名空间 + 多客户端权限协调 + Agent 权限 UI 兼容 + ACP 取消停止语义 |
+| auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 #4291 #4305 #5179 #5404 #5478 #5539 #5632 #5637 #5654 #5729 #5769 | provider 配置/apiKey 保留/auth status 识别 + daemon 设备流(PKCE) + Requesty/custom provider + 模型旗标 / thinking / display-name follow-up |
+| 权限系统 | [permission-system.md](permission-system.md) | #3467 #3726 #4335 #5085 #5105 #5196 #5218 #5258 #5260 #5622 #5743 #5754 | 规则解析+畸形规则守卫 + 多客户端权限协调 + ACP 取消停止语义 + workspace permissions API + auto 模式破坏性命令硬拦截 |
+
+## 最近两天 PR 覆盖核对（2026-06-22 ~ 2026-06-23，全作者）
+
+> 逐 PR 明细见 [recent-pr-feature-coverage.md](recent-pr-feature-coverage.md)。覆盖口径：`QwenLM/qwen-code` 中 `created:2026-06-22..2026-06-23` 的全作者、全状态 PR；统计以 2026-06-24 查询为准，共 127 个 PR：84 merged / 24 open / 19 closed。#5743 等 06-23 创建、06-24 合入的 PR 按创建日期纳入。
+
+| feature 文档 | 对应 PR | 本次文档动作 |
+|---|---|---|
+| [workflow-token-budget.md](workflow-token-budget.md) | #5600 #5679 #5740 | 从单点 token budget 扩展为 Dynamic Workflows：nested workflow、stall retry、journal resume、snapshot、saved slash workflow、env 严格解析和 snapshot prune 防穿越。 |
+| [mcp-resources-prompts.md](mcp-resources-prompts.md) | #5589 #5635 #5733 #5774 | 补 `/mcp` OAuth 恢复提示、resource browser、按友好名称/裸 `@` 全局资源补全与完整引用展示。 |
+| [daemon-serve-mode/](daemon-serve-mode/) | #5613 #5638 #5741 #5743 #5753 #5784 | 补 Web Shell `/branch`/`/fork`、workspace provider defaults、remote LSP status、workspace permissions、extension operation polling、stale prompt client 拒绝。 |
+| [voice-dictation.md](voice-dictation.md) | #5605 #5609 #5628 #5632 | 补 native recorder fallback 日志、stop-error 后可重试、standalone audio addon 打包、`voiceOnly` 模型标记。 |
+| [artifact-tool.md](artifact-tool.md) | #5615 #5617 | 补 host/OSS 远端发布确认文案、用户取消语义与 `artifact.autoOpen` 设置。 |
+| [permission-system.md](permission-system.md) | #5622 #5743 #5754 | 补 `ask_user_question` answer index 校验、远程 workspace rule API、auto 模式破坏性命令硬拦截。 |
+| [auth-providers.md](auth-providers.md) | #5632 #5637 #5654 #5729 #5769 | 补 fast/voice model flag、DashScope thinking 默认值、自定义模型恢复、runtime model 列表与重复 display name 消歧。 |
+| [tool-call-id-integrity.md](tool-call-id-integrity.md) | #5624 | 补历史 replay 中 dangling tool call 的失败终态化，防恢复 UI 永远 processing。 |
+
+open / closed PR 处理规则：open PR 仅在 feature 文档的「后续观察」中登记，不按已落地能力写成实现；closed/superseded/wrong-base/release-only/CI-only PR 不新增 feature 专题，只在覆盖矩阵保留归属判断。
 
 ## 近期 PR 覆盖核对（2026-06-15 ~ 2026-06-21，全作者）
 
@@ -52,4 +69,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/)（见其 07 子文档）。
 - 每篇「已知限制」综合了 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；最后更新 2026-06-23_
+_生成于 2026-05-31；最后更新 2026-06-24_

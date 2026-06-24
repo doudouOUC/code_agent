@@ -4,7 +4,7 @@
 >
 > 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。本文已对齐到 `origin/daemon_mode_b_main@18e848f32`。
 >
-> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）。
+> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）、#5741（remote LSP status）、#5743（workspace permissions API）、#5753（extension operation polling）。
 
 ---
 
@@ -77,6 +77,9 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #5216 | fix(daemon): ACP daemon sessions load extension commands | 2026-06-17 | ACP daemon sessions 不再传空 extension override，恢复 extension-provided slash commands。 |
 | #5398 | feat(web-shell): manage extensions from web shell | 2026-06-20 | extension management endpoints / SDK / web-shell UI；异步 mutation、`extensions_changed` 事件、来源与 workspace client 校验。 |
 | #5504 | feat(acp): support model-invocable commands in daemon sessions | 2026-06-21 | `available_commands_update` 驱动 daemon ACP session 注册 model-invocable command provider/executor。 |
+| #5741 | feat(serve): add remote LSP status route | 2026-06-23 | REST/ACP/SDK 只读 LSP status，补齐远程客户端查询 `/lsp` 状态的结构化 API。 |
+| #5743 | feat(cli): Add workspace permissions rules API | 2026-06-24 | `GET/POST /workspace/permissions`、ACP ext method、SDK helper，远程管理 persistent allow/ask/deny rules。 |
+| #5753 | fix(serve): expose extension operation polling | 2026-06-23 | extension mutation 返回 operationId，并提供 operation status polling，避免前端只靠 workspace refresh 猜测结果。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -295,6 +298,41 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 - active sessions 会刷新 extension-derived commands/hooks/settings 视图，避免新装/禁用后 web-shell 和 ACP daemon session 看到不同 command set。
 
 #5216 修复了 ACP daemon session 的一个实际偏差：之前某些 daemon session 以空 extension override 启动，导致 extension-provided slash commands 没被加载；修复后 ACP daemon session 回到正常 extension command discovery。#5504 再把 `available_commands_update` 接到 model-invocable command provider/executor，使模型在 daemon/ACP 路径也能看到 extension 或 slash-command 侧提供的可调用命令，同时避免 disabled commands 和 stale timeout signal。
+
+#5753 给 extension mutation 增加 operation polling：install/enable/disable/update/uninstall/refresh 这类请求返回 operationId，客户端再查 `GET /workspace/extensions/operations/:operationId`。状态包含 `queued` / `running` / `succeeded` / `failed` / `succeeded_with_refresh_error`，daemon 端保留 capped in-memory history。这样 Web Shell 不必把 HTTP 返回和最终 `extensions_changed` 之间的空窗解释成成功或失败；刷新 active sessions 失败也能作为部分成功暴露给用户。
+
+---
+
+## remote LSP status（#5741）
+
+#5741 补的是远程客户端缺失的只读 LSP 观测面。CLI `/lsp` 原本输出 Markdown，适合 TUI 但不适合 Web Shell、ACP-native client 或 SDK 消费。新增 route / ext-method / SDK 类型返回结构化状态：
+
+- workspace/session 的 LSP 是否启用、server 是否 ready、最近错误与能力摘要。
+- per-session 的 sanitized LSP detail，避免直接泄漏不该给远程 UI 的内部对象。
+- REST 与 ACP HTTP/WS 都走同一 status extension；TS SDK 提供 typed helper。
+
+该 PR 不改变 slash `/lsp` 的文本输出，也不新增 LSP 控制能力。它只是把已有状态读取为 machine-readable API，归入只读 diagnostic surface。
+
+---
+
+## workspace permissions API（#5743）
+
+#5743 给 persistent permission rules 增加最小远程管理面：
+
+| Route / ext method | 作用 |
+|---|---|
+| `GET /workspace/permissions` | 返回 user scope、workspace scope、merged result、trust-state 视图。 |
+| `POST /workspace/permissions` | 替换 workspace scope 下一个 rule type（`allow` / `ask` / `deny`）的完整列表。 |
+
+设计点：
+
+- response shaping 与 ACP ext methods 共享 helper，REST 和 ACP 看到同一 schema。
+- 新提交的 malformed rules 会以 `invalid_rules` 拒绝；已存在的 malformed rules 在 read-modify-write 时保留，避免用户 settings 无法往返。
+- 写入优先走 live ACP child，同步活跃 PermissionManager；没有 child 时才由 daemon host 直接持久化 settings。
+- daemon 只有在 settings persistence 可用时才广告 `workspace_permissions` capability。
+- SDK helper 提供 get/set/add/remove，但 add/remove 是 read-modify-write 便利封装，没有 ETag/versioning；并发写仍以后写覆盖为准。
+
+这个 API 不暴露交互式 `/permissions` dialog，也不管理 session-only rules。它填补的是远程 daemon/ACP 客户端无法读取和更新 persistent permission arrays 的缺口。
 
 ---
 
