@@ -4,7 +4,7 @@
 >
 > 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。本文已对齐到 `origin/daemon_mode_b_main@18e848f32`。
 >
-> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）、#5741（remote LSP status）、#5743（workspace permissions API）、#5753（extension operation polling）。
+> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）、#5741（remote LSP status）、#5743（workspace permissions API）、#5753（extension operation polling）、#5765（workspace voice/control APIs）、#5826（skill usage stats）、#5857（single session status）。
 
 ---
 
@@ -80,6 +80,9 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #5741 | feat(serve): add remote LSP status route | 2026-06-23 | REST/ACP/SDK 只读 LSP status，补齐远程客户端查询 `/lsp` 状态的结构化 API。 |
 | #5743 | feat(cli): Add workspace permissions rules API | 2026-06-24 | `GET/POST /workspace/permissions`、ACP ext method、SDK helper，远程管理 persistent allow/ask/deny rules。 |
 | #5753 | fix(serve): expose extension operation polling | 2026-06-23 | extension mutation 返回 operationId，并提供 operation status polling，避免前端只靠 workspace refresh 猜测结果。 |
+| #5765 | feat(serve): Add daemon workspace voice and control APIs | 2026-06-25 | workspace voice config / batch transcription、trust request、permission/LSP/control REST/ACP/SDK surface。 |
+| #5826 | feat(cli): Add skill usage stats | 2026-06-25 | session stats 增加 skills block，`/stats skills` 展示真实 skill body load 的成功/失败和按技能分组统计。 |
+| #5857 | feat(serve): query a single session's status by id | 2026-06-25 | 新增 `GET /session/:id/status`，按 session id 查询 live summary，避免为一个 session 拉取整个 workspace session list。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -238,9 +241,12 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 - `models[modelName].tokens`：prompt/candidates/total/cached/thoughts
 - `tools.totalCalls/totalSuccess/totalFail/totalDurationMs`
 - `tools.byName[name].decisions`：accept/reject/modify/auto_accept
+- `skills.totalCalls/totalSuccess/totalFail/byName`（#5826）：只统计真实 skill body load，包含 `Skill` tool 与 skill slash command 路径；每个 skill 记录调用数、成功数、失败数和最近错误摘要。
 - `files.totalLinesAdded/totalLinesRemoved`
 
 这两个端点没有 SSE delta；它们是 dashboard snapshot。`session_stats` 已经是能力标签，早期 README 把 `stats/export` 作为未落地整体描述已经过期：**stats 已落地，export 仍未落地**。
+
+#5826 还给 CLI 的 `/stats` 增加 `skills` 子视图：交互式 UI 和非交互输出都从同一 session stats snapshot 取 `skills` block 渲染。该统计有意排除 MCP prompt、文件命令 fallback 这类“看起来像技能但没有加载 skill body”的路径，避免把资源注入或命令别名误算为 skill 使用。
 
 ---
 
@@ -312,6 +318,37 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 - REST 与 ACP HTTP/WS 都走同一 status extension；TS SDK 提供 typed helper。
 
 该 PR 不改变 slash `/lsp` 的文本输出，也不新增 LSP 控制能力。它只是把已有状态读取为 machine-readable API，归入只读 diagnostic surface。
+
+---
+
+## workspace voice / trust / control APIs（#5765）
+
+#5765 把 Web Shell 和远程 daemon 客户端需要的 voice/control 面从“只能靠本地 CLI 状态”补成结构化 API。它不是单一 voice endpoint，而是一组 workspace/session 控制面：
+
+| Route / surface | 作用 |
+|---|---|
+| `GET /workspace/voice` | 返回当前 workspace 可用的 voice settings、模型校验结果和安全脱敏后的 provider 状态。 |
+| `POST /workspace/voice` | 更新 workspace voice 配置，复用 settings 持久化和 schema 校验。 |
+| `POST /workspace/voice/transcribe` | 接收二进制音频做 batch transcription，daemon 端完成模型选择、凭据读取和 ASR 调用。 |
+| workspace trust request | 远程客户端可发起 workspace trust 请求，而不是要求本机 TUI 交互。 |
+| permission / LSP / session control helpers | SDK/ACP surface 复用 daemon bridge 的 permission rules、LSP status、session control 能力，避免 Web Shell 绕 raw fetch。 |
+
+边界也需要写清楚：voice provider 凭据仍留在 daemon 进程；浏览器或 SDK 客户端只发送音频/配置意图并接收转写结果。batch transcription 与 #5755 的 streaming WebSocket 是互补关系：#5755 解决浏览器持续听写，#5765 补 workspace 级配置、一次性转写和控制面。
+
+---
+
+## single session status（#5857）
+
+#5857 新增 `GET /session/:id/status`，用于按 id 查询一个 live session 的轻量摘要：
+
+- `sessionId`
+- `workspaceCwd`
+- `createdAt`
+- `displayName?`
+- `clientCount`
+- `hasActivePrompt`
+
+这是 live runtime view，不承诺与 workspace session list 的分页结果 byte-identical。它的价值是让 Web Shell、SDK 或 companion UI 在只关心一个 session 是否仍有连接、是否正在跑 prompt 时，不必调用全量 `GET /workspace/sessions` 再本地过滤。未知 session 返回 404；已知 session 的 `clientCount` / `hasActivePrompt` 来自 bridge 当前内存状态。
 
 ---
 

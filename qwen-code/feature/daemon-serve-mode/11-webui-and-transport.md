@@ -36,6 +36,12 @@
 | [#5398](https://github.com/QwenLM/qwen-code/pull/5398) | @ytahdn | Merged | web-shell extension management + daemon extension mutation/events |
 | [#5541](https://github.com/QwenLM/qwen-code/pull/5541) | @wenshao | Merged | Web Shell static sendFile 允许 `.nvm` 等 dotfile 安装路径 |
 | [#5613](https://github.com/QwenLM/qwen-code/pull/5613) | @ytahdn | Merged | daemon-backed Web Shell `/branch` / `/fork` session branching |
+| [#5650](https://github.com/QwenLM/qwen-code/pull/5650) | @ytahdn | Merged | Web Shell enhanced Markdown tables：排序、过滤、选择、复制、隐藏列、行详情 |
+| [#5755](https://github.com/QwenLM/qwen-code/pull/5755) | @ytahdn | Merged | Web Shell voice dictation over daemon `/voice/stream` |
+| [#5818](https://github.com/QwenLM/qwen-code/pull/5818) | @ytahdn | Merged | Web Shell restored active prompt loading，刷新/重连后保持 active prompt 状态 |
+| [#5822](https://github.com/QwenLM/qwen-code/pull/5822) | @ytahdn | Merged | streaming turn 中本地 slash/shell command transcript append 延后排队 |
+| [#5864](https://github.com/QwenLM/qwen-code/pull/5864) | @ytahdn | Merged | finished thinking summary 保留 duration |
+| [#5876](https://github.com/QwenLM/qwen-code/pull/5876) | @ytahdn | Merged | 中文工具组文案从“执行了 N 个工具”改为“调用了 N 个工具” |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -356,6 +362,36 @@ sequenceDiagram
 | SDK / bridge | TS daemon SDK 暴露 session branching helper，serve bridge 负责把 fork/branch 请求路由到 ACP child 并返回新 session identity。 |
 
 这个 PR 的边界是“Web Shell 通过 daemon 复用已有 session fork 能力”。它不把 fork 语义改成本地前端复制，也不绕过 daemon 的 workspace/session 权限边界；失败时通过 daemon 返回的错误和 transcript notification 告诉用户，而不是在前端猜测状态。
+
+## Web Shell W26 voice dictation over daemon
+
+#5755 把 CLI 已有的 voice dictation 接到 daemon-hosted Web Shell。Web Shell 不是直接拿 provider key 去请求 ASR provider，而是只负责浏览器端采集和 UI 回填；daemon 端继续承担模型选择、凭据读取和 ASR provider 调用。
+
+| 能力 | 实现方式 |
+|---|---|
+| 浏览器采集 | Web Shell 使用麦克风 API 采集音频，并转换为 raw 16kHz mono PCM。 |
+| daemon transport | 前端打开 daemon `/voice/stream` WebSocket，把 PCM chunk 传给 daemon 侧 voice stream session。 |
+| ASR 复用 | daemon 复用 CLI voice pipeline，按当前 voice model 选择 batch 或 realtime ASR，转写结果通过 Web Shell voice client 回到 composer。 |
+| model picker | Web Shell `/model --voice` 复用 `voiceOnly` 模型过滤，避免语音模型进入主聊天模型列表。 |
+| credential boundary | provider credentials 只留在 daemon 进程；浏览器只看到音频流、partial/final transcript 和 daemon session 状态。 |
+
+认证边界需要单独记住：浏览器 WebSocket 不能像普通 `fetch` 一样可靠附带 Authorization header，所以 #5755 的可靠目标是 loopback、无 token daemon。远程带 token 的 Web Shell voice 仍需要后续鉴权设计，不应在文档里当作已完整支持。
+
+---
+
+## Web Shell W26 transcript / Markdown polish
+
+本周 Web Shell 的重点不是新增传输协议，而是把浏览器端 transcript 从“能看”推进到“长会话可操作、刷新可恢复、流式边界稳定”：
+
+| PR | 能力 | 实现方式 / 边界 |
+|---|---|---|
+| #5650 | assistant Markdown table 增强。 | 只作用于普通 assistant Markdown table；支持列排序、文本过滤、矩形单元格选择、复制选区/整表 TSV、隐藏列和行详情。thinking 渲染和其它 Markdown renderer 不受影响。 |
+| #5818 | active prompt 恢复更稳定。 | daemon 在 attach/load 时返回 active prompt flag；Web Shell 合并 server-restored prompts 与本地 submission tracking，覆盖刷新、SSE 重连、取消和 terminal event 顺序，避免 reconnect 时重复提交或误判空闲。 |
+| #5822 | streaming turn 中本地命令延后写 transcript。 | `/context`、`/stats`、`/status`、`/about`、`/bug`、`/model --voice`、`/skills`、`/tools`、`/extensions` 等命令走同一 choke point；如果当前 turn 正在 streaming，先排队，等 turn 边界稳定后再插入 transcript，避免本地 user row 插进 assistant 正在输出的中间。 |
+| #5864 | finished thinking summary 保留 duration。 | thinking 完成态从只有“Done thinking / 思考完成”补成可显示“Thought for 5s / 已思考 5s”；没有 duration 时才回落旧文案。 |
+| #5876 | 中文工具组文案更准确。 | 中文从“执行了 N 个工具”改为“调用了 N 个工具”，英文保持不变；这只是 display copy，不改变 tool block schema。 |
+
+这批改动都保持在 Web Shell / SDK transcript projection 层，不改变 daemon 事件 wire schema 的核心语义。#5818/#5822 特别重要：它们把“客户端本地动作”和“daemon 正在流式输出的 turn”重新分界，避免刷新、重连或本地命令把 transcript 变成不可恢复的交错状态。
 
 ---
 

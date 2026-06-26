@@ -38,6 +38,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **层级化 span 树**：`session → interaction → llm_request / tool → tool.execution / hook / tool.blocked_on_user / subagent`，见 `telemetry/session-tracing.ts` + `telemetry/constants.ts`。
 - **基于 AsyncLocalStorage 的上下文传播与并发隔离**，见 `session-tracing.ts` 的 `interactionContext` / `toolContext` 与 `tracer.ts` 的 `getParentContext`。
 - **敏感属性 opt-in**：prompt / system prompt / tool input·result / 模型输出默认不写入 span，见 `telemetry/detailed-span-attributes.ts`。
+- **敏感属性长度上限可配置（#5804）**：启用 sensitive span attributes 后，user/system prompt、tool schema、模型输出、tool input/result 的截断上限由 `telemetry.sensitiveSpanAttributeMaxLength` 或 `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` 控制，默认 1 MiB。
 - **trace ↔ debug log 关联**：debug 日志行注入 `trace_id` / `span_id`，见 `utils/debugLogger.ts:getTraceContext`。
 - **GenAI 语义双发 + TTFT + retry 可见性**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传，见 `telemetry/daemon-tracing.ts`（`daemon_mode_b_main`）。
@@ -201,19 +202,19 @@ const toolContext        = new AsyncLocalStorage<SpanContext | undefined>();
 
 ### 3.4 敏感属性 opt-in 与 PII
 
-**总开关**：`detailed-span-attributes.ts:isEnabled(config)` = `isTelemetrySdkInitialized() && config.getTelemetryIncludeSensitiveSpanAttributes()`，默认 **false**（`config.ts:resolveTelemetrySettings` 中 `includeSensitiveSpanAttributes ?? false`）。该模块负责把以下「可能含 PII」的内容写入 span：
+**总开关**：`detailed-span-attributes.ts:isEnabled(config)` = `isTelemetrySdkInitialized() && config.getTelemetryIncludeSensitiveSpanAttributes()`，默认 **false**（`config.ts:resolveTelemetrySettings` 中 `includeSensitiveSpanAttributes ?? false`）。#5804 之后，写入时的截断上限不再是硬编码 60KB，而是 `telemetry.sensitiveSpanAttributeMaxLength` / `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` / 默认 1 MiB 三层解析。该模块负责把以下「可能含 PII」的内容写入 span：
 
 | 写入函数 | span 属性 | 去重/截断策略 |
 |---|---|---|
-| `addUserPromptAttributes` | `new_context` | 60KB 截断 |
+| `addUserPromptAttributes` | `new_context` | 可配置上限截断，默认 1 MiB |
 | `addSystemPromptAttributes` | `system_prompt_hash` / `_preview(500)` / `_length` / `system_prompt` | **按 SHA-256 去重**：同一 system prompt 全文只写一次 |
 | `addToolSchemaAttributes` | `tools`(summary) / 逐 tool `tool_schema` event | 每个 declaration 按 hash 去重 |
-| `addModelOutputAttributes` | `response.model_output` | 60KB 截断 |
-| `addToolInputAttributes` / `addToolResultAttributes` | `tool_input` / `tool_result` | 60KB 截断 |
+| `addModelOutputAttributes` | `response.model_output` | 可配置上限截断，默认 1 MiB |
+| `addToolInputAttributes` / `addToolResultAttributes` | `tool_input` / `tool_result` | 可配置上限截断，默认 1 MiB |
 
 **去重机制**：进程级 `seenHashes: Set<string>`（L18），key 形如 `sp_<hash>` / `tool_<hash>`，生产环境**故意不清理**（上界 = 一个 session 内 unique system prompt + tool schema 数）。`hash = SHA-256(content)[:12]`。这样大体量、重复出现的 system prompt / tool schema 只随首次出现写一次全文，后续仅写 hash 引用——既保留可关联性又控制基数与体积。
 
-`MAX_CONTENT_SIZE = 60KB`、`SYSTEM_PROMPT_PREVIEW_LENGTH = 500`。`truncateContent` 返回 `{content, truncated}`，截断时附带 `*_truncated` / `*_original_length` 旁注属性。
+`SYSTEM_PROMPT_PREVIEW_LENGTH = 500`；sensitive span attribute 全文截断上限由配置解析得到，默认 1 MiB。`truncateContent` 返回 `{content, truncated}`，截断时附带 `*_truncated` / `*_original_length` 旁注属性。
 
 ### 3.5 trace ↔ debug log 关联
 

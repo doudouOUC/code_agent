@@ -1,7 +1,7 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769**。
+> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769 / #5793 / #5827 / #5845**。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
@@ -32,6 +32,10 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 - **交互菜单缺 API Key 入口（#3413/#3624）**：`qwen auth` 交互菜单只有 Coding Plan / OpenRouter / Qwen OAuth，没有「自带 API Key」的引导。
 
 - **远程 daemon 登录（#4175 Wave4 / #4255）**：`qwen serve` 作为常驻 daemon 时，远端 SDK 客户端如何触发一次 Qwen 账号登录？不能在 daemon 上弹浏览器（可能是无头服务器），token 也必须落在 **daemon** 文件系统而非客户端。需要一条「daemon 代跑设备授权、客户端只显示 user code」的设备流（RFC 8628）。
+
+- **自定义 provider id 与 transport protocol 解耦（#5793）**：某些自定义 provider 需要保留自己的 provider id / label / preset metadata，但底层请求应复用内置 SDK protocol（例如走已有 OpenAI-compatible 或 DashScope 风格 transport）。如果强行把 id 当 protocol，会让 provider identity 与请求行为绑定过死。
+
+- **OpenAI-compatible stream 卡死（#5827/#5845）**：OpenAI SDK 的 request `timeout` 通常只覆盖连接或首包；一旦流式响应已经开始但长时间没有新 chunk，旧实现可能一直挂住。需要 provider pipeline 内部的 inactivity timeout，让“无流量”也能 abort 并复用既有 retry 分类，同时允许部署通过环境变量统一覆盖默认 idle timeout。
 
 本方案的目标即：用**统一的 source 溯源 + 优先级**解决前四个配置问题，用**设备流注册表**解决远程登录，并在全过程对凭据/密文做脱敏与原子落盘。
 
@@ -170,6 +174,39 @@ const httpOptions = config.baseUrl
 #5729 修复 configured models listing：默认 `getAllConfiguredModels` 会保留 active runtime model，即便它不是当前静态 defaults 中的第一类条目。这样 `/model`/provider 状态不会因为 active model 只存在于运行态或 settings merge 结果中而丢项。
 
 #5769 修复重复 model display name：当多个 OpenAI-compatible provider 使用同一个 model id 时，header/status line 根据当前 resolved baseUrl 精确匹配 provider entry，再回退 id-only lookup。这样重启后显示的 provider label 与 `/about` 的 Base URL、实际请求 endpoint 保持一致，不再看起来“跳回第一个 provider”。
+
+#### 3.1.5 OpenAI-compatible stream inactivity timeout（#5827/#5845）
+
+#5827 补的是 content generator 运行时边界，而不是 provider 配置字段。问题在于 OpenAI-compatible 流式请求一旦拿到响应开始迭代，SDK 层 request timeout 往往不再覆盖“后续 chunk 长时间不来”的场景；对于代理、网关或模型服务半断开的连接，CLI/daemon 可能卡在 streaming turn。
+
+实现方式：
+
+- 在 `pipeline.executeStream` 内包一层 `withStreamInactivityTimeout`，而不是只依赖 OpenAI SDK 的 request timeout。
+- 新增 `contentGenerator.streamIdleTimeoutMs` 配置，默认 120000ms；`<= 0` 表示禁用。
+- 每收到任意 chunk 都重置 idle timer，包括普通文本、thinking/reasoning chunk 和其它流式事件。
+- idle 超时后 abort 当前 per-request controller，并抛出合成 `ETIMEDOUT`，让既有 retry classifier 把它当作可重试 transport error。
+- 用户主动 abort 仍保留 `AbortError` 语义，不被改写成 timeout。
+
+#5845 给这条运行时保护补了部署级配置入口：`QWEN_STREAM_IDLE_TIMEOUT_MS`。解析优先级为：
+
+1. 显式 `ContentGeneratorConfig.streamIdleTimeoutMs`，包括 `0` 禁用；
+2. 合法的 `QWEN_STREAM_IDLE_TIMEOUT_MS` 非负整数毫秒值；
+3. 默认 `120000`。
+
+非法环境变量会被忽略并输出 debug warning，不影响启动。这样线上部署可以在不改 settings / provider preset 的情况下缩短或拉长 idle timeout；同时测试和调用方仍能通过显式 config 覆盖 env。
+
+边界：如果已经向上游产出过部分 chunk，再发生 idle timeout，是否能重试取决于调用层对“已产生部分输出”的处理；#5827 的核心是让卡死连接可被关闭并进入既有错误分类，而不是重新定义所有 partial-output recovery。
+
+#### 3.1.6 `providerProtocol` 映射（#5793）
+
+#5793 把“provider identity”和“底层 SDK protocol”分开。自定义 provider 可以继续使用自己的 `id`、display label、preset metadata 和 model ownership，但通过 `providerProtocol` 映射到已有协议实现：
+
+- built-in providers 仍按原有 protocol 自动路由，不需要迁移配置；
+- 自定义 provider 若声明 `providerProtocol`，请求 pipeline 使用映射后的 SDK protocol；
+- 未声明映射且无法推断 protocol 的自定义 provider 仍按旧逻辑 warn/skip，避免把未知 provider 误发到错误 endpoint；
+- provider id 仍保留在 UI、配置、auth status 和 model ownership 判断里，transport behavior 才走 mapped protocol。
+
+这解决的是“同一个 transport 行为被多个 provider identity 复用”的问题，不是 provider preset 大改。它不要求现有 `modelProviders` settings 迁移，也不改变 built-in provider 的默认路由。
 
 ### 3.2 apiKey 跨重启保留（#3495）
 
@@ -453,6 +490,9 @@ sequenceDiagram
 | #5654 | merged | auth wizard custom models | 重新进入 `/auth` 时恢复用户自定义 model IDs，并让 provider update detector 只比较 built-in defaults |
 | #5729 | merged | active runtime model listing | configured models 默认保留 active runtime model，避免当前会话模型从列表中消失 |
 | #5769 | merged | duplicate display name disambiguation | active model display 按 resolved baseUrl 匹配重复 model id provider，再回退 id-only lookup |
+| #5793 | merged | providerProtocol mapping | 自定义 provider id 可映射到已有 SDK protocol，分离 provider identity 与 transport behavior |
+| #5827 | merged | OpenAI stream inactivity timeout | 流式请求长时间无 chunk 时 abort per-request controller，合成 `ETIMEDOUT` 并复用既有 retry 分类；默认 120s，`<=0` 禁用 |
+| #5845 | merged | stream idle timeout env override | 新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，显式 config > env > 默认；非法 env 忽略并 debug warning |
 
 ---
 
@@ -480,7 +520,10 @@ sequenceDiagram
    - #5478 明确图像、音频、embedding 等模态不在范围；provider detection 也必须继续使用 hostname 级别匹配，不能退回字符串 contains，否则会 over-claim 恶意 baseUrl。
 
 8. **provider identity 仍需沿 baseUrl/envKey 继续收敛**
-   - #5179/#5769 已分别修复“选择持久化”和“显示名”两个 same-id provider 问题，但 ACP/OpenWork 等外部 provider identity 仍可能有自己的 display/selection surface；后续 PR 若改 provider identity，应同时检查 persisted `model.baseUrl`、runtime resolved baseUrl、display name 和 request route 四者是否一致。
+   - #5179/#5769 已分别修复“选择持久化”和“显示名”两个 same-id provider 问题，#5793 再把 provider identity 与 SDK protocol 拆开。但 ACP/OpenWork 等外部 provider identity 仍可能有自己的 display/selection surface；后续 PR 若改 provider identity，应同时检查 persisted `model.baseUrl`、runtime resolved baseUrl、display name、providerProtocol 和 request route 是否一致。
+
+9. **stream idle timeout 不等于 turn-level recovery**
+   - #5827/#5845 只负责在 OpenAI-compatible stream 长时间无 chunk 时关闭请求并把错误归类为 retryable transport failure，并提供 env/config 两级超时配置。若超时前已经输出了部分内容，最终 UI/历史/重试是否能无缝恢复仍取决于上层 streaming pipeline；这些 PR 不新增 terminal `turn_error` SSE 或 partial-output replay 语义。
 
 ---
 
@@ -521,6 +564,26 @@ sequenceDiagram
 - #5654：`AuthDialog.getExistingModelIds` 只把 saved provider 中非 built-in defaults 的项作为 custom IDs 传回 wizard；`useProviderSetupFlow` 用 `[...defaults, ...customIds]` 预填；`useProviderUpdates` 只用 built-in IDs 做 update diff。
 - #5729：configured models 聚合默认包含 active runtime model，避免 UI/命令列表与当前实际 session model 不一致。
 - #5769：`getModelDisplayName` 先按 active resolved baseUrl 在 duplicate id provider entries 中匹配，再回退旧的 id-only lookup；tests 覆盖 same id/different baseUrl 的 header/status label。
+
+### #5827 — OpenAI stream inactivity timeout
+
+- **修复点**：在 OpenAI-compatible `pipeline.executeStream` 内增加 `withStreamInactivityTimeout`，覆盖“stream 已开始但后续 chunk 长时间不来”的半断开场景，而不是只依赖 SDK request timeout。
+- **配置**：`contentGenerator.streamIdleTimeoutMs` 默认 120000ms；`<= 0` 禁用。#5845 之后还可用 `QWEN_STREAM_IDLE_TIMEOUT_MS` 提供部署级默认，显式 config 优先于 env。每个请求都有独立 controller，idle timeout 只 abort 当前请求。
+- **计时语义**：任意 chunk 到达都会 reset timer，包括普通 content、thinking/reasoning 和其它流式事件；用户主动 abort 仍保持 `AbortError`，不会被误标成 timeout。
+- **错误归类**：idle 超时抛合成 `ETIMEDOUT`，复用现有 retry classifier，把它归为可重试 transport error。该 PR 不新增 partial-output replay 或 turn-level terminal event。
+
+### #5793 — providerProtocol mapping
+
+- **协议映射**：provider preset / resolver 增加 `providerProtocol`，允许自定义 provider id 映射到已有 SDK protocol，实现“provider 身份独立、transport 行为复用”。
+- **兼容性**：built-in providers 不需要显式配置；未知且未映射的 custom provider 继续 warn/skip，不把请求发到不确定协议。
+- **调用链影响**：model ownership、display label、auth status 仍使用原 provider id；content generator / provider dispatch 使用 mapped protocol 选择 SDK 实现。
+- **测试重点**：覆盖 built-in provider 不变、自定义 provider 映射成功、未映射 custom provider 保持原 warning/skip，以及 provider identity 不被映射值覆盖。
+
+### #5845 — stream idle timeout env override
+
+- **配置入口**：新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，解析为非负整数毫秒；非法值忽略并通过 debug logger 记录。
+- **优先级**：显式 `ContentGeneratorConfig.streamIdleTimeoutMs`（包括 0 禁用）> env > 默认 `120000`。
+- **边界**：该 env 只提供 OpenAI-compatible stream inactivity timeout 的默认值，不改变用户主动 abort、partial-output recovery 或 retry classifier 的语义。
 
 ### #3495 — apiKey 跨重启保留
 

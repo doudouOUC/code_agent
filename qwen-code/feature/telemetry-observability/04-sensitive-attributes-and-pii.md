@@ -29,6 +29,7 @@ qwen-code 把「可能含 PII / 机密的高价值内容」分成两类载体写
 | **#3893** | MERGED | 敏感属性 opt-in | 引入 `includeSensitiveSpanAttributes` + `LogToSpanProcessor` 的 `SENSITIVE_ATTRIBUTE_KEYS` 二次脱敏；**同时**让 `api_response` 开始携带 `response_text`（非 internal）。PR body 自述「destinations that consume those events」会拿到 response_text —— 即本文重点泄露面的源头。 |
 | **#4097** | MERGED (2026-05-16) | interaction span + detailed sensitive attrs | 新增 `detailed-span-attributes.ts` 全套 helper（`addUserPromptAttributes` / `addSystemPromptAttributes` / `addToolSchemaAttributes` / `addModelOutputAttributes` / `addToolInputAttributes` / `addToolResultAttributes`），并在调用方（`client.ts` / `coreToolScheduler.ts` / `loggingContentGenerator.ts`）加「双守卫」。这些 SPAN 属性是**双重门控**（`isEnabled` + 调用方守卫）。 |
 | #3847 | MERGED | traceId/spanId 注入 | 部分相关：桥接 span 的 traceId 派生与本文的脱敏发生在同一个 `LogToSpanProcessor.onEmit` 里。 |
+| #5804 | MERGED (2026-06-25) | sensitive span attr length configurable | 将 sensitive span attributes 的截断上限从旧的 60KB 常量改成可配置值：`telemetry.sensitiveSpanAttributeMaxLength` / `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` / 默认 1 MiB。 |
 
 ---
 
@@ -176,29 +177,30 @@ if (
 
 ---
 
-## 截断与去重（60KB 截断、SHA-256 system_prompt 去重、`seenHashes` 进程级）
+## 截断与去重（可配置截断、SHA-256 system_prompt 去重、`seenHashes` 进程级）
 
-### 截断 `truncateContent`（L27–40）
+### 截断 `truncateContent`（#5804 后可配置）
 
 ```ts
-const MAX_CONTENT_SIZE = 60 * 1024; // 60KB (L13)
-export function truncateContent(content, maxSize = MAX_CONTENT_SIZE) {
+const DEFAULT_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH = 1024 * 1024;
+export function truncateContent(content, maxSize = resolvedMaxLength) {
   if (content.length <= maxSize) return { content, truncated: false };
   return {
-    content: content.slice(0, maxSize) + '\n\n[TRUNCATED - Content exceeds 60KB limit]',
+    content: content.slice(0, maxSize) + '\n\n[TRUNCATED - Content exceeds configured limit]',
     truncated: true,
   };
 }
 ```
 
-- 单位是 **JS string length（UTF-16 code unit）**，不是字节；非 ASCII payload 实际字节会更多。60KB 是「噪声/泄露预算」而非硬字节上限。
+- 单位是 **JS string length（UTF-16 code unit）**，不是字节；非 ASCII payload 实际字节会更多。#5804 之后默认上限是 1 MiB，并可通过 `telemetry.sensitiveSpanAttributeMaxLength` 或 `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` 覆盖。
+- 解析优先级：settings 显式值 > 环境变量非负整数 > 默认 1 MiB。非法 env 被忽略并记录 debug warning；显式 `0` 等价于“只保留截断 marker 前的空内容”，不是关闭 sensitive span attributes，关闭仍由 `includeSensitiveSpanAttributes=false` 控制。
 - 返回 `{content, truncated}`；每个调用 helper 在 `truncated` 为真时附带旁注属性，便于后端识别被截断：
   - `addUserPromptAttributes`：`new_context_truncated` + `new_context_original_length`（L63–66）
   - `addModelOutputAttributes`：`response.model_output_truncated` + `response.model_output_original_length`（L164–167）
   - `addToolInputAttributes` / `addToolResultAttributes`：`*_truncated` + `*_original_length`（L184–187 / L204–207）
   - `addSystemPromptAttributes`：仅 `system_prompt_truncated`（L93–95，无 original_length，因为 `system_prompt_length` 已单独写）
 
-> 注意这是 **SPAN 路径** 的 60KB 截断。**LOG 路径**（`response_text`）走的是另一套更小的 4096 截断（`loggingContentGenerator.ts:extractResponseText`，下一节），两条截断逻辑互相独立。
+> 注意这是 **SPAN 路径** 的可配置截断。**LOG 路径**（`response_text`）走的是另一套更小的 4096 截断（`loggingContentGenerator.ts:extractResponseText`，下一节），两条截断逻辑互相独立；#5804 不改变 LOG 路径。
 
 ### system_prompt 去重（L82–96）
 
@@ -420,7 +422,7 @@ sequenceDiagram
 1. **SPAN 敏感属性默认 OFF + 四层 `?? false`**：解析/构造/getter/桥接四处独立兜底到 `false`，任一层漏填都不会意外开启。代价是开箱 trace 信息量少，深度排障需显式 `QWEN_TELEMETRY_INCLUDE_SENSITIVE_SPAN_ATTRIBUTES=true` 或 settings opt-in。
 2. **helper 内 `isEnabled` + 调用方双守卫**：helper 内门控保证「绝不写」，调用方守卫额外省掉昂贵序列化（`safeJsonStringify` 大 Part[]、`partToString`）。两层职责分离：正确性在 helper，性能在调用方。
 3. **SHA-256 去重 + preview/hash 永远写**：全量只写一次、轻量元数据每次写。权衡：12 字符 hash 有极小碰撞概率（可接受）；去重进程级导致「全量内容跨进程仅一次」的可见性风险。
-4. **SPAN 60KB / LOG 4096 两套截断**：SPAN 给排障留更大窗口（60KB），LOG 事件（高频、易放大基数）收得更紧（4096）。`response_text` 走 4096 是因为它本就是高频 api_response 事件属性。
+4. **SPAN 可配置上限 / LOG 4096 两套截断**：#5804 后 SPAN sensitive attributes 默认 1 MiB 且可由 settings/env 覆盖；LOG 事件（高频、易放大基数）仍固定收在 4096。`response_text` 走 4096 是因为它本就是高频 api_response 事件属性。
 5. **`response_text` 写在「源事件」而非桥接处（#3893 的有意取舍）**：PR body 明确「response text is now populated on non-internal API response telemetry events, destinations that consume those events [will receive it]」。即作者**有意**让 api_response 携带 response_text 以服务「消费 api_response 的下游」，把脱敏责任放到桥接的 `SENSITIVE_ATTRIBUTE_KEYS`。**遗漏**在于：没有为「直连 logs / outfile」这两条不经桥接的路径补门控，导致 SPAN 与 LOG 的隐私姿态不一致。
 
 ---
@@ -439,7 +441,7 @@ sequenceDiagram
 
 | 测试文件:用例 | 覆盖点 |
 |---|---|
-| `detailed-span-attributes.test.ts` (404 行) | 全部 6 个 helper 的 happy path + `no-ops when flag is disabled`（L132/L213/L358 验证 opt-in 关短路）+ `no-ops when SDK is not initialized`（L141）+ 60KB 截断旁注（L158/L203/L328/L379）+ system_prompt SHA-256 去重（L181 `deduplicates full content on same hash`）+ Gemini `functionDeclarations` 扁平化（L277）+ `clearDetailedSpanState` 重置去重（L390） |
+| `detailed-span-attributes.test.ts` | 全部 6 个 helper 的 happy path + `no-ops when flag is disabled` 验证 opt-in 关短路 + `no-ops when SDK is not initialized` + 可配置截断旁注 + system_prompt SHA-256 去重 + Gemini `functionDeclarations` 扁平化 + `clearDetailedSpanState` 重置去重 |
 | `log-to-span-processor.test.ts` | `drops sensitive attributes before exporting bridged spans`（L155，默认关时 `prompt`/`function_args`/`response_text` 被剔除，L178–180）+ `keeps sensitive attributes when explicitly enabled`（L186，opt-in 开时三者保留，L214–216） |
 | `loggers.test.ts` | `logApiResponse` 用例（L321–343）断言 `response_text: 'test-response'` **无条件**写入 LogRecord attributes —— 即**该测试本身固化了「response_text 不受敏感开关门控」的现状行为**（mockConfig 未设任何 sensitive flag） |
 | `loggingContentGenerator.test.ts` | `extractResponseText` 行为：thought 排除（L331 `normalizes thought parts`，L412 断言 `response_text='ok'` 不含 thought）+ 4096 截断（L806 `truncates long response text`，L830–831）+ internal/thought-only 省略 response_text（L840–866 `omits response_text for %s`，L1953/L2021 internal 路径 `response_text` undefined） |
@@ -457,7 +459,7 @@ sequenceDiagram
 - `docs/` — 配置表新增 `includeSensitiveSpanAttributes` 行 + `settingsSchema` 默认 false + 警告文案
 
 ### #4097 — detailed-span-attributes
-- `telemetry/detailed-span-attributes.ts` — 新增文件：`isEnabled`（双闸门）+ `truncateContent`（60KB）+ `shortHash`（SHA-256[:12]）+ 6 个 helper（`addUserPrompt`/`addSystemPrompt`/`addToolSchema`/`addModelOutput`/`addToolInput`/`addToolResult`）
+- `telemetry/detailed-span-attributes.ts` — 新增文件：`isEnabled`（双闸门）+ `truncateContent`（最初 60KB，#5804 后改为可配置）+ `shortHash`（SHA-256[:12]）+ 6 个 helper（`addUserPrompt`/`addSystemPrompt`/`addToolSchema`/`addModelOutput`/`addToolInput`/`addToolResult`）
 - `client.ts` — 新增双守卫：`getTelemetryIncludeSensitiveSpanAttributes?.()` 包裹 `addUserPromptAttributes`（跳过 `partToString` 序列化）
 - `coreToolScheduler.ts` — 新增双守卫包裹 `addToolInputAttributes`/`addToolResultAttributes`（跳过 `safeJsonStringify` 大 Part[]）
 - `loggingContentGenerator.ts` — 接入 `addSystemPromptAttributes`/`addToolSchemaAttributes`/`addModelOutputAttributes`
@@ -471,3 +473,9 @@ sequenceDiagram
 - `detailed-span-attributes.ts:seenHashes` — 注释从「intentionally never cleared in production」改为「Cleared on chat compression」
 - `geminiChat.ts:tryCompressChat` — 压缩成功后调用 `clearDetailedSpanState()` 清理 `seenHashes`（修复压缩后 system_prompt 全量丢失）
 - `detailed-span-attributes.test.ts` — 新增 tool schema 去重重置测试（`clearDetailedSpanState` 后 re-emit 全文）
+
+### #5804 — configurable sensitive span attribute length
+- `telemetry/config.ts` / settings schema — 新增 `sensitiveSpanAttributeMaxLength` 配置项，并支持 `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` 环境变量。
+- `config.ts:Config` — 暴露 resolved max length getter；非法 env 不覆盖默认值，只写 debug warning。
+- `detailed-span-attributes.ts:truncateContent` — 从固定 60KB 常量改为调用 resolved max length，覆盖 user prompt、system prompt 全文、tool schema、model output、tool input/result。
+- tests — 覆盖默认 1 MiB、settings/env 覆盖、非法 env 忽略，以及各 helper 使用配置后的 truncation metadata。

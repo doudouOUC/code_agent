@@ -401,6 +401,22 @@ sequenceDiagram
 | #5753 | extension operation polling | extension mutation 不再只靠最终 `extensions_changed`，而是返回 operationId；`GET /workspace/extensions/operations/:operationId` 查询 queued/running/succeeded/failed/succeeded_with_refresh_error，内存保留 capped history。 |
 | #5784 | prompt client admission | prompt 入队前校验 clientId 是否仍有效；stale / invalid client 直接 `400 invalid_client_id` 且不分配 promptId，避免 `202 Accepted` 后客户端永远等不到 terminal event。 |
 
+### 3.12 2026-06-24 daemon / serve follow-up
+
+2026-06-24 创建或合入的 daemon 相关 PR 主要集中在 serve 启动性能、Web Shell 语音、SDK client identity 恢复、MCP budget 输入校验和 session stats 诊断：
+
+| PR | 子主题 | 一句话作用 |
+|---|---|---|
+| #5752 | MCP client budget strict parse | `QWEN_SERVE_MCP_CLIENT_BUDGET` 只接受十进制数字字符串；`0x10`、`1e2`、`1.0` 等 `Number()` 可接受但配置语义不清的写法会被拒绝，避免预算被误读。 |
+| #5755 | Web Shell voice over daemon | Web Shell 采集浏览器麦克风 PCM，经 daemon `/voice/stream` WebSocket 发送；daemon 复用 CLI voice pipeline 做 batch/realtime ASR，再把 transcript 回填 composer，provider 凭据不进入浏览器。 |
+| #5765 | workspace voice/control APIs | 增加 `GET/POST /workspace/voice`、`POST /workspace/voice/transcribe`、workspace trust request、permissions/LSP 相关 REST/ACP/SDK surface；daemon client 可替代 CLI-only `/voice`/`/trust`/`/permissions`/`/lsp` 交互。 |
+| #5785 | serve startup fast path | `qwen serve` 先走 slim fast path 到 `listen()`，再延迟加载 interactive UI、React/Ink、完整 settings、Web Shell 和 ACP runtime；`/daemon/status` 与 stderr 暴露 process-to-listen / runQwenServe-to-listen / ACP preheat timing。 |
+| #5797 | stale SDK client self-heal | TS `DaemonSessionClient.prompt()` 遇到 admission-time `400 invalid_client_id` 时，用 `resumeSession` 单飞 reattach 获取新 clientId，并对 blocking/non-blocking prompt 重试一次；cancel/btw/shell/heartbeat 不在本 PR 范围。 |
+| #5826 | skill usage stats | ACP/session stats 增加 `skills.totalCalls/totalSuccess/totalFail/byName`；`/stats skills` 显示真实 skill body load 的调用、成功和失败，SDK 字段保持 optional 兼容旧 daemon。 |
+| #5825 | startup benchmark | 新增 gated integration benchmark，测 built CLI `qwen serve` 从 spawn 到 stdout listening line，并校验 `/daemon/status` startup timing 与 preheat state。 |
+| #5857 | single session status | 增加 `GET /session/:id/status`，按 id 查询 live session 的 `clientCount` 与 `hasActivePrompt`，避免客户端为了一个 session 拉全量 paginated session list。 |
+| #5874 | skip wrapper spawnSync | `qwen serve` 在 CLI entry wrapper 中直接 in-process import `cli.js`，跳过为 `--expose-gc` 额外 `spawnSync` 的 Node 进程，减少冷启动成本；ACP child 仍独立带 `--expose-gc`。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -564,6 +580,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #5144 | docs | daemon developer docs 英文化刷新，并按当前 main 核对 event schema、capabilities、startup flags、error taxonomy、resync、MCP pool 和 web UI wording。 |
 | #5174 | status API | `GET /daemon/status` 只读诊断面：summary/full detail、session/permission/SSE/ACP/rate-limit/runtime/capability 汇总，full 模式聚合 workspace 诊断并按 section 独立降级（merged 2026-06-16）。 |
 | #5260 | timeout flag | `qwen serve --permission-response-timeout-ms` 暴露 ACP 权限/`ask_user_question` 单次响应超时，`0` 无限等待，非法值启动失败，超大值 clamp 到 Node timer 上限（merged 2026-06-18）。 |
+| #5826 | stats | `GET /session/:id/stats` 增加 skill usage block，并支持 `/stats skills` 以 daemon stats 展示真实 skill body load。 |
 
 ### W24/W25 全作者近期补强
 
@@ -618,6 +635,20 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #5743 | workspace permissions | workspace persistent permission rules REST/ACP/SDK API。 |
 | #5753 | extension operations | extension mutation operationId + polling endpoint。 |
 | #5784 | prompt client admission | stale prompt client id 在 admission 阶段 fail-fast。 |
+
+### W26 2026-06-24 daemon / serve follow-up
+
+| PR | 子主题 | 一句话作用 |
+| --- | --- | --- |
+| #5752 | MCP budget strict parse | `QWEN_SERVE_MCP_CLIENT_BUDGET` 严格按十进制解析，拒绝非十进制或小数/指数写法。 |
+| #5755 | Web Shell voice | 浏览器 PCM 经 daemon `/voice/stream` 转写，复用 CLI voice pipeline 且不向浏览器暴露 provider credentials。 |
+| #5765 | workspace voice/control APIs | workspace voice config/transcription、trust request、permissions/LSP 相关 daemon API 和 SDK helper。 |
+| #5785 | startup fast path | serve 先监听再延迟加载重模块，并把 startup timing 暴露到 `/daemon/status` / stderr。 |
+| #5797 | SDK client self-heal | prompt 遇到 stale `clientId` 时单飞 reattach 并重试一次 admission-time prompt。 |
+| #5826 | skill stats | daemon session stats 与 `/stats skills` 展示 skill 调用成功/失败和 per-name 统计。 |
+| #5825 | startup benchmark | gated integration benchmark 输出 daemon cold-start JSON/Markdown artifacts。 |
+| #5857 | session status by id | `GET /session/:id/status` 查询单 live session summary。 |
+| #5874 | wrapper fast path | `qwen serve` CLI entry 跳过 wrapper `spawnSync`，减少一次 Node process startup。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 

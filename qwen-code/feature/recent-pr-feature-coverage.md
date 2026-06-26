@@ -4,7 +4,136 @@
 
 ---
 
-## 2026-06-22 ~ 2026-06-23（昨天 + 前天，全作者）
+## 2026-06-22 ~ 2026-06-26（本周，全作者）
+
+> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-26` 全作者、全状态 PR；补充口径为本周内合入但创建更早的 PR。统计以 2026-06-26 查询为准：本周创建共 207 个 PR，当前 146 merged / 38 open / 23 closed；其中 2026-06-25~26 新创建 44 个 PR，当前 21 merged / 20 open / 3 closed。2026-06-25~26 合入共 49 个 PR，其中 #5561 是 06-21 创建但本周合入，按本周落地能力补记。
+
+本周已拆成三层记录：
+
+| 范围 | 作用 |
+|---|---|
+| 2026-06-25~26 增量 | 本节重点补 06-25/26 新创建或新合入的 PR，以及上一节 open 观察转 merged 的 PR。 |
+| 2026-06-24 | 见下一节，覆盖 06-24 创建 PR 和 06-24 合入的跨日 PR。 |
+| 2026-06-22~23 | 见后续节，覆盖周一/周二创建 PR；其中部分在 06-24/25 合入的 PR 已在本周增量节复核。 |
+
+### 2026-06-25 ~ 2026-06-26 已落地且需要更新 feature 文档
+
+| PR | 状态 | feature 归属判断 | 文档动作 |
+|---|---|---|---|
+| #5561 | merged | MCP settings live reconcile：settings / extensions 改动后增删改 server、approval gating、`/mcp` pending/denied reason 不再要求重启 session。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)。 |
+| #5616 | merged | auto-generated skills 先 staged 到 `.qwen/pending-skills/`，用户确认后才进入 skill library；避免一次性任务污染 skill 库。 | 新增 [managed-memory.md](managed-memory.md)。 |
+| #5650 | merged | Web Shell assistant Markdown table 变成可排序、过滤、选择、复制、隐藏列、展开行的增强表格。 | 已补 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #5657 | merged | repeated duplicate provider tool-call response 熔断，避免 OpenAI-compatible provider 反复 replay 同一个 tool id 导致工具结果循环。 | 已补 [tool-call-id-integrity.md](tool-call-id-integrity.md)。 |
+| #5747 | merged | 发布包 bundling native audio capture，改善 mirror/private registry 未同步 optional dependency 时的 voice capture 体验。 | 已补 [voice-dictation.md](voice-dictation.md)。 |
+| #5765 | merged | daemon workspace voice/control APIs：`GET/POST /workspace/voice`、batch transcription、trust request、permission/LSP/status SDK/ACP surface。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)、[daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md) 与 [voice-dictation.md](voice-dictation.md)。 |
+| #5793 | merged | `providerProtocol` 映射让自定义 provider id 可复用内置 SDK protocol，分离 provider identity 与 transport behavior。 | 已补 [auth-providers.md](auth-providers.md)。 |
+| #5804 | merged | `telemetry.sensitiveSpanAttributeMaxLength` / env override，让敏感 span 属性截断上限从硬编码变成可配置。 | 已补 [telemetry-observability/README.md](telemetry-observability/README.md) 与 [telemetry-observability/04-sensitive-attributes-and-pii.md](telemetry-observability/04-sensitive-attributes-and-pii.md)。 |
+| #5814 | merged | `/remember` 不再在 `enableManagedAutoMemory=false` 时回退写 QWEN.md；auto-extract 与 manual memory 管理解耦。 | 已补 [managed-memory.md](managed-memory.md)。 |
+| #5817 | merged | voice keyterms file：`general.voice.keytermsFile` 或 `.qwen/voice-keyterms.txt` 合并到 ASR bias。 | 已补 [voice-dictation.md](voice-dictation.md)。 |
+| #5818 #5822 | merged | Web Shell active prompt loading 与 streaming turn 中本地命令排队，修复刷新/重连/命令插入导致的状态和 transcript 边界问题。 | 已补 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #5825 #5874 | merged | daemon startup benchmark 与 `qwen serve` 跳过 wrapper `spawnSync`，补齐性能测量和冷启动优化。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5844 | merged | self-paced `/loop` 对 monitor/background-task terminal notification 做模型侧引导，长 fallback heartbeat + 事件优先处理。 | 已补 [loop-wakeup.md](loop-wakeup.md)。 |
+| #5845 | merged | `QWEN_STREAM_IDLE_TIMEOUT_MS` env override，补 #5827 stream idle timeout 的部署级配置口。 | 已补 [auth-providers.md](auth-providers.md)。 |
+| #5857 | merged | `GET /session/:id/status` 查询单个 live session 的 client count / active prompt，不再分页拉全 workspace session list。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md) 与 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md)。 |
+| #5864 #5876 | merged | Web Shell thinking summary 保留 finished duration，中文工具组文案从“执行了”改为“调用了”。 | 已补 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #5865 | merged | context compression side-query 改 opt-in streaming，避免 BFF/gateway 60s read timeout 杀死长摘要请求。 | 已补 [context-compression.md](context-compression.md)。 |
+
+### 2026-06-25 ~ 2026-06-26 已看过但暂不新增专题
+
+| PR | 归属判断 |
+|---|---|
+| #5727 #5839 #5850 #5872 | docs / startup warning / response timestamp consistency / macOS Option-compose Alt+T，属于用户体验或文档小修；不改变 feature 长期技术方案。 |
+| #5792 #5824 #5846 | status line default、auto mode startup copy、thinking-intent loading indicator revert，属于 CLI copy/默认值细节；本轮覆盖矩阵登记，不新增专题。 |
+| #5783 | WebFetch userinfo URL 拒绝，属于 WebFetch URL validation 小安全边界；当前 feature 目录未维护独立 WebFetch 专题。 |
+| #5811 #5815 | token speed accounting、reasoning_content merge preservation，属于 metrics/provider merge 小修；不单开专题。 |
+| #5842 #5851 #5854 #5858 #5859 #5862 #5870 #5878 #5880 #5885 | CI / release / test reliability，不作为 product feature 技术方案。 |
+
+### 2026-06-25 ~ 2026-06-26 open PR 后续观察
+
+| PR | 当前归属判断 |
+|---|---|
+| #5847 #5852 #5879 #5884 | daemon runtime context injection、resumable ACP stream、Web Shell `/mcp` browser、sessionless workspace remember；若合入归 daemon/serve 与 MCP/memory。 |
+| #5848 #5849 #5869 #5891 #5893 #5898 | UI / autocomplete / transcript rendering polish；若合入归 Web Shell 或 CLI UX。 |
+| #5856 | desktop voice dictation，若合入补 [voice-dictation.md](voice-dictation.md) 与 desktop 相关记录。 |
+| #5868 | auto-compact threshold / Stop hook context usage，若合入补 [context-compression.md](context-compression.md) 与 hook/permission 相关记录。 |
+| #5886 | git-shared team memory tier，若合入补 [managed-memory.md](managed-memory.md)。 |
+| #5888 | qwen tag / multiplayer channel-resident agent RFC，若合入补 [channel-adapters.md](channel-adapters.md)。 |
+| #5890 | loop task file injection via sentinels，若合入补 [loop-wakeup.md](loop-wakeup.md)。 |
+| #5892 | Windows PTY shell tree-kill，若合入补权限/shell 执行边界。 |
+| #5895 | session artifacts daemon API design，若合入补 daemon/serve 或 artifact 专题。 |
+| #5896 | CUA driver vendoring，若合入需新增 computer-use/CUA 专题或覆盖矩阵记录。 |
+
+### 2026-06-25 ~ 2026-06-26 closed / superseded / wrong-base
+
+| PR | 原因 |
+|---|---|
+| #5843 #5853 #5871 | release/CI merge-queue 或 throwaway validation closed，不作为 feature 实现统计。 |
+
+---
+
+## 2026-06-24（按 2026-06-25 请求口径，全作者）
+
+> 覆盖口径：`QwenLM/qwen-code`，主口径为 `created:2026-06-24` 的全作者、全状态 PR；补充口径为 `merged:2026-06-24` 但创建更早的 PR。统计以 2026-06-25 查询为准：当天创建共 36 个 PR，当前状态 15 merged / 20 open / 1 closed；补充合入但创建更早的 PR 共 9 个，其中 #5654/#5743/#5784 已在前一轮按创建日期覆盖，本次重点补 #5660/#5752/#5755/#5781/#5785/#5788。
+
+### 已落地且需要更新 feature 文档
+
+| PR | 状态 | feature 归属判断 | 文档动作 |
+|---|---|---|---|
+| #5752 | merged | `QWEN_SERVE_MCP_CLIENT_BUDGET` 严格十进制解析，避免 `Number()` 接受 `0x10` / `1e2` / `1.0` 这类非预期预算写法。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)，作为 daemon MCP client budget 安全边界。 |
+| #5755 | merged | Web Shell 语音听写走 daemon：浏览器采集麦克风 PCM，经 `/voice/stream` WebSocket 发给 daemon，daemon 复用现有 ASR pipeline 转写并回填 composer。 | 已补 [voice-dictation.md](voice-dictation.md)、[daemon-serve-mode/README.md](daemon-serve-mode/README.md) 与 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #5781 | merged | 新增模型可调用 `read_mcp_resource` 工具，通过 server name + URI 在普通 tool-call turn 读取 MCP resource；与用户手输 `@server:uri` 互补。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)。 |
+| #5785 | merged | `qwen serve` slim fast path：先监听再延迟加载 interactive UI / React Ink / web-shell / ACP runtime，并通过 `/daemon/status` 暴露 startup timing。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5794 | merged | voice ASR transcript fast-model refinement：转写后用 fast model 做保守清理，超时/失败/不安全输出回退 raw transcript。 | 已补 [voice-dictation.md](voice-dictation.md)。 |
+| #5797 | merged | SDK prompt 遇到 `invalid_client_id` 时单飞 `resumeSession` 重新注册 clientId，并对 admission-time prompt 重试一次。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5808 | merged | self-paced `/loop` in-flight 被用户中断时取消 pending one-shot wakeup，防止 Esc 后下一轮自动复活。 | 已补 [loop-wakeup.md](loop-wakeup.md)。 |
+| #5812 | merged | Claude MCP server config transport mapping：`type:http|sse|stdio` 规范化为 qwen 的 `httpUrl` / `url` / `command` 字段。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)，归入 MCP config ingestion 边界。 |
+| #5826 | merged | session skill usage stats：统计真实 skill body load 的成功/失败/按技能分组，并通过 daemon stats 与 `/stats skills` 展示。 | 已补 [diagnostic-skills.md](diagnostic-skills.md)、[daemon-serve-mode/README.md](daemon-serve-mode/README.md) 与 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md)。 |
+| #5827 | merged | OpenAI-compatible streaming inactivity timeout：stream 长时间无 chunk 时 abort 当前请求并按 `ETIMEDOUT` 走既有 retry 分类。 | 已补 [auth-providers.md](auth-providers.md)。 |
+
+### 已看过但暂不新增专题的 merged PR
+
+| PR | 归属判断 |
+|---|---|
+| #5660 | `web_fetch` JSON fallback，属于 WebFetch 小边界修复；目前 feature 目录未维护独立 WebFetch 专题，暂只在覆盖矩阵登记。 |
+| #5788 | emoji thinking/summary icon 替换，属于 UI copy/presentation 小改；不改变长期 feature 合约。 |
+| #5799 | 非 VP 模式 multi-agent 滚动回弹/flicker 修复，属于 TUI rendering bugfix；不单开 feature。 |
+| #5801 | browser daemon bundle budget 提升到 126 KiB，属于打包预算调参；不改变 daemon 协议面。 |
+| #5803 | pasted image path 自动提升为 attachment，属于输入体验小功能；后续若集中整理 multimodal input 再展开。 |
+| #5805 | IDE server port 环境变量校验，属于 IDE lockfile 读取前置防护；不单开 feature。 |
+| #5810 #5813 #5833 | Linux CI / macOS-Windows tests / CodeQL / merge queue reliability，属于 CI 调度与可靠性；不作为 product feature。 |
+| #5815 | assistant turn merge 时保留 `reasoning_content`，属于 provider stream history 合并 bugfix；当前不新增专题。 |
+| #5830 | v0.19.2 release PR，只反映版本发布。 |
+
+### open PR 后续观察
+
+| PR | 当前归属判断 |
+|---|---|
+| #5791 #5802 | CLI keybinding / shortcut 文案修复，若合入归 CLI/TUI UX。 |
+| #5835 | provider install plan preserve selected model，若合入归 [auth-providers.md](auth-providers.md)。 |
+| #5795 | subagent crash notification 带 partial results / recent activities，若合入归 background agent / subagent 诊断。 |
+| #5807 | 忽略其它 workspace 的 IDE configs，若合入归 IDE/workspace 边界。 |
+| #5809 | serve server routes 拆分，若合入归 daemon 内部重构，除非改变协议面否则不写专题正文。 |
+| #5821 | local OpenAI backends 跳过默认 follow-up suggestions，若合入归 auth/provider 或 UX 小修。 |
+| #5828 | bundled extension creator skill，若合入归 diagnostic/creator skills 或 extension 生态专题。 |
+| #5829 | desktop unsafe source slug deletion guard，若合入归 desktop 安全边界。 |
+| #5832 | release flow merge-queue-safe，若合入归 release automation，不写 feature 专题。 |
+
+### closed / superseded / wrong-base
+
+| PR | 原因 |
+|---|---|
+| #5820 | closed（标题为 `Main`，无可落地 feature）。 |
+
+### 已在前一轮覆盖、本次按状态复核
+
+| PR | 复核结果 |
+|---|---|
+| #5654 #5743 #5784 | 这些 PR 在 2026-06-24 合入，但已按 06-22~06-23 创建日期纳入上一节并更新对应 feature 文档；本次不重复展开。 |
+| #5792 #5793 #5804 #5814 #5817 #5818 #5822 #5824 #5825 | 这些 PR 在 06-24 查询时仍属 open 观察；截至 2026-06-26 已合入或转为本周增量判断，当前处理见 2026-06-25~26 小节。 |
+
+---
+
+## 2026-06-22 ~ 2026-06-23（全作者）
 
 > 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-23`，全作者，全状态。统计以 2026-06-24 `gh pr list/view` 查询为准，共 127 个 PR：84 merged / 24 open / 19 closed。#5743 等 06-23 创建但 06-24 合入的 PR 仍按创建日期纳入。
 
@@ -43,9 +172,11 @@
 
 | PR | 当前归属判断 |
 |---|---|
-| #5616 #5629 | memory auto-generated skill confirmation、PreToolUse hook ask TUI confirmation，若合入后归入权限/skills/hook 交互。 |
-| #5650 #5657 #5661 #5666 #5668 #5773 #5778 | web-shell markdown tables、provider duplicate response、TUI tool display partition、TUI transcript view、thinking intent、`/config key=value`、`/model --vision`，若合入后分别归 daemon/web-shell、auth/provider、TUI/UX、模型配置专题。 |
-| #5727 #5747 #5752 #5755 #5765 #5777 #5780 #5781 #5783 #5785 #5786 | docs drift、audio packaging、MCP budget strict parse、daemon voice/control API、browser extension daemon-direct、update command、MCP resource read tool、WebFetch userinfo URL 拒绝、serve startup perf、review suggestion findings。已记录观察点，待合入后再写入对应 feature。 |
+| #5629 | PreToolUse hook ask TUI confirmation，若合入后归入权限/skills/hook 交互。 |
+| #5661 #5666 #5668 #5773 #5778 | TUI tool display partition、TUI transcript view、thinking intent、`/config key=value`、`/model --vision`，若合入后分别归 TUI/UX、模型配置专题。 |
+| #5777 #5780 #5786 | browser extension daemon-direct、update command、review suggestion findings。已记录观察点，待合入后再写入对应 feature。 |
+
+> 状态复核：#5752/#5755/#5781/#5785 在上一轮查询时作为后续观察登记，已于 2026-06-24 合入；#5616/#5650/#5657/#5747/#5765 已于 2026-06-25~26 合入并在本周增量小节补文档；#5783 已按“暂不新增专题”登记。
 
 ### closed / superseded / wrong-base
 
@@ -134,7 +265,7 @@
 | #5203 | merged | on-demand tmux real-user testing。 | CI/验证基础设施，不作为 feature 专题。 |
 | #5233 | merged | autofix issue-fix/review-response lifecycle。 | CI/automation，不作为 feature 专题。 |
 | #5547 | merged | triage review check 文档。 | docs/process，不作为 product feature 专题。 |
-| #5561 | open | MCP servers live reconcile on settings change。 | open PR，暂不作为已落地 feature；已在 [mcp-resources-prompts.md](mcp-resources-prompts.md) 后续中提及。 |
+| #5561 | merged 2026-06-25 | MCP servers live reconcile on settings change。 | 上周查询时为 open；本周合入后已在 2026-06-25~26 增量小节和 [mcp-resources-prompts.md](mcp-resources-prompts.md) 补正文。 |
 
 ---
 
@@ -146,4 +277,4 @@
 | release / version bump PRs | merged | v0.18.x release、desktop release、VS Code companion publish 等只反映发布动作，不单独进入 feature 技术方案。 |
 | 大量 path/URL/schema/i18n/desktop/parser 小修 | merged | 归入对应周报主题分组；除改变 feature 合约或安全边界者外，不单开专题。 |
 
-_更新于 2026-06-24_
+_更新于 2026-06-26_

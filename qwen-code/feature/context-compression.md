@@ -1,7 +1,7 @@
 # 上下文压缩技术方案
 
 > 适用范围：`QwenLM/qwen-code`，`packages/core` + `packages/cli`。
-> 关联 PR：**#3879**（反应式压缩）、**#3985**（反应式压缩加固）、**#3872**（会话记录瘦身，修复 #3822）、**#5042**（超大工具结果外置）、**#5111**（active tool result history 累计预算）。
+> 关联 PR：**#3879**（反应式压缩）、**#3985**（反应式压缩加固）、**#3872**（会话记录瘦身，修复 #3822）、**#5042**（超大工具结果外置）、**#5111**（active tool result history 累计预算）、**#5865**（compression summary side-query streaming）。
 > 代码锚点格式：`file:symbol`，行号以仓库 `main` 为准（实现已在 PR 之后继续演进，差异在文中标注）。
 
 ---
@@ -252,6 +252,16 @@ function isCompressionFailureStatus(status: CompressionStatus): boolean {
 关键设计：**只把"显式失败"算作失败，`NOOP` 不算**。`NOOP` 表示"无需/未做压缩"（历史太短、低于阈值、熔断已开等），它不是失败，不应触发 latch / 计数器，也不应改变既有 force 压缩语义。该 helper 同时被 `recordCompression`（latch 判断）与反应式失败分支复用，保证两处口径一致。
 > `main` 上 `isCompressionFailureStatus` 还纳入了后来新增的 `COMPRESSION_FAILED_OUTPUT_TRUNCATED`（摘要输出被 max-output 截断，`turn.ts:CompressionStatus`）。
 
+### 3.2.1 摘要 side-query opt-in streaming（#5865）
+
+#5865 修的是压缩摘要这条 side-query 的 transport 边界。压缩本身仍由 `ChatCompressionService.compress` 发起，返回仍是同一个 `{ text, usage }` 形状；变化在于 compression caller 显式传 `stream: true`，让 `runSideQuery` / `BaseLlmClient.generateText` 走既有 `generateContentStream`，逐 chunk 收集 delta 后再拼回摘要文本。
+
+动机是避免 BFF/gateway 这类代理对非流式请求施加 60s read timeout：长摘要生成如果一直没有 HTTP body 返回，会被代理杀掉；streaming 后即便模型还在生成，代理也能持续看到 chunk。边界：
+
+- 只有 compression summary side-query opt-in；recap/btw/follow-up 等其它 side-query 不因此改变 transport。
+- 对调用方返回的 `CompressionStatus`、`newHistory`、usage 统计和 hook 触发语义不变。
+- abort signal 继续沿 #3985 的路径透传；streaming 只改变底层读取方式，不改变用户取消或压缩失败分类。
+
 ### 3.3 会话记录瘦身（#3872，修复 #3822）
 
 #### 3.3.1 落盘前非破坏性 `sanitize`
@@ -449,6 +459,7 @@ stateDiagram-v2
 | **#3872** | 会话记录瘦身（fix #3822） | 落盘前非破坏性 `sanitizeToolCallResultForRecording` / `sanitizeFileDiffForRecording`：超限的 `fileDiff` 用合法占位、原文/新文中间截断；保留 `diffStat` 与 `*Length` 元数据 + `truncatedForSession` 标记；更新 TUI 渲染、ACP 回放、导出归一化与统计等消费者，共享 `buildTruncatedDiffPreviewText`。 |
 | **#5042** | 超大工具结果外置 | 超过 28K 字符的工具结果写入 `tool-results/<callId>.txt`；上下文只保留 `<persisted-output>` stub、2KB preview 和文件指针，并加 24h 清理与 session 磁盘预算。 |
 | **#5111** | active tool result history 预算 | 新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`（默认 500000，`-1` 禁用）；provider request 前把 pending ToolResult 作为虚拟尾部计入累计字符预算，超过阈值时用 microcompaction 清理较早 compactable results。 |
+| **#5865** | compression summary streaming | 压缩摘要 side-query 显式 opt-in streaming，复用 `generateContentStream` 收集 delta 并返回同形 `{text, usage}`，避免代理/网关非流式 read timeout。 |
 
 ---
 
@@ -507,3 +518,9 @@ Copilot review 指出：当 `fileDiff <= 50_000` 且两份内容各 `<= 16_000` 
 - `config.ts` / settings schema：新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`，默认 500000，`-1` 禁用；兼容旧的 `toolResultsThresholdMinutes: -1` 行为。
 - `client.ts` / microcompaction：provider request 前统计历史 compactable tool result + pending ToolResult 虚拟尾部，超过阈值则清理较早结果并保留近期输出。
 - `microcompact.ts`：size-triggered cleanup 跳过 error、already-cleared、non-compactable 和媒体输出，复用既有 cleared-result placeholder 与 file-read-cache disarm 语义。
+
+### PR #5865 — stream compression summaries
+
+- `ChatCompressionService.compress` / side-query call site：给压缩摘要请求传 `stream:true`，只让 compression opt-in streaming。
+- `core/utils/sideQuery.ts` / `BaseLlmClient.generateText`：新增 stream 参数并复用既有 `generateContentStream`，收集 text delta 和 usage 后仍返回 `{ text, usage }`。
+- 行为边界：不改变 compression status、history replacement、hook trigger、abort signal 或 retry budget；目标只是避免长摘要非流式请求被代理 read timeout 中断。
