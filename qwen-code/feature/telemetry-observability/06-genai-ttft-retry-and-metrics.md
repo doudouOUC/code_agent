@@ -9,12 +9,13 @@
 
 ## 概述
 
-本文聚焦 `qwen-code.llm_request` span 的「请求计时与可观测语义」这一条线，四块内容彼此咬合：
+本文聚焦 `qwen-code.llm_request` span 的「请求计时与可观测语义」这一条线，五块内容彼此咬合：
 
 1. **TTFT（time-to-first-token）采集**：在流式迭代中捕获「首个用户可见 chunk」的墙钟时延。关键点是**基线（baseline）的语义**——`ttftMs` 从 `generateContentStream` 进入点开始计时（含本次调用的 request setup），是**方法内闭包变量**（绝不能是实例字段），首 token 判定用 `hasUserVisibleContent` 并对 `thought === true` 做了精确修复。
 2. **GenAI 语义双发（dual-emit）**：在写私有属性（`input_tokens` / `output_tokens` / `ttft_ms` …）的同时，并行写一份 OTel GenAI 语义约定属性（`gen_ai.*`）。**关键设计：双发只写 span attribute，绝不再发一份 metric counter**——token 计量已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 承担一次，再发 counter 就会**双计**。
 3. **重试可见性【#4432 已合入】**：通过 `AsyncLocalStorage`（`retryContext`）把「第几次尝试 / 累计退避 / 累计 setup」从 `retryWithBackoff` 透传到 `LoggingContentGenerator`。核心三处精妙：(a) `iterationCount` **单调计数器**与被 clamp 的 `attempt` 循环变量**解耦**；(b) `onRetry` 三汇（QwenLogger / OTel log / metric counter）；(c) 顺带修复 Phase 4a 的 `sampling_ms` **重复扣减 setup** bug。
-4. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
+4. **LLM request phase breakdown（#5904 / Phase 4c）**：把已有但未接线的 `recordApiRequestBreakdown` histogram 接到 `endLLMRequestSpan`，每个 LLM request 最多记录 REQUEST_PREPARATION、NETWORK_LATENCY、RESPONSE_PROCESSING 三段耗时，便于判断延迟花在 retry/setup、TTFT 还是输出 streaming。
+5. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
 
 一句话串起来：**一次 LLM 请求 = 一个 `llm_request` span**；TTFT/token/gen_ai.\* 都是这个 span 的**属性**；retry 在这个 span 之**上**（每次重试是一个**全新**的 span），靠 ALS 把上下文灌进每个 per-attempt span；只有 token 用量和 retry 次数会另外落 **metric counter**（受基数开关约束）。
 
@@ -26,6 +27,7 @@
 |---|---|---|---|
 | **#4417** | MERGED | Phase 4a — TTFT + GenAI 双发 | 引入流式 `ttftMs` 采集（`loggingStreamWrapper` 闭包变量 + `hasUserVisibleContent`）、`endLLMRequestSpan` 的 `gen_ai.*` 双发、派生 `sampling_ms` / `output_tokens_per_second`。本文 TTFT + 双发两节的代码主体。 |
 | **#4432** | MERGED（2026-06-05） | Phase 4b — retry 可见性 | 新增 `utils/retryContext.ts`（ALS）、`retry.ts` 的 `onRetry` + 单调 `iterationCount` + try/catch、`types.ts:ApiRetryEvent`、`loggers.ts:logApiRetry`、`metrics.ts:api.retry.count`、`loggingContentGenerator.ts:snapshotRetryMetadata`，并**修复** `session-tracing.ts` 的 `sampling_ms` 双减 setup bug。本文「重试可见性」整节 + sampling 修复。 |
+| **#5904** | MERGED（2026-06-26） | Phase 4c — api request breakdown metric | `endLLMRequestSpan` 调用已有 `recordApiRequestBreakdown`，按 REQUEST_PREPARATION / NETWORK_LATENCY / RESPONSE_PROCESSING 三段记录 `qwen-code.api.request.breakdown` histogram。 |
 | **#4367** | MERGED | Resource 属性 + metric 基数 | `resource-attributes.ts` 自定义属性解析、percent-decode 防保留键绕过、`RESERVED_RESOURCE_ATTRIBUTE_KEYS`、`session.id` 移出 metrics 默认（`metrics.ts:getCommonAttributes` + `QWEN_TELEMETRY_METRICS_INCLUDE_SESSION_ID`）、`OTEL_SERVICE_NAME` 逃生口。本文「指标与资源属性」整节。 |
 | #4482 | MERGED | 桥接错误信息 + TUI | 与本文弱相关：`logApiRetry` 走 OTel log → `LogToSpanProcessor` 桥接路径时，复用 #4482 的 `formatExportError` / `diagnosticsSink`。 |
 | #3893 | MERGED | 敏感属性 opt-in | 弱相关：`logApiResponse` 的 `response_text` 与本文 token 计量同函数；详见 04 子文档。 |
@@ -408,6 +410,22 @@ const samplingMs = Math.max(0, duration - metadata.ttftMs);
 语义从「整条链的终态」变成「**per-attempt 视角**」，与「每 attempt 一个 span」的架构前提一致。
 
 ---
+
+## LLM request phase breakdown metric（#5904 / Phase 4c）
+
+#5904 把早期已存在但没有生产调用方的 `recordApiRequestBreakdown` 接到 `session-tracing.ts:endLLMRequestSpan`。它不是新增 span attribute，而是把一次 LLM request 的耗时按 phase 额外写入 `qwen-code.api.request.breakdown` histogram，便于在 metrics 后端直接看“延迟花在哪一段”。
+
+三段 phase 的口径与前文 TTFT / retry 字段保持一致：
+
+| phase | 记录条件 | 语义 |
+|---|---|---|
+| `REQUEST_PREPARATION` | 有 `requestSetupMs` 时记录 | retry/setup overhead：从 `retryWithBackoff` 进入到本 attempt 开始前的累计准备与退避成本。无 retry context 的直连请求不强行写 0。 |
+| `NETWORK_LATENCY` | 有 `ttftMs` 时记录 | time to first token：本 attempt 从 `generateContentStream` 进入点到首个用户可见 chunk。 |
+| `RESPONSE_PROCESSING` | 有 `ttftMs` 且能得到 request duration 时记录 | output streaming remainder：首 token 之后到 request 结束的输出阶段耗时，沿用 `Math.max(0, duration - ttft)` 的非负 clamp 口径。 |
+
+这组 histogram 与 span 上的 `duration_ms`、`ttft_ms`、`request_setup_ms`、`sampling_ms` 互补：span attribute 适合逐请求排查，breakdown metric 适合按模型/阶段聚合趋势。#5904 还把 `LLMRequestMetadata` 增加为可选 `config?`，因为 metrics 记录需要 `Config` 才能复用当前 telemetry metric 初始化状态和 common attributes；没有 config 或 metrics 未初始化时，metrics helper 仍按既有 guard 静默跳过。
+
+风险边界：`recordApiRequestBreakdown` 内部已有 initialized/config guard，正常不会抛；PR body 仍明确指出若它异常抛出，span status 设置可能被跳过，但 `span.end()` 仍会执行，不会造成活跃 span 泄漏。这也是后续审计应关注的点：metrics 写入应保持 best-effort，不应成为 request span 收尾的硬依赖。
 
 ## 指标与资源属性（#4367）
 

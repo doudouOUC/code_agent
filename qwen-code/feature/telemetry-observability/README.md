@@ -17,7 +17,7 @@
 | 03 | [上下文传播与并发隔离](03-context-propagation-and-concurrency.md) | ALS、resolveParentContext、subagent 并发隔离(#4410) |
 | 04 | [敏感属性 opt-in 与 PII](04-sensitive-attributes-and-pii.md) | 门控链、截断 / SHA-256 去重、response_text 未门控泄露面 |
 | 05 | [trace↔日志关联与 daemon 端遥测](05-correlation-and-daemon-telemetry.md) | getTraceContext、daemon route span、W3C 跨进程传播 |
-| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、资源属性与基数 |
+| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数 |
 | 07 | [出站关联与 traceparent 传播](07-outbound-correlation.md) | 默认安全、OTLP 反馈环防护、opt-in 广播安全面 |
 
 ---
@@ -40,7 +40,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **敏感属性 opt-in**：prompt / system prompt / tool input·result / 模型输出默认不写入 span，见 `telemetry/detailed-span-attributes.ts`。
 - **敏感属性长度上限可配置（#5804）**：启用 sensitive span attributes 后，user/system prompt、tool schema、模型输出、tool input/result 的截断上限由 `telemetry.sensitiveSpanAttributeMaxLength` 或 `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` 控制，默认 1 MiB。
 - **trace ↔ debug log 关联**：debug 日志行注入 `trace_id` / `span_id`，见 `utils/debugLogger.ts:getTraceContext`。
-- **GenAI 语义双发 + TTFT + retry 可见性**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
+- **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传，见 `telemetry/daemon-tracing.ts`（`daemon_mode_b_main`）。
 
 ---

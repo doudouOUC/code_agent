@@ -42,6 +42,8 @@
 | [#5822](https://github.com/QwenLM/qwen-code/pull/5822) | @ytahdn | Merged | streaming turn 中本地 slash/shell command transcript append 延后排队 |
 | [#5864](https://github.com/QwenLM/qwen-code/pull/5864) | @ytahdn | Merged | finished thinking summary 保留 duration |
 | [#5876](https://github.com/QwenLM/qwen-code/pull/5876) | @ytahdn | Merged | 中文工具组文案从“执行了 N 个工具”改为“调用了 N 个工具” |
+| [#5893](https://github.com/QwenLM/qwen-code/pull/5893) | @ytahdn | Merged | Web Shell chat UI polish：颜色 token、composer、permission/question panels、scroll-follow |
+| [#5900](https://github.com/QwenLM/qwen-code/pull/5900) | @carffuca | Merged | Web Shell host 可覆盖 streaming loading phrases |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -390,8 +392,12 @@ sequenceDiagram
 | #5822 | streaming turn 中本地命令延后写 transcript。 | `/context`、`/stats`、`/status`、`/about`、`/bug`、`/model --voice`、`/skills`、`/tools`、`/extensions` 等命令走同一 choke point；如果当前 turn 正在 streaming，先排队，等 turn 边界稳定后再插入 transcript，避免本地 user row 插进 assistant 正在输出的中间。 |
 | #5864 | finished thinking summary 保留 duration。 | thinking 完成态从只有“Done thinking / 思考完成”补成可显示“Thought for 5s / 已思考 5s”；没有 duration 时才回落旧文案。 |
 | #5876 | 中文工具组文案更准确。 | 中文从“执行了 N 个工具”改为“调用了 N 个工具”，英文保持不变；这只是 display copy，不改变 tool block schema。 |
+| #5893 | chat UI polish。 | 更新 light/dark color tokens、composer controls、permission/question panels、queued prompt controls、message hover actions、system/status messages；审批按钮顺序改为 reject first，AskUserQuestion/approval 文案更紧凑，用户展开/折叠历史 turn 时暂停 auto bottom-follow。 |
+| #5900 | host loading phrases 定制。 | `WebShellCustomization.loadingPhrases` / `WebShellProps.loadingPhrases` 允许 embedding host 按语言返回短语数组、`[]` 隐藏短语、`undefined/null` 使用内置默认；resolver 用 ref 读取，避免 streaming 中 inline resolver 触发 15s rotation interval 重建和闪烁。 |
 
 这批改动都保持在 Web Shell / SDK transcript projection 层，不改变 daemon 事件 wire schema 的核心语义。#5818/#5822 特别重要：它们把“客户端本地动作”和“daemon 正在流式输出的 turn”重新分界，避免刷新、重连或本地命令把 transcript 变成不可恢复的交错状态。
+
+#5893/#5900 属于 host/UI surface：它们不改变 daemon REST/SSE/ACP 事件语义，也不改变 transcript block schema。#5893 主要压缩视觉噪音和权限面板操作顺序；#5900 则补齐 web-shell embedding customization 的一个缺口，让宿主无需 fork 组件即可替换或隐藏流式加载短语。
 
 ---
 
