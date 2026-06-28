@@ -41,9 +41,13 @@
 | [#5818](https://github.com/QwenLM/qwen-code/pull/5818) | @ytahdn | Merged | Web Shell restored active prompt loading，刷新/重连后保持 active prompt 状态 |
 | [#5822](https://github.com/QwenLM/qwen-code/pull/5822) | @ytahdn | Merged | streaming turn 中本地 slash/shell command transcript append 延后排队 |
 | [#5864](https://github.com/QwenLM/qwen-code/pull/5864) | @ytahdn | Merged | finished thinking summary 保留 duration |
+| [#5869](https://github.com/QwenLM/qwen-code/pull/5869) | @carffuca | Merged | streaming code block highlight + fence-language alias normalization |
 | [#5876](https://github.com/QwenLM/qwen-code/pull/5876) | @ytahdn | Merged | 中文工具组文案从“执行了 N 个工具”改为“调用了 N 个工具” |
 | [#5893](https://github.com/QwenLM/qwen-code/pull/5893) | @ytahdn | Merged | Web Shell chat UI polish：颜色 token、composer、permission/question panels、scroll-follow |
 | [#5900](https://github.com/QwenLM/qwen-code/pull/5900) | @carffuca | Merged | Web Shell host 可覆盖 streaming loading phrases |
+| [#5917](https://github.com/QwenLM/qwen-code/pull/5917) | @ytahdn | Merged | enhanced Markdown tables 改为手动 toggle，复制反馈更明确 |
+| [#5931](https://github.com/QwenLM/qwen-code/pull/5931) | @ytahdn | Merged | standalone Web Shell workspace session sidebar |
+| [#5943](https://github.com/QwenLM/qwen-code/pull/5943) | @carffuca | Merged | Web Shell error boundaries，防 render crash 白屏 |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -391,13 +395,17 @@ sequenceDiagram
 | #5818 | active prompt 恢复更稳定。 | daemon 在 attach/load 时返回 active prompt flag；Web Shell 合并 server-restored prompts 与本地 submission tracking，覆盖刷新、SSE 重连、取消和 terminal event 顺序，避免 reconnect 时重复提交或误判空闲。 |
 | #5822 | streaming turn 中本地命令延后写 transcript。 | `/context`、`/stats`、`/status`、`/about`、`/bug`、`/model --voice`、`/skills`、`/tools`、`/extensions` 等命令走同一 choke point；如果当前 turn 正在 streaming，先排队，等 turn 边界稳定后再插入 transcript，避免本地 user row 插进 assistant 正在输出的中间。 |
 | #5864 | finished thinking summary 保留 duration。 | thinking 完成态从只有“Done thinking / 思考完成”补成可显示“Thought for 5s / 已思考 5s”；没有 duration 时才回落旧文案。 |
+| #5869 | streaming code block highlight 与 fence alias。 | 共享 lazy Shiki highlighter，流式 code block 随 chunk 同步重高亮；`ts/js/py/sql`、大小写 alias 归一化；语言按需 `loadLanguage`、并发 dedupe、失败 grammar 记录、LRU HTML cache 和大 block plain fallback。 |
 | #5876 | 中文工具组文案更准确。 | 中文从“执行了 N 个工具”改为“调用了 N 个工具”，英文保持不变；这只是 display copy，不改变 tool block schema。 |
 | #5893 | chat UI polish。 | 更新 light/dark color tokens、composer controls、permission/question panels、queued prompt controls、message hover actions、system/status messages；审批按钮顺序改为 reject first，AskUserQuestion/approval 文案更紧凑，用户展开/折叠历史 turn 时暂停 auto bottom-follow。 |
 | #5900 | host loading phrases 定制。 | `WebShellCustomization.loadingPhrases` / `WebShellProps.loadingPhrases` 允许 embedding host 按语言返回短语数组、`[]` 隐藏短语、`undefined/null` 使用内置默认；resolver 用 ref 读取，避免 streaming 中 inline resolver 触发 15s rotation interval 重建和闪烁。 |
+| #5917 | enhanced Markdown tables 手动切换。 | `enhanceTables` 开启时默认先渲染普通 Markdown table，右上角 icon 手动切到 interactive table，也可切回普通视图；Copy / Copy TSV 成功后显示短暂 copied feedback。 |
+| #5931 | workspace session sidebar。 | standalone Web Shell 默认展示 workspace session sidebar；支持新建、切换、重命名 active session、删除 inactive session、本地搜索、项目/侧边栏折叠和宽度 resize。切 session 时保留当前 transcript，等目标 session replay ready 后再替换，避免空白中间态。 |
+| #5943 | error boundaries 防白屏。 | message body 外包 per-message `ErrorBoundary`，单条坏消息降级成 inline notice；top-level WebShell / standalone App 外再包边界，组件树 crash 时显示 retry fallback。content 改变时自动恢复；dev-only 显示 raw error detail，生产不外露。 |
 
 这批改动都保持在 Web Shell / SDK transcript projection 层，不改变 daemon 事件 wire schema 的核心语义。#5818/#5822 特别重要：它们把“客户端本地动作”和“daemon 正在流式输出的 turn”重新分界，避免刷新、重连或本地命令把 transcript 变成不可恢复的交错状态。
 
-#5893/#5900 属于 host/UI surface：它们不改变 daemon REST/SSE/ACP 事件语义，也不改变 transcript block schema。#5893 主要压缩视觉噪音和权限面板操作顺序；#5900 则补齐 web-shell embedding customization 的一个缺口，让宿主无需 fork 组件即可替换或隐藏流式加载短语。
+#5893/#5900/#5917/#5931/#5943 属于 host/UI surface：它们不改变 daemon REST/SSE/ACP 事件语义，也不改变 transcript block schema。#5893 主要压缩视觉噪音和权限面板操作顺序；#5900 补齐 embedding customization；#5917 把 enhanced table 从默认接管改成用户主动切换；#5931 增加 standalone session navigation；#5943 则把 render crash 限制在 message 或 app fallback 内，避免 embed 宿主页面被单条 transcript 数据拖成白屏。
 
 ---
 

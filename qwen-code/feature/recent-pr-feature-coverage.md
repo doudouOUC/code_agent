@@ -4,18 +4,46 @@
 
 ---
 
-## 2026-06-22 ~ 2026-06-26（本周，全作者）
+## 2026-06-22 ~ 2026-06-27（本周，全作者）
 
-> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-26` 全作者、全状态 PR；补充口径为本周内合入但创建更早的 PR。统计以 2026-06-27 查询为准：本周创建共 212 个 PR，当前 162 merged / 27 open / 23 closed；其中 2026-06-25~26 新创建 49 个 PR，当前 33 merged / 13 open / 3 closed。2026-06-26（昨天）创建 20 个 PR（13 merged / 7 open），当天合入 18 个 PR。2026-06-25~26 合入共 61 个 PR，其中 #5561 是 06-21 创建但本周合入，按本周落地能力补记。
+> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-27` 全作者、全状态 PR；补充口径为本周内合入但创建更早的 PR。统计以 2026-06-28 查询为准：本周创建共 238 个 PR，当前 186 merged / 26 open / 26 closed；其中 2026-06-27（昨天）创建 26 个 PR，当前 19 merged / 4 open / 3 closed。`merged:2026-06-27` 口径返回 25 个 `mergedAt` 非空 PR，另有 #5911/#5943/#5945 是 06-27 创建、06-28 合入，按“昨天创建 PR”登记但不写成 06-27 已合入。
 
-本周已拆成四层记录：
+本周已拆成五层记录：
 
 | 范围 | 作用 |
 |---|---|
+| 2026-06-27 昨日复核 | 本次重点：逐一复核昨天创建与昨天合入的 PR，补“每个 PR 做什么、怎么做、对应 feature 是否要更新”。 |
 | 2026-06-26 昨日复核 | 本次重点：逐一复核昨天创建与昨天合入的 PR，补“每个 PR 做什么、怎么做、对应 feature 是否要更新”。 |
 | 2026-06-25~26 增量 | 本节重点补 06-25/26 新创建或新合入的 PR，以及上一节 open 观察转 merged 的 PR。 |
 | 2026-06-24 | 见下一节，覆盖 06-24 创建 PR 和 06-24 合入的跨日 PR。 |
 | 2026-06-22~23 | 见后续节，覆盖周一/周二创建 PR；其中部分在 06-24/25 合入的 PR 已在本周增量节复核。 |
+
+### 2026-06-27 昨日 PR 专项复核
+
+昨天创建 26 个 PR：当前 19 merged / 4 open / 3 closed。昨天合入的跨日 PR 里，#5886/#5903/#5869/#5778 从前序 open 观察转为 merged，需要同步更新对应 feature 文档；#5906 已在前一轮写入 settings minimum validation，本轮只复核状态。
+
+| PR | 处理结果 |
+|---|---|
+| #5886 | 已更新 [managed-memory.md](managed-memory.md)：新增 git-shared team memory tier，写清 `.qwen/team-memory/`、secret guard、生成式 `MEMORY.md` index、可选 git sync 和 trusted workspace 边界。 |
+| #5903 | 已更新 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md)：ACP `/cd` 走 server-side cwd update，说明绝对路径、trust/sandbox/client 校验、per-session logical cwd、`session_cwd_changed` 事件和 prompt-busy 排队语义。 |
+| #5938 | 已更新 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)：`qwen serve` fast path 增加 Node compile cache 与 deferred `getCliVersion()`，解释 warm restart bytecode cache 和 version promise 并行化。 |
+| #5945 | 已更新 [daemon-serve-mode/08-extension-endpoints.md](daemon-serve-mode/08-extension-endpoints.md)：`general.sessionRecapAwayThresholdMinutes` 增加 `minimum:1`，与 #5906 的 minimum validator 统一到 daemon API、TUI settings、VS Code schema。 |
+| #5931 #5917 #5943 #5869 | 已更新 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)：workspace session sidebar、enhanced table 手动 toggle、error boundaries、streaming code highlight / fence alias。 |
+| #5930 | 已更新 [workflow-token-budget.md](workflow-token-budget.md)：`QWEN_CODE_WORKFLOW_STALL_SECONDS` 只接受十进制整秒，`0` 禁用，hex/scientific/float 回落默认值。 |
+| #5927 #5921 | 已更新 [loop-wakeup.md](loop-wakeup.md)：footer scheduled task count，以及 cron/loop 管理意图在 `tool_search` 中更容易命中 list/delete/wakeup。 |
+| #5925 | 已更新 [cua-driver.md](cua-driver.md)：shared Computer Use client 增加 idle timeout，默认空闲 5 分钟停止 `cua-driver`，`tools.computerUse.idleTimeoutMs=0` 可禁用。 |
+| #5923 | 已更新 [conversation-rewind.md](conversation-rewind.md)：resume/load 重建 rewind turn boundaries 时保留 persisted `parentUuid`，覆盖 CLI resume、ACP loadSession 和 unstable_resumeSession。 |
+| #5919 | 已更新 [channel-adapters.md](channel-adapters.md)：Telegram bot command menu 与 shared `/cancel` command adapter，补 command 注册和 group mention 边界。 |
+| #5918 | 已更新 [monitor-tool.md](monitor-tool.md)：交互式前台 shell 临近超时 live warning，只在可 Ctrl+B promote 的 TUI 场景显示，不改变 shell 输出或后台任务行为。 |
+| #5934 | 已更新 [tool-call-id-integrity.md](tool-call-id-integrity.md)：默认输出 token 上限改为模型声明上限，重复截断 `write_file`/edit 拒绝接入 retry-loop detector。 |
+| #5778 | 已更新 [auth-providers.md](auth-providers.md)：`/model --vision` fallback vision model、`visionModel` 配置、跨 provider vision bridge 和 stale modality gate 修复。 |
+| #5835 | 非昨天创建/合入，但本轮复核时从 06-24 open 观察转 merged；已更新 [auth-providers.md](auth-providers.md)：provider install plan 重新应用时保留当前已选模型。 |
+| #5937 | serve server assembly refactor，属于 daemon 内部拆分；不改变协议/feature 合约，本轮只登记。 |
+| #5935 #5916 #5915 #5898 | MCP dialog border、tool display cleanup、schema warning 静音、mid-input skill completion 等局部 UX/补全/噪音修复；暂无长期 feature 专题，只在矩阵登记。 |
+| #5914 #5911 #5829 | desktop source slug/path validation hardening；当前 feature 目录没有 desktop source 专题，本轮登记安全边界但不新增专题。 |
+| #5631 #3683 | CONTRIBUTING provider governance docs / GitHub Actions 升级；属于 docs/process/CI，不新增 feature 专题。 |
+| #5944 #5928 #5926 #5912 | 仍 open，分别归 shell retry loop、todo persistence、PR intake evidence gate、ACP permission votes；合入后再更新对应 feature。 |
+| #5940 #5913 #5910 | closed / superseded / clarification；不作为已落地 feature。#5910 的 ACP permission vote 方向由 open #5912 继续承接。 |
 
 ### 2026-06-25 ~ 2026-06-26 已落地且需要更新 feature 文档
 
@@ -64,7 +92,7 @@
 | #5807 #5809 | 06-26 合入；IDE stale workspace config ignore 与 serve route split 属于 workspace/daemon 内部边界或重构，本次只登记不新增专题。 |
 | #5878 #5880 #5885 #5899 | release / test / CI reliability，覆盖矩阵登记，不新增 feature 专题。 |
 | #5891 #5898 | CLI tool-call description wrapping、mid-input skill completion，属于局部 UX/补全修复；暂无对应长期 feature 专题，只在矩阵登记。 |
-| #5884 #5886 #5888 #5890 #5895 #5902 #5903 | 仍 open，分别归 sessionless remember、team memory、channel qwen tag、loop task file、session artifacts、QQ Bot streaming、ACP `/cd` 后续观察，合入后再更新对应 feature。 |
+| #5884 #5888 #5890 #5895 #5902 | 仍 open，分别归 sessionless remember、channel qwen tag、loop task file、session artifacts、QQ Bot streaming，合入后再更新对应 feature。#5886/#5903 已于 2026-06-27 合入并在本轮更新 feature 文档。 |
 
 ### 2026-06-25 ~ 2026-06-26 已看过但暂不新增专题
 
@@ -81,15 +109,14 @@
 | PR | 当前归属判断 |
 |---|---|
 | #5847 #5852 #5884 | daemon runtime context injection、resumable ACP stream、sessionless workspace remember；若合入归 daemon/serve 与 memory。 |
-| #5848 #5869 | UI / transcript rendering polish；若合入归 Web Shell 或 CLI UX。 |
+| #5848 | UI / transcript rendering polish；若合入归 Web Shell 或 CLI UX。#5869 已于 2026-06-27 合入并在本轮更新 Web Shell 文档。 |
 | #5856 | desktop voice dictation，若合入补 [voice-dictation.md](voice-dictation.md) 与 desktop 相关记录。 |
 | #5868 | auto-compact threshold / Stop hook context usage，若合入补 [context-compression.md](context-compression.md) 与 hook/permission 相关记录。 |
-| #5886 | git-shared team memory tier，若合入补 [managed-memory.md](managed-memory.md)。 |
 | #5888 | qwen tag / multiplayer channel-resident agent RFC，若合入补 [channel-adapters.md](channel-adapters.md)。 |
 | #5890 | loop task file injection via sentinels，若合入补 [loop-wakeup.md](loop-wakeup.md)。 |
 | #5895 | session artifacts daemon API design，若合入补 daemon/serve 或 artifact 专题。 |
 | #5902 | QQ Bot streaming idle flush / markdown pipe / replyMsgId TTL，若合入补 [channel-adapters.md](channel-adapters.md)。 |
-| #5903 | ACP session `/cd` server-side cwd update，若合入补 daemon ACP/session 文档。 |
+| #5944 #5928 #5926 #5912 | 06-27 新增 open 观察：shell inspection loop、project-local todo persistence、PR intake evidence gate、ACP permission votes；合入后再补对应专题。 |
 
 ### 2026-06-25 ~ 2026-06-26 closed / superseded / wrong-base
 
@@ -139,7 +166,7 @@
 | PR | 当前归属判断 |
 |---|---|
 | #5791 #5802 | CLI keybinding / shortcut 文案修复，若合入归 CLI/TUI UX。 |
-| #5835 | provider install plan preserve selected model，若合入归 [auth-providers.md](auth-providers.md)。 |
+| #5835 | 已于 2026-06-28 合入，当前轮按本周状态复核更新 [auth-providers.md](auth-providers.md)。 |
 | #5795 | subagent crash notification 带 partial results / recent activities，若合入归 background agent / subagent 诊断。 |
 | #5821 | local OpenAI backends 跳过默认 follow-up suggestions，若合入归 auth/provider 或 UX 小修。 |
 | #5829 | desktop unsafe source slug deletion guard，若合入归 desktop 安全边界。 |
@@ -200,7 +227,7 @@
 | PR | 当前归属判断 |
 |---|---|
 | #5629 | PreToolUse hook ask TUI confirmation，若合入后归入权限/skills/hook 交互。 |
-| #5661 #5666 #5668 #5773 #5778 | TUI tool display partition、TUI transcript view、thinking intent、`/config key=value`、`/model --vision`，若合入后分别归 TUI/UX、模型配置专题。 |
+| #5666 #5773 | TUI transcript view、`/config key=value`，若合入后分别归 TUI/UX、模型配置专题。#5661/#5668 已合入但仍属 TUI/UX 小面，本轮只登记；#5778 已于 2026-06-27 合入并更新 [auth-providers.md](auth-providers.md)。 |
 | #5777 #5780 #5786 | browser extension daemon-direct、update command、review suggestion findings。已记录观察点，待合入后再写入对应 feature。 |
 
 > 状态复核：#5752/#5755/#5781/#5785 在上一轮查询时作为后续观察登记，已于 2026-06-24 合入；#5616/#5650/#5657/#5747/#5765 已于 2026-06-25~26 合入并在本周增量小节补文档；#5783 已按“暂不新增专题”登记。

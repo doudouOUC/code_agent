@@ -1,7 +1,7 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769 / #5793 / #5827 / #5845**。
+> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769 / #5778 / #5793 / #5827 / #5835 / #5845**。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
@@ -36,6 +36,8 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 - **自定义 provider id 与 transport protocol 解耦（#5793）**：某些自定义 provider 需要保留自己的 provider id / label / preset metadata，但底层请求应复用内置 SDK protocol（例如走已有 OpenAI-compatible 或 DashScope 风格 transport）。如果强行把 id 当 protocol，会让 provider identity 与请求行为绑定过死。
 
 - **OpenAI-compatible stream 卡死（#5827/#5845）**：OpenAI SDK 的 request `timeout` 通常只覆盖连接或首包；一旦流式响应已经开始但长时间没有新 chunk，旧实现可能一直挂住。需要 provider pipeline 内部的 inactivity timeout，让“无流量”也能 abort 并复用既有 retry 分类，同时允许部署通过环境变量统一覆盖默认 idle timeout。
+
+- **视觉模型 fallback 与 provider install 不应误改主模型（#5778/#5835）**：多模态输入需要一个可选 vision fallback model，但它不能污染主聊天模型选择；同样，重新认证或重新应用 provider install plan 时也不应把用户选好的 cheaper/faster model 重置成 provider 默认模型。
 
 本方案的目标即：用**统一的 source 溯源 + 优先级**解决前四个配置问题，用**设备流注册表**解决远程登录，并在全过程对凭据/密文做脱敏与原子落盘。
 
@@ -175,7 +177,34 @@ const httpOptions = config.baseUrl
 
 #5769 修复重复 model display name：当多个 OpenAI-compatible provider 使用同一个 model id 时，header/status line 根据当前 resolved baseUrl 精确匹配 provider entry，再回退 id-only lookup。这样重启后显示的 provider label 与 `/about` 的 Base URL、实际请求 endpoint 保持一致，不再看起来“跳回第一个 provider”。
 
-#### 3.1.5 OpenAI-compatible stream inactivity timeout（#5827/#5845）
+#### 3.1.5 vision fallback model（#5778）
+
+#5778 给模型选择增加 `/model --vision <model-id>` 和无参 picker，并把选择持久化到 flat `visionModel` 配置。它解决的是“当前主模型不可读图，但会话里出现图片”时的桥接模型选择，而不是主模型切换。
+
+解析顺序：
+
+| 场景 | 行为 |
+|---|---|
+| `visionModel` 已配置且 provider/model 可用 | 使用该 vision fallback，可跨 provider。 |
+| `visionModel` 配置已过期或 typo | 回落到既有 same-provider auto-pick，不向不可达模型发请求。 |
+| 未配置 `visionModel` | 保持原先同 provider 自动选择多模态模型的逻辑。 |
+
+同 PR 还修了 runtime `/model` 切换后的 stale modality gate：在 qwen-oauth hot-update path 中，刚切到多模态主模型后紧接着发图片，不应还走 vision bridge。图片无法通过 `read_file` 工具读取时，transcription 文本会站在 image slot 上，并明确告诉模型“这张图不能被工具读取”，避免模型反复 `read_file` 或忽略 transcript。
+
+#### 3.1.6 provider install preserves selected model（#5835）
+
+#5835 修的是 provider install plan 的副作用。重新认证、ACP reconnect、token refresh、或升级后 provider 模型列表重排时，旧实现会把 `model.name` 写回 provider plan 的第一个/default model。用户如果已经选了更便宜或更快的同 provider 模型，会被静默切走。
+
+实现方式：
+
+- `applyProviderInstallPlan` 读取当前 settings 里的 `model.name`。
+- 如果 install plan 仍提供这个 model，就构造 `effectiveModelSelection` 并跳过 `model.name` / `model.baseUrl` 写入。
+- `syncAuthState` 和 ACP/serve 响应都读回 adapter 中实际生效的 model，而不是盲用 `plan.modelSelection`。
+- 只有首次 setup 没有当前模型，或当前模型已不在该 provider plan 中时，才采用 provider default。
+
+这与 #5179/#5404 的 `model.baseUrl` 消歧互补：#5179 保证“同名 model id 的 endpoint 不漂”，#5835 保证“provider 重新应用时不重置用户已选 model”。
+
+#### 3.1.7 OpenAI-compatible stream inactivity timeout（#5827/#5845）
 
 #5827 补的是 content generator 运行时边界，而不是 provider 配置字段。问题在于 OpenAI-compatible 流式请求一旦拿到响应开始迭代，SDK 层 request timeout 往往不再覆盖“后续 chunk 长时间不来”的场景；对于代理、网关或模型服务半断开的连接，CLI/daemon 可能卡在 streaming turn。
 
@@ -197,7 +226,7 @@ const httpOptions = config.baseUrl
 
 边界：如果已经向上游产出过部分 chunk，再发生 idle timeout，是否能重试取决于调用层对“已产生部分输出”的处理；#5827 的核心是让卡死连接可被关闭并进入既有错误分类，而不是重新定义所有 partial-output recovery。
 
-#### 3.1.6 `providerProtocol` 映射（#5793）
+#### 3.1.8 `providerProtocol` 映射（#5793）
 
 #5793 把“provider identity”和“底层 SDK protocol”分开。自定义 provider 可以继续使用自己的 `id`、display label、preset metadata 和 model ownership，但通过 `providerProtocol` 映射到已有协议实现：
 

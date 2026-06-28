@@ -1,7 +1,7 @@
 # 工具调用 ID 完整性技术方案
 
 > 适用代码库：`QwenLM/qwen-code` `main`。
-> 关联 PR：[#5107](https://github.com/QwenLM/qwen-code/pull/5107) `fix(core): Repair duplicate tool call IDs`、#5624 `fix(cli): Fail dangling replayed tool calls`、#5657 `fix(core): Stop repeated duplicate provider tool-call responses`；关联 issue：#5099。
+> 关联 PR：[#5107](https://github.com/QwenLM/qwen-code/pull/5107) `fix(core): Repair duplicate tool call IDs`、#5624 `fix(cli): Fail dangling replayed tool calls`、#5657 `fix(core): Stop repeated duplicate provider tool-call responses`、#5934 `fix(core): stop repeated truncated write_file/edit retries from looping`；关联 issue：#5099。
 
 ---
 
@@ -17,6 +17,8 @@ OpenAI-compatible provider 的 tool-call 协议要求：一次 assistant tool ca
 #5624 处理的是另一类历史完整性问题：保存的 session 里可能只有 tool start，没有匹配 tool result。恢复或导出 transcript 时，如果原样 replay，会重新创建一个永远 in-progress 的工具卡片。修复后 replay 阶段会把 dangling historical tool calls 合成为 failed terminal update，保证恢复出的 UI 是终态。
 
 #5657 进一步处理 provider 持续 replay 同一 tool id 的循环：第一次重复可以作为 duplicate-error tool response 回给模型，让模型有机会自我修正；如果同一 prompt 内又重复同一个 provider id，就进入 terminal/drop-only 路径，不再调度新的 sibling tool，避免工具调用和 duplicate response 互相喂出无限循环。
+
+#5934 处理的是另一条 retry-loop：模型输出被 `max_tokens` 截断后，scheduler 会拒绝残缺的 `write_file`/edit，模型又反复重发同一个超大调用。修复分两层：默认 `max_tokens` 改用模型声明输出上限，减少正常大响应被 8K cap 截断；残余的重复截断拒绝接入已有 retry-loop detector，第三次同类错误给出 `RETRY LOOP DETECTED` stop directive。
 
 ---
 
@@ -37,6 +39,8 @@ flowchart TD
     REPLAY --> FAIL["synthetic failed update<br/>missing saved result"]
     GUARD --> CB["duplicate response circuit breaker<br/>same prompt/provider id"]
     CB --> TERM["terminal/drop-only<br/>no fresh sibling tool"]
+    GUARD --> TRUNC["truncated write/edit rejection<br/>retry-loop counter"]
+    TRUNC --> STOP["3rd same rejection<br/>RETRY LOOP DETECTED"]
 ```
 
 关键边界：
@@ -80,6 +84,19 @@ flowchart TD
 
 这个策略的取舍是保守的：provider id 协议已经损坏时，宁可终止该 prompt 的异常循环，也不继续执行可能有副作用的工具。
 
+### 3.6 truncated write/edit retry-loop backstop（#5934）
+
+#5934 针对 issue #5756 的失败循环：默认 8K output cap 会截断合法的大文件生成，`write_file`/edit scheduler 为了避免写入残缺内容拒绝该 tool call，模型收到普通 hint 后又重发同一个超大调用。
+
+修复分两层：
+
+| 层 | 做法 |
+|---|---|
+| 根因 | OpenAI-compatible、DashScope、Anthropic 等 generator 默认 `max_tokens` 改成模型声明的输出上限，不再无配置时强制 `min(modelLimit, 8K)`。已有 escalation 到 64K floor / model limit 的多轮 recovery 仍保留。 |
+| backstop | core scheduler 把 repeated truncated `write_file`/edit rejection 接入与 schema validation 相同的 `(tool,error)` retry-loop counter；第 1/2 次仍给普通拒绝，第 3 次附带 `RETRY LOOP DETECTED` stop directive。 |
+
+显式用户/env `max_tokens` 仍然优先，并继续禁用自动 escalation；容量受限的自建后端如果依赖低 slot reservation，可以设置 `QWEN_CODE_MAX_OUTPUT_TOKENS=8000` 恢复旧的 8K 上限。这把默认行为调成适合第三方/自建 provider 的“用模型上限”，把低预留变成 operator opt-in。
+
 ---
 
 ## 4. 涉及 PR
@@ -89,6 +106,7 @@ flowchart TD
 | [#5107](https://github.com/QwenLM/qwen-code/pull/5107) | duplicate tool call id repair | 规范化模型返回 id；同 turn replay 去重；跨 turn raw id suffix；OpenAI payload cleanup；core/CLI/AgentCore/ACP Session 执行 guard；speculation id 配对 |
 | #5624 | dangling replay tool calls | replay 历史时跟踪 tool start/result 配对，对缺失 result 的 historical tool call 合成 failed terminal update，避免恢复 UI 卡在 processing |
 | #5657 | repeated duplicate provider responses | 同一 prompt 内 provider 反复 replay 同一 tool id 时触发 circuit breaker，首次 synthetic duplicate-error，后续 terminal/drop-only，AgentCore 报 `LOOP_DETECTED` |
+| #5934 | truncated write/edit retry loop | 默认 output cap 改为模型声明上限；重复截断 write/edit 拒绝接入 retry-loop detector，第 3 次返回 stop directive |
 
 ---
 
@@ -99,6 +117,7 @@ flowchart TD
 3. **旧损坏历史只能保守处理**：已经写入 session 的重复 id 记录无法可靠还原模型真实意图；出站 cleanup 与 microcompaction disarm 是防止继续放大的保护，不是历史迁移。
 4. **dangling replay 修复仅限历史重建**：#5624 不改变 live tool lifecycle；它只保证旧 transcript 恢复时不会留下无终态 tool block。
 5. **duplicate circuit breaker 是 prompt-scoped**：#5657 按 prompt 清理重复跟踪；跨 prompt 的 raw id 复用仍由 #5107 的 local suffix / cleanup 处理。
+6. **高 `max_tokens` 会改变自建后端 slot reservation**：#5934 默认使用模型上限，容量受限部署如需旧 8K 预留，应显式设置 `QWEN_CODE_MAX_OUTPUT_TOKENS=8000`。
 
 ---
 
@@ -125,3 +144,9 @@ flowchart TD
 - core/TUI/non-interactive/ACP/AgentCore 执行路径：首次 duplicate 生成 synthetic duplicate-error tool response；重复 duplicate 直接 terminal/drop-only，不调度 fresh sibling tool。
 - AgentCore：repeated duplicate 命中时以 `LOOP_DETECTED` 结束，避免后台 agent 无限工具循环。
 - ACP Session：duplicate tracking 在每个 prompt 结束后清空，防止上一轮异常影响下一轮正常调用。
+
+### PR #5934 — truncated write/edit retry-loop backstop
+
+- `tokenLimits` / provider generators：删除 8K capped default，未显式配置 `max_tokens` 时使用模型声明输出上限；OpenAI-compatible、DashScope、Anthropic 路径同步更新测试。
+- `coreToolScheduler`：截断 `write_file`/edit 拒绝进入 retry-loop detector，第三次相同拒绝返回 `RETRY LOOP DETECTED`。
+- docs/config：说明 operator 可用 `QWEN_CODE_MAX_OUTPUT_TOKENS=8000` 恢复低 slot reservation。

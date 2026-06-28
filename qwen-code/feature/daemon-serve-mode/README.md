@@ -416,6 +416,7 @@ sequenceDiagram
 | #5825 | startup benchmark | 新增 gated integration benchmark，测 built CLI `qwen serve` 从 spawn 到 stdout listening line，并校验 `/daemon/status` startup timing 与 preheat state。 |
 | #5857 | single session status | 增加 `GET /session/:id/status`，按 id 查询 live session 的 `clientCount` 与 `hasActivePrompt`，避免客户端为了一个 session 拉全量 paginated session list。 |
 | #5874 | skip wrapper spawnSync | `qwen serve` 在 CLI entry wrapper 中直接 in-process import `cli.js`，跳过为 `--expose-gc` 额外 `spawnSync` 的 Node 进程，减少冷启动成本；ACP child 仍独立带 `--expose-gc`。 |
+| #5938 | compile cache + deferred version | serve fast path 在 import `cli.js` 前启用 Node compile cache，warm restart 可复用 bytecode；`getCliVersion()` 改成 promise 并与 runtime module load 并行，`/capabilities` 和 `/daemon/status` 仍在 route bootstrap 前拿到 `qwenCodeVersion`。 |
 
 ---
 
@@ -649,6 +650,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #5825 | startup benchmark | gated integration benchmark 输出 daemon cold-start JSON/Markdown artifacts。 |
 | #5857 | session status by id | `GET /session/:id/status` 查询单 live session summary。 |
 | #5874 | wrapper fast path | `qwen serve` CLI entry 跳过 wrapper `spawnSync`，减少一次 Node process startup。 |
+| #5938 | compile cache / version defer | serve fast path 启用 Node compile cache，并把 `getCliVersion()` 延迟到 runtime build 阶段并行等待，降低 warm restart 和监听前阻塞。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 

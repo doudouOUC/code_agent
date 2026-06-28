@@ -1,7 +1,7 @@
 # Loop wakeup 技术方案
 
 > 适用范围：`QwenLM/qwen-code` bundled loop skill、cron scheduler、`loop_wakeup` tool。
-> 涉及 PR：#5182（second-resolution session wakeup engine）、#5197（prompt-only `/loop` self-paced wakeups）、#5808（cancel self-paced wakeup on user abort）、#5844（monitor/background-task notification guidance）。
+> 涉及 PR：#5182（second-resolution session wakeup engine）、#5197（prompt-only `/loop` self-paced wakeups）、#5808（cancel self-paced wakeup on user abort）、#5844（monitor/background-task notification guidance）、#5921（scheduled task count footer）、#5927（cron tool search intents）。
 
 ---
 
@@ -16,6 +16,8 @@
 | `/loop check deploy` | prompt-only self-paced：立即运行，必要时调用 `LoopWakeup(delaySeconds, prompt, reason)` 只安排一次未来 wakeup。 |
 | `/loop 5m check deploy` | fixed interval recurring：仍走 `CronCreate(recurring:true)`。 |
 | `/loop list` / `/loop clear` | 列出或取消 cron jobs 与 pending wakeups。 |
+
+#5921/#5927 补的是“用户如何看见和管理这些安排”：CLI footer 会在 cron scheduling 开启且 scheduler 里有 pending entries 时显示 `◎ 1 scheduled task` / `◎ N scheduled tasks`；工具搜索也会把“stop/cancel/remove/clear cron/loop wakeup”导向 `cron_delete`，把可见性查询导向 `cron_list`，把新建排程导向 `loop_wakeup`。
 
 ---
 
@@ -85,6 +87,20 @@ bundled loop skill 明确要求：
 
 这让 `/loop` 可以覆盖“等 CI / 等部署 / 等后台命令结束”这类长等待场景：后台任务完成时尽快唤醒，任务迟迟没有终态时才由长 heartbeat 兜底。实现边界也很清楚：monitor wake 只来自 terminal notification；它不把所有 monitor 事件都变成 loop trigger，也不替代 `/loop list` / `/loop clear` 的管理入口。
 
+### 3.6 scheduled task visibility and tool discovery（#5921/#5927）
+
+#5921 增加的是轻量可见性，不是完整任务管理 UI：当 cron scheduling enabled 且 in-memory scheduler 有 pending entries 时，footer 轮询 scheduler 并显示 scheduled task count。它只显示数量，不列任务、不提供 stop 按钮；singular/plural 文案固定，避免 hidden `/loop` cron task 完全不可见。
+
+#5927 修的是模型/用户通过 tool search 找管理工具时的意图识别。搜索 tokenization 去掉 filler words，并增加 action alias：
+
+| 意图 | 优先暴露 |
+|---|---|
+| stop/cancel/remove/clear cron/loop/wakeup | `cron_delete` |
+| list/show/what scheduled/cron/loop | `cron_list` |
+| schedule/wake me/later/check again | `loop_wakeup` |
+
+这不改变 `cron_*` 或 `loop_wakeup` 工具 schema，只改善发现路径，尤其是 issue #5823 里 hidden cron/loop tasks 难以停止的问题。
+
 ---
 
 ## 4. 涉及 PR
@@ -95,6 +111,8 @@ bundled loop skill 明确要求：
 | #5197 | merged | `/loop <prompt>` 改为 prompt-only self-paced wakeup，并更新 bundled loop skill contract、权限与测试。 |
 | #5808 | merged | 用户 abort self-paced tick 时取消关联 pending one-shot wakeup，避免停止后 loop 自动复活。 |
 | #5844 | merged | self-paced loop 对 monitor/background-task terminal notification 做模型引导：长 fallback heartbeat + 通知优先处理。 |
+| #5921 | merged | CLI footer 显示 pending scheduled task count，让隐藏的 cron/loop wakeup 不再完全不可见。 |
+| #5927 | merged | tool_search ranking/tokenization 增加 cron/loop 管理意图，停/删/list/schedule 分别命中对应工具。 |
 
 ---
 
@@ -105,5 +123,6 @@ bundled loop skill 明确要求：
 3. **wakeup 是 session 级**。session stop/destroy 会重置预算并取消 pending wakeups，跨 session 的长期计划仍应使用 cron。
 4. **idle pending wakeup 仍需显式管理**。#5808 只处理用户 abort in-flight tick 的场景；未执行中的 pending wakeup 仍通过 `/loop list` / `/loop clear` 管理。
 5. **notification 只覆盖 loop 自己启动并监控的后台工作**。#5844 不把任意 monitor 事件广播给所有 loop；模型仍需要在通知到达后判断是否继续 schedule。
+6. **footer count 不是管理面**。#5921 只显示 pending count；列出、停止、清理仍依赖 `/loop list`/`/loop clear` 或 cron tools。
 
 _新增于 2026-06-23；更新于 2026-06-26_

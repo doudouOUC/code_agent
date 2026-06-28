@@ -4,7 +4,7 @@
 >
 > 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。**行号可能随版本漂移，以 `file:symbol` 为准**——#4774（strip comments，net -2194 行）和 #4563（抽 DaemonWorkspaceService）合入后，`server.ts` / `bridge.ts` / `acpAgent.ts` 的行号普遍下移 100-220 行。本文已对齐到 `origin/daemon_mode_b_main@18e848f32`。
 >
-> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）、#5741（remote LSP status）、#5743（workspace permissions API）、#5753（extension operation polling）、#5765（workspace voice/control APIs）、#5826（skill usage stats）、#5857（single session status）、#5892（Windows PTY tree-kill）、#5906（settings minimum validation）。
+> 关联 PR：#4504（recap）、#4610（btw）、#4578（tasks snapshot）、#4576（server-side shell `!`）、#4559（daemon file logger）、#4606（request-level logging）、#4563（`DaemonWorkspaceService` 抽出，方案 C）、#4816（workspace settings）、#4820（rewind）、#4822/#4834（hooks）、#4832（extensions 诊断）、#5216（ACP daemon sessions 加载 extension commands）、#5398（extension management）、#5504（ACP model-invocable commands）、#5741（remote LSP status）、#5743（workspace permissions API）、#5753（extension operation polling）、#5765（workspace voice/control APIs）、#5826（skill usage stats）、#5857（single session status）、#5892（Windows PTY tree-kill）、#5903（ACP `/cd`）、#5906/#5945（settings minimum validation）。
 
 ---
 
@@ -84,7 +84,9 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #5826 | feat(cli): Add skill usage stats | 2026-06-25 | session stats 增加 skills block，`/stats skills` 展示真实 skill body load 的成功/失败和按技能分组统计。 |
 | #5857 | feat(serve): query a single session's status by id | 2026-06-25 | 新增 `GET /session/:id/status`，按 session id 查询 live summary，避免为一个 session 拉取整个 workspace session list。 |
 | #5892 | fix(core): tree-kill PTY shell tree on Windows | 2026-06-26 | Windows interactive-shell PTY teardown 改为 `taskkill /f /t` tree-kill，并在正常完成后 guarded reap 防 ConPTY 残留 shell。 |
+| #5903 | feat(acp): support /cd command in ACP sessions | 2026-06-27 | 新增 server-side ACP session cwd update：HTTP `POST /session/:id/cd` 校验路径/trust/sandbox/client 后更新 per-session logical cwd 并广播 `session_cwd_changed`。 |
 | #5906 | fix(serve): reject negative cleanupPeriodDays values | 2026-06-27 | `SettingDefinition.minimum` + `general.cleanupPeriodDays minimum:0`，让 workspace settings / TUI settings / VS Code schema 都拒绝负保留期。 |
+| #5945 | fix(serve): reject non-positive sessionRecapAwayThresholdMinutes values | 2026-06-28 | `general.sessionRecapAwayThresholdMinutes minimum:1`，复用 settings minimum validator，拒绝 `0` 和负数避免 recap away 阈值被配置成无效值。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -393,13 +395,43 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 
 `POST /workspace/settings` 是 strict mutation route。body `{scope, key, value}`，当前 `scope` 只允许 `workspace`；value 按 schema type 校验，string 限长 1024。写入成功后广播 `settings_changed {key,value,scope}` 到所有 session bus。`requiresRestart` 仍会返回给客户端：设置落盘不等于 live session 已经重新读取。
 
-#5906 给 settings schema 增加 `minimum?: number` 并把 `general.cleanupPeriodDays` 标为 `minimum: 0`。这把原先“settings surface 接受负数，housekeeping runtime 再静默 clamp”的不一致前移到边界层：
+#5906 给 settings schema 增加 `minimum?: number` 并把 `general.cleanupPeriodDays` 标为 `minimum: 0`。#5945 复用同一 validator，把 `general.sessionRecapAwayThresholdMinutes` 标为 `minimum: 1`。这把原先“settings surface 接受无效数值，runtime 再静默 clamp/兜底”的不一致前移到边界层：
 
 - `POST /workspace/settings` 通过共享 `validateSettingValue()` 拒绝低于 minimum 的值。
 - TUI `/settings` 保存 number/string 设置前复用同一 validator。
 - `generate-settings-schema.ts` 把 `minimum` 写入 VS Code settings JSON schema。
 
-因此 negative cleanup period 不再能被持久化成看似有效的配置；runtime 的防御性 clamp 仍保留，但不再承担第一道用户输入校验。
+因此 negative cleanup period、`0` 或负数 recap-away threshold 不再能被持久化成看似有效的配置；runtime 的防御性 clamp/默认值仍保留，但不再承担第一道用户输入校验。HTTP API 拒绝后不写 settings，也不会广播 `settings_changed`。
+
+---
+
+## session cwd control（ACP `/cd`，#5903）
+
+#5903 把 ACP session 的 `/cd` 从“客户端本地概念”提升为 daemon 侧控制面：HTTP `POST /session/:id/cd` 接收目标目录并更新该 session 的 logical cwd。它不调用 `process.chdir()`，也不修改整个 daemon 进程 cwd；真正变更的是 session config / bridge entry 里后续 prompt、shell/history、文件解析使用的 per-session working directory。
+
+调用链：
+
+```
+POST /session/:id/cd
+  -> serve session route 校验 session/client/body
+  -> acp-bridge cd helper
+  -> ACP child session relocateWorkingDirectory(skipProcessChdir)
+  -> publish session_cwd_changed
+```
+
+校验与错误口径：
+
+| 条件 | 响应 |
+|---|---|
+| session 不存在 | `404` |
+| target path 非绝对路径 / client id 无效 | `400 invalid_path` / `400 invalid_client_id` |
+| 目录不存在 | `400 directory_not_found` |
+| 目标目录未 trust | `403 directory_not_trusted` |
+| sandbox 不允许 cwd relocation | `403 restrictive_sandbox` |
+
+如果 session 当前有 active prompt，`/cd` 不直接打断正在跑的 turn，而是排到 prompt 后执行并在完成后返回成功。这保持了“同一 session 的语义变更按 turn 边界生效”的直觉，但也意味着 v1 没有独立的 busy 409 或短超时：客户端发起 `/cd` 时可能等待当前 prompt 完成。
+
+这个 PR 只落 server/ACP surface；SDK wrapper、capability advertisement 和更细的客户端 UI 仍是后续工作。客户端如果要探测支持度，只能按 route/错误做兼容处理，不能假设老 daemon 一定有 `/cd`。
 
 ---
 
@@ -836,3 +868,17 @@ flowchart TD
 
 - ACP daemon session 收到 `available_commands_update` 后，在 settings 可用时注册 model-invocable command provider/executor。
 - 过滤 disabled commands，并清理 stale timeout signal，避免模型拿到 UI 已禁用或已过期的可调用命令。
+
+### #5903 — ACP `/cd` session cwd update（@doudouOUC）
+
+- `routes/session.ts` / bridge control path：新增 `POST /session/:id/cd`，校验 absolute target path、session/client id、trusted workspace 与 sandbox policy。
+- ACP child：通过 `Config.relocateWorkingDirectory(..., { skipProcessChdir: true })` 更新 per-session logical cwd，不调用进程级 `process.chdir()`。
+- 事件与错误：成功后广播 `session_cwd_changed`；目录不存在、未 trust、sandbox 限制、非法 client id 分别映射到 typed 400/403 错误。
+- 并发语义：active prompt 期间排队到 prompt 后执行，而不是中途改 cwd；v1 无独立 SDK wrapper/capability tag。
+
+### #5906/#5945 — settings minimum validation（@russeell / @he-yufeng）
+
+- `settingsSchema`：`SettingDefinition` 增加 `minimum?: number`；`general.cleanupPeriodDays` 标 `minimum:0`，`general.sessionRecapAwayThresholdMinutes` 标 `minimum:1`。
+- `validateSettingValue()`：number 设置统一拒绝低于 minimum 的值，daemon `POST /workspace/settings` 与 TUI `/settings` 复用同一口径。
+- schema 生成：VS Code settings JSON schema 写入 `minimum`，让编辑器端也能提前提示。
+- 行为边界：拒绝无效值时不持久化、不广播 `settings_changed`；runtime clamp/默认值仍是防御层而不是第一道输入校验。

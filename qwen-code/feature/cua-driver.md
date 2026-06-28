@@ -1,7 +1,7 @@
 # CUA driver / Qwen-VL computer-use 坐标适配技术方案
 
 > 适用范围：`packages/cua-driver` vendored driver、`qwen-cua-driver` binary/bundle、Qwen-VL `computer_use` 的 0-1000 相对坐标适配。
-> 涉及 PR：#5896（vendor qwen-cua-driver with opt-in 0-1000 relative coordinates）。
+> 涉及 PR：#5896（vendor qwen-cua-driver with opt-in 0-1000 relative coordinates）、#5925（stop computer use driver when idle）。
 > 代码基线：`QwenLM/qwen-code` `main`（#5896 已合并）。
 
 ---
@@ -49,6 +49,7 @@ flowchart LR
 | coordinate shim | `CUA_DRIVER_RS_COORDINATE_SPACE`、`CUA_DRIVER_RS_COORDINATE_SCALE` | 开关式把模型归一化坐标和 driver pixel 坐标互转。 |
 | tool contract rewrite | tool/param descriptions、agent instructions、screenshot dimension output | 让 `tools/list` 和模型 prompt 中的坐标语义与运行时一致。 |
 | release / sync | `cd-cua-driver.yml`、upstream sync script、`.vendored-from` / `.vendored-patches.md` | 独立发布 driver artifact，并记录 vendored 来源和本地 patch。 |
+| client lifecycle | shared `ComputerUseClient` idle timer | 最后一次 `computer_use__*` 调用后默认 5 分钟停 driver，降低空闲 CPU 占用。 |
 
 ---
 
@@ -111,6 +112,23 @@ pixel_y = normalized_y / scale * window_height
 
 PR 同时补了 `zoom` / `move_cursor` 支持，使 Qwen-VL computer-use 计划中常见的“先移动指针/放大再操作”可以走同一 driver 表面。这里的坐标原则与 click/drag 一致：默认 pixel，开启相对坐标模式后再按当前 scale 映射。
 
+### 3.6 idle shutdown（#5925）
+
+#5925 处理 shared Computer Use driver 的进程生命周期。问题不是坐标协议，而是工具调用结束后 `cua-driver` 仍保持运行，尤其在 Windows 上可能在 qwen-code 空闲时继续占 CPU。
+
+新规则：
+
+| 配置 | 行为 |
+|---|---|
+| 默认 | 最后一次 `computer_use__*` 工具调用后 5 分钟停 shared driver client。 |
+| `tools.computerUse.idleTimeoutMs=0` | 禁用 idle shutdown，保持旧的长驻行为。 |
+| `tools.computerUse.idleTimeoutMs=<positive>` | 使用自定义毫秒值。 |
+| `tools.computerUse.enabled=false` | 完全禁用 computer use 工具。 |
+
+实现放在 shared `ComputerUseClient`，而不是散在每个 tool wrapper：每次 computer-use 工具调用都会 touch idle timer；到期后停止 driver，下次工具调用再冷启动。负数或非法设置回落默认 5 分钟，并同步进 CLI config / VS Code schema。
+
+边界：idle stop 会清掉 driver 侧窗口/截图状态，后续动作可能需要重新 `get_window_state`；截图尺寸 rewrite、相对坐标 contract、tool descriptions 都不受 #5925 影响。
+
 ---
 
 ## 4. 关键流程
@@ -164,6 +182,7 @@ sequenceDiagram
 | PR | 状态 | 作用 |
 |---|---|---|
 | **#5896** `feat(cua-driver): vendor qwen-cua-driver with opt-in 0-1000 relative coordinates` | MERGED（2026-06-26） | 将 trycua/cua driver vendor 到 `packages/cua-driver`，改名为 qwen fork，新增 opt-in 相对坐标模式、tool contract rewrite、zoom/move_cursor 支持、跨平台 release workflow 与 upstream sync 记录。 |
+| **#5925** `fix(core): stop computer use driver when idle` | MERGED（2026-06-27） | shared Computer Use client 增加 idle timeout，默认空闲 5 分钟停止 `cua-driver`；`idleTimeoutMs=0` 可禁用。 |
 
 ---
 
@@ -179,6 +198,13 @@ sequenceDiagram
 - **能力补充**：补 `zoom` / `move_cursor` 支持，并保留平台 click/drag/zoom 主体代码边界。
 - **验证**：PR 本地跑 `cargo test -p cua-driver-core`（128 passed）、`cargo build -p cua-driver --release`，并端到端检查 `qwen-cua-driver mcp` 的 `tools/list` 在 off / `SPACE=1` / `SPACE=1 SCALE=999` 下描述正确；Linux/Windows release build 依赖 CI runner。
 
+### #5925 computer-use idle shutdown
+
+- **生命周期集中**：在 shared `ComputerUseClient` 维护 idle timer，避免每个 `computer_use__*` tool wrapper 各自处理 driver stop。
+- **默认策略**：最后一次 computer-use 调用后 5 分钟停止 driver；下一次调用按原路径重启。
+- **配置面**：`tools.computerUse.idleTimeoutMs=0` 禁用 idle shutdown，正数为自定义毫秒值，负数/非法值回落默认；`tools.computerUse.enabled=false` 仍是总禁用开关。
+- **边界**：idle stop 不改变 screenshot dimension runtime、坐标 contract 或相对坐标 shim；它只影响 driver 进程长驻状态。
+
 ---
 
 ## 7. 已知限制 / 后续
@@ -187,5 +213,6 @@ sequenceDiagram
 - **默认兼容性依赖开关不漂移**：`CUA_DRIVER_RS_COORDINATE_SPACE` 必须保持默认 off。任何默认开启都会把 pixel caller 变成 breaking change。
 - **模型定位准确率不在 driver 范围内**：driver 只保证 normalized-to-pixel 映射正确；Qwen-VL 是否能在截图中选中正确目标，仍是模型和 prompt 的问题。
 - **Windows / Linux 本地人工验证有限**：PR 说明中 macOS 做了本地构建和开关检查，Linux/Windows release build 主要依赖 CI；后续若改平台输入实现，应补对应系统的真机 click/drag/zoom smoke。
+- **idle shutdown 后第一步可能需要重建窗口状态**：#5925 停 driver 后不会保留 driver 内部 UI state；后续自动化最好先重新获取窗口/截图状态再执行坐标动作。
 
 _新增于 2026-06-27_
