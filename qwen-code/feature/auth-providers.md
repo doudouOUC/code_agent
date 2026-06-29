@@ -1,7 +1,7 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769 / #5778 / #5793 / #5827 / #5835 / #5845 / #5946**。
+> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5553 / #5632 / #5637 / #5638 / #5654 / #5729 / #5769 / #5778 / #5793 / #5827 / #5835 / #5845 / #5946**。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
@@ -25,7 +25,11 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 
 - **重复 model id provider 选择丢失（#5173/#5179）**：多个 `modelProviders.openai[]` 条目可以共享同一个 `id` 但指向不同 `baseUrl` / `envKey`。早期模型选择器只持久化 `model.name`，重启时按 id 取第一个 provider，导致用户选中的非首个 endpoint 被静默替换。
 
+- **workspace provider default 与 session current model 混淆（#5638）**：daemon `GET /workspace/providers` 应表达“下一次新建 session 会用的 workspace catalog/default”，而不是某个 live ACP/session 的当前模型状态；已有 session 的 current model 应来自 session context。
+
 - **Requesty 只能手配通用 OpenAI-compatible（#5478/#5539）**：Requesty 是 OpenAI-compatible gateway，但没有一等 provider preset、归因 header、auth migration 或 model picker 分组。#5478 增加 Requesty provider；#5539 后续把 OpenRouter/Requesty 这类 provider-specific headers 收敛到 preset `customHeaders`，减少 provider class 分叉。
+
+- **bare fastModel 不应跨 auth 解析（#5553）**：历史配置里的 `fastModel: "coder-model"` 是裸 model id。如果当前主模型已切到 OpenAI-compatible auth，旧解析可能把这个裸 fast model 路由到 Qwen OAuth 的硬编码模型，触发用户没预期的浏览器登录。bare selector 必须约束在当前 auth type，跨 auth 只能用显式 `qwen-oauth:coder-model`。
 
 - **`qwen auth status` 识别不全（#3612/#3623）**：OpenAI-compatible provider（尤其无 `envKey`、靠 `OPENAI_API_KEY` 或 `settings.security.auth.apiKey` 的）被误报为「未配置/不完整」。
 
@@ -167,7 +171,9 @@ const httpOptions = config.baseUrl
 
 #5539 随后把 OpenRouter/Requesty 的 provider-specific request headers 收敛到 preset `customHeaders`，减少“每个 gateway 一个 provider class”的重复。这样 Requesty 仍保持一等 preset 和 detection，但 header 注入不必长期复制 OpenRouter provider 类。
 
-#### 3.1.4 模型用途旗标、thinking 和 display name follow-up（#5632/#5637/#5654/#5729/#5769）
+#### 3.1.4 fast-model auth scope、模型用途旗标、thinking 和 display name follow-up（#5553/#5632/#5637/#5654/#5729/#5769）
+
+#5553 收紧 bare fast-model selector 的认证边界：`fastModel: "coder-model"` 这类未带 auth 前缀的配置，只在当前 active auth type 内解析；如果当前 auth 是 OpenAI-compatible 且该 provider 不拥有 `coder-model`，`getFastModel()` 返回 `undefined`，不会跨到 Qwen OAuth 并触发浏览器流。需要有意跨 auth 的用户必须写显式 selector，例如 `qwen-oauth:coder-model`。这和 #5632 的 `fastOnly` 分层互补：#5632 决定“哪些模型可作为 fast model”，#5553 决定“裸 fast model 在哪个 auth 命名空间里找”。
 
 #5632 给 model config 增加 `fastOnly` / `voiceOnly` 用途旗标。主模型选择列表会过滤掉专用模型，`/model --voice` 只看 `voiceOnly` ASR 模型，fast-model 解析只看 `fastOnly`。这把“能作为对话主模型”和“只服务某个系统路径”的模型从 UI 层分开，避免用户把语音模型或快模型误选成主模型。
 
@@ -206,7 +212,21 @@ const httpOptions = config.baseUrl
 
 这与 #5179/#5404 的 `model.baseUrl` 消歧互补：#5179 保证“同名 model id 的 endpoint 不漂”，#5835 保证“provider 重新应用时不重置用户已选 model”。
 
-#### 3.1.7 OpenAI-compatible stream inactivity timeout（#5827/#5845）
+#### 3.1.7 workspace provider defaults 与 session context model（#5638）
+
+#5638 把 daemon `GET /workspace/providers` 的语义从“可能借 live ACP/session config 的 provider 状态”收敛成“workspace 级 provider catalog + 下一次新建 session 的默认模型”。这属于 provider 状态来源边界：pre-session 页面和新建 session 入口需要的是 fresh workspace settings/env，而不是某个已有 session 的运行时模型。
+
+实现方式：
+
+- route 每次请求都在 daemon 侧从最新 workspace settings/env 构建 provider snapshot；
+- 即使没有 live ACP channel，`initialized` 也可以代表 workspace provider snapshot 已可用，ACP live 状态单独通过 `acpChannelLive` 表达；
+- 已有 session 初始化 current model / model list 时优先使用 session context model state，workspace providers 只做 fallback；
+- session model 切换若持久化了新的 default model，会发 workspace settings change 信号，让缓存 workspace providers 的客户端重新拉取；
+- duplicate model id 场景仍按 persisted baseUrl 精确标记 current，provider base URL 不泄露凭据。
+
+这个 PR 的关键取舍是：`/workspace/providers` 不再适合作为“当前 session model”的真相源。需要显示 live session current model 的 WebUI/SDK 必须读 session context；需要显示“新建会话默认模型”的入口才读 workspace providers。
+
+#### 3.1.8 OpenAI-compatible stream inactivity timeout（#5827/#5845）
 
 #5827 补的是 content generator 运行时边界，而不是 provider 配置字段。问题在于 OpenAI-compatible 流式请求一旦拿到响应开始迭代，SDK 层 request timeout 往往不再覆盖“后续 chunk 长时间不来”的场景；对于代理、网关或模型服务半断开的连接，CLI/daemon 可能卡在 streaming turn。
 
@@ -228,7 +248,7 @@ const httpOptions = config.baseUrl
 
 边界：如果已经向上游产出过部分 chunk，再发生 idle timeout，是否能重试取决于调用层对“已产生部分输出”的处理；#5827 的核心是让卡死连接可被关闭并进入既有错误分类，而不是重新定义所有 partial-output recovery。
 
-#### 3.1.8 Anthropic per-request abort controller（#5946）
+#### 3.1.9 Anthropic per-request abort controller（#5946）
 
 #5946 是 provider runtime hygiene：Anthropic generator 的非流式 `generateContent` 与流式 `generateContentStream` 不再把调用方的 `request.config?.abortSignal` 直接交给 SDK，而是通过现有 `createChildAbortController` 包一层 per-request child signal。
 
@@ -244,7 +264,7 @@ const httpOptions = config.baseUrl
 
 这与 #4810 在 OpenAI generator 上做的隔离一致；#5946 只是补上 Anthropic path。其它 SDK 未改动，Anthropic SDK 上游泄漏本身也不在本 PR 范围内。
 
-#### 3.1.9 `providerProtocol` 映射（#5793）
+#### 3.1.10 `providerProtocol` 映射（#5793）
 
 #5793 把“provider identity”和“底层 SDK protocol”分开。自定义 provider 可以继续使用自己的 `id`、display label、preset metadata 和 model ownership，但通过 `providerProtocol` 映射到已有协议实现：
 
@@ -532,8 +552,10 @@ sequenceDiagram
 | #5404 | merged | custom provider install preservation | provider install 保留 custom provider models，并透传 `model.baseUrl` 让 same-id 不同 endpoint 的新安装 provider 被精确选中 |
 | #5478 | merged | Requesty provider | 新增 Requesty OpenAI-compatible provider preset、hostname detection、dispatch registration、auth migration 和用户文档 |
 | #5539 | merged | provider customHeaders refactor | 将 OpenRouter/Requesty provider-specific headers 收敛进 preset `customHeaders`，减少 provider class 重复 |
+| #5553 | merged | bare fast-model auth scope | 裸 `fastModel` 只在当前 auth type 内解析，避免 OpenAI-compatible 会话因历史 `coder-model` 配置意外触发 Qwen OAuth；显式 `qwen-oauth:...` selector 保持可用 |
 | #5632 | merged | model purpose flags | 新增 `fastOnly` / `voiceOnly`，主模型列表过滤专用模型，`/model --voice` 只展示语音模型 |
 | #5637 | merged | DashScope preserve thinking default | 调整 DashScope thinking 相关默认值，避免默认路径丢失 thinking intent/summary 所需配置 |
+| #5638 | merged | workspace provider defaults | `GET /workspace/providers` 返回 fresh workspace settings/env catalog 和 next-session default；已有 session current model 改从 session context 读取 |
 | #5654 | merged | auth wizard custom models | 重新进入 `/auth` 时恢复用户自定义 model IDs，并让 provider update detector 只比较 built-in defaults |
 | #5729 | merged | active runtime model listing | configured models 默认保留 active runtime model，避免当前会话模型从列表中消失 |
 | #5769 | merged | duplicate display name disambiguation | active model display 按 resolved baseUrl 匹配重复 model id provider，再回退 id-only lookup |
@@ -592,6 +614,13 @@ sequenceDiagram
 - `/model <id>`、ACP `setModel`、`qwen/settings/setCoreValue`、provider install：id-only 写入 `model.name` 时同步写空字符串 tombstone 清除 `model.baseUrl`，防止 stale disambiguator 跨 settings scope 生效。
 - tests 覆盖 exact match、fallback、removed-provider、empty-string tombstone、argv 忽略 persisted baseUrl、pre-flight auth envKey、dialog/command/ACP/provider install 写入路径。
 
+### #5638 — workspace provider defaults
+
+- `workspace-providers-status.ts` / `server.ts`：`GET /workspace/providers` 由 daemon 侧 fresh workspace settings/env 构建 provider catalog 与 next-session default，不再依赖 live ACP/session config。
+- `DaemonSessionProvider` / mappers：已有 session current model 优先来自 session context model state；workspace providers 只作为缺省 fallback，避免把 workspace default 误当 live session model。
+- `bridge.ts` / ACP session context：session model change 持久化 default 时发 workspace settings change signal，驱动缓存 workspace providers 的客户端刷新。
+- tests 覆盖 pre-session provider snapshot、duplicate model id + baseUrl 精确 current 标记、session context 覆盖 workspace default、provider base URL 凭据不外露。
+
 ### #5404 — preserve custom provider models on install
 
 - `providers/install.ts` / custom provider preset：custom provider install 合并时保留用户自定义 provider models，不因同 id provider install 覆盖掉已有 model entries。
@@ -607,8 +636,9 @@ sequenceDiagram
 - docs：`docs/users/configuration/auth.md` 与 `model-providers.md` 增加 Requesty 配置说明。
 - tests：provider/preset suites 覆盖 hostname spoofing 拒绝、dispatch routing、OpenRouter 回归和 preset gate。
 
-### #5632/#5637/#5654/#5729/#5769 — provider/model follow-ups
+### #5553/#5632/#5637/#5654/#5729/#5769 — provider/model follow-ups
 
+- #5553：`Config.getFastModel()` 在 auth 激活后把 bare fast model 限定在当前 auth type；当前 auth 下的裸模型继续可用，跨 auth 需显式 `authType:modelId` selector；tests 覆盖 OpenAI-compatible 当前 auth 下 `coder-model` 不再路由到 Qwen OAuth。
 - #5632：model config schema / resolver 增加 `fastOnly`、`voiceOnly`；主 `/model` 列表过滤专用模型，`/model --voice` 使用 voice-only filter。
 - #5637：DashScope provider preset / generation config 默认保留 thinking 相关配置，降低用户无显式设置时的行为漂移。
 - #5654：`AuthDialog.getExistingModelIds` 只把 saved provider 中非 built-in defaults 的项作为 custom IDs 传回 wizard；`useProviderSetupFlow` 用 `[...defaults, ...customIds]` 预填；`useProviderUpdates` 只用 built-in IDs 做 update diff。

@@ -247,7 +247,7 @@
 | PR | 归属判断 |
 |---|---|
 | #5577 #5578 #5592 #5604 #5607 #5618 #5639 #5646 #5652 #5671 #5676 #5684 #5685 #5688 #5689 #5709 #5711 #5714 #5716 #5718 #5719 #5720 #5724 #5731 #5735 #5737 #5745 #5746 #5764 #5767 #5772 #5788 | CLI completion、命名/大小写 refactor、测试 smoke、整数校验、迁移幂等、ACP/VS Code/extension 小边界、release gate、theme/render 小修等。它们有对应周报归类，但没有改变 feature 目录里的长期技术方案合约，故不单开或大幅改专题。 |
-| #5593 #5595 #5599 #5627 #5730 #5751 #5757 #5775 | docs / plan-mode / model adapter / TUI viewer / desktop preview / VS Code view / web-shell UI restructure 等用户体验面补强。现阶段进入周报或 daemon/web-shell 后续观察，不新增单独 feature 文档。 |
+| #5593 #5599 #5627 #5730 #5751 #5757 #5775 | docs / model adapter / TUI viewer / desktop preview / VS Code view / web-shell UI restructure 等用户体验面补强。现阶段进入周报或 daemon/web-shell 后续观察，不新增单独 feature 文档；#5595 已移出本表，见上方 Plan Mode 行。 |
 | #5739 #5762 | release PR。只反映版本发布，不作为 feature 实现统计。 |
 
 ### open PR 后续观察
@@ -321,13 +321,14 @@
 | #5196 | merged | `/dev/tcp`/`/dev/udp` redirect 不当建模为 file I/O，属 permission/shell 解析安全边界。 | 已补 [permission-system.md](permission-system.md)；暂不单开。 |
 | #5218 | merged | cancelled `ask_user_question` 后停止 ACP turn。 | 已在 [permission-system.md](permission-system.md) 覆盖。 |
 | #5258 | merged | cancelled 普通工具权限后停止 ACP turn。 | 已在 [permission-system.md](permission-system.md) 覆盖。 |
-| #5279 | merged | per-turn tool-call circuit breaker，属 tool loop / runaway 防护。 | 记录为 core safety follow-up；待后续 loop/circuit-breaker 专题统一展开。 |
-| #5311/#5433 | merged | plan mode `exit_plan_mode` 显示与 opt-in prompt，属 plan-mode UX/safety。 | 周报记录；当前 feature 目录暂不单开 plan-mode 专题。 |
+| #5279/#5564/#5573 | merged | per-turn tool-call circuit breaker、non-interactive loop failure、consecutive identical tool-call always-on guard，属 tool loop / runaway 防护。 | 已补 [tool-call-id-integrity.md](tool-call-id-integrity.md)。 |
+| #5311/#5433/#5595 | merged | plan mode `exit_plan_mode` 显示、opt-in prompt、手动进入后的确认框，属 plan-mode UX/safety。 | 新增 [plan-mode.md](plan-mode.md)。 |
+| #5367 | merged | MCP OAuth token file 首次保存时创建文件，属 MCP OAuth/runtime recovery。 | 已补 [mcp-resources-prompts.md](mcp-resources-prompts.md)。 |
 | #5404 | merged | custom provider models install 后保留，属 auth/provider provider preset。 | 已补 [auth-providers.md](auth-providers.md) 的近期覆盖表。 |
+| #5409 | merged | broad shell self-kill commands 前置拦截，属 permission/shell safety。 | 已补 [permission-system.md](permission-system.md)。 |
 | #5478 | merged | Requesty first-class provider。 | 已补 [auth-providers.md](auth-providers.md)。 |
 | #5539 | merged | OpenRouter/Requesty provider classes 收敛到 preset customHeaders，属 provider 内部重构。 | 已补 [auth-providers.md](auth-providers.md) 的近期覆盖表。 |
-| #5553 | merged | bare fast model 保持当前 auth，属 provider/model fallback。 | 归入 auth/provider 后续观察，不单开。 |
-| #5564 | merged | non-interactive loop detection 触发时 fail run。 | 归入 loop/circuit-breaker 后续观察，不单开。 |
+| #5553 | merged | bare fast model 保持当前 auth，属 provider/model fallback。 | 已补 [auth-providers.md](auth-providers.md)。 |
 
 ---
 

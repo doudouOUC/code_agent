@@ -29,6 +29,9 @@
 | [#5040](https://github.com/QwenLM/qwen-code/pull/5040) | @chiga0 | Merged | feat(sdk,serve): DaemonTransport abstraction + ACP standard compliance |
 | [#5066](https://github.com/QwenLM/qwen-code/pull/5066) | @ytahdn | Merged | web-shell token usage、settings/i18n、retry、streaming metrics、hidden commands |
 | [#5098](https://github.com/QwenLM/qwen-code/pull/5098) | @ytahdn | Merged | `/goal` 状态持久化为 daemon transcript events |
+| [#5161](https://github.com/QwenLM/qwen-code/pull/5161) | @ytahdn | Merged | imperative composer API：外部宿主可注入文本/tag/submit |
+| [#5163](https://github.com/QwenLM/qwen-code/pull/5163) | @wenshao | Merged | per-turn time/tokens collapse seam + `assistant.usage` event |
+| [#5166](https://github.com/QwenLM/qwen-code/pull/5166) | @ytahdn | Merged | custom footer renderer + shared background-task hook |
 | [#5175](https://github.com/QwenLM/qwen-code/pull/5175) | @wenshao | Merged | web-shell mid-turn messages 注入当前 turn |
 | [#5193](https://github.com/QwenLM/qwen-code/pull/5193) | @ytahdn | Merged | web-shell transcript block change callback + replay prompt-status 恢复 |
 | [#5266](https://github.com/QwenLM/qwen-code/pull/5266) | @wenshao | Merged | `mid_turn_message_injected` 常量集中 + drain timeout recovery |
@@ -348,6 +351,9 @@ sequenceDiagram
 | #5109 | TodoWrite 历史 UI。 | 从 tool result / transcript block 中解析 todo 状态，按历史 turn 渲染任务列表变化。 |
 | #5118 | 每个任务显示 token/time 明细。 | 将 per-task usage/runtime metadata 汇总到 task card，和 session 级 token usage 区分展示。 |
 | #5125 | 已完成 turn 可折叠。 | turn boundary reducer 记录完成态，UI 对 finished turn 提供 collapse state，活跃 turn 保持展开。 |
+| #5161 | 宿主可命令式控制 composer。 | 新增 `WebShellComposerApi` / `composerRef`，支持 `insertText`、replace、top/inline tags、`removeTag`、`clear`、`submit`；声明式 `composerInput + composerInputVersion` 作为一次性 replay key，inline tags 用 CodeMirror `StateField`/`StateEffect` 保存，不污染文档文本或历史 recall。 |
+| #5163 | 每个 turn 的耗时/token 在折叠 seam 展示。 | 折叠控件移到 prompt 与步骤之间的 seam；SDK normalizer 不再丢弃空文本 usage chunk，而是发 `assistant.usage`，reducer 将 input/output/cached tokens（含 sub-agent rounds）累计到顶层 assistant block，Web Shell 汇总 per-turn time/tokens；active/step-less turn 也显示稳定指标。 |
+| #5166 | 嵌入方可替换 footer。 | `renderFooter` prop 可替换内置 StatusBar；导出 `WebShellFooterRenderInfo`、task/skill/model 类型；原先 StatusBar 内的 background task polling 抽成 `useBackgroundTasks`，默认 footer 与 custom footer 共享数据源。未传 `renderFooter` 时行为不变。 |
 | #5175/#5266 | 纯文本 mid-turn 输入进入当前 turn；wire 常量集中，drain 超时可恢复。 | `POST /session/:id/mid-turn-message` 入 daemon queue，ACP child `craft/drainMidTurnQueue` 拉取，成功后发 `mid_turn_message_injected`；#5266 集中事件常量并处理迟到 drain response。 |
 | #5183 | mid-turn image message 不丢。 | 对 mid-turn rich content 做能力分流：当前 turn 只注入 text，可保留 image payload 到下一轮普通 prompt。 |
 | #5190 | 执行展示 polish。 | 调整 running/completed/error tool states 的文案、间距和状态展示，降低 streaming 中的跳动。 |
@@ -407,7 +413,9 @@ sequenceDiagram
 
 这批改动都保持在 Web Shell / SDK transcript projection 层，不改变 daemon 事件 wire schema 的核心语义。#5818/#5822 特别重要：它们把“客户端本地动作”和“daemon 正在流式输出的 turn”重新分界，避免刷新、重连或本地命令把 transcript 变成不可恢复的交错状态。
 
-#5893/#5900/#5917/#5931/#5943 属于 host/UI surface：它们不改变 daemon REST/SSE/ACP 事件语义，也不改变 transcript block schema。#5893 主要压缩视觉噪音和权限面板操作顺序；#5900 补齐 embedding customization；#5917 把 enhanced table 从默认接管改成用户主动切换；#5931 增加 standalone session navigation；#5943 则把 render crash 限制在 message 或 app fallback 内，避免 embed 宿主页面被单条 transcript 数据拖成白屏。
+#5161/#5166/#5900 属于 embedding customization surface：它们扩展宿主对 composer、footer、loading phrase 的控制面，但都保持默认 Web Shell 行为不变。#5163 是 transcript projection 的 additive schema：新增 `assistant.usage` / block usage 后，旧 session 缺 usage 时仍只显示步数和可推导耗时，不需要迁移历史。
+
+#5893/#5917/#5931/#5943 属于 host/UI surface：它们不改变 daemon REST/SSE/ACP 事件语义，也不改变 transcript block schema。#5893 主要压缩视觉噪音和权限面板操作顺序；#5917 把 enhanced table 从默认接管改成用户主动切换；#5931 增加 standalone session navigation；#5943 则把 render crash 限制在 message 或 app fallback 内，避免 embed 宿主页面被单条 transcript 数据拖成白屏。
 
 ## Web Shell W26 toolbar / mobile follow-up
 
