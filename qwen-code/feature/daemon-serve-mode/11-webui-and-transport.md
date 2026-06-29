@@ -48,6 +48,8 @@
 | [#5917](https://github.com/QwenLM/qwen-code/pull/5917) | @ytahdn | Merged | enhanced Markdown tables 改为手动 toggle，复制反馈更明确 |
 | [#5931](https://github.com/QwenLM/qwen-code/pull/5931) | @ytahdn | Merged | standalone Web Shell workspace session sidebar |
 | [#5943](https://github.com/QwenLM/qwen-code/pull/5943) | @carffuca | Merged | Web Shell error boundaries，防 render crash 白屏 |
+| [#5947](https://github.com/QwenLM/qwen-code/pull/5947) | @LiBaher | Merged | `ComposerToolbarAction` 增加 `voice`，embedding host 可控制 voice button 显隐 |
+| [#5948](https://github.com/QwenLM/qwen-code/pull/5948) | @ytahdn | Merged | mobile TodoPanel progress summary compact label + progress ring |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -406,6 +408,17 @@ sequenceDiagram
 这批改动都保持在 Web Shell / SDK transcript projection 层，不改变 daemon 事件 wire schema 的核心语义。#5818/#5822 特别重要：它们把“客户端本地动作”和“daemon 正在流式输出的 turn”重新分界，避免刷新、重连或本地命令把 transcript 变成不可恢复的交错状态。
 
 #5893/#5900/#5917/#5931/#5943 属于 host/UI surface：它们不改变 daemon REST/SSE/ACP 事件语义，也不改变 transcript block schema。#5893 主要压缩视觉噪音和权限面板操作顺序；#5900 补齐 embedding customization；#5917 把 enhanced table 从默认接管改成用户主动切换；#5931 增加 standalone session navigation；#5943 则把 render crash 限制在 message 或 app fallback 内，避免 embed 宿主页面被单条 transcript 数据拖成白屏。
+
+## Web Shell W26 toolbar / mobile follow-up
+
+2026-06-28 的 Web Shell 小面主要补 embedding control 和移动端任务面板密度：
+
+| PR | 能力 | 实现方式 / 边界 |
+|---|---|---|
+| #5947 | voice toolbar action 可被宿主控制。 | `ComposerToolbarAction` union 增加 `voice`，`VoiceButton` 复用 `showToolbarAction()` gate；不传 `composerToolbarActions` 时仍显示 voice，外部宿主可省略 `voice` 来隐藏。daemon 端 `voice_transcribe` capability check 不变。 |
+| #5948 | TodoPanel mobile progress 更紧凑。 | `TodoPanel` 在 desktop `>=600px` 继续显示 `Step 3 / 8` / `第 3 / 8 步`；mobile `<600px` 改为 `3 / 8` + progress ring，并缩小 padding，避免窄屏任务面板被长文案挤压。 |
+
+这两项都不改变 transcript block schema 或 daemon event wire。#5947 是 Web Shell 作为可嵌入组件的 API polish；#5948 是同一 TodoPanel 数据的 responsive presentation。
 
 ---
 

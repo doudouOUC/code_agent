@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
 >
-> 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由 + re-export shim）。
+> 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
 > 注意一处**文档与代码的时间差**：`packages/acp-bridge/README.md` 仍把 `PermissionMediator` 描述为 "type-only stub / No implementation yet"——那是 F1 抬包时点的快照。本文以 `daemon_mode_b_main` 上**已落地**的 `permissionMediator.ts`（1318 行）为准，F3 已把四策略实现合入。
 
@@ -15,7 +15,7 @@
 抽包要解决两件事：
 
 1. **解耦**。bridge 的这套事件流/通道/权限/状态契约不止 `qwen serve` 要用——`packages/channels`、VSCode IDE companion、未来 TUI co-host、WebSocket transport 都要复用同一套原语。与其各写一套并行的事件流（最容易在 replay/背压语义上各自跑偏），不如抽成包，并通过**注入 seam** 让宿主（serve / IDE / 测试）把自己特有的行为塞进来，而 bridge 本身对宿主一无所知。
-2. **行为保持**。抽包是大规模机械迁移，必须做到「搬家不改语义」——所有 `serve/` 内部相对导入零改造（靠 `httpAcpBridge.ts`/`eventBus.ts` re-export shim），所有线协议帧 byte-for-byte 不变，6800+ 行 bridge 测试一并抬升。
+2. **行为保持**。抽包是大规模机械迁移，必须做到「搬家不改语义」——F1 阶段靠 `httpAcpBridge.ts`/`eventBus.ts` re-export shim 让 `serve/` 内部相对导入零改造，所有线协议帧 byte-for-byte 不变，6800+ 行 bridge 测试一并抬升；#5955 后 active CLI consumers 已迁到 package exports，并删除剩余 event-bus/status/in-memory-channel wrapper。
 
 三个注入 seam 是抽包的接缝设计核心：
 
@@ -125,12 +125,12 @@ flowchart LR
 
 关键纪律：**22a 先冻结 `PermissionMediator` 的 type-only 契约**（`permission.ts` 的 `PermissionPolicy` 4 字面量、`PermissionRequestRecord`、`PermissionVote`、`PermissionVoteOutcome`、`PermissionResolution`），让 F3 的实现是「填空」而非「重设计」。`permission.ts` 的 `PermissionRequestRecord` 形状刻意镜像当时 `BridgeClient` 里的 `PendingPermission` 记录，所以 F3 的 lift 是「结构性重命名」而非重构。
 
-### cli 侧 re-export shim
+### cli 侧 compatibility wrapper（历史 F1 状态；#5955 后已收敛）
 
-行为保持的关键工具是 **re-export shim**：抽包后 serve 侧的旧文件退化为转发壳，所有相对导入零改造。
+F1 行为保持阶段的关键工具是 **re-export shim**：抽包后 serve 侧的旧文件退化为转发壳，所有相对导入零改造。#5955 后，剩余 event-bus / status / in-memory-channel wrapper 已删除，active CLI consumers 直接引用 `@qwen-code/acp-bridge` package exports；serve package barrel 仍保留下游兼容导出。
 
-- **`serve/eventBus.ts`** 退化为一行 `export * from '@qwen-code/acp-bridge/eventBus';`。`serve/` 内部的 `import { ... } from './eventBus.js'` 与 `cli/src/commands/serve.ts` 的唯一外部 import 全部继续解析。
-- **`serve/httpAcpBridge.ts`** 退化为 ~97 行 re-export shim，转发**每一个**先前导出的符号：`createHttpAcpBridge`（来自 `/bridge`）、`defaultSpawnChannelFactory`（来自 `/spawnChannel`）、`BridgeClient`（来自 `/bridgeClient`）、全部 typed error（来自 `/bridgeErrors`，含 F3 新增的 `CancelSentinelCollisionError`/`PermissionForbiddenError`/`PermissionPolicyNotImplementedError`）、全部类型别名（来自 `/bridgeTypes`/`/bridgeOptions`/`/bridgeFileSystem`）、`canonicalizeWorkspace`/`MAX_WORKSPACE_PATH_LENGTH`（来自 `/workspacePaths`）。`server.ts`/`runQwenServe.ts`/`workspaceAgents.ts`/`workspaceMemory.ts`/`index.ts` + bridge 测试套件的每一个 `./httpAcpBridge.js` import 零改动。
+- **`serve/eventBus.ts`** 在 F1 阶段退化为一行 `export * from '@qwen-code/acp-bridge/eventBus';`，用于让 `serve/` 内部的 `import { ... } from './eventBus.js'` 与 `cli/src/commands/serve.ts` 的唯一外部 import 全部继续解析；#5955 删除该 wrapper 后，调用方已改直接走 package export。
+- **`serve/httpAcpBridge.ts`** 在 F1 阶段退化为 ~97 行 re-export shim，转发**每一个**先前导出的符号：`createHttpAcpBridge`（来自 `/bridge`）、`defaultSpawnChannelFactory`（来自 `/spawnChannel`）、`BridgeClient`（来自 `/bridgeClient`）、全部 typed error（来自 `/bridgeErrors`，含 F3 新增的 `CancelSentinelCollisionError`/`PermissionForbiddenError`/`PermissionPolicyNotImplementedError`）、全部类型别名（来自 `/bridgeTypes`/`/bridgeOptions`/`/bridgeFileSystem`）、`canonicalizeWorkspace`/`MAX_WORKSPACE_PATH_LENGTH`（来自 `/workspacePaths`）。`server.ts`/`runQwenServe.ts`/`workspaceAgents.ts`/`workspaceMemory.ts`/`index.ts` + bridge 测试套件的每一个 `./httpAcpBridge.js` import 在该阶段零改动。
 
 shim 里还留了一条值得注意的注释（`httpAcpBridge.ts`，wenshao review #4335 / 3272581548）：F3 删掉了 `MAX_RESOLVED_PERMISSION_RECORDS`、`PendingPermission`、`PermissionResolutionRecord` 的 re-export——因为这些状态被搬进了 mediator，mediator 声明了自己（形状不同）的 cap 与记录类型。这是 shim 唯一一处「不止转发、还反映了 F3 的状态归属迁移」的地方。
 
@@ -442,7 +442,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 - 新建 `packages/acp-bridge/` 包骨架（`package.json` + `tsconfig.json` + `vitest.config.ts`）；抬升 `eventBus.ts:EventBus` + `inMemoryChannel.ts:createInMemoryChannel` + `channel.ts:AcpChannel` 类型到包内。
 - `permission.ts` 冻结 `PermissionMediator` type-only 契约：`PermissionPolicy` 4 字面量、`PermissionRequestRecord`、`PermissionVote`、`PermissionVoteOutcome`、`PermissionResolution`。
-- `serve/eventBus.ts` 退化为 re-export shim `export * from '@qwen-code/acp-bridge/eventBus'`；`serve/httpAcpBridge.ts` 同步调整 import。
+- F1 阶段 `serve/eventBus.ts` 退化为 re-export shim `export * from '@qwen-code/acp-bridge/eventBus'`；#5955 后该 wrapper 删除，active imports 直接走 package export。
 
 ### #4298 — lift status/paths/errors 22b/1（@doudouOUC）
 
@@ -466,7 +466,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 - 抬升 `bridge.ts:createHttpAcpBridge` 工厂闭包 + `bridgeClient.ts:BridgeClient` + `spawnChannel.ts:defaultSpawnChannelFactory` 到 `packages/acp-bridge/src/`。
 - 新增 `bridgeFileSystem.ts:BridgeFileSystem` seam（`readText`/`writeText`，签名镜像 ACP SDK 形状）；`bridgeOptions.ts` 增加 `fileSystem` 注入点 + `BridgeClient` early-return 委托。
-- `serve/httpAcpBridge.ts` 退化为 ~97 行 re-export shim 转发全部导出符号；内部 import 零改动。
+- F1 阶段 `serve/httpAcpBridge.ts` 退化为 ~97 行 re-export shim 转发全部导出符号；内部 import 零改动。
 - `bridgeClient.test.ts` + `spawnChannel.test.ts` 随迁。
 
 ### #4335 — F3 多客户端权限协调（@doudouOUC）

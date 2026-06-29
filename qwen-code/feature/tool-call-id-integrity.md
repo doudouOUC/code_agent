@@ -1,7 +1,7 @@
 # 工具调用 ID 完整性技术方案
 
 > 适用代码库：`QwenLM/qwen-code` `main`。
-> 关联 PR：[#5107](https://github.com/QwenLM/qwen-code/pull/5107) `fix(core): Repair duplicate tool call IDs`、#5624 `fix(cli): Fail dangling replayed tool calls`、#5657 `fix(core): Stop repeated duplicate provider tool-call responses`、#5934 `fix(core): stop repeated truncated write_file/edit retries from looping`；关联 issue：#5099。
+> 关联 PR：[#5107](https://github.com/QwenLM/qwen-code/pull/5107) `fix(core): Repair duplicate tool call IDs`、#5624 `fix(cli): Fail dangling replayed tool calls`、#5657 `fix(core): Stop repeated duplicate provider tool-call responses`、#5934 `fix(core): stop repeated truncated write_file/edit retries from looping`、#5944 `fix(core): halt repeated shell inspection variants`；关联 issue：#5099、#4695。
 
 ---
 
@@ -19,6 +19,8 @@ OpenAI-compatible provider 的 tool-call 协议要求：一次 assistant tool ca
 #5657 进一步处理 provider 持续 replay 同一 tool id 的循环：第一次重复可以作为 duplicate-error tool response 回给模型，让模型有机会自我修正；如果同一 prompt 内又重复同一个 provider id，就进入 terminal/drop-only 路径，不再调度新的 sibling tool，避免工具调用和 duplicate response 互相喂出无限循环。
 
 #5934 处理的是另一条 retry-loop：模型输出被 `max_tokens` 截断后，scheduler 会拒绝残缺的 `write_file`/edit，模型又反复重发同一个超大调用。修复分两层：默认 `max_tokens` 改用模型声明输出上限，减少正常大响应被 8K cap 截断；残余的重复截断拒绝接入已有 retry-loop detector，第三次同类错误给出 `RETRY LOOP DETECTED` stop directive。
+
+#5944 处理的是“工具调用文本不完全重复但语义停滞”的 shell loop：模型在 `git status`、overview `git diff`、`git ls-files` 等只读仓库概览命令之间变体循环，exact repeated-call guard 捕不到，默认 `model.skipLoopDetection` 又可能跳过启发式 stagnation。修复后核心 loop detection service 增加 always-on `shell_command_stagnation` guard。
 
 ---
 
@@ -41,6 +43,8 @@ flowchart TD
     CB --> TERM["terminal/drop-only<br/>no fresh sibling tool"]
     GUARD --> TRUNC["truncated write/edit rejection<br/>retry-loop counter"]
     TRUNC --> STOP["3rd same rejection<br/>RETRY LOOP DETECTED"]
+    GUARD --> SHELL["shell git overview inspection bucket"]
+    SHELL --> SHELLSTOP["8th similar inspection<br/>shell_command_stagnation"]
 ```
 
 关键边界：
@@ -97,6 +101,18 @@ flowchart TD
 
 显式用户/env `max_tokens` 仍然优先，并继续禁用自动 escalation；容量受限的自建后端如果依赖低 slot reservation，可以设置 `QWEN_CODE_MAX_OUTPUT_TOKENS=8000` 恢复旧的 8K 上限。这把默认行为调成适合第三方/自建 provider 的“用模型上限”，把低预留变成 operator opt-in。
 
+### 3.7 repeated shell inspection variants guard（#5944）
+
+#5944 给 `LoopDetectionService` 增加一个 always-on guard，专门拦截重复的 shell git overview inspection 变体。它解决的是 #4695 这类场景：模型不断调用 `run_shell_command`，但每次把命令文本略微变一下，exact duplicate guard 不会命中。
+
+入桶范围刻意窄：
+
+| 入桶 | 不入桶 |
+|---|---|
+| `git status`、overview-style `git diff`、`git ls-files` 等只读仓库概览检查。 | `git diff -- src/file.ts` / `git diff src/file.ts` 这类文件级 review；包含 `git add` / `git commit` 等写操作的 compound shell；被非 inspection tool call 打断的 streak。 |
+
+命中策略：同一 prompt 中连续相似 shell inspection 到第 8 次时，中止运行并返回 `shell_command_stagnation`，文案明确这是 always-on guard，不能被 `model.skipLoopDetection` 关闭。这个设计避免模型烧到 `--max-tool-calls` 或 100 次硬上限，同时降低误伤正常代码审查中“看多个具体文件 diff”的概率。
+
 ---
 
 ## 4. 涉及 PR
@@ -107,6 +123,7 @@ flowchart TD
 | #5624 | dangling replay tool calls | replay 历史时跟踪 tool start/result 配对，对缺失 result 的 historical tool call 合成 failed terminal update，避免恢复 UI 卡在 processing |
 | #5657 | repeated duplicate provider responses | 同一 prompt 内 provider 反复 replay 同一 tool id 时触发 circuit breaker，首次 synthetic duplicate-error，后续 terminal/drop-only，AgentCore 报 `LOOP_DETECTED` |
 | #5934 | truncated write/edit retry loop | 默认 output cap 改为模型声明上限；重复截断 write/edit 拒绝接入 retry-loop detector，第 3 次返回 stop directive |
+| #5944 | repeated shell inspection variants | always-on shell git overview inspection guard：相似 `git status` / overview diff / `git ls-files` 连续循环时以 `shell_command_stagnation` 中止；文件级 diff 和写操作复合命令不入桶 |
 
 ---
 
@@ -118,6 +135,7 @@ flowchart TD
 4. **dangling replay 修复仅限历史重建**：#5624 不改变 live tool lifecycle；它只保证旧 transcript 恢复时不会留下无终态 tool block。
 5. **duplicate circuit breaker 是 prompt-scoped**：#5657 按 prompt 清理重复跟踪；跨 prompt 的 raw id 复用仍由 #5107 的 local suffix / cleanup 处理。
 6. **高 `max_tokens` 会改变自建后端 slot reservation**：#5934 默认使用模型上限，容量受限部署如需旧 8K 预留，应显式设置 `QWEN_CODE_MAX_OUTPUT_TOKENS=8000`。
+7. **shell inspection guard 只覆盖 git overview 变体**：#5944 不尝试识别所有 shell 循环；它刻意 fail open，避免把文件级 diff review、带写操作的 shell chain 或穿插其它工具的正常探索误判为 stagnation。
 
 ---
 
@@ -150,3 +168,10 @@ flowchart TD
 - `tokenLimits` / provider generators：删除 8K capped default，未显式配置 `max_tokens` 时使用模型声明输出上限；OpenAI-compatible、DashScope、Anthropic 路径同步更新测试。
 - `coreToolScheduler`：截断 `write_file`/edit 拒绝进入 retry-loop detector，第三次相同拒绝返回 `RETRY LOOP DETECTED`。
 - docs/config：说明 operator 可用 `QWEN_CODE_MAX_OUTPUT_TOKENS=8000` 恢复低 slot reservation。
+
+### PR #5944 — repeated shell inspection variants guard
+
+- `LoopDetectionService`：新增 read-only git overview inspection bucketing，把 `git status`、overview `git diff`、`git ls-files` 等语义相近命令计入同一 streak。
+- false-positive guards：file-specific diff、带 repo 写操作的 compound commands、非 inspection tool call 打断后的新 streak 都不触发。
+- `client.ts` / non-interactive path：命中时以 `shell_command_stagnation` 终止 turn，避免继续跑到工具调用硬上限。
+- tests/E2E：loop detection service 覆盖正负例，nonInteractive CLI 和 tmux fake OpenAI-compatible endpoint 验证第 8 次请求前后行为。

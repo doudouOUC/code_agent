@@ -17,7 +17,7 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 
 | 层 | 文件 | 角色 |
 | --- | --- | --- |
-| **内存事件总线** | `packages/acp-bridge/src/eventBus.ts:EventBus` | per-session 单调序号 + bounded ring replay + 每订阅者背压队列。`serve/eventBus.ts` 仅 re-export（F1 抽包，见总览 §3.8）。 |
+| **内存事件总线** | `packages/acp-bridge/src/eventBus.ts:EventBus` | per-session 单调序号 + bounded ring replay + 每订阅者背压队列。F1 抽包时 `serve/eventBus.ts` 曾作为 compatibility wrapper；#5955 后 active consumers 直接引用 bridge package export。 |
 | **SSE 写侧** | `packages/cli/src/serve/server.ts` 的 `GET /session/:id/events` handler（L2653）+ `formatSseFrame`（L3629） | 把 `BridgeEvent` 序列化为 SSE wire，单飞写链 + drain 背压 + 心跳 + writer idle 守卫；协议帧补全（serverTimestamp）也在此。 |
 | **SDK 消费侧** | `packages/sdk-typescript/src/daemon/events.ts`（reducer）+ `ui/store.ts` / `ui/transcript.ts` | `Last-Event-ID` 解析、`awaitingResync` 一向闩、terminal 事件归并、errorKind/provenance 归一化。 |
 

@@ -1,7 +1,7 @@
 # Loop wakeup 技术方案
 
 > 适用范围：`QwenLM/qwen-code` bundled loop skill、cron scheduler、`loop_wakeup` tool。
-> 涉及 PR：#5182（second-resolution session wakeup engine）、#5197（prompt-only `/loop` self-paced wakeups）、#5808（cancel self-paced wakeup on user abort）、#5844（monitor/background-task notification guidance）、#5921（scheduled task count footer）、#5927（cron tool search intents）。
+> 涉及 PR：#5182（second-resolution session wakeup engine）、#5197（prompt-only `/loop` self-paced wakeups）、#5808（cancel self-paced wakeup on user abort）、#5844（monitor/background-task notification guidance）、#5890（inject `.qwen/loop.md` task file at fire time）、#5921（scheduled task count footer）、#5927（cron tool search intents）。
 
 ---
 
@@ -19,6 +19,8 @@
 
 #5921/#5927 补的是“用户如何看见和管理这些安排”：CLI footer 会在 cron scheduling 开启且 scheduler 里有 pending entries 时显示 `◎ 1 scheduled task` / `◎ N scheduled tasks`；工具搜索也会把“stop/cancel/remove/clear cron/loop wakeup”导向 `cron_delete`，把可见性查询导向 `cron_list`，把新建排程导向 `loop_wakeup`。
 
+#5890 补的是“长跑 loop 如何携带可编辑任务清单”：模型把 wakeup/cron prompt 设成 sentinel，fire 时运行时读取 `.qwen/loop.md` 或 `~/.qwen/loop.md`，首次/变更/压缩后注入全文，未变时只注入短提醒。
+
 ---
 
 ## 2. 整体架构
@@ -31,7 +33,11 @@ flowchart TB
   DECIDE -->|yes| WAKE["LoopWakeup tool<br/>delaySeconds"]
   DECIDE -->|no| END["loop ends"]
   WAKE --> SCHED["CronScheduler session wakeup"]
-  SCHED --> FIRE["onFire -> /loop original prompt"]
+  SCHED --> RESOLVE{"prompt is loop.md sentinel?"}
+  RESOLVE -->|yes| FILE["read .qwen/loop.md<br/>project wins"]
+  FILE --> INJECT["full task block or short reminder"]
+  RESOLVE -->|no| FIRE["onFire -> /loop original prompt"]
+  INJECT --> FIRE
 ```
 
 关键点：
@@ -41,6 +47,7 @@ flowchart TB
 - wakeup 使用 second precision，而非分钟级 cron。
 - session-level 24h budget 从第一次 wakeup 开始计时；fire 或 cancel 不重置，session stop/destroy 才重置。
 - 用户中断正在执行的 self-paced tick 时，会清掉该 tick 已安排的 pending one-shot wakeup。
+- `.qwen/loop.md` task-file mode 只在模型显式使用 sentinel 时生效，普通 `/loop` prompt 不会被隐式替换。
 
 ---
 
@@ -101,6 +108,29 @@ bundled loop skill 明确要求：
 
 这不改变 `cron_*` 或 `loop_wakeup` 工具 schema，只改善发现路径，尤其是 issue #5823 里 hidden cron/loop tasks 难以停止的问题。
 
+### 3.7 `.qwen/loop.md` 动态任务文件（#5890）
+
+#5890 给 `/loop` 增加 task-file mode，让长跑循环可以引用一份持久、用户可编辑的任务清单，而不是每个 tick 都让模型重述。
+
+模型通过 sentinel opt-in：
+
+| sentinel | 场景 | fire 行为 |
+|---|---|---|
+| `<<loop.md-dynamic>>` | self-paced `LoopWakeup` | fire 时读取 task file，并展开为 full block 或 short reminder。 |
+| `<<loop.md>>` | fixed-interval `CronCreate` | 同样读取 task file，但 reminder 文案按 cron 场景区分。 |
+
+reader 与 resolver 的关键边界：
+
+- 路径优先级为 `[<cwd>/.qwen/loop.md, ~/.qwen/loop.md]`，project 文件优先；
+- project 文件受 `realpath` workspace boundary 约束，指向 workspace 外的 symlink 被拒；
+- 空文件、缺失文件、非目录候选、symlinked candidate 会被跳过；
+- 文件按 25KB byte cap 读取，并保持 UTF-8 边界；
+- 变更检测按内容相等，编辑或删除后重建都会触发重新全文投递；
+- cached content 只有在 tick 实际投递后才 commit，避免 resolve 后 send 前 abort 造成下一轮误发 short reminder；
+- compaction 后 resolver 会重新投递全文，避免摘要后只剩短提醒丢失任务细节。
+
+客户端回显不展示裸 sentinel 或全文 dump，而是稳定 label，如 `Loop tick - tasks from <path>`。当前 headless full resolver wiring 仍是后续项：headless 下裸 sentinel fire 会 no-op 跳过，不会把 sentinel 原样发给模型。
+
 ---
 
 ## 4. 涉及 PR
@@ -111,6 +141,7 @@ bundled loop skill 明确要求：
 | #5197 | merged | `/loop <prompt>` 改为 prompt-only self-paced wakeup，并更新 bundled loop skill contract、权限与测试。 |
 | #5808 | merged | 用户 abort self-paced tick 时取消关联 pending one-shot wakeup，避免停止后 loop 自动复活。 |
 | #5844 | merged | self-paced loop 对 monitor/background-task terminal notification 做模型引导：长 fallback heartbeat + 通知优先处理。 |
+| #5890 | merged | `.qwen/loop.md` 动态任务文件：sentinel fire 时读取项目/用户 task file，首次/变更/压缩后全文注入，未变时短提醒，并加 workspace boundary 与 25KB cap。 |
 | #5921 | merged | CLI footer 显示 pending scheduled task count，让隐藏的 cron/loop wakeup 不再完全不可见。 |
 | #5927 | merged | tool_search ranking/tokenization 增加 cron/loop 管理意图，停/删/list/schedule 分别命中对应工具。 |
 
@@ -118,11 +149,12 @@ bundled loop skill 明确要求：
 
 ## 5. 已知限制 / 后续
 
-1. **只覆盖 prompt-only `/loop`**。任务文件注入、autonomous bare `/loop`、monitor-as-primary signal 属后续步骤。
+1. **只覆盖 prompt-only `/loop` 和显式 sentinel task-file mode**。#5890 已补任务文件注入，但 autonomous bare `/loop`、完整 headless resolver wiring 和 monitor-as-primary signal 仍属后续步骤。
 2. **模型必须遵守 skill contract**。self-paced 停止依赖模型不再调用 `LoopWakeup`；系统侧用 24h session budget 做硬兜底。
 3. **wakeup 是 session 级**。session stop/destroy 会重置预算并取消 pending wakeups，跨 session 的长期计划仍应使用 cron。
 4. **idle pending wakeup 仍需显式管理**。#5808 只处理用户 abort in-flight tick 的场景；未执行中的 pending wakeup 仍通过 `/loop list` / `/loop clear` 管理。
 5. **notification 只覆盖 loop 自己启动并监控的后台工作**。#5844 不把任意 monitor 事件广播给所有 loop；模型仍需要在通知到达后判断是否继续 schedule。
 6. **footer count 不是管理面**。#5921 只显示 pending count；列出、停止、清理仍依赖 `/loop list`/`/loop clear` 或 cron tools。
+7. **task file 不是任意文件注入工具**。#5890 只读取固定 `.qwen/loop.md` / `~/.qwen/loop.md`，并拒绝 project symlink escape；它不支持模型传任意 path。
 
-_新增于 2026-06-23；更新于 2026-06-26_
+_新增于 2026-06-23；更新于 2026-06-29_

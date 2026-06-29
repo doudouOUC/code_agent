@@ -1,7 +1,7 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769 / #5778 / #5793 / #5827 / #5835 / #5845**。
+> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5632 / #5637 / #5654 / #5729 / #5769 / #5778 / #5793 / #5827 / #5835 / #5845 / #5946**。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
@@ -36,6 +36,8 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 - **自定义 provider id 与 transport protocol 解耦（#5793）**：某些自定义 provider 需要保留自己的 provider id / label / preset metadata，但底层请求应复用内置 SDK protocol（例如走已有 OpenAI-compatible 或 DashScope 风格 transport）。如果强行把 id 当 protocol，会让 provider identity 与请求行为绑定过死。
 
 - **OpenAI-compatible stream 卡死（#5827/#5845）**：OpenAI SDK 的 request `timeout` 通常只覆盖连接或首包；一旦流式响应已经开始但长时间没有新 chunk，旧实现可能一直挂住。需要 provider pipeline 内部的 inactivity timeout，让“无流量”也能 abort 并复用既有 retry 分类，同时允许部署通过环境变量统一覆盖默认 idle timeout。
+
+- **Anthropic SDK abort listener 泄漏（#5946）**：Anthropic SDK 的 `fetchWithTimeout` 会在传入 signal 上注册 abort listener 但不移除。若直接传 session/turn 级长寿 signal，多次请求会积累死 listener，最终触发 `MaxListenersExceededWarning` 并持有不再需要的引用。
 
 - **视觉模型 fallback 与 provider install 不应误改主模型（#5778/#5835）**：多模态输入需要一个可选 vision fallback model，但它不能污染主聊天模型选择；同样，重新认证或重新应用 provider install plan 时也不应把用户选好的 cheaper/faster model 重置成 provider 默认模型。
 
@@ -226,7 +228,23 @@ const httpOptions = config.baseUrl
 
 边界：如果已经向上游产出过部分 chunk，再发生 idle timeout，是否能重试取决于调用层对“已产生部分输出”的处理；#5827 的核心是让卡死连接可被关闭并进入既有错误分类，而不是重新定义所有 partial-output recovery。
 
-#### 3.1.8 `providerProtocol` 映射（#5793）
+#### 3.1.8 Anthropic per-request abort controller（#5946）
+
+#5946 是 provider runtime hygiene：Anthropic generator 的非流式 `generateContent` 与流式 `generateContentStream` 不再把调用方的 `request.config?.abortSignal` 直接交给 SDK，而是通过现有 `createChildAbortController` 包一层 per-request child signal。
+
+原因是 Anthropic SDK 的 `fetchWithTimeout` 会在传入 signal 上注册 `'abort'` listener，但不会 `removeEventListener`，也没有使用 `{ once: true }`。如果传入的是 session/turn 级长寿 `AbortController`，每次 Anthropic 请求都会在同一个 caller signal 上留下一个死 listener。
+
+修复后的生命周期：
+
+1. 每次 Anthropic 请求创建 child controller；
+2. SDK `client.messages.create` 与 streaming empty-stream fallback probe 都只拿 child signal；
+3. parent abort 仍传播到 child，用户取消语义不变；
+4. 非流式路径在 `finally` 中 abort child；流式路径在 stream drained 后 abort child；
+5. child 自己挂在 parent 上的 listener 随 cleanup 移除，SDK 泄漏的 listener 只落到短命 child 上。
+
+这与 #4810 在 OpenAI generator 上做的隔离一致；#5946 只是补上 Anthropic path。其它 SDK 未改动，Anthropic SDK 上游泄漏本身也不在本 PR 范围内。
+
+#### 3.1.9 `providerProtocol` 映射（#5793）
 
 #5793 把“provider identity”和“底层 SDK protocol”分开。自定义 provider 可以继续使用自己的 `id`、display label、preset metadata 和 model ownership，但通过 `providerProtocol` 映射到已有协议实现：
 
@@ -554,6 +572,9 @@ sequenceDiagram
 9. **stream idle timeout 不等于 turn-level recovery**
    - #5827/#5845 只负责在 OpenAI-compatible stream 长时间无 chunk 时关闭请求并把错误归类为 retryable transport failure，并提供 env/config 两级超时配置。若超时前已经输出了部分内容，最终 UI/历史/重试是否能无缝恢复仍取决于上层 streaming pipeline；这些 PR 不新增 terminal `turn_error` SSE 或 partial-output replay 语义。
 
+10. **Anthropic abort listener 隔离只覆盖 Anthropic generator**
+    - #5946 复用 OpenAI path 的 child abort controller 形态，但没有修改其它 provider SDK，也没有修补 Anthropic SDK 自身。若未来接入新的 SDK 且它也在长寿 signal 上泄漏 listener，需要按同一模式审计。
+
 ---
 
 ## 8. 各 PR 代码贡献
@@ -613,6 +634,13 @@ sequenceDiagram
 - **配置入口**：新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，解析为非负整数毫秒；非法值忽略并通过 debug logger 记录。
 - **优先级**：显式 `ContentGeneratorConfig.streamIdleTimeoutMs`（包括 0 禁用）> env > 默认 `120000`。
 - **边界**：该 env 只提供 OpenAI-compatible stream inactivity timeout 的默认值，不改变用户主动 abort、partial-output recovery 或 retry classifier 的语义。
+
+### #5946 — Anthropic abort listener isolation
+
+- **修复点**：Anthropic `generateContent` / `generateContentStream` 先用 `createChildAbortController` 从 caller signal 派生 per-request child，再把 child signal 传给 SDK 和 streaming fallback probe。
+- **清理语义**：非流式请求在 `finally` 中 abort child；流式请求在 stream 被消费完后 abort child，避免 SDK 泄漏 listener 累积到长寿 caller signal。
+- **取消语义**：parent abort 仍传播到 child，用户取消和 request abort 行为不变。
+- **测试**：Anthropic generator tests 覆盖流式/非流式连续请求后 caller signal 无残留 abort listener，以及 caller abort 能传播到 child signal。
 
 ### #3495 — apiKey 跨重启保留
 

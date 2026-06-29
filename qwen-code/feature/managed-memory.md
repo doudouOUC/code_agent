@@ -1,8 +1,8 @@
 # Managed memory 技术方案
 
 > 适用范围：`QwenLM/qwen-code` managed memory、`/remember` / `/dream` / `/forget`、auto-generated skills persistence。
-> 涉及 PR：#5616（confirm auto-generated skills before persisting）、#5814（decouple `/remember` from auto-extract, stop writing to QWEN.md）、#5886（git-shared team memory tier）。
-> 状态：2026-06-27 已合入本周主线。
+> 涉及 PR：#5616（confirm auto-generated skills before persisting）、#5814（decouple `/remember` from auto-extract, stop writing to QWEN.md）、#5886（git-shared team memory tier）、#5963（only spawn memory recall when auto-memory is enabled）。
+> 状态：2026-06-28 已合入上周主线。
 
 ---
 
@@ -18,6 +18,7 @@ Managed memory 负责把长期有用的信息保存到 qwen-code 的 memory/skil
 1. #5616：auto-generated skills 不再直接进入 `.qwen/skills/`，而是先 staged 到 `.qwen/pending-skills/`，用户确认后才变成可加载 skill。
 2. #5814：`enableManagedAutoMemory` 不再是 managed memory 的总开关，只控制后台 auto-extract；`/remember` 等手动能力只在 `--bare` 下禁用，且绝不再回退写 QWEN.md。
 3. #5886：新增 opt-in TEAM memory tier，写入 `.qwen/team-memory/`，适合被 Git 共享的项目/团队知识；默认不启用，且只在 trusted workspace 中可写。
+4. #5963：`enableManagedAutoMemory=false` 时不再发起 memory recall side-query，避免用户关闭自动记忆后仍被后台记忆查询占用本地模型或增加延迟。
 
 ---
 
@@ -34,14 +35,14 @@ flowchart TB
   UI -->|Keep| LIVE
   UI -->|Discard| DROP["delete staged copy"]
 
-  USER["/remember"] --> MANUAL{"managed memory available?"}
+  REMEMBER["/remember"] --> MANUAL{"managed memory available?"}
   MANUAL -->|!bare| MEM["managed memory write path<br/>user/feedback/project/reference"]
   MANUAL -->|bare| DISABLED["disabled"]
-  AUTO["background auto-extract"] --> AUTOFLAG{"enableManagedAutoMemory"}
+  AUTO["background auto-extract / recall side-query"] --> AUTOFLAG{"enableManagedAutoMemory"}
   AUTOFLAG -->|true| MEM
-  AUTOFLAG -->|false| NOAUTO["skip auto-extract only"]
+  AUTOFLAG -->|false| NOAUTO["skip auto-extract and recall side-query"]
   MEM --> TIER{"memory tier"}
-  TIER --> USER["USER / PROJECT<br/>private/local"]
+  TIER --> USERMEM["USER / PROJECT<br/>private/local"]
   TIER --> TEAM["TEAM<br/>.qwen/team-memory/<br/>git-shared"]
   TEAM --> GUARD["secret guard<br/>hard-block credentials"]
   TEAM --> INDEX["generated MEMORY.md index"]
@@ -54,7 +55,7 @@ flowchart TB
 
 - `.qwen/pending-skills/` 是 `.qwen/skills/` 的 sibling，不会被 skill loader 扫描；未确认 skill 对模型不可见。
 - `memory.autoSkillConfirm` 默认 `true`。设为 `false` 时恢复旧的直接持久化行为。
-- `enableManagedAutoMemory=false` 只关闭后台 auto-extract，不关闭手动 `/remember`、memory prompt injection、recall prefetch、`/dream` / `/forget` 注册。
+- `enableManagedAutoMemory=false` 关闭后台 auto-extract；#5963 后也关闭 memory recall side-query。手动 `/remember`、已有 memory prompt injection、`/dream` / `/forget` 注册仍按非 `--bare` 边界理解。
 - `--bare` 是 managed memory 的真正全局禁用边界。
 - TEAM memory 是 opt-in：`memory.enableTeamMemory` 或 `QWEN_CODE_MEMORY_TEAM` 开启，且要求 trusted workspace；未开启时不扫描/不写 `.qwen/team-memory/`。
 - TEAM memory 写入前跑 curated secret guard，命中 credential/token/private-key 等高风险 pattern 时 hard block；通过后的写入仍按默认 `ask` 权限进入审批和 git diff。
@@ -89,7 +90,7 @@ flowchart TB
 | background auto-extract | 受 `enableManagedAutoMemory` 控制 | 仍受 `enableManagedAutoMemory` 控制 |
 | `/remember` routing | auto memory 关闭时可能回退写 QWEN.md | 只要不是 `--bare`，走 managed memory；不写 QWEN.md |
 | `/dream` / `/forget` | auto memory 关闭时隐藏 | 只要不是 `--bare`，仍注册 |
-| memory prompt injection / recall prefetch | 受 auto memory 总开关影响 | 只要不是 `--bare`，仍可用 |
+| memory prompt injection / recall side-query | 受 auto memory 总开关影响 | prompt injection 仍按非 `--bare` 可用；#5963 后 recall side-query 只有 `enableManagedAutoMemory=true` 才会发起 |
 
 这个改动保护 QWEN.md 的用户控制权：QWEN.md 类似 AGENTS.md / CLAUDE.md，应由用户手动维护，不应被 `/remember` 或自动流程半自动改写。
 
@@ -111,6 +112,17 @@ flowchart TB
 
 sync 也是保守的：默认关闭，不自动合并；开启后只做 fast-forward pull，遇到冲突或远端拒绝时降级为普通本地文件，用户用正常 Git 流程处理。作者身份按本地 git 配置/用户 attribution 走 cooperative 模型，不把 daemon 变成强一致同步服务。
 
+### 3.4 auto-memory disabled 时跳过 recall side-query（#5963）
+
+#5963 修的是“配置关闭自动记忆后仍有后台记忆查询”的运行时边界。对只能本地跑一个模型会话、或需要所有用户可见请求命中缓存的用户来说，memory recall side-query 会额外占用模型并拉长每轮 wall time。修复后：
+
+- `enableManagedAutoMemory=false` 时，client 不再 spawn memory recall side-query；
+- `enableManagedAutoDream=false`、`enableAutoSkill=false` 等关闭项配合使用时，不会再被 memory recall 背景请求绕过；
+- 手动 `/remember` / `/forget` / `/dream` 的命令注册与持久化能力不因此回退到 QWEN.md，也不被误判为全局 memory 禁用；
+- 未配置该开关时保持默认行为，仍可在 managed memory 开启的场景做 recall。
+
+这个 PR 让“自动后台记忆”和“用户手动长期记忆”进一步分离：#5814 先避免手动 `/remember` 被 auto-extract 开关误伤，#5963 则确保关闭 auto-memory 时不会继续跑隐藏 side-query。
+
 ---
 
 ## 4. 涉及 PR
@@ -120,6 +132,7 @@ sync 也是保守的：默认关闭，不自动合并；开启后只做 fast-for
 | #5616 | merged | auto-generated skills 先 staged 到 `.qwen/pending-skills/`，经 `SkillReviewDialog` Keep/Discard 后才进入 `.qwen/skills/`；新增 `memory.autoSkillConfirm`。 |
 | #5814 | merged | `enableManagedAutoMemory` 只控制后台 auto-extract；`/remember`、`/dream`、`/forget`、memory injection 和 recall prefetch 改由 `!bare` gate，且 `/remember` 不再写 QWEN.md。 |
 | #5886 | merged | 新增 opt-in TEAM memory tier：`.qwen/team-memory/` git-shared 存储、secret guard hard block、deterministic `MEMORY.md` index 和可选 best-effort git sync。 |
+| #5963 | merged | `enableManagedAutoMemory=false` 时跳过 memory recall side-query，避免自动记忆关闭后仍产生后台模型请求；手动 memory 命令语义保持不变。 |
 
 ---
 
@@ -130,5 +143,6 @@ sync 也是保守的：默认关闭，不自动合并；开启后只做 fast-for
 3. **TEAM memory sync 不是强一致协作协议**。#5886 的 sync 默认关闭；开启后只做 best-effort commit / `pull --ff-only` / push，不解决 merge conflict、不保证跨用户实时同步。
 4. **secret guard 只覆盖 TEAM managed write path**。模型或用户通过 shell/editor 直接写 `.qwen/team-memory/` 不经过 managed-memory secret guard；仍需要 code review 和仓库级 secret scanning。
 5. **TEAM memory 只适合 trusted workspace**。未 trusted workspace 不允许写 TEAM，避免把不可信目录变成可被模型修改并参与 Git 共享的长期知识库。
+6. **memory 关闭语义仍分层**。#5963 只关闭 auto-memory recall side-query；它不等价于 `--bare`，也不代表所有 memory injection/手动命令都被禁用。排障时需要区分“自动后台查询”与“显式 memory 管理入口”。
 
-_新增于 2026-06-26_
+_新增于 2026-06-26；更新于 2026-06-29_

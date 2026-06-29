@@ -103,7 +103,7 @@ flowchart TB
 | `packages/core/src/tools/mcp-transport-pool.ts` 等 | workspace 级 MCP 共享传输池（F2）。 |
 | `packages/sdk-typescript/src/daemon/` | TS SDK：`DaemonClient`（workspace 级）、`DaemonSessionClient`（session 级）、`events.ts`（typed 事件）、`ui/normalizer.ts`（serverTimestamp/provenance 归一化）。 |
 
-`server.ts:createServeApp` 是纯函数（无副作用构建 Express app）；`runQwenServe.ts:runQwenServe` 负责参数校验、boot 门控与 `listen()`。`httpAcpBridge.ts` 现在只是一个 **向后兼容 re-export shim**——F1（#4319）把 bridge 核心整体抬到了 `@qwen-code/acp-bridge`，旧的 `./httpAcpBridge.js` 相对导入路径全部保留以零改造解析（见 `serve/httpAcpBridge.ts` 模块 docstring）。
+`server.ts:createServeApp` 是纯函数（无副作用构建 Express app）；`runQwenServe.ts:runQwenServe` 负责参数校验、boot 门控与 `listen()`。F1（#4319）把 bridge 核心整体抬到了 `@qwen-code/acp-bridge`，早期 serve 侧保留过 `httpAcpBridge.ts` / event-bus / status / in-memory-channel 等兼容 wrapper；#5955 后，active CLI consumers 已改为直接使用 bridge package exports，event-bus / status / in-memory-channel wrapper 删除，只保留 serve package barrel 的下游兼容面。
 
 ---
 
@@ -142,7 +142,7 @@ flowchart TB
 
 ### 3.2 SSE 事件流与背压 / replay / resync
 
-核心实现 `packages/acp-bridge/src/eventBus.ts:EventBus`（serve 侧 `serve/eventBus.ts` 仅 re-export）。每个 session 一个 `EventBus`。
+核心实现 `packages/acp-bridge/src/eventBus.ts:EventBus`；#5955 后 serve 侧不再保留 `serve/eventBus.ts` wrapper，active CLI consumers 直接引用 `@qwen-code/acp-bridge` package export。每个 session 一个 `EventBus`。
 
 **事件帧** `BridgeEvent`：`{ id?, v, type, data, originatorClientId? }`。`id` 是 per-session 单调序号（从 1 起），用于 SSE `Last-Event-ID` 断点续传。**合成终止/告警帧不带 `id`**（`client_evicted`、`slow_client_warning`、`state_resync_required`、`replay_complete`、`stream_error`），否则会在其他订阅者观察到的序列里"烧掉"一个槽位、造成假性 gap。
 
@@ -347,7 +347,7 @@ sequenceDiagram
 | F1 测试拆分 | #4445 | 把 6861 行的 `bridge.test.ts` 抬到 acp-bridge |
 | F3 PR 24 | #4335 | 实现四种 `PermissionMediator` 策略（first-responder / designated / consensus / local-only）+ pair-token 撤销 + 审计。已合入。 |
 
-抽包后 serve 侧 `httpAcpBridge.ts` / `eventBus.ts` 退化为 re-export shim，所有相对导入零改造。`#4300` 顺带把 channel-closed / missing-cli-entry 从 regex 匹配改为 typed `instanceof` 异常。包对外注入 seam（`DaemonStatusProvider` / `BridgeFileSystem` / `ChannelFactory`）让 serve 之外的宿主（IDE 自 spawn）也能装配 bridge。
+抽包后早期 serve 侧曾通过 compatibility wrapper 保留旧相对导入路径；#5955 清掉剩余的 event-bus / status / in-memory-channel wrapper，并把 CLI 内部导入迁到 `@qwen-code/acp-bridge` package exports，serve barrel 继续对下游提供兼容导出。`#4300` 顺带把 channel-closed / missing-cli-entry 从 regex 匹配改为 typed `instanceof` 异常。包对外注入 seam（`DaemonStatusProvider` / `BridgeFileSystem` / `ChannelFactory`）让 serve 之外的宿主（IDE 自 spawn、Chrome extension 这类 daemon-direct client）也能装配 bridge。
 
 ### 3.9 多客户端权限仲裁（F3 / permission mediation）
 
@@ -418,6 +418,18 @@ sequenceDiagram
 | #5874 | skip wrapper spawnSync | `qwen serve` 在 CLI entry wrapper 中直接 in-process import `cli.js`，跳过为 `--expose-gc` 额外 `spawnSync` 的 Node 进程，减少冷启动成本；ACP child 仍独立带 `--expose-gc`。 |
 | #5938 | compile cache + deferred version | serve fast path 在 import `cli.js` 前启用 Node compile cache，warm restart 可复用 bytecode；`getCliVersion()` 改成 promise 并与 runtime module load 并行，`/capabilities` 和 `/daemon/status` 仍在 route bootstrap 前拿到 `qwenCodeVersion`。 |
 
+### 3.13 2026-06-28 daemon / serve follow-up
+
+2026-06-28 合入的 daemon 相关 PR 主要是 client surface 扩展和 bridge import ownership cleanup：
+
+| PR | 子主题 | 一句话作用 |
+|---|---|---|
+| #5777 | Chrome extension daemon-direct | 复活 Chrome extension，但去掉 Native Messaging host；side panel 通过 `@qwen-code/webui` 的 `DaemonSessionProvider` 直连本地 `qwen serve`，浏览器工具以 client-hosted MCP server 经 daemon WebSocket 反向路由给 agent。新公共面 `qwen/control/client_mcp/message` 与 `QWEN_SERVE_CLIENT_MCP_OVER_WS` 默认关闭。 |
+| #5955 | serve bridge wrapper removal | 删除 serve 侧剩余 ACP bridge status / event-bus / in-memory-channel wrapper，CLI consumers 改直接引用 bridge package exports；serve package barrel 继续兼容下游，不改变 daemon protocol、HTTP 或 SSE 行为。 |
+| #5954 | daemon docs refresh wave 2 | 上游 developer docs 同步 recent PR：resumable SSE、cross-connection vote routing、75 capabilities / 47 events 计数、proposed workspace remember。docs-only，本方案只登记为源码/文档对齐依据。 |
+| #5948 | Web Shell mobile TodoPanel | TodoPanel progress summary 在 `<600px` 下切 compact label + progress ring，desktop 保持完整 step label；归入 Web Shell/transport UI surface。 |
+| #5947 | Web Shell voice toolbar action | `ComposerToolbarAction` 增加 `voice`，embedding host 可控制 voice button 显隐；daemon voice capability 与 `/voice/stream` 行为不变。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -482,7 +494,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 
 4. **SSE replay ring 取舍**。ring 默认 8000（不是更小的 1000，因为一个 chatty turn 可能几百帧，5s 重连窗口要兜住），代价是每 session 几百 KB RAM + 满 ring 时 O(n) shift。环形缓冲改 O(1) 被刻意推迟到 profiling 真正报警。`maxQueued` cap 只算 live 帧、replay/告警走 `forced` 不计入，是兑现"重连不被自己的 backlog 挤爆"契约的关键。`state_resync_required` 选择"保持流 OPEN + 继续 replay"而非终止，让 SDK 能算"你错过了什么"diff 且不必再次重连（网络友好）。
 
-5. **acp-bridge 抽包动机**。bridge 原语要被 serve / channels / IDE / 未来 TUI 共享，与其各写一套事件流不如抽成包并提供注入 seam（`DaemonStatusProvider`/`BridgeFileSystem`/`ChannelFactory`）。代价是大规模机械迁移 + re-export shim 维护，但换来单一事实源与可测性（6861 行测试一并抬升）。
+5. **acp-bridge 抽包动机**。bridge 原语要被 serve / channels / IDE / 未来 TUI / browser extension daemon-direct client 共享，与其各写一套事件流不如抽成包并提供注入 seam（`DaemonStatusProvider`/`BridgeFileSystem`/`ChannelFactory`）。代价是大规模机械迁移和一段时间的 compatibility wrapper 维护；#5955 已删除剩余 serve wrapper，使 active import ownership 更清晰。收益是单一事实源与可测性（6861 行测试一并抬升）。
 
 6. **协议向后兼容**。所有新能力都是 additive：新 tag、新 additive 字段（`protocolVersions`/`workspaceCwd`/`serverTimestamp`/`errorKind`）老 daemon 省略即可，客户端 gate on `features` 而非版本号。`v` 仅在帧布局不兼容时自增。`unstable_session_resume` 用前缀显式标注底层 ACP 方法未定稿。这套"feature-detect 而非 version-pin"让新旧 SDK 与新旧 daemon 任意组合都能优雅降级。
 

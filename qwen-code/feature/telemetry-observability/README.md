@@ -41,6 +41,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **敏感属性长度上限可配置（#5804）**：启用 sensitive span attributes 后，user/system prompt、tool schema、模型输出、tool input/result 的截断上限由 `telemetry.sensitiveSpanAttributeMaxLength` 或 `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` 控制，默认 1 MiB。
 - **trace ↔ debug log 关联**：debug 日志行注入 `trace_id` / `span_id`，见 `utils/debugLogger.ts:getTraceContext`。
 - **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
+- **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传，见 `telemetry/daemon-tracing.ts`（`daemon_mode_b_main`）。
 
 ---
@@ -467,6 +468,12 @@ sequenceDiagram
 | #4630 | daemon/ACP tool span | 在 daemon/ACP 路径补 tool span + `session.id` | Daemon |
 | #5047 | daemon ACP trace continuity | 从 daemon bridge active span 派生 ACP prompt traceparent，修 deferred span 的 session 归因 | Daemon |
 
+### 6.6 文档/schema 对齐与事件名规范化
+
+| PR | 子主题 | 作用 | Phase |
+|---|---|---|---|
+| #5960 | telemetry docs refresh + event constant | 上游 developer docs 补齐未记录的 events/metrics/spans，修正 `diff_stat` attribute schema 描述，并把硬编码 `tool_output_truncated` 提取为 `EVENT_TOOL_OUTPUT_TRUNCATED = 'qwen-code.tool_output_truncated'` | Docs/schema |
+
 ---
 
 ## 7. 已知限制 / 后续
@@ -488,3 +495,5 @@ sequenceDiagram
 8. **`seenHashes` 永不清理**：`detailed-span-attributes.ts` 的去重集合进程级常驻、生产环境不清。虽然上界是「一个 session 的 unique system prompt + tool schema 数」，但对超长 daemon 常驻进程（多 session 复用同一进程）会单调增长，属潜在的慢内存增长点。
 
 9. **daemon 遥测分支标注为历史语境**：早期文档中的 `daemon_mode_b_main` 标注表示原始落地位置。#4490 已在 2026-06-11 将 daemon feature batch 合入 `main`，#5047 又补了 daemon ACP trace continuity；继续维护时应以当前 `main` 的 `daemon-tracing.ts` / `Session.ts` / `runtime-config.ts` 为准。
+
+10. **`tool_output_truncated` 事件名有兼容性变更（#5960）**：#5960 把原先 hardcoded、未加命名空间的 `tool_output_truncated` 改为 `qwen-code.tool_output_truncated`，与其它 event constants 对齐。代码侧更一致，但下游 collector/dashboard/filter 如果按旧事件名筛选，需要同时迁移 filter。

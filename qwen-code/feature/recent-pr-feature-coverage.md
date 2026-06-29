@@ -4,19 +4,47 @@
 
 ---
 
-## 2026-06-22 ~ 2026-06-27（本周，全作者）
+## 2026-06-22 ~ 2026-06-28（上周，全作者）
 
-> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-27` 全作者、全状态 PR；补充口径为本周内合入但创建更早的 PR。统计以 2026-06-28 查询为准：本周创建共 238 个 PR，当前 186 merged / 26 open / 26 closed；其中 2026-06-27（昨天）创建 26 个 PR，当前 19 merged / 4 open / 3 closed。`merged:2026-06-27` 口径返回 25 个 `mergedAt` 非空 PR，另有 #5911/#5943/#5945 是 06-27 创建、06-28 合入，按“昨天创建 PR”登记但不写成 06-27 已合入。
+> 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-28` 全作者、全状态 PR；补充口径为上周内合入但创建更早的 PR。统计以 2026-06-29 查询为准：上周创建共 252 个 PR，当前 203 merged / 22 open / 27 closed；其中 2026-06-28（昨天）创建 14 个 PR，当前 10 merged / 3 open / 1 closed。`merged:2026-06-28` 口径返回 20 个 `mergedAt` 非空 PR，包含 #5030/#5777/#5856/#5868/#5890/#5944 等前序创建但昨天才落地的能力。
 
-本周已拆成五层记录：
+上周已拆成六层记录：
 
 | 范围 | 作用 |
 |---|---|
+| 2026-06-28 昨日复核 | 本次重点：补昨天创建与昨天合入的 PR，尤其把前序 open 观察转为已落地 feature。 |
 | 2026-06-27 昨日复核 | 本次重点：逐一复核昨天创建与昨天合入的 PR，补“每个 PR 做什么、怎么做、对应 feature 是否要更新”。 |
 | 2026-06-26 昨日复核 | 本次重点：逐一复核昨天创建与昨天合入的 PR，补“每个 PR 做什么、怎么做、对应 feature 是否要更新”。 |
 | 2026-06-25~26 增量 | 本节重点补 06-25/26 新创建或新合入的 PR，以及上一节 open 观察转 merged 的 PR。 |
 | 2026-06-24 | 见下一节，覆盖 06-24 创建 PR 和 06-24 合入的跨日 PR。 |
 | 2026-06-22~23 | 见后续节，覆盖周一/周二创建 PR；其中部分在 06-24/25 合入的 PR 已在本周增量节复核。 |
+
+### 2026-06-28 昨日 PR 专项复核
+
+昨天创建 14 个 PR：当前 10 merged / 3 open / 1 closed。昨天合入 20 个 PR；其中 #5030/#5777/#5856/#5868/#5890/#5944 属于前序创建但 06-28 合入，已从 open 观察或前序待办转入对应 feature 文档。
+
+| PR | 处理结果 |
+|---|---|
+| #5963 | 已更新 [managed-memory.md](managed-memory.md)：auto-memory 关闭时不再发起 memory recall side-query，避免本地/单 GPU 用户关闭自动记忆后仍被后台记忆查询拖慢。手动 `/remember` 与已有 memory injection 仍按非 `--bare` 能力边界理解。 |
+| #5960 | 已更新 [telemetry-observability/README.md](telemetry-observability/README.md)：记录 telemetry 文档/schema 刷新，并标注 `tool_output_truncated` 事件名改为 `qwen-code.tool_output_truncated` 的下游 filter 兼容性影响。 |
+| #5955 | 已更新 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)：serve 侧不再保留 event-bus/status/in-memory-channel wrapper；CLI 内部改直接使用 `@qwen-code/acp-bridge` exports，serve barrel 对外保持兼容，旧的 “eventBus re-export shim” 描述已修正。 |
+| #5948 | 已更新 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)：TodoPanel progress 在 mobile 下切为 compact `3 / 8` + progress ring，desktop 仍显示完整 `Step 3 / 8` / `第 3 / 8 步`。 |
+| #5947 | 已更新 [voice-dictation.md](voice-dictation.md) 与 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)：`ComposerToolbarAction` 增加 `voice`，embedding host 可通过 `composerToolbarActions` 隐藏/显示 voice button，默认保持向后兼容。 |
+| #5946 | 已更新 [auth-providers.md](auth-providers.md)：Anthropic generator 与 OpenAI path 对齐，把 caller abort signal 包成 per-request child controller，流式/非流式请求结束后清理，隔离 SDK `fetchWithTimeout` 泄漏到长寿 session signal 的 abort listener。 |
+| #5944 | 已更新 [tool-call-id-integrity.md](tool-call-id-integrity.md)：always-on shell git overview inspection guard，重复 `git status` / overview `git diff` / `git ls-files` 变体时以 `shell_command_stagnation` 中止；file-specific diff、带写操作的复合命令和非 inspection 工具调用不会入桶。 |
+| #5890 | 已更新 [loop-wakeup.md](loop-wakeup.md)：`.qwen/loop.md` 动态任务文件，`<<loop.md-dynamic>>` / `<<loop.md>>` sentinel 在 fire 时展开全文或短提醒，project 文件优先且受 workspace realpath、25KB cap 和投递后提交缓存约束。 |
+| #5868 | 已更新 [context-compression.md](context-compression.md)：新增 `context.autoCompactThreshold` 和 Stop hook 的 `context_usage/context_limit/input_tokens`，同时保留三层阈值中 large-window absolute branch 可能主导的设计边界。 |
+| #5856 | 已更新 [voice-dictation.md](voice-dictation.md)：desktop Electron composer 增加 mic button/recording bar，renderer 采集 16kHz mono PCM 到 main process loopback `/voice/stream`，server-core 复用 CLI ASR pipeline；端到端 mic runtime 仍标记未实测。 |
+| #5777 | 已更新 [daemon-serve-mode/README.md](daemon-serve-mode/README.md) 与 [daemon-serve-mode/10-client-adapters-and-sdk.md](daemon-serve-mode/10-client-adapters-and-sdk.md)：Chrome extension 从 Native Messaging 改为 daemon-direct side panel，浏览器工具以 client-hosted MCP server 经 daemon WebSocket 反向暴露，`QWEN_SERVE_CLIENT_MCP_OVER_WS` 默认关闭。 |
+| #5030 | 已更新 [background-agent-resume.md](background-agent-resume.md)：SDK / stream-json `continueLastTurn()` 从持久化历史分类 interrupted prompt/turn/none，不再向 transcript 注入合成 `"continue"` 用户消息；dangling tool calls 用合成 error tool result 续上。 |
+| #5954 | daemon developer docs refresh（resumable SSE、cross-connection vote routing、capability/event count、proposed workspace remember）；上游 docs-only，本轮只登记为覆盖依据，不按已落地实现新增专题正文。 |
+| #5952 | v0.19.3 release PR，仅版本和 changelog，不新增 feature 文档。 |
+| #5961 #5959 | CI review timeout 调整，属于 CI 可靠性，不新增 feature 文档。 |
+| #5962 | 仍 open：model API `--insecure` / `QWEN_TLS_INSECURE` 跳过 TLS 验证；若合入归 [auth-providers.md](auth-providers.md) 的 provider/network runtime 边界，并需强调 MITM 风险与 `NODE_EXTRA_CA_CERTS` 推荐路径。 |
+| #5957 | 仍 open：compression 阈值扣除 reserved output tokens；若合入归 [context-compression.md](context-compression.md)，补 `reservedOutputTokens` 从 context window 中扣除以避免 64K output reservation 下 auto-compression 过晚触发。 |
+| #5953 | 仍 open：native LSP server runtime hot reload；若合入归 daemon/LSP 或另开 LSP runtime feature，关注 `.lsp.json` watcher、semantic config hash、incremental reconcile 和 cleanup 边界。 |
+| #5951 | closed：chat-panel package 拆分 PR 未合入，不作为已落地 feature。 |
+| #5911 #5860 | desktop source hardening / CI test PR；昨天合入但当前 feature 目录没有对应长期专题或属于 CI，覆盖矩阵登记不展开。 |
 
 ### 2026-06-27 昨日 PR 专项复核
 
@@ -42,7 +70,7 @@
 | #5935 #5916 #5915 #5898 | MCP dialog border、tool display cleanup、schema warning 静音、mid-input skill completion 等局部 UX/补全/噪音修复；暂无长期 feature 专题，只在矩阵登记。 |
 | #5914 #5911 #5829 | desktop source slug/path validation hardening；当前 feature 目录没有 desktop source 专题，本轮登记安全边界但不新增专题。 |
 | #5631 #3683 | CONTRIBUTING provider governance docs / GitHub Actions 升级；属于 docs/process/CI，不新增 feature 专题。 |
-| #5944 #5928 #5926 #5912 | 仍 open，分别归 shell retry loop、todo persistence、PR intake evidence gate、ACP permission votes；合入后再更新对应 feature。 |
+| #5928 #5926 #5912 | 仍 open，分别归 todo persistence、PR intake evidence gate、ACP permission votes；合入后再更新对应 feature。#5944 已于 2026-06-28 合入并补 [tool-call-id-integrity.md](tool-call-id-integrity.md)。 |
 | #5940 #5913 #5910 | closed / superseded / clarification；不作为已落地 feature。#5910 的 ACP permission vote 方向由 open #5912 继续承接。 |
 
 ### 2026-06-25 ~ 2026-06-26 已落地且需要更新 feature 文档
@@ -92,7 +120,7 @@
 | #5807 #5809 | 06-26 合入；IDE stale workspace config ignore 与 serve route split 属于 workspace/daemon 内部边界或重构，本次只登记不新增专题。 |
 | #5878 #5880 #5885 #5899 | release / test / CI reliability，覆盖矩阵登记，不新增 feature 专题。 |
 | #5891 #5898 | CLI tool-call description wrapping、mid-input skill completion，属于局部 UX/补全修复；暂无对应长期 feature 专题，只在矩阵登记。 |
-| #5884 #5888 #5890 #5895 #5902 | 仍 open，分别归 sessionless remember、channel qwen tag、loop task file、session artifacts、QQ Bot streaming，合入后再更新对应 feature。#5886/#5903 已于 2026-06-27 合入并在本轮更新 feature 文档。 |
+| #5884 #5888 #5895 #5902 | 仍 open，分别归 sessionless remember、channel qwen tag、session artifacts、QQ Bot streaming，合入后再更新对应 feature。#5886/#5903 已于 2026-06-27 合入并在本轮更新 feature 文档；#5890 已于 2026-06-28 合入并补 [loop-wakeup.md](loop-wakeup.md)。 |
 
 ### 2026-06-25 ~ 2026-06-26 已看过但暂不新增专题
 
@@ -110,13 +138,13 @@
 |---|---|
 | #5847 #5852 #5884 | daemon runtime context injection、resumable ACP stream、sessionless workspace remember；若合入归 daemon/serve 与 memory。 |
 | #5848 | UI / transcript rendering polish；若合入归 Web Shell 或 CLI UX。#5869 已于 2026-06-27 合入并在本轮更新 Web Shell 文档。 |
-| #5856 | desktop voice dictation，若合入补 [voice-dictation.md](voice-dictation.md) 与 desktop 相关记录。 |
-| #5868 | auto-compact threshold / Stop hook context usage，若合入补 [context-compression.md](context-compression.md) 与 hook/permission 相关记录。 |
+| #5856 | 已于 2026-06-28 合入并补 [voice-dictation.md](voice-dictation.md)：desktop voice dictation。 |
+| #5868 | 已于 2026-06-28 合入并补 [context-compression.md](context-compression.md)：auto-compact threshold / Stop hook context usage。 |
 | #5888 | qwen tag / multiplayer channel-resident agent RFC，若合入补 [channel-adapters.md](channel-adapters.md)。 |
-| #5890 | loop task file injection via sentinels，若合入补 [loop-wakeup.md](loop-wakeup.md)。 |
+| #5890 | 已于 2026-06-28 合入并补 [loop-wakeup.md](loop-wakeup.md)：loop task file injection via sentinels。 |
 | #5895 | session artifacts daemon API design，若合入补 daemon/serve 或 artifact 专题。 |
 | #5902 | QQ Bot streaming idle flush / markdown pipe / replyMsgId TTL，若合入补 [channel-adapters.md](channel-adapters.md)。 |
-| #5944 #5928 #5926 #5912 | 06-27 新增 open 观察：shell inspection loop、project-local todo persistence、PR intake evidence gate、ACP permission votes；合入后再补对应专题。 |
+| #5928 #5926 #5912 | 06-27 新增 open 观察：project-local todo persistence、PR intake evidence gate、ACP permission votes；合入后再补对应专题。#5944 已于 2026-06-28 合入并补 [tool-call-id-integrity.md](tool-call-id-integrity.md)。 |
 
 ### 2026-06-25 ~ 2026-06-26 closed / superseded / wrong-base
 
@@ -228,7 +256,7 @@
 |---|---|
 | #5629 | PreToolUse hook ask TUI confirmation，若合入后归入权限/skills/hook 交互。 |
 | #5666 #5773 | TUI transcript view、`/config key=value`，若合入后分别归 TUI/UX、模型配置专题。#5661/#5668 已合入但仍属 TUI/UX 小面，本轮只登记；#5778 已于 2026-06-27 合入并更新 [auth-providers.md](auth-providers.md)。 |
-| #5777 #5780 #5786 | browser extension daemon-direct、update command、review suggestion findings。已记录观察点，待合入后再写入对应 feature。 |
+| #5780 #5786 | update command、review suggestion findings。已记录观察点，待合入后再写入对应 feature。#5777 已于 2026-06-28 合入并补 [daemon-serve-mode/](daemon-serve-mode/) 的 daemon-direct Chrome extension / client-hosted MCP 文档。 |
 
 > 状态复核：#5752/#5755/#5781/#5785 在上一轮查询时作为后续观察登记，已于 2026-06-24 合入；#5616/#5650/#5657/#5747/#5765 已于 2026-06-25~26 合入并在本周增量小节补文档；#5783 已按“暂不新增专题”登记。
 

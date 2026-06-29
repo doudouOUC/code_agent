@@ -68,6 +68,7 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | [#4202](https://github.com/QwenLM/qwen-code/pull/4202) | @chiga0 | merged | TUI daemon adapter spike（reducer + prompt/cancel/model-switch 转发） |
 | [#4203](https://github.com/QwenLM/qwen-code/pull/4203) | @chiga0 | merged | Channel daemon bridge spike（server-side bridge，session factory + text 收集） |
 | [#4199](https://github.com/QwenLM/qwen-code/pull/4199) | @chiga0 | merged | IDE daemon connection spike（VS Code extension host + SDK import） |
+| [#5777](https://github.com/QwenLM/qwen-code/pull/5777) | @Eric-GoodBoy-Tech | merged | Chrome extension daemon-direct client + client-hosted MCP over daemon WebSocket |
 
 ### 跨客户端协调
 
@@ -307,6 +308,20 @@ clientId 是 **live-session scoped**——daemon 进程 / session 消亡后 rese
 | 目的 | 验证 VS Code extension host 通过 HTTP + SSE 消费 daemon 是否可行（替代 ACP subprocess） |
 | 结论 | 可行；spike 覆盖 session creation / SSE consumption / prompt forwarding / permission response / cancel / model switch / session death handling |
 | 显式 gap | 无 `QwenAgentManager` wiring、无 webview flow、无 reverse RPC（local editor/browser/clipboard） |
+
+### Chrome extension daemon-direct（#5777）
+
+#5777 把早期 Native Messaging 方案改成“extension 作为本地 daemon 的薄客户端”：
+
+| 维度 | 细节 |
+|---|---|
+| side panel chat | 扩展侧边栏复用 `@qwen-code/webui` / `DaemonSessionProvider`，通过 HTTP+SSE 直连本机 `qwen serve`；daemon 不可达时显示运行 `qwen serve` 的 health gate。 |
+| browser tools | read page、screenshot、console、navigate、click、fill 等浏览器能力不再走 Native Messaging，而是作为 client-hosted MCP server 暴露。 |
+| reverse channel | extension 通过 daemon WebSocket 注册最小 MCP JSON-RPC server；agent 发现/调用 `chrome_*` tool 时，daemon 把 `tools/call` 经同一 socket 路由回 extension。 |
+| public contract | 新增 ACP ext-method `qwen/control/client_mcp/message`（child->parent）和 runtime-MCP config flag；`QWEN_SERVE_CLIENT_MCP_OVER_WS=1` 开启，默认关闭。 |
+| 验证边界 | daemon side 有 headless WebSocket integration/unit tests；真实 Chrome extension + live LLM turn 在 PR 合入时仍标记未完整实测。 |
+
+这个设计让 browser extension 和 Web Shell 共用 daemon session/client surface，也把浏览器工具归入 MCP tool discovery，而不是让 extension 自己维护一套独立 agent runtime。安全取舍是新反向工具通道默认 dormant，是否进入 `qwen serve` core 仍需后续维护者确认。
 
 ---
 
