@@ -1,7 +1,6 @@
 # auth / provider 技术方案
 
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
-> 覆盖 PR **#3212 / #3495 / #3623 / #3624 / #4255(+#4291+#4305) / #5179 / #5404 / #5478 / #5539 / #5553 / #5632 / #5637 / #5638 / #5654 / #5729 / #5769 / #5778 / #5793 / #5827 / #5835 / #5845 / #5946**。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。
 
@@ -27,9 +26,6 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 
 - **workspace provider default 与 session current model 混淆（#5638）**：daemon `GET /workspace/providers` 应表达“下一次新建 session 会用的 workspace catalog/default”，而不是某个 live ACP/session 的当前模型状态；已有 session 的 current model 应来自 session context。
 
-- **Requesty 只能手配通用 OpenAI-compatible（#5478/#5539）**：Requesty 是 OpenAI-compatible gateway，但没有一等 provider preset、归因 header、auth migration 或 model picker 分组。#5478 增加 Requesty provider；#5539 后续把 OpenRouter/Requesty 这类 provider-specific headers 收敛到 preset `customHeaders`，减少 provider class 分叉。
-
-- **bare fastModel 不应跨 auth 解析（#5553）**：历史配置里的 `fastModel: "coder-model"` 是裸 model id。如果当前主模型已切到 OpenAI-compatible auth，旧解析可能把这个裸 fast model 路由到 Qwen OAuth 的硬编码模型，触发用户没预期的浏览器登录。bare selector 必须约束在当前 auth type，跨 auth 只能用显式 `qwen-oauth:coder-model`。
 
 - **`qwen auth status` 识别不全（#3612/#3623）**：OpenAI-compatible provider（尤其无 `envKey`、靠 `OPENAI_API_KEY` 或 `settings.security.auth.apiKey` 的）被误报为「未配置/不完整」。
 
@@ -37,17 +33,9 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 
 - **远程 daemon 登录（#4175 Wave4 / #4255）**：`qwen serve` 作为常驻 daemon 时，远端 SDK 客户端如何触发一次 Qwen 账号登录？不能在 daemon 上弹浏览器（可能是无头服务器），token 也必须落在 **daemon** 文件系统而非客户端。需要一条「daemon 代跑设备授权、客户端只显示 user code」的设备流（RFC 8628）。
 
-- **自定义 provider id 与 transport protocol 解耦（#5793）**：某些自定义 provider 需要保留自己的 provider id / label / preset metadata，但底层请求应复用内置 SDK protocol（例如走已有 OpenAI-compatible 或 DashScope 风格 transport）。如果强行把 id 当 protocol，会让 provider identity 与请求行为绑定过死。
 
 - **OpenAI-compatible stream 卡死（#5827/#5845）**：OpenAI SDK 的 request `timeout` 通常只覆盖连接或首包；一旦流式响应已经开始但长时间没有新 chunk，旧实现可能一直挂住。需要 provider pipeline 内部的 inactivity timeout，让“无流量”也能 abort 并复用既有 retry 分类，同时允许部署通过环境变量统一覆盖默认 idle timeout。
 
-- **Anthropic SDK abort listener 泄漏（#5946）**：Anthropic SDK 的 `fetchWithTimeout` 会在传入 signal 上注册 abort listener 但不移除。若直接传 session/turn 级长寿 signal，多次请求会积累死 listener，最终触发 `MaxListenersExceededWarning` 并持有不再需要的引用。
-
-- **视觉模型 fallback 与 provider install 不应误改主模型（#5778/#5835）**：多模态输入需要一个可选 vision fallback model，但它不能污染主聊天模型选择；同样，重新认证或重新应用 provider install plan 时也不应把用户选好的 cheaper/faster model 重置成 provider 默认模型。
-
-- **TLS insecure 只能是显式逃生口（#5962）**：自签 endpoint 或内网代理排障需要跳过 TLS 校验，但默认安全姿态必须保持验证证书；文档也要明确这是 MITM 风险较高的最后手段，优先建议安装 CA。
-
-- **daemon model surface 不能漏掉专用模型过滤（#5993）**：#5632 先覆盖 CLI `/model` picker；Web Shell / SDK / ACP 客户端常从 daemon metadata 构造模型列表，因此 workspace provider status 与 ACP session model options 也必须过滤 `fastOnly` / `voiceOnly`。
 
 本方案的目标即：用**统一的 source 溯源 + 优先级**解决前四个配置问题，用**设备流注册表**解决远程登录，并在全过程对凭据/密文做脱敏与原子落盘。
 
@@ -154,70 +142,6 @@ const httpOptions = config.baseUrl
 
 修复方式是把 `model.baseUrl` 作为 `model.name` 的 disambiguator 一起持久化：启动解析和 pre-flight auth 优先按 `id + baseUrl` 精确匹配；如果对应 provider 被改名/删除，再回退首个 id 匹配以保持向后兼容。所有 id-only 写入路径（`/model <id>`、ACP `setModel`、`qwen/settings/setCoreValue`、provider install）会用空字符串 tombstone 清掉旧 `model.baseUrl`，避免低优先级 scope 的 stale baseUrl 在 settings merge 后继续影响新选择。
 
-#### 3.1.2 custom provider install 与 baseUrl 透传（#5404）
-
-#5404 是 #5179 的 provider install follow-up：custom provider install 仍保留 custom provider ownership detection 给 UI/ACP discovery 使用，但合并安装结果时按 model identity 与 `baseUrl` 传递精确选择，避免同一个 model id 在不同 endpoint 上安装后又落回旧 endpoint。
-
-核心点：
-
-- provider install 持久化并透传 `model.baseUrl`，让新安装 endpoint 能被下一次解析选中。
-- custom provider merge 按 model identity 处理，不把用户自定义模型误删。
-- UI/ACP discovery 仍能识别 custom provider ownership，避免 install 路径修复反向破坏模型发现。
-
-#### 3.1.3 Requesty provider preset（#5478/#5539）
-
-#5478 把 Requesty 作为一等 OpenAI-compatible provider 接入，而不是让用户手动配置 generic endpoint。新增内容包括：
-
-- provider preset：`REQUESTY_API_KEY`、`https://router.requesty.ai/v1`、third-party UI group、`ownsModel` gate。
-- provider detection：按 URL hostname 精确匹配 `router.requesty.ai` 或 `.requesty.ai` 后缀，拒绝 `router.requesty.ai.evil.example` 这类伪造 host。
-- dispatch chain：`determineProvider` 能把 Requesty baseUrl 路由到 Requesty provider，并加 Requesty attribution headers。
-- docs / auth migration：用户可通过 Requesty key 获得与 OpenRouter 类似的一步式 provider 体验。
-
-#5539 随后把 OpenRouter/Requesty 的 provider-specific request headers 收敛到 preset `customHeaders`，减少“每个 gateway 一个 provider class”的重复。这样 Requesty 仍保持一等 preset 和 detection，但 header 注入不必长期复制 OpenRouter provider 类。
-
-#### 3.1.4 fast-model auth scope、模型用途旗标、thinking 和 display name follow-up（#5553/#5632/#5637/#5654/#5729/#5769/#5993）
-
-#5553 收紧 bare fast-model selector 的认证边界：`fastModel: "coder-model"` 这类未带 auth 前缀的配置，只在当前 active auth type 内解析；如果当前 auth 是 OpenAI-compatible 且该 provider 不拥有 `coder-model`，`getFastModel()` 返回 `undefined`，不会跨到 Qwen OAuth 并触发浏览器流。需要有意跨 auth 的用户必须写显式 selector，例如 `qwen-oauth:coder-model`。这和 #5632 的 `fastOnly` 分层互补：#5632 决定“哪些模型可作为 fast model”，#5553 决定“裸 fast model 在哪个 auth 命名空间里找”。
-
-#5632 给 model config 增加 `fastOnly` / `voiceOnly` 用途旗标。主模型选择列表会过滤掉专用模型，`/model --voice` 只看 `voiceOnly` ASR 模型，fast-model 解析只看 `fastOnly`。这把“能作为对话主模型”和“只服务某个系统路径”的模型从 UI 层分开，避免用户把语音模型或快模型误选成主模型。
-
-#5993 把同样的过滤语义扩展到 daemon-backed model surface：`GET /workspace/providers`、ACP workspace provider status、ACP session model state、ACP model config options 都不再把 `fastOnly` / `voiceOnly` 暴露为普通 conversation model。这样 Web Shell、SDK 或其它 daemon 客户端即便不经过 Ink `/model` picker，也不会把后台快模型或语音 ASR 模型列成可选主模型。它不新增 daemon fast/voice 专用选择器，只保证普通模型列表与 CLI 语义一致。
-
-#5637 调整 DashScope `preserve_thinking` 默认值。对支持 thinking 的 DashScope 路径，默认保留 thinking intent / summary 所需的 provider 配置，避免用户不显式配置时丢失推理相关输出。该改动属于 provider preset/generation config 默认值，不改变通用 OpenAI-compatible provider。
-
-#5654 修复 auth wizard 中自定义模型 ID 的恢复：重新进入 `/auth` 时，wizard 会从现有 provider 中拆出用户添加的 custom model IDs，并与默认 model IDs 一起预填。provider update detector 只比较 built-in defaults，不再把 custom model 误判为“被上游移除”，避免每次启动都出现噪音 diff，也避免完成 wizard 后覆盖掉用户自定义模型。
-
-#5729 修复 configured models listing：默认 `getAllConfiguredModels` 会保留 active runtime model，即便它不是当前静态 defaults 中的第一类条目。这样 `/model`/provider 状态不会因为 active model 只存在于运行态或 settings merge 结果中而丢项。
-
-#5769 修复重复 model display name：当多个 OpenAI-compatible provider 使用同一个 model id 时，header/status line 根据当前 resolved baseUrl 精确匹配 provider entry，再回退 id-only lookup。这样重启后显示的 provider label 与 `/about` 的 Base URL、实际请求 endpoint 保持一致，不再看起来“跳回第一个 provider”。
-
-#### 3.1.5 vision fallback model（#5778）
-
-#5778 给模型选择增加 `/model --vision <model-id>` 和无参 picker，并把选择持久化到 flat `visionModel` 配置。它解决的是“当前主模型不可读图，但会话里出现图片”时的桥接模型选择，而不是主模型切换。
-
-解析顺序：
-
-| 场景 | 行为 |
-|---|---|
-| `visionModel` 已配置且 provider/model 可用 | 使用该 vision fallback，可跨 provider。 |
-| `visionModel` 配置已过期或 typo | 回落到既有 same-provider auto-pick，不向不可达模型发请求。 |
-| 未配置 `visionModel` | 保持原先同 provider 自动选择多模态模型的逻辑。 |
-
-同 PR 还修了 runtime `/model` 切换后的 stale modality gate：在 qwen-oauth hot-update path 中，刚切到多模态主模型后紧接着发图片，不应还走 vision bridge。图片无法通过 `read_file` 工具读取时，transcription 文本会站在 image slot 上，并明确告诉模型“这张图不能被工具读取”，避免模型反复 `read_file` 或忽略 transcript。
-
-#### 3.1.6 provider install preserves selected model（#5835）
-
-#5835 修的是 provider install plan 的副作用。重新认证、ACP reconnect、token refresh、或升级后 provider 模型列表重排时，旧实现会把 `model.name` 写回 provider plan 的第一个/default model。用户如果已经选了更便宜或更快的同 provider 模型，会被静默切走。
-
-实现方式：
-
-- `applyProviderInstallPlan` 读取当前 settings 里的 `model.name`。
-- 如果 install plan 仍提供这个 model，就构造 `effectiveModelSelection` 并跳过 `model.name` / `model.baseUrl` 写入。
-- `syncAuthState` 和 ACP/serve 响应都读回 adapter 中实际生效的 model，而不是盲用 `plan.modelSelection`。
-- 只有首次 setup 没有当前模型，或当前模型已不在该 provider plan 中时，才采用 provider default。
-
-这与 #5179/#5404 的 `model.baseUrl` 消歧互补：#5179 保证“同名 model id 的 endpoint 不漂”，#5835 保证“provider 重新应用时不重置用户已选 model”。
-
 #### 3.1.7 workspace provider defaults 与 session context model（#5638）
 
 #5638 把 daemon `GET /workspace/providers` 的语义从“可能借 live ACP/session config 的 provider 状态”收敛成“workspace 级 provider catalog + 下一次新建 session 的默认模型”。这属于 provider 状态来源边界：pre-session 页面和新建 session 入口需要的是 fresh workspace settings/env，而不是某个已有 session 的运行时模型。
@@ -253,45 +177,6 @@ const httpOptions = config.baseUrl
 非法环境变量会被忽略并输出 debug warning，不影响启动。这样线上部署可以在不改 settings / provider preset 的情况下缩短或拉长 idle timeout；同时测试和调用方仍能通过显式 config 覆盖 env。
 
 边界：如果已经向上游产出过部分 chunk，再发生 idle timeout，是否能重试取决于调用层对“已产生部分输出”的处理；#5827 的核心是让卡死连接可被关闭并进入既有错误分类，而不是重新定义所有 partial-output recovery。
-
-#### 3.1.9 Anthropic per-request abort controller（#5946）
-
-#5946 是 provider runtime hygiene：Anthropic generator 的非流式 `generateContent` 与流式 `generateContentStream` 不再把调用方的 `request.config?.abortSignal` 直接交给 SDK，而是通过现有 `createChildAbortController` 包一层 per-request child signal。
-
-原因是 Anthropic SDK 的 `fetchWithTimeout` 会在传入 signal 上注册 `'abort'` listener，但不会 `removeEventListener`，也没有使用 `{ once: true }`。如果传入的是 session/turn 级长寿 `AbortController`，每次 Anthropic 请求都会在同一个 caller signal 上留下一个死 listener。
-
-修复后的生命周期：
-
-1. 每次 Anthropic 请求创建 child controller；
-2. SDK `client.messages.create` 与 streaming empty-stream fallback probe 都只拿 child signal；
-3. parent abort 仍传播到 child，用户取消语义不变；
-4. 非流式路径在 `finally` 中 abort child；流式路径在 stream drained 后 abort child；
-5. child 自己挂在 parent 上的 listener 随 cleanup 移除，SDK 泄漏的 listener 只落到短命 child 上。
-
-这与 #4810 在 OpenAI generator 上做的隔离一致；#5946 只是补上 Anthropic path。其它 SDK 未改动，Anthropic SDK 上游泄漏本身也不在本 PR 范围内。
-
-#### 3.1.10 TLS insecure escape hatch（#5962）
-
-#5962 增加 `--insecure` / `QWEN_TLS_INSECURE`，用于自签证书 endpoint 或内网代理排障时跳过 TLS certificate verification。它是 provider/network runtime 的显式逃生口，而不是新默认：
-
-| 入口 | 作用 |
-|---|---|
-| CLI flag / config | 写入 runtime fetch options，当前进程的 provider fetch 可跳过 TLS 校验。 |
-| `QWEN_TLS_INSECURE` | 环境变量等价入口，便于容器或一次性排障。 |
-| docs troubleshooting | 明确 MITM 风险，优先建议配置系统/Node 信任链或 `NODE_EXTRA_CA_CERTS`，只在确认 endpoint/trust boundary 时使用 insecure。 |
-
-实现上把 TLS 行为集中到 `runtimeFetchOptions` / `fetch` helper，避免各 provider SDK 各自拼 `rejectUnauthorized`。风险边界是：一旦开启，当前 provider 请求无法验证服务端身份，token/API key 可能暴露给中间人；因此它不应被写进共享项目配置或长期 CI 环境。
-
-#### 3.1.11 `providerProtocol` 映射（#5793）
-
-#5793 把“provider identity”和“底层 SDK protocol”分开。自定义 provider 可以继续使用自己的 `id`、display label、preset metadata 和 model ownership，但通过 `providerProtocol` 映射到已有协议实现：
-
-- built-in providers 仍按原有 protocol 自动路由，不需要迁移配置；
-- 自定义 provider 若声明 `providerProtocol`，请求 pipeline 使用映射后的 SDK protocol；
-- 未声明映射且无法推断 protocol 的自定义 provider 仍按旧逻辑 warn/skip，避免把未知 provider 误发到错误 endpoint；
-- provider id 仍保留在 UI、配置、auth status 和 model ownership 判断里，transport behavior 才走 mapped protocol。
-
-这解决的是“同一个 transport 行为被多个 provider identity 复用”的问题，不是 provider preset 大改。它不要求现有 `modelProviders` settings 迁移，也不改变 built-in provider 的默认路由。
 
 ### 3.2 apiKey 跨重启保留（#3495）
 
@@ -567,21 +452,10 @@ sequenceDiagram
 | #4291 | merged | #4255 review 跟进 | poll 超时竞速、poll catch 写原始 err.message、GET clientId 门控、`cancellerClientId` first-writer-wins、`sanitizeForStderr` 上提 |
 | #4305 | merged | #4291 post-merge 跟进(7项) | late-poll 闭包解构防引用持有、`callerIsDeviceFlowInitiator` 抽公共 helper、`err.name` 脱敏、`isServeDebugMode()` 复用、late-rejection 改 name+length |
 | #5179 | merged | duplicate model id provider persistence | 模型选择器持久化 `model.baseUrl`；启动解析/auth 校验按 `id + baseUrl` 精确匹配；id-only 写入路径用空串 tombstone 清除旧 disambiguator |
-| #5404 | merged | custom provider install preservation | provider install 保留 custom provider models，并透传 `model.baseUrl` 让 same-id 不同 endpoint 的新安装 provider 被精确选中 |
-| #5478 | merged | Requesty provider | 新增 Requesty OpenAI-compatible provider preset、hostname detection、dispatch registration、auth migration 和用户文档 |
-| #5539 | merged | provider customHeaders refactor | 将 OpenRouter/Requesty provider-specific headers 收敛进 preset `customHeaders`，减少 provider class 重复 |
-| #5553 | merged | bare fast-model auth scope | 裸 `fastModel` 只在当前 auth type 内解析，避免 OpenAI-compatible 会话因历史 `coder-model` 配置意外触发 Qwen OAuth；显式 `qwen-oauth:...` selector 保持可用 |
-| #5632 | merged | model purpose flags | 新增 `fastOnly` / `voiceOnly`，主模型列表过滤专用模型，`/model --voice` 只展示语音模型 |
-| #5637 | merged | DashScope preserve thinking default | 调整 DashScope thinking 相关默认值，避免默认路径丢失 thinking intent/summary 所需配置 |
 | #5638 | merged | workspace provider defaults | `GET /workspace/providers` 返回 fresh workspace settings/env catalog 和 next-session default；已有 session current model 改从 session context 读取 |
-| #5654 | merged | auth wizard custom models | 重新进入 `/auth` 时恢复用户自定义 model IDs，并让 provider update detector 只比较 built-in defaults |
-| #5729 | merged | active runtime model listing | configured models 默认保留 active runtime model，避免当前会话模型从列表中消失 |
 | #5769 | merged | duplicate display name disambiguation | active model display 按 resolved baseUrl 匹配重复 model id provider，再回退 id-only lookup |
-| #5793 | merged | providerProtocol mapping | 自定义 provider id 可映射到已有 SDK protocol，分离 provider identity 与 transport behavior |
 | #5827 | merged | OpenAI stream inactivity timeout | 流式请求长时间无 chunk 时 abort per-request controller，合成 `ETIMEDOUT` 并复用既有 retry 分类；默认 120s，`<=0` 禁用 |
 | #5845 | merged | stream idle timeout env override | 新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，显式 config > env > 默认；非法 env 忽略并 debug warning |
-| #5962 | merged | TLS insecure escape hatch | `--insecure` / `QWEN_TLS_INSECURE` 显式跳过 TLS certificate verification，作为自签 endpoint 排障手段，默认安全姿态不变 |
-| #5993 | merged | daemon specialized model filtering | daemon workspace/ACP/session model surfaces 过滤 `fastOnly` / `voiceOnly`，与 CLI 普通模型选择器一致 |
 
 ---
 
@@ -606,16 +480,13 @@ sequenceDiagram
    - §3.3/§3.4 描述的 `handler.ts:showAuthStatus`/`runInteractiveAuth`/`handleApiKeyAuth` 在 commit `4ac9ec07`/`f0e8601` 时点有效；当前 `main` 上 `packages/cli/src/commands/auth.ts` 已是 `buildRemovalNotice`，引导改用会话内 `/auth` 与 `/doctor`。本文相关章节应结合该迁移阅读。
 
 7. **Requesty 当前只覆盖文本推理**
-   - #5478 明确图像、音频、embedding 等模态不在范围；provider detection 也必须继续使用 hostname 级别匹配，不能退回字符串 contains，否则会 over-claim 恶意 baseUrl。
 
 8. **provider identity 仍需沿 baseUrl/envKey 继续收敛**
-   - #5179/#5769 已分别修复“选择持久化”和“显示名”两个 same-id provider 问题，#5793 再把 provider identity 与 SDK protocol 拆开。但 ACP/OpenWork 等外部 provider identity 仍可能有自己的 display/selection surface；后续 PR 若改 provider identity，应同时检查 persisted `model.baseUrl`、runtime resolved baseUrl、display name、providerProtocol 和 request route 是否一致。
 
 9. **stream idle timeout 不等于 turn-level recovery**
    - #5827/#5845 只负责在 OpenAI-compatible stream 长时间无 chunk 时关闭请求并把错误归类为 retryable transport failure，并提供 env/config 两级超时配置。若超时前已经输出了部分内容，最终 UI/历史/重试是否能无缝恢复仍取决于上层 streaming pipeline；这些 PR 不新增 terminal `turn_error` SSE 或 partial-output replay 语义。
 
 10. **Anthropic abort listener 隔离只覆盖 Anthropic generator**
-    - #5946 复用 OpenAI path 的 child abort controller 形态，但没有修改其它 provider SDK，也没有修补 Anthropic SDK 自身。若未来接入新的 SDK 且它也在长寿 signal 上泄漏 listener，需要按同一模式审计。
 
 ---
 
@@ -641,31 +512,6 @@ sequenceDiagram
 - `bridge.ts` / ACP session context：session model change 持久化 default 时发 workspace settings change signal，驱动缓存 workspace providers 的客户端刷新。
 - tests 覆盖 pre-session provider snapshot、duplicate model id + baseUrl 精确 current 标记、session context 覆盖 workspace default、provider base URL 凭据不外露。
 
-### #5404 — preserve custom provider models on install
-
-- `providers/install.ts` / custom provider preset：custom provider install 合并时保留用户自定义 provider models，不因同 id provider install 覆盖掉已有 model entries。
-- provider install 写入并透传 `model.baseUrl`，与 #5179 的 duplicate-id disambiguator 对齐，使同 model id 的新 endpoint 能在 install 后立即被选中。
-- CLI UI / ACP provider updates 路径保持 custom provider ownership discovery，用于 model picker 和 daemon session provider refresh。
-- tests 覆盖 preserving custom provider models、baseUrl-specific sync、install regression 和 `modelsConfig` 解析。
-
-### #5478/#5539 — Requesty provider
-
-- `providers/presets/requesty.ts`：新增 Requesty preset，声明 `REQUESTY_API_KEY`、baseUrl、third-party 分组和 `ownsModel`。
-- `openaiContentGenerator/provider/requesty.ts`：按 hostname 识别 Requesty endpoint，给请求追加 Requesty attribution headers；#5539 后续把 header 注入迁到 preset `customHeaders`。
-- `providers/all-providers.ts` / `provider/index.ts`：注册 Requesty，使 dispatch chain 和 model picker 能把它当一等 provider。
-- docs：`docs/users/configuration/auth.md` 与 `model-providers.md` 增加 Requesty 配置说明。
-- tests：provider/preset suites 覆盖 hostname spoofing 拒绝、dispatch routing、OpenRouter 回归和 preset gate。
-
-### #5553/#5632/#5637/#5654/#5729/#5769/#5993 — provider/model follow-ups
-
-- #5553：`Config.getFastModel()` 在 auth 激活后把 bare fast model 限定在当前 auth type；当前 auth 下的裸模型继续可用，跨 auth 需显式 `authType:modelId` selector；tests 覆盖 OpenAI-compatible 当前 auth 下 `coder-model` 不再路由到 Qwen OAuth。
-- #5632：model config schema / resolver 增加 `fastOnly`、`voiceOnly`；主 `/model` 列表过滤专用模型，`/model --voice` 使用 voice-only filter。
-- #5993：daemon `workspace-providers-status`、ACP session model state 与 config options 复用专用模型过滤，避免 daemon 客户端把 `fastOnly` / `voiceOnly` 暴露成普通 chat model。
-- #5637：DashScope provider preset / generation config 默认保留 thinking 相关配置，降低用户无显式设置时的行为漂移。
-- #5654：`AuthDialog.getExistingModelIds` 只把 saved provider 中非 built-in defaults 的项作为 custom IDs 传回 wizard；`useProviderSetupFlow` 用 `[...defaults, ...customIds]` 预填；`useProviderUpdates` 只用 built-in IDs 做 update diff。
-- #5729：configured models 聚合默认包含 active runtime model，避免 UI/命令列表与当前实际 session model 不一致。
-- #5769：`getModelDisplayName` 先按 active resolved baseUrl 在 duplicate id provider entries 中匹配，再回退旧的 id-only lookup；tests 覆盖 same id/different baseUrl 的 header/status label。
-
 ### #5827 — OpenAI stream inactivity timeout
 
 - **修复点**：在 OpenAI-compatible `pipeline.executeStream` 内增加 `withStreamInactivityTimeout`，覆盖“stream 已开始但后续 chunk 长时间不来”的半断开场景，而不是只依赖 SDK request timeout。
@@ -673,31 +519,11 @@ sequenceDiagram
 - **计时语义**：任意 chunk 到达都会 reset timer，包括普通 content、thinking/reasoning 和其它流式事件；用户主动 abort 仍保持 `AbortError`，不会被误标成 timeout。
 - **错误归类**：idle 超时抛合成 `ETIMEDOUT`，复用现有 retry classifier，把它归为可重试 transport error。该 PR 不新增 partial-output replay 或 turn-level terminal event。
 
-### #5962 — TLS insecure escape hatch
-
-- **入口**：CLI flag / config 和 `QWEN_TLS_INSECURE` 都汇聚到 runtime fetch options；实现集中在 fetch/runtime options helper，而不是分散到每个 provider。
-- **用途**：自签证书 endpoint、企业内网代理或临时排障。它只影响显式开启的当前 runtime，不改变默认 TLS 验证。
-- **安全边界**：开启后无法验证服务端身份，API key/token 可能暴露给中间人；长期方案应优先把自签 CA 加进系统/Node 信任链，例如 `NODE_EXTRA_CA_CERTS`。
-
-### #5793 — providerProtocol mapping
-
-- **协议映射**：provider preset / resolver 增加 `providerProtocol`，允许自定义 provider id 映射到已有 SDK protocol，实现“provider 身份独立、transport 行为复用”。
-- **兼容性**：built-in providers 不需要显式配置；未知且未映射的 custom provider 继续 warn/skip，不把请求发到不确定协议。
-- **调用链影响**：model ownership、display label、auth status 仍使用原 provider id；content generator / provider dispatch 使用 mapped protocol 选择 SDK 实现。
-- **测试重点**：覆盖 built-in provider 不变、自定义 provider 映射成功、未映射 custom provider 保持原 warning/skip，以及 provider identity 不被映射值覆盖。
-
 ### #5845 — stream idle timeout env override
 
 - **配置入口**：新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，解析为非负整数毫秒；非法值忽略并通过 debug logger 记录。
 - **优先级**：显式 `ContentGeneratorConfig.streamIdleTimeoutMs`（包括 0 禁用）> env > 默认 `120000`。
 - **边界**：该 env 只提供 OpenAI-compatible stream inactivity timeout 的默认值，不改变用户主动 abort、partial-output recovery 或 retry classifier 的语义。
-
-### #5946 — Anthropic abort listener isolation
-
-- **修复点**：Anthropic `generateContent` / `generateContentStream` 先用 `createChildAbortController` 从 caller signal 派生 per-request child，再把 child signal 传给 SDK 和 streaming fallback probe。
-- **清理语义**：非流式请求在 `finally` 中 abort child；流式请求在 stream 被消费完后 abort child，避免 SDK 泄漏 listener 累积到长寿 caller signal。
-- **取消语义**：parent abort 仍传播到 child，用户取消和 request abort 行为不变。
-- **测试**：Anthropic generator tests 覆盖流式/非流式连续请求后 caller signal 无残留 abort listener，以及 caller abort 能传播到 child signal。
 
 ### #3495 — apiKey 跨重启保留
 

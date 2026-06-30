@@ -2,10 +2,10 @@
 
 **主题**: daemon 新端点（recap/btw/tasks/shell）、serve T2.x、daemon prompt 链路追踪、集成合并
 
-**统计**: 22 PRs — 13 merged / 6 open / 3 closed
-**代码量**: +152,911 / -35,150，994 个文件变更
-**类型**: feat ×16, fix ×3, chore ×2, refactor ×1
-**范围 (scope)**: serve ×8, telemetry ×5, daemon ×5, integration ×2, core ×1, sdk ×1, rewind ×1
+**统计**: 23 PRs — 14 merged / 6 open / 3 closed
+**代码量**: +153,167 / -35,166，1000 个文件变更
+**类型**: feat ×17, fix ×3, chore ×2, refactor ×1
+**范围 (scope)**: serve ×8, telemetry ×5, daemon ×6, integration ×2, core ×1, sdk ×1, rewind ×1
 
 **本周最大改动**:
 - [#4490](https://github.com/QwenLM/qwen-code/pull/4490) (+93283/-22535, 489 files) chore(integration): merge daemon_mode_b_main into main — F1/F2/F3/F4-prereq + F5 alpha docs batch (#4175)
@@ -36,6 +36,7 @@
 | #4610 | 🟡 open | feat(daemon) | feat(daemon): add POST /session/:id/btw endpoint for side questions | +385/-128 | 11 | 05-28 | — | https://github.com/QwenLM/qwen-code/pull/4610 |
 | #4628 | 🟡 open | feat(telemetry) | feat(telemetry): add client_id attribute and permission route spans | +167/-10 | 6 | 05-29 | — | https://github.com/QwenLM/qwen-code/pull/4628 |
 | #4630 | 🟡 open | feat(telemetry) | feat(telemetry): add tool spans and session.id to daemon/ACP path | +1115/-742 | 4 | 05-29 | — | https://github.com/QwenLM/qwen-code/pull/4630 |
+| #4646 | ✅ merged | feat(daemon) | feat(daemon): clamp oversized inline media on the prompt path | +256/-16 | 6 | 05-30 | 05-31 | https://github.com/QwenLM/qwen-code/pull/4646 |
 
 ---
 
@@ -47,7 +48,6 @@
 |---|---|---|
 | [#4490](https://github.com/QwenLM/qwen-code/pull/4490) | 仍在观察，尚未作为已落地实现；当前目标是 超大集成 PR；body 严重过期 + 自相矛盾 + 有冲突。 | 声称区域确实都在（acp-bridge 23 / core 97 / docs 32 含 qwen-serve*.md / webui 53 / sdk 48）；但大量未描述范围：web-shell 109 文件（全新增、body 只字未提）、cli 103、channels 5、vscode-ide-companion 6。巨型合并典型风险：6 包 / 489 文件，几乎不可逐行审； |
 | [#4499](https://github.com/QwenLM/qwen-code/pull/4499) | 干净修复，对应 #4486 | 以 `getSessionContext() ?? otelContext.active()` 作为 `startInteractionSpan` 的父 context，正是 issue 建议的修法；`clearSessionTracingForTesting` 里 `setSessionContext(undefined)` 卫生处理也已实现。 |
-| [#4500](https://github.com/QwenLM/qwen-code/pull/4500) | 正常 main→分支同步，body 与 squash 一致 | body 与 squash commit `394ccf0ed` 逐字一致；声称回流的 5 个上游 PR（#4464/4465/4470/4468/4288）已核验在 main 上。`gh pr diff` 只显示 3 文件是 merge-base 漂移假象（两分支事后都推进了），非真实范围缺口。 纯集成；冲突解决（如 text-buffer 采用 main 的 `useRef`）合理。未逐行复核全部 13 处解决。 |
 | [#4504](https://github.com/QwenLM/qwen-code/pull/4504) | 功能完整；body 把"无取消"说成"断连即取消" | route、capability `session_recap`、ext-method `qwen/control/session/recap`、`bridge.generateSessionRecap`、SDK `recapSession`/`recap`、docs、tests 全部到位。逻辑无 bug；ACP 侧传 never-abort signal，bridge 有 60s backstop。 |
 | [#4505](https://github.com/QwenLM/qwen-code/pull/4505) | 仍在观察，尚未作为已落地实现；当前目标是 修复有效；body 漏说 model gate，pipeline gate 口径存疑。 | 核心修复对（去掉死的 `'enable_thinking' in typed` 守卫）； |
 | [#4507](https://github.com/QwenLM/qwen-code/pull/4507) | 纯增量，护栏完善 | SDK schema（events/normalizer/types/transcript/store/terminal）、bridge `extNotification` 解 `qwen/notify/session/prompt-suggestion`→`followup_suggestion`、`Session.#maybeEmitFollowupSuggestion` fire-and-forget、webui `useDaemonFollowupSuggestio… |
@@ -67,3 +67,4 @@
 | [#4610](https://github.com/QwenLM/qwen-code/pull/4610) | 仍在观察，尚未作为已落地实现；当前目标是 干净 well-scoped；clientId 未用。 | `POST /session/:id/btw`(server.ts)、`generateSessionBtw`(bridge.ts)、`sessionBtw` ext-method(acpAgent.ts)、共享 `buildBtwPrompt`/`buildBtwCacheSafeParams`(core/btwUtils.ts)、`supportedModes:['interactive','acp']`、`session_btw… |
 | [#4628](https://github.com/QwenLM/qwen-code/pull/4628) | 仍在观察，尚未作为已落地实现；当前目标是 小而正确的遥测增强；helper 未接线。 | `qwen-code.client_id` 加到 request span(经 `CLIENT_ID_RE`/`MAX_CLIENT_ID_LENGTH` 校验)与 `prompt.dispatch` span；permission 路由在 `resolveDaemonTelemetryRoute` 匹配并加 `qwen-code.daemon.permission.request_id`； |
 | [#4630](https://github.com/QwenLM/qwen-code/pull/4630) | 仍在观察，尚未作为已落地实现；当前目标是 #4608 的干净重写，正确实现 #4602。 | Milestone 1：`session.id` 经 `resolveSessionId`(session-tracing.ts) 加到 llm_request/tool/tool.execution。 |
+| [#4646](https://github.com/QwenLM/qwen-code/pull/4646) | 限制 prompt path 中过大的 inline media，避免 base64 图片直接撑爆模型输入或 daemon/ACP 传输。 | 新增 `inlineMediaLimit` 工具，按 `QWEN_CODE_MAX_INLINE_MEDIA_BYTES` / 默认 10MB 估算 base64 解码大小；超限 image part 降级为文本 placeholder，CLI ACP session 与 ACP HTTP dispatch 共用该边界，并补大小估算和降级测试。 |

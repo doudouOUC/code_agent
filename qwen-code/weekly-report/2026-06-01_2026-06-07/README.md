@@ -2,10 +2,10 @@
 
 **主题**: daemon 修复（btw 泄漏/transcript 隔离/compaction/resync）、ACP 命令扩展（rewind/hooks/directory/remember）、telemetry metrics + 响应元数据、大规模重构
 
-**统计**: 25 PRs — 22 merged / 0 open / 3 closed
-**代码量**: +12,945 / -12,163，264 个文件变更
-**类型**: feat ×13, fix ×9, refactor ×1, chore ×1
-**范围 (scope)**: daemon ×7, serve ×5, cli ×4, telemetry ×3, core ×2, integration ×1
+**统计**: 26 PRs — 23 merged / 0 open / 3 closed
+**代码量**: +13,052 / -12,307，272 个文件变更
+**类型**: feat ×14, fix ×9, refactor ×1, chore ×1
+**范围 (scope)**: daemon ×7, serve ×5, cli ×4, telemetry ×4, core ×2, integration ×1
 
 **本周最大改动**:
 - [#4774](https://github.com/QwenLM/qwen-code/pull/4774) (+2775/-4969, 81 files) refactor(daemon): simplify code and strip PR/commit references from comments — net -2194 行
@@ -14,6 +14,7 @@
 
 | PR | 状态 | 标题 | 变更 | 文件 | 创建 | 合并/关闭 | 链接 |
 |---|---|---|---|---|---|---|---|
+| #4661 | ✅ merged | feat(telemetry): per-prompt traceId for bounded, renderable traces | +107/-144 | 8 | 06-01 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4661 |
 | #4666 | ✅ merged | fix(daemon): btw cross-session leak + timeout + input cap + permission | +67/-45 | 5 | 06-01 | 06-01 | https://github.com/QwenLM/qwen-code/pull/4666 |
 | #4667 | ⬜ closed | fix(core): add configurable bodyTimeout to prevent streaming timeout w | +255/-100 | 12 | 06-01 | 06-03 | https://github.com/QwenLM/qwen-code/pull/4667 |
 | #4682 | ✅ merged | feat(telemetry): expand daemon telemetry route coverage | +52/-11 | 1 | 06-01 | 06-02 | https://github.com/QwenLM/qwen-code/pull/4682 |
@@ -83,6 +84,7 @@ _W23 最终版 · 更新于 2026-06-08_
 
 | PR | 解决了什么问题 | 怎么做的 |
 |---|---|---|
+| [#4661](https://github.com/QwenLM/qwen-code/pull/4661) | 让每个 prompt 形成独立、可渲染、边界清晰的 trace，同时仍保留 `session.id` 做跨 prompt 关联。 | telemetry interaction span 默认以 `ROOT_CONTEXT` 开新 trace，不继承 active span；`SessionIdSpanProcessor` 继续给 span 打 `session.id`，并补 interaction root、active span 忽略和 fallback trace context 相关测试。 |
 | [#4666](https://github.com/QwenLM/qwen-code/pull/4666) | btw 修复 4/5 项到位；shallow copy 项仅在描述中、代码未落地 | 描述列 5 项修复，但 "btw shallow copy: `getHistoryTail(40, false)`" 未在 diff 中；`btwUtils.ts` 当前仍为 `getHistoryTail(maxHistoryEntries, true)`（deep clone）。其余 4 项（cross-session leak、timeout、input cap、requestId cardinality）均落地。 |
 | [#4667](https://github.com/QwenLM/qwen-code/pull/4667) | 未作为已落地实现；bodyTimeout 可配置，55 测试全绿。 | config 字段 + undici Agent + sanitize + proxy 回退 + keepAliveTimeout 五项全落地。`sanitizeBodyTimeout` 处理 negative/float/NaN/Infinity/undefined 全回退 0；`noProxyDispatcherCache` 按 bodyTimeout keyed 防 Agent 膨胀； |
 | [#4682](https://github.com/QwenLM/qwen-code/pull/4682) | daemon telemetry 路由覆盖扩展，无基数问题 | 新增 9 条路由模式（recap/btw/model/shell/detach/approval-mode/metadata/sessions-delete/workspace 系列）+ 尾部斜杠归一化 + `[^/]+` regex 收紧，全部对应描述。 路由值全为静态模板（参数化占位），无原始 ID 泄入 span name；`[^/]+` 正确防止跨段匹配。 |
@@ -97,7 +99,6 @@ _W23 最终版 · 更新于 2026-06-08_
 | [#4749](https://github.com/QwenLM/qwen-code/pull/4749) | 11 个 OTel metric 仪表盘，基数有界（~200 max）；17 测试 | 11 个 OTel metric 仪表（counter/histogram/observable gauge）全部在 diff 中。bridge 经 optional `metrics` 子对象解耦。 基数有界（~200 max time-series）；shutdown 路径 `forceFlushMetrics()` → `bridge.shutdown()` 链式正确。17 单测覆盖。 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | ACP 子进程生命周期优化（skip relaunch+preheat+idle）；1852 行 benchmark 测试维护面大 + POSIX-only | skip relaunch + preheat + idle keep-alive 三项优化全落地；描述含架构图。核心逻辑（`getAcpMemoryArgs` cgroup 感知内存分配 + 16GB cap）正确； |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | compaction 引擎 parentToolCallId 保留；双路径 merge 设计正确；9 测试含 9-subagent 压力 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引，top-level 按连续同 kind。 tool call eviction 保留段边界；`seed()` 清除 in-flight 状态。9 新测试含 9-subagent 并发压力测试。本批最高质量修复。 |
-| [#4774](https://github.com/QwenLM/qwen-code/pull/4774) | net -2194 行；提取共享 helper + 剥离 PR/commit 引用注释 | net -2194 行；两类改动：(1) 提取共享 helper（`resolveWithVote`/`requireSessionId`/`optionalField` 等）消除跨 ~20 文件重复；(2) 剥离所有 PR/issue/commit 引用注释、保留技术 WHY（约束/不变量/spec 引用如 `RFD #721`）。 机械重构，无行为变更。 |
 | [#4811](https://github.com/QwenLM/qwen-code/pull/4811) | /remember /forget /dream ACP 实现正确，但合入错误分支 main（已 revert） | 三命令 ACP 模式实现完整。 实现正确但合入错误分支 `main`（应入 `daemon_mode_b_main`）；#4818 revert + #4819 re-land 修正。 |
 | [#4812](https://github.com/QwenLM/qwen-code/pull/4812) | 给 daemon/web-shell 增加 session forking 能力，让客户端能从现有会话分叉出新 session。 | 新增 `POST /session/:id/branch`、bridge branch request/response 类型、唯一标题生成、`session_branched` 事件、SDK client/types/events 与 server 测试。 |
 | [#4816](https://github.com/QwenLM/qwen-code/pull/4816) | 给 web-shell/daemon 会话补 `/settings` slash command，缩小与 TUI 命令面的差距。 | 接入 serve/ACP slash command 路径、settings 命令输出与 web-shell 消费链路，并更新相关命令、类型和测试文件。 |

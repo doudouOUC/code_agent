@@ -338,7 +338,6 @@ stateDiagram-v2
 
 配套 `rebuildTurnBoundaries`（约 1170）在 `/resume` 后重建 `turnParentUuids`，并**跳过** `notification`/`cron`/`mid_turn_user_message` 子类型——与 #4580 的 UI 侧过滤保持一致（见 3.7）。
 
-#5923 修复了 resume 后这一步的 parent 边界保留：旧逻辑在重建 turn boundaries 时会按重放记录的相邻关系推断 parent，自动 rewind/edit 后恢复出来的 `parentUuid` 可能丢失，导致已回退分支在 resumed session 里看起来消失或边界错位。修复后重建时优先使用 session JSONL 中持久化的 `parentUuid`，并把同一口径接到 CLI resume、ACP `loadSession` 和 `unstable_resumeSession`，让 daemon/web-shell 恢复路径与 TUI resume 一致。
 
 ### 3.7 compressed-turn 误报修复（#4580，`NOTIFICATION` 类型）
 
@@ -478,7 +477,6 @@ sequenceDiagram
 | **#5044** | rewind selector / confirm 测试覆盖 | 补 selector 导航/取消、restore fallback、restoring 按键 guard，以及 code/conversation/both/no-client/compressed/file-restore-failure 等 confirm 分支测试 |
 | **#5057** | snapshot 更新即时持久化 | `trackEdit` 新增或修复备份后立即追加最新 snapshot record，避免进程在下一轮 snapshot 前退出丢最后一轮文件历史 |
 | **#5141** | supported `sed -i` file-history tracking | 把安全单文件 `sed -i` 替换命令模拟成 edit confirmation：预览 diff、写前 `trackEdit`、stale guard、`FileSystemService.writeTextFile()` 落盘；不支持的 sed 仍走 shell path |
-| **#5923** | resume 后保留 rewind parent 边界 | 重建 `turnParentUuids` 时使用持久化 `parentUuid`，覆盖 CLI resume、ACP `loadSession` 和 `unstable_resumeSession`，避免自动 rewind/edit 后恢复历史丢失。 |
 
 ---
 
@@ -525,12 +523,6 @@ sequenceDiagram
 - **trackEdit 前移**：`edit.ts`（约 500）和 `write-file.ts`（约 392）将 `await trackEdit(file)` 从 `checkPriorRead` 与 `writeTextFile` 之间移至 `checkPriorRead` **之前**，收窄 stat-then-write 竞态窗口。移植自 upstream `claude-code` 的注释约定（「These awaits must stay OUTSIDE the critical section below」）。
 - **sticky failed 允许重试**：`fileHistoryService.ts:trackEdit` 入口守卫改为 `if (existing && !existing.failed) return;`（约 543），让 `failed` 标记的条目允许重试备份；异步后复检改为 `if (!current || current.failed)` 才覆写（约 562）；`makeSnapshot` 复用分支增加 `!latestBackup.failed` 条件（约 601），`failed` 条目 fall through 到 `createBackup` 重试。
 - **测试**：`fileHistoryService.test.ts` 新增 `heals a failed entry on the next trackEdit attempt` 用例（先制造 failed、再验证 trackEdit 能 heal）；`edit.test.ts`/`write-file.test.ts` 各增 `backs up before the pre-write freshness check (TOCTOU ordering)` 用例（mock trackEdit 改 mtime → 断言 checkPriorRead 拒写 → 证明顺序正确）。
-
-### #5923 — preserve rewind parents after resume
-
-- **重建边界**：resume/load 后重建 `turnParentUuids` 时优先使用持久化 `parentUuid`，而不是只靠重放顺序推断相邻 parent。
-- **路径覆盖**：CLI resume、ACP `loadSession`、`unstable_resumeSession` 走同一 rebuild 逻辑，避免 daemon/web-shell 恢复路径与 TUI resume 分叉。
-- **行为修复**：自动 rewind/edit 后，resumed session 能保留死分支边界和可回退轮父节点，不再出现历史分支消失或 turn boundary 错位。
 
 ### #4122 — IDE 模式禁用
 

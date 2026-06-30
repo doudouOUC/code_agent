@@ -53,7 +53,6 @@
 ### #4490 chore(integration): merge daemon_mode_b_main into main — F1/F2/F3/F4-prereq + F5 alpha docs batch (#4175)
 - **状态**: open（draft，**mergeable=dirty / 有冲突**）| **关联 issue**: #4175（Mode B `qwen serve` daemon 史诗 / 分批回流策略）
 - **一致性**: ⚠️ — 声称区域确实都在（acp-bridge 23 / core 97 / docs 32 含 qwen-serve*.md / webui 53 / sdk 48）；但**大量未描述范围**：web-shell 109 文件（全新增、body 只字未提）、cli 103、channels 5、vscode-ide-companion 6。
-- **描述准确性**: ⚠️ 偏低 —— body 自称 "14 PR / 139 文件 / +42368-8071"，实际 **28 commit / 489 文件 / +93283-22535**（约 3×）；且 "Out of scope" 明列 #4472(ACP HTTP)/#4484(跨端同步) 不在本批，但二者均已在 commit list 中，**自相矛盾**。
 - **正确性**: ⚠️ — 巨型合并典型风险：6 包 / 489 文件，几乎不可逐行审；mergeable=dirty（body 自列的"先 sync main"前置未完成）；仍为 draft。
 - **结论**: 范围在扩、描述已脱节、且冲突未解的超大集成 PR；合并前必须刷新 body 并解决冲突。
 
@@ -66,7 +65,6 @@
 
 ### #4500 chore(integration): sync main into daemon_mode_b_main (2026-05-25)
 - **状态**: merged | **关联 issue**: 无（chore）
-- **一致性**: ✅ — body 与 squash commit `394ccf0ed` 逐字一致；声称回流的 5 个上游 PR（#4464/4465/4470/4468/4288）已核验在 main 上。`gh pr diff` 只显示 3 文件是 merge-base 漂移假象（两分支事后都推进了），非真实范围缺口。
 - **描述准确性**: 异常详尽诚实——主动披露 50 个既有 tsc error 与明确的 out-of-scope 项。
 - **正确性**: ✅ — 纯集成；冲突解决（如 text-buffer 采用 main 的 `useRef`）合理。未逐行复核全部 13 处解决。
 - **结论**: 正常的周期性 main→分支同步，描述忠实镜像 squash commit。
@@ -178,7 +176,6 @@
 
 ### #4608 feat(telemetry): add tool spans and session.id to daemon/ACP path
 - **状态**: closed（superseded）| **关联 issue**: #4602（对齐 daemon/ACP 与 CLI 的 session tracing）
-- **一致性**: ❌ — body 描述一个聚焦的遥测改动（给 llm_request/tool/tool.execution 加 `session.id`、包裹 `Session.runTool`、turn 末 `conversation_finished`、cron 包 `withInteractionSpan`），但 diff 达 **232 文件 / +32913**。**错基分支**（base 误为 `feat/daemon-otel-e2e-design` 而非 `daemon_mode_b_main`）把整套 #4563 workspace-service、#4472 acpHttp、SDK serve-bridge MCP、无关 UI(`text-buffer.ts`/`contextCommand.ts`) 全扫了进来。body ≠ diff。
 - **描述准确性**: body 准确描述了**意图中的**遥测切片，只是与膨胀的 diff 不符。
 - **正确性**: —（轻审，未合并）真正的遥测切片已在 #4630 重做并审查。
 - **结论**: 错基分支产生的废弃产物，已被干净的 4 文件 #4630（cherry-pick）取代；判断意图应看 #4630。
@@ -209,7 +206,6 @@
 ## 重点跟进清单
 
 ### Open PR（仍可改，建议优先）
-1. **#4490**（集成）：刷新 body —— 文件数/PR 数已偏差约 3×；删除自相矛盾的 "out of scope #4472/#4484"（实际已含）；补上 web-shell(109 文件) 等未述范围；解决 `mergeable=dirty` 冲突后再合。
 2. **#4505**（fix core）：body 补上 model-name 门（`qwen*`/`coder-model`）说明（该门基于 `request.model`，即 side-query 运行时模型，符合预期——原 review "基于 config.model" 判断有误，已更正）。
 3. **#4563**（refactor）：`getWorkspacePreflightStatus` 的 acp-locality 过滤是**行为变更**——要么在描述声明、要么改回不过滤以保持纯抽取；修正 body 对 `initWorkspace "fixes FIXME"` 的夸大（实为逐字搬运）。
 4. **#4576**（已合并，但 channels 路径待接通）：修 `ChannelBase.ts:216` 的 `this` 绑定（`this.bridge.shellCommand(...)` 或 `.bind(this.bridge)`），否则该路径接通即 TypeError；同步修正 body 中"频道 ! 直执行"的描述（当前 inert）。

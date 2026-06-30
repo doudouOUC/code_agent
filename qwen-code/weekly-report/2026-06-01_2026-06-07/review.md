@@ -119,7 +119,6 @@
 ### #4694 fix(daemon): compacted session replay for long-session recovery
 - **状态**: merged | **关联 issue**: 无
 - **一致性**: ✅ — turn-boundary 压缩引擎、同步 snapshot、slot 压缩、`liveJournal`、向后兼容可选字段全落地。
-- **描述准确性**: 准确（supersedes #4678 的声明经验证）。
 - **正确性**: ⚠️ — 核心压缩逻辑（文本合并、tool 折叠、slot 排序、transient 过滤）正确；但 (1) **resume 路径仅返回 `lastEventId`**，若 ring 淘汰了上一完整 turn 与 resume 之间的事件，客户端丢失该段状态；(2) 压缩引擎 per-session、O(turns) 无上限增长，超长 session（数百 turn）可能显著。22 compaction + 20 EventBus + 19 SDK 测试覆盖。
 - **结论**: 25-30× 体积缩减的设计权衡合理；resume 后环淘汰间隙 + 无界增长是已知的 v1 权衡。
 
@@ -150,7 +149,6 @@
 
 ### #4774 refactor(daemon): simplify code and strip PR/commit references
 - **状态**: merged | **关联 issue**: 无
-- **一致性**: ✅ — net -2194 行；两类改动：(1) 提取共享 helper（`resolveWithVote`/`requireSessionId`/`optionalField` 等）消除跨 ~20 文件重复；(2) 剥离所有 PR/issue/commit 引用注释、保留技术 WHY（约束/不变量/spec 引用如 `RFD #721`）。
 - **正确性**: ✅ — 机械重构，无行为变更。
 
 ### #4811 feat(cli): enable /remember, /forget, /dream in ACP mode (v1)

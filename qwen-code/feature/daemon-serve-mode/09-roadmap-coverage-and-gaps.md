@@ -28,10 +28,8 @@
 | §02 Architectural Decisions | `02-architectural-decisions.md` | 7 条核心决策（修正：MCP per-session 生命周期；Mode A → parking lot）。 |
 | §03 HTTP API & Protocol | `03-http-api.md` | 路由表 + ACP wire 4 层兼容矩阵 + SSE + Last-Event-ID + reverse-RPC 异步 + 能力协商 + **additive 兼容原则**。 |
 | §04 Deployment & Client | `04-deployment-and-client.md` | Mode B 客户端收敛 + TUI/channels/web/IDE adapter 边界 + remote-control deferred + 多客户端协作 + **runtime locality / environment contract（§五，commit `36c9927`）**。 |
-| §05 Security & Permission | `05-permission-auth.md` | Bearer + Host allowlist + PR #3723 4-mode evaluatePermissionFlow + first-responder vote + **per-session permission routing** + §八 生产部署 best practice。 |
 | §06 Roadmap & Ecosystem | `06-roadmap.md` | 时间线 + Stage 1.5（Mode B 优先）+ client adapters + remote-control + 7 工程原则 + Stage 2 + External Reference Architecture + #4175 25-PR Wave breakdown。 |
 
-> roadmap reset 由 codeagents PR #131（MERGED 2026-05-15，chiga0）落定：Mode B 优先 + MCP per-session 修正 + Mode A 降级 parking lot。
 
 ### 1.2 #4175 的 F1-F5 wave 计划
 
@@ -62,7 +60,6 @@ capability registry → DaemonSessionClient → typed events
 [#4156](https://github.com/QwenLM/qwen-code/issues/4156)（@doudouOUC，**OPEN**）= Stage 1.5b 三阶段计划：
 
 - **Phase A — loopback-only 最小骨架**（A0/A1/A2/A3 stacked）：
-  - ⏳ **A0** 从 #4113 抽 `validateAndCanonicalizeWorkspace` helper（~50 LOC）— pending。
   - ✅ **A1** 抽 `createInMemoryChannel` helper — **[#4160](https://github.com/QwenLM/qwen-code/pull/4160) MERGED →main**（2026-05-15，作为可复用原语保留，即便其余 Mode A 工作 parked）。
   - ⏳ **A2** 新 `inProcessAcpBridge.ts`（~200 LOC，实现 `HttpAcpBridge` 接口）— pending。
   - ⏳ **A3** `gemini.tsx` `--serve` flag 集成（lazy import / boot path / default port 0）— pending。
@@ -79,11 +76,9 @@ capability registry → DaemonSessionClient → typed events
 
 | 阶段 | 描述 | 状态 | PR |
 |---|---|---|---|
-| **Stage 1** | Mode B headless `qwen serve` daemon | ✅ →main | [#3889](https://github.com/QwenLM/qwen-code/pull/3889)（2026-05-13） |
-| **Stage 1.5a §02** | 1 daemon = 1 workspace 简化 | ✅ →main | [#4113](https://github.com/QwenLM/qwen-code/pull/4113)（2026-05-15） |
 | `createInMemoryChannel` 原语 | 配对 NDJSON channel helper | ✅ →main | [#4160](https://github.com/QwenLM/qwen-code/pull/4160) |
 
-### 3.2 P0 — Stage 1.5a 9 must-haves（chiga0）+ per-session permission routing
+### 3.2 P0 — Stage 1.5a 9 must-haves + per-session permission routing
 
 #3803 列的 9 must-haves，已在 #4175 Wave 1-2.5 落地（全部 →main）：
 
@@ -91,15 +86,12 @@ capability registry → DaemonSessionClient → typed events
 |---|---|---|---|---|
 | #1 | per-request `sessionScope` override | ✅ | [#4209](https://github.com/QwenLM/qwen-code/pull/4209) + #4214 | →main |
 | #2 | `loadSession` / `resume` HTTP（★最大痛点）| ✅ | [#4222](https://github.com/QwenLM/qwen-code/pull/4222) | →main |
-| #3 | daemon-stamped client identity（pair token / revocation 半截）| 🔧 | [#4231](https://github.com/QwenLM/qwen-code/pull/4231) | →main（revocation 见 F3，未实现）|
 | #4 | client heartbeat | ✅ | [#4235](https://github.com/QwenLM/qwen-code/pull/4235) | →main |
-| #5 | `permission_already_resolved` 事件 | ✅ | [#4232](https://github.com/QwenLM/qwen-code/pull/4232) | →main |
 | #6 | per-session 可配 replay ring | ✅ | [#4237](https://github.com/QwenLM/qwen-code/pull/4237) | →main |
 | #7 | `slow_client_warning` 事件 | ✅ | [#4237](https://github.com/QwenLM/qwen-code/pull/4237) | →main |
 | #8 | `_meta` per-session 上下文 push + close/delete | ✅(close/delete) / ❌(`_meta`) | [#4240](https://github.com/QwenLM/qwen-code/pull/4240)；`_meta` 见 [#4516](https://github.com/QwenLM/qwen-code/pull/4516) **CLOSED 未合入** | →main |
 | #9 | `/capabilities` 真协商 + protocol_versions | ✅ | [#4191](https://github.com/QwenLM/qwen-code/pull/4191) | →main |
 | #10 | durability 文档 | ✅ | commit `bbc7b8b6` | →main |
-| — | per-session permission routing `POST /session/:id/permission/:requestId` | ✅ | [#4232](https://github.com/QwenLM/qwen-code/pull/4232) | →main |
 
 ### 3.3 P0 — Stage 1.5c daemon-side state CRUD（control-plane parity，10+ 路由）
 
@@ -123,8 +115,6 @@ capability registry → DaemonSessionClient → typed events
 | acp-bridge 骨架 + EventBus/inMemoryChannel/AcpChannel/PermissionMediator 类型桩（22a）| ✅ | [#4295](https://github.com/QwenLM/qwen-code/pull/4295) | →main |
 | status/paths/errors/bridgeTypes 抬升（22b/1）| ✅ | [#4298](https://github.com/QwenLM/qwen-code/pull/4298) | →main |
 | `BridgeOptions` + `DaemonStatusProvider` seam（22b/2）| ✅ | [#4304](https://github.com/QwenLM/qwen-code/pull/4304) | →main |
-| typed daemon event schema v1（判别联合 + reducer + type guard）| ✅ | [#4217](https://github.com/QwenLM/qwen-code/pull/4217) + [#4226](https://github.com/QwenLM/qwen-code/pull/4226) | →main |
-| `DaemonSessionClient` SDK 骨架 + 加固 | ✅ | [#4201](https://github.com/QwenLM/qwen-code/pull/4201) + [#4225](https://github.com/QwenLM/qwen-code/pull/4225) | →main |
 | typed errors（channel-closed / missing-cli-entry）| ✅ | [#4300](https://github.com/QwenLM/qwen-code/pull/4300) | →main |
 | **F4-prereq 协议补全**（`serverTimestamp` / `provenance` / `errorKind` / `state_resync_required`）| ✅ | [#4360](https://github.com/QwenLM/qwen-code/pull/4360) | →dmbm |
 
@@ -144,8 +134,6 @@ capability registry → DaemonSessionClient → typed events
 
 | 子阶段 | 项 | 状态 | 实测/PR |
 |---|---|---|---|
-| **2a** 协议补全 | `/acp` ACP Streamable HTTP（RFD #721）| ✅ →dmbm | [#4472](https://github.com/QwenLM/qwen-code/pull/4472)（chiga0 #18 的 YES；`mountAcpHttp(app, bridge)`）。**main 上 ABSENT**。 |
-| | WebSocket bidi（RFD #721 另一半）| ⏳ pending | 仅 Streamable HTTP 落地，WebSocket transport **未实现**。 |
 | | `/health?deep=1` | ✅(浅) →main | server.ts 已有 `deep`，但只读 Map-size getter（`sessionCount`/`pendingPermissionCount`），非真实 liveness（见 [README](README.md) §7 已知限制）。 |
 | | `POST /ext/:method` | ⏳ pending | serve 源**未实现**（实测 absent）。 |
 | | Reverse-RPC 5 类 Client Capability（editor/clipboard/browser/notification/file_picker）| ⏳ pending | 仅 §04 设计；runtime-locality 更新澄清其为"显式委派 client-local 资源"，**未实现**。 |
@@ -157,7 +145,6 @@ capability registry → DaemonSessionClient → typed events
 | | `--max-sessions` guard rail | ✅ →main | runQwenServe.ts 已实现（超限 `503 session_limit_exceeded` + `Retry-After`）。 |
 | | （额外）daemon 文件 logger | ✅ →dmbm | [#4559](https://github.com/QwenLM/qwen-code/pull/4559)（关闭 issue [#4548](https://github.com/QwenLM/qwen-code/issues/4548)）+ request 级日志 [#4606](https://github.com/QwenLM/qwen-code/pull/4606)。 |
 | | （额外）OpenTelemetry daemon e2e | 🔧 部分 | tool spans + session.id [#4630](https://github.com/QwenLM/qwen-code/pull/4630) →dmbm；全链路 issue [#4554](https://github.com/QwenLM/qwen-code/issues/4554) **OPEN**。 |
-| **2d** perf | baseline harness | ✅ →main | [#4205](https://github.com/QwenLM/qwen-code/pull/4205)（+#4220/#4234）。 |
 | | perf eval + docs | ⏳ pending | harness 已在，正式评测/调优未做。 |
 | **2e** native in-process | 去掉 `qwen --acp` child | ⏳ pending | 仍 spawn ACP 子进程；`acpAgent.ts` `loadSettings(cwd)` 跨 workspace 污染未解。**未实现**。 |
 
@@ -169,14 +156,11 @@ capability registry → DaemonSessionClient → typed events
 
 | roadmap 能力 | 状态 | 实现 PR | 本仓子文档 |
 |---|---|---|---|
-| HTTP server + 中间件链（Origin-strip/CORS/hostAllowlist/bearer/mutate）| ✅ →main | #3889 / #4236 | [01](01-http-server-and-middleware.md) |
 | `--allow-origin` CORS allowlist | ✅ →dmbm | [#4527](https://github.com/QwenLM/qwen-code/pull/4527) | [01](01-http-server-and-middleware.md) §CORS |
-| SSE EventBus（ring/replay/背压/state_resync/slow_client）| ✅ →main | #3889 / #4237 | [02](02-sse-event-bus.md) |
 | 协议帧 serverTimestamp/provenance/errorKind | ✅ →dmbm | [#4360](https://github.com/QwenLM/qwen-code/pull/4360) | [02](02-sse-event-bus.md) / [04](04-capabilities-and-protocol.md) |
 | 会话 spawn/attach/close/delete + sessionScope | ✅ →main | #4209 / #4240 | [03](03-session-lifecycle.md) |
 | heartbeat + load/resume | ✅ →main | #4235 / #4222 | [03](03-session-lifecycle.md) |
 | capability registry + protocol versions | ✅ →main | [#4191](https://github.com/QwenLM/qwen-code/pull/4191) | [04](04-capabilities-and-protocol.md) |
-| typed daemon event schema v1 + reducer | ✅ →main | #4217 / #4226 | [04](04-capabilities-and-protocol.md) |
 | WorkspaceFileSystem 边界 + 文件读写/edit CAS | ✅ →main | #4250 / #4269 / #4280 | [05](05-workspace-files-and-fs-boundary.md) |
 | prompt deadline + SSE writer-idle timeout | ✅ →dmbm | [#4530](https://github.com/QwenLM/qwen-code/pull/4530) | [01](01-http-server-and-middleware.md) / [02](02-sse-event-bus.md) |
 | MCP per-session 守卫（budget + push 事件 + 迟滞）| ✅ →main | #4247 / #4271 | [06](06-mcp-guardrails-and-pool.md) |
@@ -189,11 +173,8 @@ capability registry → DaemonSessionClient → typed events
 | **preflight/env 诊断路由** + closed errorKind 分类 | ✅ →main | [#4251](https://github.com/QwenLM/qwen-code/pull/4251) | ⚠️ **未文档化** |
 | **workspace memory/agents CRUD + generate** | ✅ →main/→dmbm | [#4249](https://github.com/QwenLM/qwen-code/pull/4249) + follow-up `workspace_agent_generate` | ⚠️ **部分未文档化**（01/04 提及，缺少单独 CRUD 深入）|
 | **OAuth 2.0 Device Grant 鉴权子系统**（DeviceFlowRegistry / BrandedSecret）| ✅ →main | #4255 / #4291 | ⚠️ **未文档化**（01 只讲 5 道闸，未讲 device-flow 路由）|
-| **`/acp` ACP Streamable HTTP 双传输**（RFD #721）| ✅ →dmbm | [#4472](https://github.com/QwenLM/qwen-code/pull/4472) | ⚠️ **未文档化**（README §3.1 仅一笔 `mountAcpHttp`）|
 | **daemon telemetry（tool spans + session.id）**| ✅ →dmbm | [#4630](https://github.com/QwenLM/qwen-code/pull/4630) | ⚠️ 交叉到 telemetry 方案，01-08 未覆盖 |
-| **chiga0 daemon-ui 库**（`@qwen-code/webui` + SDK `daemon/ui` reducer/store）| ✅ →dmbm | #4328 / #4353 / #4380 / #4834 | [11](11-webui-and-transport.md) 覆盖主线；#4834 focused hooks 接入见 [08](08-extension-endpoints.md) |
 | Mode A `qwen --serve` | 🅿️ parked | #4156（A1=#4160 ✅）| 未文档化（roadmap parked）|
-| F4 daemon-native client / remote-control | ⏳ pending / ❌ | #3929-3931 CLOSED | — |
 | Stage 2a 余下 / 2b / 2c Prometheus·mDNS / 2e | ⏳ pending | 无 PR | — |
 
 ---
@@ -212,26 +193,10 @@ capability registry → DaemonSessionClient → typed events
 
 ### 5.3 客户端适配器 onboarding（behind flag）当前状态
 
-- **3 个 spike 全 merged 但仅作 future-reference**：TUI [#4202](https://github.com/QwenLM/qwen-code/pull/4202) / IDE [#4199](https://github.com/QwenLM/qwen-code/pull/4199) / channel [#4203](https://github.com/QwenLM/qwen-code/pull/4203)（均 →main）。
-- **默认迁移计划已撤**（2026-05-19 web-first pivot [#4296](https://github.com/QwenLM/qwen-code/pull/4296) **CLOSED**；PR 26 ❌ SUPERSEDED）：native TUI / VS Code / channel adapter **保留各自 direct ACP/runtime 路径**，不默认切 daemon。
-- **web-demo `/demo`**（[#4132](https://github.com/QwenLM/qwen-code/pull/4132)）✅ →main，仍是最薄 POST+SSE 验证面。
 - **F4 具体 sub-scope 仍 TBD**（`qwen --connect` / IDE daemon-native / channel demo / scale instrumentation 都 ⏳ 未实现）。
-
-### 5.4 webui / daemon-ui 库（独立发布，非 daemon-hosted）
-
-[#4328](https://github.com/QwenLM/qwen-code/pull/4328) + [#4353](https://github.com/QwenLM/qwen-code/pull/4353) ✅ →dmbm，[#4380](https://github.com/QwenLM/qwen-code/pull/4380)（daemon-react-cli）✅ →dmbm，[#4834](https://github.com/QwenLM/qwen-code/pull/4834) 把 focused daemon hooks 暴露给 webui。**2026-05-21 决策**：daemon **不** host 浏览器 UI（无 `/web` 端点 / 无 cookie BFF / 无 browser auth bridge，浏览器不能安全持有 daemon bearer token）。`@qwen-code/webui` React 组件库 + `@qwen-code/sdk/daemon/ui` reducer/store 改为**独立 npm 包**，由下游 embedder 自行 host。传输与组件主线见 [11](11-webui-and-transport.md)，daemon hooks 接入见 [08](08-extension-endpoints.md)。
-
-### 5.5 typed SessionEvent 判别联合 + event reducer（1.5-prereq）落地状态
-
-✅ **已落地**：typed event schema v1（[#4217](https://github.com/QwenLM/qwen-code/pull/4217)）+ pure `SessionState` reducer + type guard（→main）；F4-prereq（[#4360](https://github.com/QwenLM/qwen-code/pull/4360)）补 `serverTimestamp`/`provenance`/`errorKind`/`state_resync_required`（→dmbm）。**未落地**：`Output sinks`（JSONL/stream-json/dual-output 收敛为同一事件流消费者，PR 25 OutputSink lift）⏳ CLI-internal cleanup，低优先级、无人认领。
-
-### 5.6 remote-control（#3929/#3930/#3931）—— 已 CLOSED，非 deferred
-
-三个 draft PR（remote-control foundation / worker server / attach to TUI）**全部 CLOSED（2026-05-15，从未 merged）**。#3803 原计划 P2 deferred「重定位为复用同一契约的 daemon facade」；现状是**已关闭**，等主客户端收敛后再以新形态 revisit。
 
 ### 5.7 Stage 2 逐项缺口（gh 核对：均无已合 PR，除下列）
 
-- **2a**：`/acp` Streamable HTTP ✅（[#4472](https://github.com/QwenLM/qwen-code/pull/4472) →dmbm）；`/health?deep=1` ✅ 浅实现（→main，非真 liveness）；**WebSocket bidi / `POST /ext/:method` / Reverse-RPC 5 类 client capability ⏳ 全未实现**。
 - **2b**：OpenAPI codegen ⏳ / multi-token ⏳（PR29 deferred）/ `HttpTransport` SDK adapter 🔧 部分（具体 client 有，抽象 transport 未抽）。**均无已合 PR**。
 - **2c**：Prometheus ⏳ / mDNS ⏳（**均无 PR**）；`--max-sessions` ✅ 已实现（→main）；daemon 文件 logger ✅（[#4559](https://github.com/QwenLM/qwen-code/pull/4559) →dmbm）/ request 日志 ✅（[#4606](https://github.com/QwenLM/qwen-code/pull/4606)）/ OTel daemon e2e 🔧（[#4630](https://github.com/QwenLM/qwen-code/pull/4630) 部分，issue [#4554](https://github.com/QwenLM/qwen-code/issues/4554) OPEN）。
 - **2d**：perf harness ✅（[#4205](https://github.com/QwenLM/qwen-code/pull/4205) →main）；正式 perf eval + docs ⏳。
@@ -245,9 +210,7 @@ capability registry → DaemonSessionClient → typed events
 2. **preflight/env 诊断路由 + closed errorKind 分类**（[#4251](https://github.com/QwenLM/qwen-code/pull/4251)，→main）—— 完全未文档化。
 3. **workspace memory/agents CRUD**（[#4249](https://github.com/QwenLM/qwen-code/pull/4249)，→main）—— control-plane state CRUD 无专章。
 4. **OAuth 2.0 Device Grant 鉴权子系统**（#4255/#4291，→main）—— 01 只讲 5 道闸，未讲 `/workspace/auth/device-flow` 4 路由 / DeviceFlowRegistry / BrandedSecret。
-5. **`/acp` ACP Streamable HTTP 双传输**（[#4472](https://github.com/QwenLM/qwen-code/pull/4472)，→dmbm）—— README §3.1 仅 `mountAcpHttp` 一笔，未讲与 REST+SSE 的双传输关系 / RFD #721。
 6. **daemon telemetry tool spans + session.id**（[#4630](https://github.com/QwenLM/qwen-code/pull/4630)，→dmbm）—— 交叉到 telemetry 方案，01-08 未覆盖。
-7. **chiga0 daemon-ui 库 `@qwen-code/webui` + SDK `daemon/ui`**（#4328/#4353/#4380，→dmbm）—— 独立库 track，daemon 侧 01-08 不含。
 
 > 注：sessionScope / heartbeat / load-resume / close-delete / SSE 背压 / MCP 池 / FS 边界 / acp-bridge 抽包 / 4 策略权限 / 扩展端点等**核心子系统均已被 01-08 深入覆盖**——文档缺口集中在 **control-plane state CRUD（1.5c 那批 read-only + memory/agents + device-flow + 诊断）** 与 **`/acp` Streamable HTTP + daemon-ui 库**两块。
 
@@ -260,7 +223,6 @@ capability registry → DaemonSessionClient → typed events
 - **In scope（F5 text-only flavor，4 PR）**：PR27 alpha docs（[#4473](https://github.com/QwenLM/qwen-code/pull/4473) ✅）+ PR28 npm publish scaffolding（待启）+ PR30a 本机启动模板（[#4483](https://github.com/QwenLM/qwen-code/pull/4483) ✅ systemd/launchd/tmux/nohup）+ PR31 v0.16-alpha.0 cut（待启）。**净服务端代码 ≈ 0**（仅 PR27 ~10 LOC SDK `QWEN_SERVER_TOKEN` env fallback 是真代码）。
 - **browser / webui 作为 daemon-hosted 被砍 → 独立发布**：daemon 不 host `/web`；`@qwen-code/webui` 独立 npm 包（见 §5.4）。publish list（2026-05-24 frozen）：`@qwen-code/qwen-code` + `-core` + `@qwen-code/sdk`(0.1.7→0.2.0) + `@qwen-code/webui`；**`@qwen-code/acp-bridge` 不发 npm**（保持 workspace-internal，避免过早锁 50+ semver export）。
 - **explicitly deferred 到 v0.16.x**：PR29 production token defaults（auto-gen/instance-path keying/stale cleanup）、PR30b 容器化部署 refs（Docker/k8s/nginx+TLS）、`--max-body-size` CLI flag、#4330 SDK/server MCP-restart timeout compat、W133-c `PoolEvent.source` discriminator——理由统一：**无真实 consumer 场景就 defer，否则文档/代码会因无人验证而腐烂**。
-- **社区 scope 决策线索**：chiga0 #27（Phase A/B/C 框架，text-only 只需 `--max-body-size`，其余条件项）、chiga0 #18（ACP Streamable HTTP —— 现已 YES，#4472 落地）、Keesan12 #21-26（terminal receipt seam，text-only 可不带，enterprise pilot 再议）。
 
 ---
 
@@ -294,18 +256,13 @@ Stage 1.5 是**增量迁移，非大重写**：
 
 | 编号 | 类型 | 状态 | base/落点 |
 |---|---|---|---|
-| #3889 #4113 #4160 | PR | ✅ MERGED | main（奠基）|
-| #4191 #4209 #4222 #4231 #4232 #4235 #4237 #4240 #4241 #4251 | PR | ✅ MERGED | main（Wave 1-3）|
 | #4236 #4249 #4250 #4255 #4269 #4280 #4282 #4291 | PR | ✅ MERGED | main（Wave 4）|
 | #4295 #4298 #4300 #4304 | PR | ✅ MERGED | main（acp-bridge 骨架 22a/22b）|
-| #4199 #4202 #4203 #4132 | PR | ✅ MERGED | main（spike + /demo）|
 | #4319 #4334 #4445 | PR | ✅ MERGED | daemon_mode_b_main（F1）|
 | #4336 #4411 #4460 | PR | ✅ MERGED | daemon_mode_b_main（F2）|
 | #4335 | PR | ✅ MERGED | daemon_mode_b_main（F3）|
 | #4360 | PR | ✅ MERGED | daemon_mode_b_main（F4-prereq）|
 | #4473 #4483 | PR | ✅ MERGED | daemon_mode_b_main（F5 partial）|
-| #4328 #4353 #4380 | PR | ✅ MERGED | daemon_mode_b_main（daemon-ui 库）|
-| #4472 #4504 #4527 #4530 #4552 #4559 #4576 #4578 #4606 #4610 #4630 | PR | ✅ MERGED | daemon_mode_b_main（Stage2 partial + 扩展端点）|
 | #4469 #4500 | PR | ✅ MERGED | daemon_mode_b_main（sync main→dmbm）|
 | #4490 | PR | ✅ MERGED 2026-06-11 | base main（反向集成）|
 | #4412 | PR | ✅ MERGED | daemon deep-dive docs 初版 |
@@ -313,7 +270,5 @@ Stage 1.5 是**增量迁移，非大重写**：
 | #4563 | PR | ✅ MERGED | #4563 base dmbm(DaemonWorkspaceService refactor，06-06 合入)|
 | #4516 | PR | ❌ CLOSED 未合入 | dmbm（compress/_meta 砍了）|
 | #4515 | PR | ❌ CLOSED / 部分后续落地 | 原 stats/export PR 未合入；stats 后续已落地，export 仍未落地 |
-| #4296 | PR | ❌ CLOSED | web-first pivot（已 superseded）|
-| #3929 #3930 #3931 | PR(draft) | ❌ CLOSED 未合入 | remote-control（2026-05-15 关）|
 | #4156 #4554 | issue | 🔧 OPEN | Mode A 3-phase；OTel daemon e2e |
 | #4548 | issue | ✅ CLOSED | 由 #4559 实现 |

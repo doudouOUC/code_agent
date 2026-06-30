@@ -163,7 +163,6 @@
 ### #4306 fix(serve): unbreak E2E after #4271 (capabilities + clientCount)
 - **状态**: merged | **关联 issue**: 无（Refs #4271）
 - **一致性**: ✅ — 仅改两个集成测试，补 `mcp_guardrail_events`、pgrep 期望改 `*2`。
-- **描述准确性**: 准确（drift 同 #4268/#4284）。
 - **正确性**: ✅ — 保留两条不变式；`N*2` 硬编码偏脆但作为未来统一 manager 的 tripwire，有意为之。
 - **结论**: 纯测试修复，对症且诚实。
 
@@ -233,7 +232,6 @@
 ### #4360 feat(serve+sdk): F4 prereq — daemon protocol completion
 - **状态**: merged | **关联 issue**: 无 closing；落地 #4175 评论 #19/#15
 - **一致性**: ✅ — `serverTimestamp`(_meta)、`resolveToolProvenance`(mcp__ 启发式)、`errorKind`(mapDomainErrorToErrorKind)、`state_resync_required`(环淘汰检出) + SDK reducer `awaitingResync` 门控均落地。
-- **描述准确性**: 准确，诚实标注 SDK 读取端在未合的 #4353。
 - **正确性**: ✅ — gap 检测正确（非终态跳过但游标推进、终态透传）；provenance 对畸形名回退 builtin。
 - **结论**: 范围清晰、向后兼容的协议补全。
 

@@ -166,21 +166,18 @@
 - **结论**: 体量大但工程化极细致，load/resume 语义与 restore 竞态均正确。
 
 ### #4226 feat(serve): advertise typed_event_schema + pin SDK public surface
-- **状态**: merged | **关联 issue**: 无（refs #4175 / #4217）
 - **一致性**: ✅ — registry 插入 `typed_event_schema`，server.test 与集成镜像同序更新，新增 `daemon-public-surface.test.ts` 围栏。
 - **描述准确性**: 准确（冗长无夸大）。
 - **正确性**: ✅ — 纯附加，未触 auth；公共面测试类型+运行时双锁 `asKnownDaemonEvent`。瑕疵：registry 注释称 `narrowDaemonEvent` 回退 `kind:'unknown'`，但 SDK 无此符号（仅注释不实）。
 - **结论**: 干净的能力标记 + 回归围栏，唯注释引用不存在符号。
 
 ### #4235 feat(serve): add client heartbeat (#4175 Wave 2.5 PR 9)
-- **状态**: merged | **关联 issue**: 无（实现 Wave 2.5 PR 9，依赖 #4231）
 - **一致性**: ✅ — 路由/SDK `heartbeat()`/能力标记/`recordHeartbeat`/`getHeartbeatState`/`SessionEntry` 字段全到位。
 - **描述准确性**: 准确（小瑕：称 14 用例，实约 16）。
 - **正确性**: ✅ — `recordHeartbeat` 先 `resolveTrustedClientId` 再写，伪造 clientId 抛错且不 bump；`unregisterClient` refcount 归零清理；`getHeartbeatState` 拷贝返回。全同步无 await → 无 TOCTOU；本 PR 无超时逻辑故无心跳/超时竞态。
 - **结论**: 资源清理与竞态处理稳健。
 
 ### #4236 feat(serve): mutation gating helper and --require-auth
-- **状态**: merged | **关联 issue**: 无（Wave 4 PR 15，依赖 #4231）
 - **一致性**: ✅ — `createMutationGate` 矩阵、`--require-auth`、条件标记、boot 检查、`/health` 收口、变更路由统一挂 `mutate()` 齐备。
 - **描述准确性**: 准确详尽。
 - **正确性**: ⚠️ — gate 本身不可绕过；但 `server.ts` 用 `tokenConfigured: opts.token !== undefined`，而 `bearerAuth` 用 `if(!token)`：`--token ""` 时 gate 视为已配置→passthrough，而全局 bearer 仍敞开。本 PR 无 strict 路由故不可利用，应在 Wave 4 前改为 `!!opts.token`。

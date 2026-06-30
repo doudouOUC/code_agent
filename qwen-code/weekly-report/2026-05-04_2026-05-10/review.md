@@ -21,7 +21,6 @@
 | [#3985](https://github.com/QwenLM/qwen-code/pull/3985) | merged | ✅ | ✅ | 反应式压缩 follow-up 加固，回滚逻辑正确 |
 | [#3986](https://github.com/QwenLM/qwen-code/pull/3986) | merged | ✅ | ✅ | OTel 诊断从 UI 改路由到 debug log |
 | [#3995](https://github.com/QwenLM/qwen-code/pull/3995) | merged | ✅ | ✅ | Python SDK 文档扩充，且纠正既有错误 |
-| [#4001](https://github.com/QwenLM/qwen-code/pull/4001) | closed | ✅ | — | 结构化 JSON 输出，与先合入的 #3598 重复而废弃 |
 
 **一致性**：✅14 / ⚠️0 / ❌0　　**正确性**：✅12 / ⚠️1 / —1
 
@@ -123,9 +122,6 @@
 ### #4001 feat(cli): add structured JSON schema output
 - **状态**: closed（未合并）| **关联 issue**: 无
 - **一致性**: ✅（就代码本身）— `structured-output.ts`（AJV 启动期校验、`build()` 校验、`terminalResult`）+ 内部工具接线 + 三语言 SDK `structured_result` 协议字段。
-- **描述准确性**: 属实，但未提与 #3598 的重叠。
-- **正确性**: —（N/A，废弃）— 同功能 `--json-schema` 由 #3598 先合入（早 18 分钟），本 PR 随即关闭；评论指出 cli/core 部分与 main 重复归零，仅 SDK 协议增量独有。
-- **结论**: 因并行重复、#3598 先落地而关闭；唯一独有价值是 SDK `structured_result` 协议，可另开小 PR。
 
 ---
 
@@ -136,7 +132,6 @@
 2. **#3847**：删除/更新 "Stable fallback spanId" 这条与最终门控不符的设计注释。
 
 ### Closed（记录）
-3. **#4001**：被 #3598 取代；若 SDK `structured_result` 协议仍需要，单独开小 PR 提取。
 
 ---
 

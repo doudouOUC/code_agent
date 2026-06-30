@@ -492,3 +492,10 @@ sequenceDiagram
 - `bridge.ts` 接线：`fileSystem: createBridgeFileSystemAdapter(fsFactory)` 统一 HTTP 与 ACP 审计流；`server.ts` 把 `fsFactory`/`boundWorkspace` 挂 `app.locals`。
 - `bridgeFileSystem.ts` 契约：符号链接拒绝（对 pre-F1 内联 proxy 的刻意 divergence）、新文件 `0o600`。
 - 18 个 `bridgeFileSystemAdapter.test.ts` 用例覆盖信任门 + line/limit null 丢弃。
+
+### #6021 — ACP managed local read fallback（@doudouOUC）
+
+- `acp-integration/service/filesystem.ts`：当 workspace-bound read 拒绝路径越界时，仅对 `read_file` 本来允许的 managed local roots（skills、临时输出、subagent transcript、managed auto-memory、user extensions 等）fallback 到 local filesystem service；其他越界路径继续 fail closed。
+- `acpAgent.ts`：ACP 工具读取接入该 fallback，保持 serve 模式与本地工具的受管本地根 allowlist 一致。
+- `core/src/utils/errors.ts` 与 `read-file.ts` / `edit.ts` / `write-file.ts` / `fileUtils.ts`：统一 plain object 和 structured JSON 错误渲染，避免用户只看到 `[object Object]`。
+- 测试覆盖 `acpAgent.test.ts`、`service/filesystem.test.ts`、core tool/error/fileUtils 单测，以及 serve fast-path bundle check/package script 回归。

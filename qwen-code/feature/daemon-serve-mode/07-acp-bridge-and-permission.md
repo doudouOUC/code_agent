@@ -48,7 +48,6 @@
 | #5174 | daemon status API | 诊断面 | 通过 bridge / ACP registry snapshot helper 暴露 `GET /daemon/status`，让权限压力、SSE/ACP 连接和 capability 状态进入统一 JSON 诊断面。 |
 | #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
-| [#4639](https://github.com/QwenLM/qwen-code/pull/4639) | merged | @he-yufeng | drop discontinued OAuth |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 

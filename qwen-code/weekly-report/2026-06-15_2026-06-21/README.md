@@ -1,7 +1,5 @@
 # qwen-code PRs · 2026-06-15 ~ 2026-06-21  (W25 最终版)
 
-> 本周目录原先按 @doudouOUC 个人 PR 口径整理；本次新增“全作者概览”，覆盖 `QwenLM/qwen-code` 中 `created:2026-06-15..2026-06-21` 的全部作者 PR。统计截至 2026-06-23，部分 06-21 创建的 PR 于 06-22 合入。
-
 **主题**: supported `sed -i` file-history tracking、daemon docs English refresh、monitor notification batch drain、daemon status API、duplicate model id provider persistence、mid-turn image preservation、ACP cancellation stop semantics、serve permission timeout flag
 
 **个人 PR 统计**: 10 PRs — 9 merged / 0 open / 1 closed
@@ -13,39 +11,6 @@
 - [#5183](https://github.com/QwenLM/qwen-code/pull/5183) (+3350/-169, 12 files) fix(cli): Preserve mid-turn image messages
 - [#5144](https://github.com/QwenLM/qwen-code/pull/5144) (+2819/-2555, 26 files) docs(daemon): Refresh daemon docs in English
 - [#5141](https://github.com/QwenLM/qwen-code/pull/5141) (+2275/-25, 12 files) fix(core): Track supported sed edits in file history
-
----
-
-## 全作者概览
-
-**口径**: `QwenLM/qwen-code`，`created:2026-06-15..2026-06-21`，全作者，全状态。
-**总量**: 285 PRs — 254 merged / 6 open / 25 closed。
-**合入代码量**: +167,376 / -10,014，1,376 个文件变更。
-**类型分布**: fix ×201, feat ×33, docs ×12, test ×11, ci ×10, chore ×6, refactor ×2, perf ×1, other ×9。
-**范围分布 Top**: core ×76, cli ×73, desktop ×23, web-shell ×11, release ×11, channel ×5, extensions ×5, weixin ×4, daemon ×3, loop ×3, dingtalk ×3, acp ×2, mcp ×2, model ×2, monitor ×2。
-
-### 全作者最大合入改动
-
-| PR | 作者 | 变更 | 文件 | 标题 |
-|---|---|---:|---:|---|
-| [#5502](https://github.com/QwenLM/qwen-code/pull/5502) | @qqqys | +102404/-75 | 75 | feat(voice): voice dictation with native capture, streaming, and biasing |
-| [#5398](https://github.com/QwenLM/qwen-code/pull/5398) | @ytahdn | +4208/-50 | 32 | feat(web-shell): add extension management |
-| [#5183](https://github.com/QwenLM/qwen-code/pull/5183) | @doudouOUC | +3350/-169 | 12 | fix(cli): Preserve mid-turn image messages |
-| [#5144](https://github.com/QwenLM/qwen-code/pull/5144) | @doudouOUC | +2819/-2555 | 26 | docs(daemon): Refresh daemon docs in English |
-| [#5544](https://github.com/QwenLM/qwen-code/pull/5544) | @wenshao | +2423/-207 | 40 | feat(mcp): support MCP resources and reliably surface prompts |
-| [#5557](https://github.com/QwenLM/qwen-code/pull/5557) | @qqqys | +2315/-0 | 24 | feat(core): add Artifact tool to publish interactive HTML pages |
-| [#5141](https://github.com/QwenLM/qwen-code/pull/5141) | @doudouOUC | +2275/-25 | 12 | fix(core): Track supported sed edits in file history |
-| [#5202](https://github.com/QwenLM/qwen-code/pull/5202) | @Eric-GoodBoy-Tech | +2229/-13 | 21 | feat(channel): add QQ Bot channel adapter |
-| [#5175](https://github.com/QwenLM/qwen-code/pull/5175) | @wenshao | +2164/-14 | 29 | feat(daemon): deliver web-shell mid-turn messages into the running turn |
-| [#5231](https://github.com/QwenLM/qwen-code/pull/5231) | @LaZzyMan | +1892/-14 | 17 | feat(core,cli): Workflow tool token budget + per-run UI surfacing |
-
-### 主题分组
-
-- **Daemon / serve / web-shell**: #5118 per-task token/time detail、#5125 completed turn collapse、#5163 per-turn time/tokens、#5174 daemon status API、#5175 mid-turn 注入、#5183 mid-turn 图片保留、#5190/#5192/#5193 execution display 与 prompt lifecycle、#5216 extension commands in daemon sessions、#5220 tool display name 本地化、#5260 permission timeout flag、#5266 mid-turn drain recovery、#5392 hosted Web Shell、#5398 extension management、#5484 session reaper timeout validation、#5504 ACP model-invocable commands、#5541 Web Shell dotfile path、#5544 MCP resources/prompts。
-- **Core / CLI 稳定性与安全边界**: sed/file-history (#5141)、tool-call circuit breaker (#5279/#5573)、provider/model 选择与 token 文件/认证修复 (#5179/#5404/#5367)、路径/URL/端口/数值解析硬化（06-18 到 06-20 一批 fix）、broad shell self-kill 防护 (#5409)、plan mode opt-in / exit tool 可见性 (#5311/#5433)。
-- **新能力与交互面**: voice dictation (#5502)、Artifact tool (#5557)、revivable background sub-agents (#5556)、QQ Bot channel (#5202)、Workflow tool token budget (#5231)、loop wakeup/session wakeup (#5182/#5197)、computer-use screenshot cap (#5122)、Requesty provider (#5478)。
-- **Desktop / companion / channels**: desktop path boundary、Windows path、locale、OAuth token response、update feed 与 packaging 合同一批修复；VS Code companion release/UNC path/scrollbar；QQ bot、DingTalk、Weixin 渠道也有连接、markdown、图片、webhook 等修复。
-- **CI / release / automation**: v0.18.1–v0.18.5 release PRs、autofix lifecycle 合并 (#5233)、merge queue / e2e 运行策略、release failure queue、tmux real-user testing 与 triage reporting。
 
 ---
 
@@ -91,4 +56,4 @@
 - 直接按 merged diff 写入正文：#5144、#5165、#5174、#5179、#5183、#5218、#5258、#5260
 - #5162 为 wrong-base closed PR，diff 中出现的 `.qwen/design/`、`.qwen/e2e-tests/` 来自被错误带入的历史改动，不作为 #5162 的有效实现依据
 
-_W25 最终版 · 个人 PR 说明更新于 2026-06-22；全作者概览补充于 2026-06-23_
+_W25 最终版 · 个人 PR 说明更新于 2026-06-22_
