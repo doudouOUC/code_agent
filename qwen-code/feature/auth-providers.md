@@ -45,6 +45,10 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 
 - **视觉模型 fallback 与 provider install 不应误改主模型（#5778/#5835）**：多模态输入需要一个可选 vision fallback model，但它不能污染主聊天模型选择；同样，重新认证或重新应用 provider install plan 时也不应把用户选好的 cheaper/faster model 重置成 provider 默认模型。
 
+- **TLS insecure 只能是显式逃生口（#5962）**：自签 endpoint 或内网代理排障需要跳过 TLS 校验，但默认安全姿态必须保持验证证书；文档也要明确这是 MITM 风险较高的最后手段，优先建议安装 CA。
+
+- **daemon model surface 不能漏掉专用模型过滤（#5993）**：#5632 先覆盖 CLI `/model` picker；Web Shell / SDK / ACP 客户端常从 daemon metadata 构造模型列表，因此 workspace provider status 与 ACP session model options 也必须过滤 `fastOnly` / `voiceOnly`。
+
 本方案的目标即：用**统一的 source 溯源 + 优先级**解决前四个配置问题，用**设备流注册表**解决远程登录，并在全过程对凭据/密文做脱敏与原子落盘。
 
 ---
@@ -171,11 +175,13 @@ const httpOptions = config.baseUrl
 
 #5539 随后把 OpenRouter/Requesty 的 provider-specific request headers 收敛到 preset `customHeaders`，减少“每个 gateway 一个 provider class”的重复。这样 Requesty 仍保持一等 preset 和 detection，但 header 注入不必长期复制 OpenRouter provider 类。
 
-#### 3.1.4 fast-model auth scope、模型用途旗标、thinking 和 display name follow-up（#5553/#5632/#5637/#5654/#5729/#5769）
+#### 3.1.4 fast-model auth scope、模型用途旗标、thinking 和 display name follow-up（#5553/#5632/#5637/#5654/#5729/#5769/#5993）
 
 #5553 收紧 bare fast-model selector 的认证边界：`fastModel: "coder-model"` 这类未带 auth 前缀的配置，只在当前 active auth type 内解析；如果当前 auth 是 OpenAI-compatible 且该 provider 不拥有 `coder-model`，`getFastModel()` 返回 `undefined`，不会跨到 Qwen OAuth 并触发浏览器流。需要有意跨 auth 的用户必须写显式 selector，例如 `qwen-oauth:coder-model`。这和 #5632 的 `fastOnly` 分层互补：#5632 决定“哪些模型可作为 fast model”，#5553 决定“裸 fast model 在哪个 auth 命名空间里找”。
 
 #5632 给 model config 增加 `fastOnly` / `voiceOnly` 用途旗标。主模型选择列表会过滤掉专用模型，`/model --voice` 只看 `voiceOnly` ASR 模型，fast-model 解析只看 `fastOnly`。这把“能作为对话主模型”和“只服务某个系统路径”的模型从 UI 层分开，避免用户把语音模型或快模型误选成主模型。
+
+#5993 把同样的过滤语义扩展到 daemon-backed model surface：`GET /workspace/providers`、ACP workspace provider status、ACP session model state、ACP model config options 都不再把 `fastOnly` / `voiceOnly` 暴露为普通 conversation model。这样 Web Shell、SDK 或其它 daemon 客户端即便不经过 Ink `/model` picker，也不会把后台快模型或语音 ASR 模型列成可选主模型。它不新增 daemon fast/voice 专用选择器，只保证普通模型列表与 CLI 语义一致。
 
 #5637 调整 DashScope `preserve_thinking` 默认值。对支持 thinking 的 DashScope 路径，默认保留 thinking intent / summary 所需的 provider 配置，避免用户不显式配置时丢失推理相关输出。该改动属于 provider preset/generation config 默认值，不改变通用 OpenAI-compatible provider。
 
@@ -264,7 +270,19 @@ const httpOptions = config.baseUrl
 
 这与 #4810 在 OpenAI generator 上做的隔离一致；#5946 只是补上 Anthropic path。其它 SDK 未改动，Anthropic SDK 上游泄漏本身也不在本 PR 范围内。
 
-#### 3.1.10 `providerProtocol` 映射（#5793）
+#### 3.1.10 TLS insecure escape hatch（#5962）
+
+#5962 增加 `--insecure` / `QWEN_TLS_INSECURE`，用于自签证书 endpoint 或内网代理排障时跳过 TLS certificate verification。它是 provider/network runtime 的显式逃生口，而不是新默认：
+
+| 入口 | 作用 |
+|---|---|
+| CLI flag / config | 写入 runtime fetch options，当前进程的 provider fetch 可跳过 TLS 校验。 |
+| `QWEN_TLS_INSECURE` | 环境变量等价入口，便于容器或一次性排障。 |
+| docs troubleshooting | 明确 MITM 风险，优先建议配置系统/Node 信任链或 `NODE_EXTRA_CA_CERTS`，只在确认 endpoint/trust boundary 时使用 insecure。 |
+
+实现上把 TLS 行为集中到 `runtimeFetchOptions` / `fetch` helper，避免各 provider SDK 各自拼 `rejectUnauthorized`。风险边界是：一旦开启，当前 provider 请求无法验证服务端身份，token/API key 可能暴露给中间人；因此它不应被写进共享项目配置或长期 CI 环境。
+
+#### 3.1.11 `providerProtocol` 映射（#5793）
 
 #5793 把“provider identity”和“底层 SDK protocol”分开。自定义 provider 可以继续使用自己的 `id`、display label、preset metadata 和 model ownership，但通过 `providerProtocol` 映射到已有协议实现：
 
@@ -562,6 +580,8 @@ sequenceDiagram
 | #5793 | merged | providerProtocol mapping | 自定义 provider id 可映射到已有 SDK protocol，分离 provider identity 与 transport behavior |
 | #5827 | merged | OpenAI stream inactivity timeout | 流式请求长时间无 chunk 时 abort per-request controller，合成 `ETIMEDOUT` 并复用既有 retry 分类；默认 120s，`<=0` 禁用 |
 | #5845 | merged | stream idle timeout env override | 新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，显式 config > env > 默认；非法 env 忽略并 debug warning |
+| #5962 | merged | TLS insecure escape hatch | `--insecure` / `QWEN_TLS_INSECURE` 显式跳过 TLS certificate verification，作为自签 endpoint 排障手段，默认安全姿态不变 |
+| #5993 | merged | daemon specialized model filtering | daemon workspace/ACP/session model surfaces 过滤 `fastOnly` / `voiceOnly`，与 CLI 普通模型选择器一致 |
 
 ---
 
@@ -636,10 +656,11 @@ sequenceDiagram
 - docs：`docs/users/configuration/auth.md` 与 `model-providers.md` 增加 Requesty 配置说明。
 - tests：provider/preset suites 覆盖 hostname spoofing 拒绝、dispatch routing、OpenRouter 回归和 preset gate。
 
-### #5553/#5632/#5637/#5654/#5729/#5769 — provider/model follow-ups
+### #5553/#5632/#5637/#5654/#5729/#5769/#5993 — provider/model follow-ups
 
 - #5553：`Config.getFastModel()` 在 auth 激活后把 bare fast model 限定在当前 auth type；当前 auth 下的裸模型继续可用，跨 auth 需显式 `authType:modelId` selector；tests 覆盖 OpenAI-compatible 当前 auth 下 `coder-model` 不再路由到 Qwen OAuth。
 - #5632：model config schema / resolver 增加 `fastOnly`、`voiceOnly`；主 `/model` 列表过滤专用模型，`/model --voice` 使用 voice-only filter。
+- #5993：daemon `workspace-providers-status`、ACP session model state 与 config options 复用专用模型过滤，避免 daemon 客户端把 `fastOnly` / `voiceOnly` 暴露成普通 chat model。
 - #5637：DashScope provider preset / generation config 默认保留 thinking 相关配置，降低用户无显式设置时的行为漂移。
 - #5654：`AuthDialog.getExistingModelIds` 只把 saved provider 中非 built-in defaults 的项作为 custom IDs 传回 wizard；`useProviderSetupFlow` 用 `[...defaults, ...customIds]` 预填；`useProviderUpdates` 只用 built-in IDs 做 update diff。
 - #5729：configured models 聚合默认包含 active runtime model，避免 UI/命令列表与当前实际 session model 不一致。
@@ -651,6 +672,12 @@ sequenceDiagram
 - **配置**：`contentGenerator.streamIdleTimeoutMs` 默认 120000ms；`<= 0` 禁用。#5845 之后还可用 `QWEN_STREAM_IDLE_TIMEOUT_MS` 提供部署级默认，显式 config 优先于 env。每个请求都有独立 controller，idle timeout 只 abort 当前请求。
 - **计时语义**：任意 chunk 到达都会 reset timer，包括普通 content、thinking/reasoning 和其它流式事件；用户主动 abort 仍保持 `AbortError`，不会被误标成 timeout。
 - **错误归类**：idle 超时抛合成 `ETIMEDOUT`，复用现有 retry classifier，把它归为可重试 transport error。该 PR 不新增 partial-output replay 或 turn-level terminal event。
+
+### #5962 — TLS insecure escape hatch
+
+- **入口**：CLI flag / config 和 `QWEN_TLS_INSECURE` 都汇聚到 runtime fetch options；实现集中在 fetch/runtime options helper，而不是分散到每个 provider。
+- **用途**：自签证书 endpoint、企业内网代理或临时排障。它只影响显式开启的当前 runtime，不改变默认 TLS 验证。
+- **安全边界**：开启后无法验证服务端身份，API key/token 可能暴露给中间人；长期方案应优先把自签 CA 加进系统/Node 信任链，例如 `NODE_EXTRA_CA_CERTS`。
 
 ### #5793 — providerProtocol mapping
 

@@ -430,6 +430,17 @@ sequenceDiagram
 | #5948 | Web Shell mobile TodoPanel | TodoPanel progress summary 在 `<600px` 下切 compact label + progress ring，desktop 保持完整 step label；归入 Web Shell/transport UI surface。 |
 | #5947 | Web Shell voice toolbar action | `ComposerToolbarAction` 增加 `voice`，embedding host 可控制 voice button 显隐；daemon voice capability 与 `/voice/stream` 行为不变。 |
 
+### 3.14 2026-06-29 daemon / serve follow-up
+
+2026-06-29 的 daemon/serve 改动集中在 fast startup 边界、standalone 发布形态和 daemon-backed provider/model surface：
+
+| PR | 子主题 | 一句话作用 |
+|---|---|---|
+| #5977 | standalone serve shim | standalone archive 中只有 `qwen serve` 改走 `lib/cli-entry.js`，复用 npm 安装路径的 compile-cache / fast-path 行为；非 serve 命令继续走 `node --expose-gc lib/cli.js`。standalone package builder 也把 `dist/cli-entry.js` 视为必需 artifact，并跳过 `prepare:package` 产生的 npm-only `postinstall.js` / `patches`。 |
+| #5989 | fast-path source import guard | 修 request helper 通过兼容 re-export 静态触达 ACP runtime 的回归；fast path 只引用轻量 ACP bridge 子路径，新增 source-level import graph 与 bundle metafile guard，确保 ACP runtime 留在 dynamic import 边界之后。 |
+| #5995 | fast-path bundle closure guard | 将真实 bundle 的重检查移出 CLI 单测，新增 `check:serve-fast-path-bundle` / CI guard，按 esbuild metafile 追踪 pre-listen static output imports，禁止 ACP bridge runtime、core shell runtime 和重 vendor 包进入静态闭包。 |
+| #5993 | daemon specialized model filtering | 把 #5632 的 `fastOnly` / `voiceOnly` 过滤扩展到 daemon workspace provider status、ACP workspace provider status、ACP session model state 和 ACP model config options，避免 Web/SDK 客户端把专用模型展示为普通对话模型。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -663,6 +674,15 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #5857 | session status by id | `GET /session/:id/status` 查询单 live session summary。 |
 | #5874 | wrapper fast path | `qwen serve` CLI entry 跳过 wrapper `spawnSync`，减少一次 Node process startup。 |
 | #5938 | compile cache / version defer | serve fast path 启用 Node compile cache，并把 `getCliVersion()` 延迟到 runtime build 阶段并行等待，降低 warm restart 和监听前阻塞。 |
+
+### W27 2026-06-29 daemon / serve follow-up
+
+| PR | 子主题 | 一句话作用 |
+| --- | --- | --- |
+| #5977 | standalone serve shim | standalone archive 中的 `qwen serve` 走 `cli-entry.js` fast path，非 serve 命令保留 `--expose-gc lib/cli.js`。 |
+| #5989 | source import guard | request helper 避免静态拉入 ACP runtime，source graph / bundle metafile 回归测试保护 lazy runtime split。 |
+| #5995 | bundle closure guard | CI 中用 esbuild metafile 检查 pre-listen static closure，禁止 ACP/core/vendor 重模块进入 fast path。 |
+| #5993 | daemon model filtering | daemon model/provider metadata 过滤 `fastOnly` / `voiceOnly` 专用模型，与 CLI 普通 `/model` 选择器语义对齐。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 

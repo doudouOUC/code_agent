@@ -53,6 +53,10 @@
 | [#5943](https://github.com/QwenLM/qwen-code/pull/5943) | @carffuca | Merged | Web Shell error boundaries，防 render crash 白屏 |
 | [#5947](https://github.com/QwenLM/qwen-code/pull/5947) | @LiBaher | Merged | `ComposerToolbarAction` 增加 `voice`，embedding host 可控制 voice button 显隐 |
 | [#5948](https://github.com/QwenLM/qwen-code/pull/5948) | @ytahdn | Merged | mobile TodoPanel progress summary compact label + progress ring |
+| [#5992](https://github.com/QwenLM/qwen-code/pull/5992) | @ytahdn | Merged | Web Shell tool output 优先使用 raw file diff |
+| [#5996](https://github.com/QwenLM/qwen-code/pull/5996) | @ytahdn | Merged | follow-up suggestion 可直接发送，跨 session 不串 |
+| [#6008](https://github.com/QwenLM/qwen-code/pull/6008) | @callmeYe | Merged | daemon WebShell `@ext:name` extension mention |
+| [#6025](https://github.com/QwenLM/qwen-code/pull/6025) | @carffuca | Merged | WebShell Esc 两次确认 + queued prompt 取消后继续 drain |
 | [#4773](https://github.com/QwenLM/qwen-code/pull/4773) | @chiga0 | Open | feat(serve): ACP WebSocket transport (RFD phase 2) |
 
 ---
@@ -427,6 +431,19 @@ sequenceDiagram
 | #5948 | TodoPanel mobile progress 更紧凑。 | `TodoPanel` 在 desktop `>=600px` 继续显示 `Step 3 / 8` / `第 3 / 8 步`；mobile `<600px` 改为 `3 / 8` + progress ring，并缩小 padding，避免窄屏任务面板被长文案挤压。 |
 
 这两项都不改变 transcript block schema 或 daemon event wire。#5947 是 Web Shell 作为可嵌入组件的 API polish；#5948 是同一 TodoPanel 数据的 responsive presentation。
+
+## Web Shell W27 composer / transcript follow-up
+
+2026-06-29 的 Web Shell 改动主要是浏览器端 transcript/composer 的可操作性，以及 daemon session 中 extension mention 与 CLI 行为对齐：
+
+| PR | 能力 | 实现方式 / 边界 |
+|---|---|---|
+| #5992 | 工具输出优先 raw file diff。 | 当 edit 工具结果同时包含 structured `oldText/newText` diff 和 `rawOutput.fileDiff` 时，Web Shell 展开面优先展示后端生成的精确 hunk；没有 raw diff 时继续 fallback 到旧的 structured diff。只改变展示来源，不改变 tool event schema。 |
+| #5996 | follow-up suggestion 可直接发送且按 session 隔离。 | composer send button 在输入为空或输入是 suggestion 前缀时直接提交完整 suggestion，与 Enter 行为一致；session 切换时只清理会跨 session 泄漏的本地/global suggestion state，不删除目标 session transcript store 自带的 suggestion。 |
+| #6008 | daemon WebShell `@ext:name` extension mention。 | WebShell `@` autocomplete 展示 active extensions，`@ext:` 进入 extension-only suggestions；选择后插入 canonical `@ext:<name>`。daemon ACP prompt path 使用共享 helper 解析/清洗 mention，并把 extension capabilities 与 bounded context files 注入模型请求，同时保持用户可见 prompt 原文不变。未知、未激活、重复或越界 context file 会被跳过。 |
+| #6025 | Esc 两次确认和取消后 queue drain。 | streaming turn 中第一次 Esc 只 arm stop affordance（按钮倒计时 + “再按一次停止”提示），窗口期内第二次才 cancel；空闲且 composer 有文字时同样用两次 Esc 清空输入。被取消 turn 写入“用户已取消”system row；若后面有 queued prompt，当前 turn settle 后继续按一条一条 drain，避免取消导致队列 stranded 或同 tick 丢消息。 |
+
+这批仍属于 Web Shell/client UI 层。#6008 会改变 daemon prompt 解析时追加给模型的 context parts，但不引入新的 prompt wire shape；它复用 CLI extension mention 的解析和 context-file 边界。#6025 的 queued prompt 自动流转仍受 session identity gate 约束，切 session / unmount 后不应把已出队消息发送到错误 session；PR body 明确慢 daemon 下仍有“显式 turn-start signal”待后续补齐。
 
 ---
 

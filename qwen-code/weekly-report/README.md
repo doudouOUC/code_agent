@@ -1,10 +1,10 @@
 # qwen-code PR 记录
 
-我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“做什么 / 怎么做”摘要；如该 PR 有单独 plan 文档，则放在对应周目录的 `plans/` 下。
+我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，以及近期需要按全作者口径复核的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“做什么 / 怎么做”摘要；如该 PR 有单独 plan 文档，则放在对应周目录的 `plans/` 下。
 
-**时间范围**: 2026-04-06 ~ 2026-06-21（持续更新）
-**总计**: 207 PRs（W15–W25 按周索引合计）
-**代码量**: +387,910 / -64,025，2,946 个文件变更 _(W15–W22；W23/W24 见对应周目录)_
+**时间范围**: 2026-04-06 ~ 2026-06-29（持续更新）
+**总计**: 256 PRs（W15–W25 按周索引 + W27 06-29 日增量合计）
+**代码量**: W15–W22 历史累计 +387,910 / -64,025，2,946 个文件变更；W23/W24/W25/W27 见对应周目录（W27 06-29 日增量 +39,249 / -4,543，558 个文件变更）
 
 ## 按周
 
@@ -21,13 +21,14 @@
 | [2026-06-01 ~ 2026-06-07](2026-06-01_2026-06-07/) (W23 最终版) | 25 | 22/0/3 | 见周目录 | daemon 修复、telemetry 补强、ACP 命令扩展（rewind/hooks/directory/remember/settings/branch） |
 | [2026-06-08 ~ 2026-06-14](2026-06-08_2026-06-14/) (W24 最终版) | 23 | 20/0/3 | 见周目录 | rate limiting、prompt queue backpressure、direct shell opt-in、tool result 持久化、TRACEPARENT、rewind 测试补强、file history snapshot、Agent 权限弹窗、tool call id 修复 |
 | [2026-06-15 ~ 2026-06-21](2026-06-15_2026-06-21/) (W25 最终版) | 10 | 9/0/1 | 见周目录 | sed edit file history、daemon docs English refresh、monitor notification batch drain、daemon status API、model provider 选择持久化、mid-turn 图片保留、ACP 取消停止语义、serve 权限超时配置；附全作者概览（created 2026-06-15..2026-06-21，285 PRs） |
+| [2026-06-29 ~ 2026-07-05](2026-06-29_2026-07-05/) (W27 日增量) | 49 | 26/15/8 | +39,249/-4,543 | 2026-06-29 北京时间创建或合入 PR：safe mode、qwen tag、ChannelAgentBridge、serve fast-path guard、WebShell queued prompt/Esc UX、daemon extension mention、provider TLS insecure |
 
 ## 类型分布
 
-feat ×101, fix ×71, refactor ×12, docs ×8, chore ×6, other ×4, test ×2, perf ×1, revert ×1, merge ×1
+feat ×114, fix ×98, refactor ×14, docs ×10, chore ×6, other ×6, test ×3, ci ×2, perf ×1, revert ×1, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 
 serve / daemon / telemetry 是 5–6 月主线；CLI、core、acp-bridge、sdk-python、rewind、integration 为主要支撑范围。精确逐周分布见各周 README。
 
-_生成于 2026-05-31；W25 最终版 + PR 说明更新于 2026-06-22；W25 全作者概览补充于 2026-06-23_
+_生成于 2026-05-31；W25 最终版 + PR 说明更新于 2026-06-22；W25 全作者概览补充于 2026-06-23；W27 06-29 日增量补充于 2026-06-30_

@@ -4,6 +4,67 @@
 
 ---
 
+## 2026-06-29（昨天，Asia/Shanghai，全作者）
+
+> 覆盖口径：`QwenLM/qwen-code`，北京时间 2026-06-29 00:00:00 ~ 23:59:59 内“创建或合入”的全作者 PR，并按 PR number 去重。UTC 窗口为 `2026-06-28T16:00:00Z` ~ `2026-06-29T15:59:59Z`。本次共 49 个 PR：26 merged / 15 open / 8 closed；当前已合并 PR 代码量 +27,523 / -1,841，300 个文件变更。逐 PR “做什么 / 怎么做 / feature 处理”见 [../weekly-report/2026-06-29_2026-07-05/README.md](../weekly-report/2026-06-29_2026-07-05/README.md)。
+
+### 已落地且需要更新 feature 文档
+
+| PR | 状态 | feature 归属判断 | 文档动作 |
+|---|---|---|---|
+| #4943 | merged | Safe mode 是排障基线能力：一键禁用 context files、hooks、extensions、custom skills、MCP、subagents 和 conditional rules。 | 已补 [diagnostic-skills.md](diagnostic-skills.md)，作为 `/doctor` 之外的 deterministic troubleshooting escape hatch。 |
+| #5888 | merged | qwen tag Phase 0 让 channel 群聊共享 session 具备多人身份、`/who`、群 `/clear confirm` 和 prompt 注入净化边界。 | 已补 [channel-adapters.md](channel-adapters.md)。 |
+| #5977 | merged | standalone archive 中 `qwen serve` 也应走 `cli-entry.js` fast path，避免 standalone 发布形态绕过 daemon 启动优化。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5978 | merged | `ChannelAgentBridge` 把 adapter-facing 合约从具体 `AcpBridge` 中抽出，给 daemon-backed / multi-channel bridge 留出演进空间。 | 已补 [channel-adapters.md](channel-adapters.md)。 |
+| #5989 #5995 | merged | serve fast path 的懒加载边界需要源码 import graph 与 esbuild bundle closure 双重 guard，防止 ACP/core/vendor 重模块重新进入 pre-listen path。 | 已补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5962 | merged | `--insecure` / `QWEN_TLS_INSECURE` 是 TLS 校验逃生口，只适合自签 endpoint 排障，默认安全姿态不变。 | 已补 [auth-providers.md](auth-providers.md)，强调 MITM 风险和 CA 证书优先路径。 |
+| #5993 | merged | daemon-backed model selectors 也必须过滤 `fastOnly` / `voiceOnly` 专用模型，避免 Web/ACP 客户端把后台/语音模型当普通 chat model。 | 已补 [auth-providers.md](auth-providers.md) 与 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #5992 #5996 #6025 | merged | WebShell transcript/composer UX：raw file diff 优先、follow-up suggestion 可直接发送并跨 session 隔离、Esc 两次确认与取消后 queue drain。 | 已补 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #6008 | merged | daemon WebShell `@ext:name` 与 CLI extension mention 对齐：autocomplete 暴露 active extensions，daemon prompt path 注入 extension context。 | 已补 [diagnostic-skills.md](diagnostic-skills.md) 与 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)。 |
+| #5972 #6015 | merged | subagent/background-agent UI 需要输出 token 口径一致，非 VP multi-agent 场景也要保留 transcript scrollback。 | 已补 [background-agent-resume.md](background-agent-resume.md)，并在 WebUI 文档登记 #5972。 |
+| #5791 #6009 | merged | `ask_user_question` 多选自定义输入的 Enter 行为、Stop hook `last_assistant_message` thought 过滤都属于工具/权限/hook 输入边界。 | 已补 [permission-system.md](permission-system.md)。 |
+
+### 已有 feature 覆盖，本轮按北京时间昨天复核登记
+
+| PR | 复核结果 |
+|---|---|
+| #5777 | 已在上周覆盖矩阵补 [daemon-serve-mode/README.md](daemon-serve-mode/README.md) 和 [daemon-serve-mode/10-client-adapters-and-sdk.md](daemon-serve-mode/10-client-adapters-and-sdk.md)：Chrome extension daemon-direct / client-hosted MCP。 |
+| #5890 | 已在上周补 [loop-wakeup.md](loop-wakeup.md)：`.qwen/loop.md` fire-time sentinel injection。 |
+| #5960 | 已在上周补 [telemetry-observability/README.md](telemetry-observability/README.md)：telemetry docs/schema refresh 与 `qwen-code.tool_output_truncated` 事件名前缀。 |
+| #5963 | 已在上周补 [managed-memory.md](managed-memory.md)：auto-memory 关闭时不再发起 memory recall side-query。 |
+
+### 已看过但暂不新增专题的 merged PR
+
+| PR | 归属判断 |
+|---|---|
+| #5860 #5994 #6016 | CI / release integration / interactive test 稳定性，不作为 product feature 技术方案。 |
+| #5973 | release packaging path 小修，不改变功能合约。 |
+| #5981 | qc-helper 文档小修，登记为 bundled skill docs 补充，不新增专题正文。 |
+| #6002 | VP thought viewer / scrolling 局部 TUI 修复，当前 feature 目录未维护独立 TUI rendering 专题。 |
+
+### open PR 后续观察
+
+| PR | 当前归属判断 |
+|---|---|
+| #5974 #5999 #6011 | CLI/TUI icon、emoji、鼠标交互 UX；合入后视影响范围决定是否新增 TUI/UX 专题。 |
+| #5980 #6022 | auth/model 解析与 `/model` one-shot override，若合入归 [auth-providers.md](auth-providers.md)。 |
+| #5991 | 裸 `/loop` autonomous mode，若合入归 [loop-wakeup.md](loop-wakeup.md)。 |
+| #5998 | DingTalk stream logs 结构化，若合入归 [channel-adapters.md](channel-adapters.md)。 |
+| #6003 #6005 | WebShell mobile sidebar / queued prompts，若合入归 [daemon-serve-mode/11-webui-and-transport.md](daemon-serve-mode/11-webui-and-transport.md)；#6025 已先合入 queue cancel/drain UX。 |
+| #6006 | browser MCP tools 默认加载，若合入归 Chrome extension daemon-direct / MCP resources。 |
+| #6012 | `mcp.allowed` / `mcp.excluded` glob patterns，若合入归 [mcp-resources-prompts.md](mcp-resources-prompts.md) 或 [permission-system.md](permission-system.md)。 |
+| #6013 | serve runtime load 前 `/health` responsiveness，若合入归 [daemon-serve-mode/README.md](daemon-serve-mode/README.md)。 |
+| #6018 | 避免 OOM-prone paths full-history clone，若合入归 background agent / OOM 调查文档。#6017 是被取代的 closed 初稿。 |
+| #6019 | `/model --compaction` 配置 compression model，若合入归 [context-compression.md](context-compression.md) 与 [auth-providers.md](auth-providers.md)。 |
+| #6021 | ACP `read_file` 支持 managed local paths，若合入归 daemon file boundary 或 [atomic-file-write.md](atomic-file-write.md)。 |
+
+### closed / superseded / wrong-base
+
+| PR | 原因 |
+|---|---|
+| #5982 #5983 #5984 #5985 #5986 #5987 #5988 | 06-29 同一作者的一批 channels/sdk/cli/acp/core/desktop/sandbox 修复/重构草稿，均 closed 未合入；不作为 feature 实现统计。 |
+| #6017 | closed 初稿，由 open #6018 继续承接。 |
+
 ## 2026-06-22 ~ 2026-06-28（上周，全作者）
 
 > 覆盖口径：`QwenLM/qwen-code`，`created:2026-06-22..2026-06-28` 全作者、全状态 PR；补充口径为上周内合入但创建更早的 PR。统计以 2026-06-29 查询为准：上周创建共 252 个 PR，当前 203 merged / 22 open / 27 closed；其中 2026-06-28（昨天）创建 14 个 PR，当前 10 merged / 3 open / 1 closed。`merged:2026-06-28` 口径返回 20 个 `mergedAt` 非空 PR，包含 #5030/#5777/#5856/#5868/#5890/#5944 等前序创建但昨天才落地的能力。

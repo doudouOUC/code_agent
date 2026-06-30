@@ -2,7 +2,7 @@
 
 > 适用范围：`QwenLM/qwen-code` 的工具调用权限子系统。
 > 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`。
-> 涉及 PR：#3467、#3726、#4335、#5085、#5105、#5196、#5218、#5258、#5260、#5409、#5622、#5743、#5754。
+> 涉及 PR：#3467、#3726、#4335、#5085、#5105、#5196、#5218、#5258、#5260、#5409、#5622、#5743、#5754、#5791、#6009。
 
 ---
 
@@ -381,6 +381,10 @@ Agent/sub-agent 工具在产品语义上需要专属权限确认文案，例如 
 
 #5622 收紧 `ask_user_question` 的 answer-map 解析。此前格式化答案时使用 `parseInt(key, 10)`，`0junk` 会被当成 index `0`，`1.5` 会被当成 index `1`，越界数字也可能落到 fallback question label。修复后只接受 canonical decimal index，且必须指向现有 question；`01`、`0junk`、`1.5`、out-of-range 都会被忽略。这保护的是 ACP / 外部客户端确认 payload 到模型格式化文本之间的边界。
 
+#5791 修的是同一工具的人机交互死角：当 `ask_user_question` 处于 multi-select 且用户聚焦 “Type something...” custom input 时，按 Enter 过去只会 toggle checkbox 而不提交，表现为对话框卡住。修复后非空 custom input 会自动选中 typed value 并提交/进入下一题；空输入仍不提交。这不改变 answer payload schema，只让 TUI 的“Enter = 确认”行为和预定义选项保持一致。
+
+#6009 补 Stop hook 的输入边界。`last_assistant_message` 由最后一条模型消息拼接而来，thinking model 会同时产出 `thought: true` 的内部推理 text part 和可见回复；旧实现把两者都传给 Stop hook，可能泄漏推理内容并破坏结构化校验。修复后 `GeminiChat.getLastModelMessageText()` 和 `GeminiClient` fallback 都过滤 `part.thought === true`，Stop hook 只收到可见 assistant output。SubagentStop 已通过 `roundText` 累积路径过滤 thought，StopFailure hook 不传该字段。
+
 #5743 增加 workspace persistent permission rules API：`GET /workspace/permissions` 返回 user、workspace、merged 与 trust-state 视图；`POST /workspace/permissions` 替换 workspace scope 下一个 rule type 的完整列表。新提交的 malformed rules 以 `invalid_rules` 拒绝；已有 malformed rules 在 read-modify-write 时保留，避免旧 settings 不能往返。写入优先走 live ACP child 来同步活跃 PermissionManager，没有 child 时回退 daemon settings persistence。
 
 #5754 在 AUTO 模式下新增 deterministic Layer 0 destructive-command pre-filter。它在 L5.3 LLM classifier 前用正则匹配 raw shell command，并识别 shell indirection unwrap 后的危险 git/IaC 操作，例如 `git reset --hard`、`git clean -fd`、`terraform destroy`。若用户最近 prompt 没有明确请求该破坏性动作，`evaluateAutoMode()` 返回新的 `blocked:destructive-command` 决策，scheduler 直接展示硬拦截信息。这样即使 classifier 超时、不可用或用户有宽泛 `Bash(git *)` allow rule，AUTO 模式也不会把这类 destructive 命令交给非确定性判断。
@@ -468,6 +472,8 @@ stateDiagram-v2
 | **#5260** | 权限响应超时可配置 | `qwen serve --permission-response-timeout-ms` 暴露 ACP 权限/`ask_user_question` 单次响应超时；`0` 无限等待，非法值启动失败，超大值 clamp 到 Node timer 上限。 |
 | **#5409** | broad shell self-kill guard | 在 permission / YOLO / AUTO classifier 前拦截过宽 `pkill` / `killall` / `taskkill` 自杀类命令，防止模型杀掉 qwen-code 自身或会话依赖进程；精确 PID / 窄目标命令继续进入后续权限判断。 |
 | **#5622** | `ask_user_question` answer index 校验 | 只接受 canonical decimal answer index，且必须落在 question 数组范围内；拒绝 `0junk`、`01`、`1.5` 和 out-of-range key 被格式化成有效答案。 |
+| **#5791** | `ask_user_question` custom input Enter | multi-select 自定义输入行按 Enter 时，非空内容自动选中并提交/进入下一题；空输入保持不提交。 |
+| **#6009** | Stop hook thought filtering | `last_assistant_message` 过滤 thinking model 的 `thought` text parts，只把可见 assistant 回复传给 Stop hook。 |
 | **#5743** | workspace permissions API | `GET/POST /workspace/permissions` 管理 persistent allow/ask/deny rules；REST/ACP/SDK 共享校验和 schema，新增规则拒绝 malformed，存量 malformed 保留往返。 |
 | **#5754** | AUTO destructive-command hard block | `evaluateAutoMode()` 前加 deterministic pre-filter，硬拦截未被用户明确请求的破坏性 git/IaC 命令，避免只依赖 LLM classifier。 |
 
@@ -566,6 +572,11 @@ stateDiagram-v2
 - `askUserQuestion.ts`：answer-map key 先做 canonical decimal 校验，再确认 index 指向现有 question，替代 `parseInt()` prefix parsing。
 - malformed / non-canonical / out-of-range key 不再格式化进模型可见答案文本；正常 `0`、`1` 等 key 语义不变。
 - tests：覆盖 `0junk`、`01`、`1.5`、out-of-range 和正常 answer payload。
+
+### #5791/#6009 — ask_user_question UX and Stop hook input
+
+- #5791：`AskUserQuestionDialog` 的 multi-select custom input submit 从“只 toggle”改为“非空 typed value 选中后 submit/advance”；空 custom input 仍 guard，不产生空答案。
+- #6009：`GeminiChat.getLastModelMessageText()` 与 `GeminiClient` fallback 在收集 text parts 时排除 `part.thought === true`，与 copy/partUtils 既有 thought-filtering pattern 对齐，防止 Stop hook `last_assistant_message` 混入内部 reasoning。
 
 ### #5743 — workspace permissions rules API
 
