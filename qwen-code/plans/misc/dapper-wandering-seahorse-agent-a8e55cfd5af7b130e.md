@@ -74,7 +74,7 @@ The only danger would be if the rate limiter middleware were `async` and `await`
 
 **Confidence: 85**
 
-The audit question #2 asks whether a non-loopback client sending `X-Qwen-Client-Id: cid:evil` could collide with a loopback key like `cid:someId`. 
+The audit question #2 asks whether a non-loopback client sending `X-Qwen-Client-Id: cid:evil` could collide with a loopback key like `cid:someId`.
 
 The plan's `createKeyExtractor` is a boot-time decision based on `isLoopbackBind(opts.hostname)`:
 - **Loopback bind** (`127.0.0.1`, `localhost`, etc.): Only loopback clients can connect. Keys are `cid:${clientId}` or `anonymous`.

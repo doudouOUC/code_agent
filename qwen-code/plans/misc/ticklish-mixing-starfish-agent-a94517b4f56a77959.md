@@ -66,7 +66,7 @@ This is already documented as a known limitation. No additional action needed, b
 
 **Location**: `mcp-tool.ts:430-449`, plan section 3
 
-The MCP tool's `truncateTextParts()` method (line 430) already calls `truncateToolOutput()` on each text Part individually. After the tool returns, the scheduler's gate (`maybePersistLargeToolResult`) runs on the combined `ToolResult.llmContent`. 
+The MCP tool's `truncateTextParts()` method (line 430) already calls `truncateToolOutput()` on each text Part individually. After the tool returns, the scheduler's gate (`maybePersistLargeToolResult`) runs on the combined `ToolResult.llmContent`.
 
 The plan's `isAlreadyTruncated()` check is designed to prevent double-filing by detecting `[CONTENT TRUNCATED]` in the content. If `truncateTextParts` truncated a part (adding `[CONTENT TRUNCATED]`), the gate should detect it and skip. This is the design intent per C1 in the plan.
 

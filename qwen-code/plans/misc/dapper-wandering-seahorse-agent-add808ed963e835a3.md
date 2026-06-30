@@ -174,7 +174,7 @@ Analysis:
 **File**: `packages/cli/src/serve/routes/workspaceFileWrite.ts`
 **File**: `packages/cli/src/serve/routes/workspaceFileRead.ts`
 
-**Analysis**: 
+**Analysis**:
 - `POST /file/write` and `POST /file/edit` (workspaceFileWrite.ts) — registered as POST routes with `mutate({ strict: true })` gate. They write to the filesystem. Correctly classified as **mutation tier** (30/min).
 - `GET /file`, `GET /file/bytes`, `GET /stat`, `GET /list`, `GET /glob` (workspaceFileRead.ts) — registered as GET routes. Correctly classified as **read tier** (120/min).
 

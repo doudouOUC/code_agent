@@ -2,9 +2,9 @@
 
 **主题**: daemon 新端点（recap/btw/tasks/shell）、serve T2.x、daemon prompt 链路追踪、集成合并
 
-**统计**: 22 PRs — 13 merged / 6 open / 3 closed  
-**代码量**: +152,911 / -35,150，994 个文件变更  
-**类型**: feat ×16, fix ×3, chore ×2, refactor ×1  
+**统计**: 22 PRs — 13 merged / 6 open / 3 closed
+**代码量**: +152,911 / -35,150，994 个文件变更
+**类型**: feat ×16, fix ×3, chore ×2, refactor ×1
 **范围 (scope)**: serve ×8, telemetry ×5, daemon ×5, integration ×2, core ×1, sdk ×1, rewind ×1
 
 **本周最大改动**:

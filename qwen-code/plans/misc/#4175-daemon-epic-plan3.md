@@ -20,7 +20,7 @@ Pure markdown. Zero code. Zero tests. ~250 LOC across 1 new file + 2 small cross
 | 6 | BYO-token integration | **All templates write `Environment=QWEN_SERVER_TOKEN=...` (or platform equivalent) directly inline** | Matches the PR 27 BYO-token guide pattern. No separate token file, no auto-gen — user generates via `openssl rand -hex 32` and inlines into the unit/plist. Explicit comments call out NOT committing the unit file with a real token. |
 | 7 | Token regeneration policy | **Document the rotation flow** ("regenerate → edit unit → systemctl restart" / `launchctl unload+load`) | Operators will ask. One-paragraph callout + commands. Avoids future re-asks. |
 | 8 | Reverse proxy / TLS coverage | **Out of scope, explicit callout pointing at PR 30b** | Local-only alpha. Reverse proxy = enterprise pilot, defers per scope freeze. |
-| 9 | restart-on-failure semantics | **Cross-link to existing `qwen-serve.md` "Durability model" section** rather than re-explain | Avoid duplication. Just say "service-manager restart works as expected; sessions are in-memory and re-attach via SSE Last-Event-ID per [Durability model](./qwen-serve.md#durability-model)". |
+| 9 | restart-on-failure semantics | **Cross-link to the archived daemon/serve durability discussion** rather than re-explain | Avoid duplication. Just say "service-manager restart works as expected; sessions are in-memory and re-attach via SSE Last-Event-ID per the daemon/serve durability model". |
 
 ## Migration steps
 
@@ -168,7 +168,7 @@ curl -H "Authorization: Bearer $QWEN_SERVER_TOKEN" \
 
 ## Restart and crash behavior
 
-Service-manager restart works as expected (systemd `Restart=on-failure`, launchd `KeepAlive=true`). Sessions are in-memory and re-attach via SSE `Last-Event-ID` resume per the [Durability model](./qwen-serve.md#durability-model) section of the user guide. Cross-restart durability is NOT in v0.16-alpha.
+Service-manager restart works as expected (systemd `Restart=on-failure`, launchd `KeepAlive=true`). Sessions are in-memory and re-attach via SSE `Last-Event-ID` resume per the archived daemon/serve durability model in [01-http-server-and-middleware.md](../../feature/daemon-serve-mode/01-http-server-and-middleware.md). Cross-restart durability is NOT in v0.16-alpha.
 
 ## Out of scope (defers to v0.16.x)
 
@@ -193,7 +193,7 @@ See [v0.16-alpha known limits](./qwen-serve.md#v016-alpha-known-limits) for the 
 
 ```diff
  ## What's next
- 
+
 +- **Setting up a long-running daemon?** [Local launch templates (systemd / launchd / nohup / tmux)](./qwen-serve-deploy-local.md) for v0.16-alpha (local-only).
  - **Build a client?** See the [DaemonClient TypeScript quickstart]...
 ```

@@ -58,7 +58,7 @@ argument-hint: '[PID or symptom]'
 1. List all Qwen Code processes:
    ps -axo pid=,pcpu=,rss=,etime=,state=,comm=,command= | grep -E '(qwen|node.*qwen)' | grep -v grep
    Filter to rows where comm is qwen, OR (comm is node/bun AND command path contains "qwen").
-   
+
 2. For suspicious processes: pgrep -lP, re-sample CPU, check command lines
    Check debug logs at ~/.qwen/debug/<session-id>.txt
    Check ~/.qwen/debug/latest symlink for most recent session

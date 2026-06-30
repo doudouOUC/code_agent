@@ -131,14 +131,14 @@ async function writeFileAtomic(filePath: string, data: string): Promise<void> {
 class WorkerWatchdog {
   private readonly checkIntervalMs = 5000;
   private readonly staleThresholdMs = 5 * 60 * 1000; // 5 minutes
-  
+
   onWorkerExit(worker: WorkerState, code: number | null) {
     // 进程退出 = 确定崩溃（或正常完成）
     if (worker.status !== 'done') {
       this.handleCrash(worker, `process exited with code ${code}`);
     }
   }
-  
+
   checkForStaleWorkers() {
     for (const worker of this.workers) {
       const elapsed = Date.now() - worker.lastActivityAt;
@@ -154,7 +154,7 @@ class WorkerWatchdog {
 
 **问题：** `@ast-grep/napi` native binding 在部分平台/网络下装不上。
 
-**方案：** 
+**方案：**
 - `@ast-grep/napi` 作为 `optionalDependencies`
 - MCP server 启动时探测，不可用则 AST 工具返回友好错误
 - 提供纯 regex 回退（精度低但可用）
@@ -197,19 +197,19 @@ class MergeOrchestrator {
   private mergeMutex = new Mutex();  // 防止并发 merge
   private pollIntervalMs = 5000;     // 5s 轮询（非 1s）
   private debounceMs = 3000;         // 3s 收集窗口
-  
+
   private scheduleMergeBatch = debounce(async () => {
     await this.mergeMutex.runExclusive(async () => {
       const batch = [...this.pendingWorkers];
       this.pendingWorkers.clear();
-      
+
       // 只 merge worker→leader，不触发 rebase
       for (const worker of batch) {
         await this.mergeWorkerIntoLeader(worker);
       }
     });
   }, this.debounceMs);
-  
+
   // 单独的空闲 rebase 循环
   async rebaseIdleWorkers() {
     for (const worker of this.workers) {
@@ -529,7 +529,7 @@ async function cleanup() {
 6. （独立循环）扫描 idle 且 behind-leader 的 worker → rebase
 ```
 
-**Phase 依赖说明：** 
+**Phase 依赖说明：**
 Phase 4 在 Phase 3 **完成后**开始（Day 32），因为 merge 依赖 worker 生命周期管理（spawn/status/exit）已稳定。
 
 验证：

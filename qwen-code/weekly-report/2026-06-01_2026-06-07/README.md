@@ -2,9 +2,9 @@
 
 **主题**: daemon 修复（btw 泄漏/transcript 隔离/compaction/resync）、ACP 命令扩展（rewind/hooks/directory/remember）、telemetry metrics + 响应元数据、大规模重构
 
-**统计**: 25 PRs — 22 merged / 0 open / 3 closed  
-**代码量**: +12,945 / -12,163，264 个文件变更  
-**类型**: feat ×13, fix ×9, refactor ×1, chore ×1  
+**统计**: 25 PRs — 22 merged / 0 open / 3 closed
+**代码量**: +12,945 / -12,163，264 个文件变更
+**类型**: feat ×13, fix ×9, refactor ×1, chore ×1
 **范围 (scope)**: daemon ×7, serve ×5, cli ×4, telemetry ×3, core ×2, integration ×1
 
 **本周最大改动**:

@@ -2,9 +2,9 @@
 
 **主题**: sdk-python 发布工具链、telemetry trace 关联、reactive compression
 
-**统计**: 14 PRs — 13 merged / 0 open / 1 closed  
-**代码量**: +10,277 / -1,242，120 个文件变更  
-**类型**: feat ×7, fix ×5, refactor ×1, docs ×1  
+**统计**: 14 PRs — 13 merged / 0 open / 1 closed
+**代码量**: +10,277 / -1,242，120 个文件变更
+**类型**: feat ×7, fix ×5, refactor ×1, docs ×1
 **范围 (scope)**: sdk-python ×4, telemetry ×3, core ×3, cli ×2
 
 **本周最大改动**:

@@ -2,9 +2,9 @@
 
 **主题**: CLI 启动优化起步 + skills/settings
 
-**统计**: 6 PRs — 4 merged / 1 open / 1 closed  
-**代码量**: +3,254 / -651，38 个文件变更  
-**类型**: feat ×4, fix ×2  
+**统计**: 6 PRs — 4 merged / 1 open / 1 closed
+**代码量**: +3,254 / -651，38 个文件变更
+**类型**: feat ×4, fix ×2
 **范围 (scope)**: cli ×4, skills ×1
 
 **本周最大改动**:

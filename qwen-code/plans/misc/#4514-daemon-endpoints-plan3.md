@@ -436,26 +436,26 @@ The ONLY difference is that `loadSession` additionally triggers `replayHistory()
    ```bash
    # Start daemon
    qwen serve --port 3100
-   
+
    # Create a session and send a prompt (wait for completion)
    SESSION=$(curl -s -X POST http://localhost:3100/session | jq -r .sessionId)
    curl -X POST http://localhost:3100/session/$SESSION/prompt \
      -H 'Content-Type: application/json' \
      -d '{"prompt":[{"type":"text","text":"hello"}]}'
-   
+
    # Branch the session
    BRANCHED=$(curl -s -X POST http://localhost:3100/session/$SESSION/branch \
      -H 'Content-Type: application/json' \
      -d '{"name":"my-experiment"}')
    echo $BRANCHED | jq .
    # Expect 201, sessionId != $SESSION, title contains "my-experiment (Branch)"
-   
+
    # Verify the new session is live and promptable
    NEW_ID=$(echo $BRANCHED | jq -r .sessionId)
    curl -X POST http://localhost:3100/session/$NEW_ID/prompt \
      -H 'Content-Type: application/json' \
      -d '{"prompt":[{"type":"text","text":"what did I say before?"}]}'
-   
+
    # Verify source session still works
    curl -X POST http://localhost:3100/session/$SESSION/prompt \
      -H 'Content-Type: application/json' \

@@ -2,9 +2,9 @@
 
 **主题**: 权限修复、Python SDK 落地、auth 修复、rewind E2E
 
-**统计**: 11 PRs — 9 merged / 0 open / 2 closed  
-**代码量**: +14,683 / -209，99 个文件变更  
-**类型**: fix ×7, other ×2, feat ×1, docs ×1  
+**统计**: 11 PRs — 9 merged / 0 open / 2 closed
+**代码量**: +14,683 / -209，99 个文件变更
+**类型**: fix ×7, other ×2, feat ×1, docs ×1
 **范围 (scope)**: core ×3, cli ×2, sdk ×1, telemetry ×1, i18n ×1, test ×1
 
 **本周最大改动**:

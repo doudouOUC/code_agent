@@ -2,9 +2,9 @@
 
 **主题**: CLI 性能（preconnect/profiler/early-input）、/doctor、rewind 功能首发
 
-**统计**: 8 PRs — 8 merged / 0 open / 0 closed  
-**代码量**: +5,369 / -416，88 个文件变更  
-**类型**: feat ×5, fix ×3  
+**统计**: 8 PRs — 8 merged / 0 open / 0 closed
+**代码量**: +5,369 / -416，88 个文件变更
+**类型**: feat ×5, fix ×3
 **范围 (scope)**: cli ×6, core ×1, tool-registry ×1
 
 **本周最大改动**:

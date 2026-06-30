@@ -2,8 +2,8 @@
 
 **主题**: daemon rate limiting、prompt queue backpressure、direct shell opt-in、tool result 持久化、telemetry TRACEPARENT、workspace reload、rewind 测试补强、file history snapshot 持久化、Agent 权限弹窗、tool call id 修复、截断 diff 回放修复、active tool result history budget
 
-**统计**: 23 PRs — 19 merged / 1 open / 3 closed
-**代码量**: +12,198 / -1,905，254 个文件变更 _(不含 closed #4886/#4986/#5056)_
+**统计**: 23 PRs — 20 merged / 0 open / 3 closed
+**代码量**: +12,419 / -1,989，256 个文件变更 _(不含 closed #4886/#4986/#5056)_
 **类型**: feat ×9, fix ×9, refactor ×1, chore ×1, test ×1, docs ×1, merge ×1
 **范围 (scope)**: core ×6, daemon ×5, serve ×3, telemetry ×2, acp ×2, cli ×1, test ×1, docs ×1, other ×2
 
@@ -36,7 +36,7 @@
 | #5105 | ✅ merged | feat(acp): dedicated agent permission dialog via _meta.toolName (follow-up to #5085) | +251/-5 | 14 | 06-14 | 06-14 | https://github.com/QwenLM/qwen-code/pull/5105 |
 | #5107 | ✅ merged | fix(core): Repair duplicate tool call IDs | +1483/-49 | 19 | 06-14 | 06-14 | https://github.com/QwenLM/qwen-code/pull/5107 |
 | #5108 | ✅ merged | fix(daemon): Avoid replaying truncated session diffs | +239/-16 | 6 | 06-14 | 06-14 | https://github.com/QwenLM/qwen-code/pull/5108 |
-| #5111 | 🟡 open | fix(core): Bound active tool result history | +568/-65 | 10 | 06-14 | — | https://github.com/QwenLM/qwen-code/pull/5111 |
+| #5111 | ✅ merged | fix(core): Bound active tool result history | +789/-149 | 12 | 06-14 | 06-15 | https://github.com/QwenLM/qwen-code/pull/5111 |
 
 ---
 
@@ -68,13 +68,13 @@
 | [#5105](https://github.com/QwenLM/qwen-code/pull/5105) | 在不改 ACP `kind` 的前提下，为 Agent 权限请求恢复专属 “Launch this agent?” UI。 | `Session.ts` 在 `session/request_permission` 的 `toolCall._meta.toolName` 镜像规范工具名；VS Code `PermissionDrawer` 和 daemon web-shell `ToolApproval` 读取 `_meta.toolName === 'agent'` 后展示 agent 专属标题与描述。 |
 | [#5107](https://github.com/QwenLM/qwen-code/pull/5107) | 修复 OpenAI-compatible provider 复用或 replay `tool_call.id` 时引发的重复 tool result、payload 膨胀和 provider 校验错误。 | 新增 `toolCallIdUtils`，同 turn 重复 id 只执行一次，跨 turn 复用 raw id 加 suffix；OpenAI parser/converter 出站前清理为一组 assistant call + 相邻 tool result，并给 core scheduler、non-interactive、AgentCore、ACP Session、speculation 补执行守卫。 |
 | [#5108](https://github.com/QwenLM/qwen-code/pull/5108) | 避免 saved-session 回放时把已截断 edit/write diff 当作 raw output 再次回放，减少 web-shell 误渲染完整 diff 的风险。 | daemon replay 对截断 diff 只发 preview content，不再塞 raw output；web-shell transcript adapter 保留规范化 tool content，`ToolGroup` 忽略已截断 raw diff fallback，并在无 diff 时展示省略预览。 |
-| [#5111](https://github.com/QwenLM/qwen-code/pull/5111) | 为 active tool result history 增加累计字符预算，避免多轮大型工具结果在 provider history 中持续膨胀。 | 新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`（默认 500000，`-1` 禁用）；provider request 前把 pending ToolResult 当虚拟尾部计入总量，超过阈值就用现有 microcompaction 清理较早 compactable results，保留近期结果；当前仍 open。 |
+| [#5111](https://github.com/QwenLM/qwen-code/pull/5111) | 为 active tool result history 增加累计字符预算，避免多轮大型工具结果在 provider history 中持续膨胀。 | 新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`（默认 500000，`-1` 禁用）；provider request 前把 pending ToolResult 当虚拟尾部计入总量，超过阈值就用现有 microcompaction 清理较早 compactable results，保留近期结果；同时更新 settings schema、用户文档和 focused tests，已于 06-15 合入。 |
 
 ## Plan 对齐
 
-> 2026-06-15 对照 GitHub 当前 PR diff；已有 plan 已同步状态、代码量和最终实现差异。
+> 2026-06-16 对照 GitHub 当前 PR diff；已有 plan 已同步状态、代码量和最终实现差异。
 
 - 已对齐 plan：#4861、#4862、#4871、#4897、#4906、#4924、#4954、#4965、#5006、#5031、#5033、#5057
 - 未找到现成 plan：#5042、#5044、#5047、#5056、#5085、#5105、#5107、#5108、#5111（分支 diff 中未包含 `.qwen/design/`、`.qwen/e2e-tests/`、`.qwen/plans/`）；#4886/#4986 为关闭的 merge/chore PR，未保留独立 plan
 
-_W24 最终版 · 更新于 2026-06-15_
+_W24 最终版 · 状态回填于 2026-06-16_

@@ -2,9 +2,9 @@
 
 **主题**: telemetry 层级 span、atomicWrite、rewind 文件恢复、/stuck，daemon/serve Wave 1–4 大爆发
 
-**统计**: 29 PRs — 29 merged / 0 open / 0 closed  
-**代码量**: +39,561 / -2,486，332 个文件变更  
-**类型**: feat ×19, fix ×4, refactor ×3, docs ×1, test ×1, other ×1  
+**统计**: 29 PRs — 29 merged / 0 open / 0 closed
+**代码量**: +39,561 / -2,486，332 个文件变更
+**类型**: feat ×19, fix ×4, refactor ×3, docs ×1, test ×1, other ×1
 **范围 (scope)**: serve ×16, telemetry ×6, rewind ×2, cli ×2, core ×1, skills ×1, perf ×1
 
 **本周最大改动**:

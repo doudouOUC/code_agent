@@ -302,8 +302,8 @@ private appendRecord(record: ChatRecord, ...) {
 
 仓库内附两个独立可执行工具：
 
-1. **假设验证 repro**（开发者侧）：[`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/) —— 证明这种 pattern 确实泄漏
-2. **用户自助诊断**：[`repros/oom-user-diagnostic/`](../../repros/oom-user-diagnostic/) —— 用户在自己的 qwen 会话里收集数据，判断 OOM 属于哪类，是否升级 v0.16.0 能修
+1. **假设验证 repro**（开发者侧）：[`repros/oom-streaming-leak/`](../repros/oom-streaming-leak/) —— 证明这种 pattern 确实泄漏
+2. **用户自助诊断**：[`repros/oom-user-diagnostic/`](../repros/oom-user-diagnostic/) —— 用户在自己的 qwen 会话里收集数据，判断 OOM 属于哪类，是否升级 v0.16.0 能修
 
 **用户诊断工具用法**：
 
@@ -1186,8 +1186,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 | 2026-05-20 | [#2868 跟进评论：@gkubon 数据点 + 请求完整 stack + heap snapshot 抓取指南](https://github.com/QwenLM/qwen-code/issues/2868#issuecomment-4498312245) |
 | 2026-05-23 | [#4116 跟进评论：v0.16.0 升级后 @maxinteresa-ops 仍崩，确认 B-TLS 未修，澄清 #4286 已合并到 v0.16.0](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521009279) |
 | 2026-05-23 | [#4116 修正评论：BatchSpanProcessor / LogToSpanProcessor 默认不启用，符号 offset 解读修正](https://github.com/QwenLM/qwen-code/issues/4116#issuecomment-4521113616) |
-| 2026-05-23 | 仓库内增加 [`repros/oom-streaming-leak/`](../../repros/oom-streaming-leak/) 本地复现 — V3 实测 OpenAI SDK 5.11.0 + mock SSE 服务器，确认 ~195 KB/iter RSS 累积 |
-| 2026-05-23 | 仓库内增加 [`repros/oom-user-diagnostic/`](../../repros/oom-user-diagnostic/) 用户自助诊断工具 — monitor.cjs（NODE_OPTIONS 注入采样） + analyze.cjs（启发式分类），让用户在自己的 OOM 会话上确定属于哪类 |
+| 2026-05-23 | 仓库内增加 [`repros/oom-streaming-leak/`](../repros/oom-streaming-leak/) 本地复现 — V3 实测 OpenAI SDK 5.11.0 + mock SSE 服务器，确认 ~195 KB/iter RSS 累积 |
+| 2026-05-23 | 仓库内增加 [`repros/oom-user-diagnostic/`](../repros/oom-user-diagnostic/) 用户自助诊断工具 — monitor.cjs（NODE_OPTIONS 注入采样） + analyze.cjs（启发式分类），让用户在自己的 OOM 会话上确定属于哪类 |
 | 2026-05-23 | **PR #4462 by @huww98 揭露真正主因** — react-reconciler 0.33 dev-build 的 PerformanceMeasure 泄漏（heap snapshot 实测 45%/148 MB），esbuild 通过 NODE_ENV=production define tree-shake 修复。本文档承认之前 B-TLS 主因判断错误，重新分类。 |
 | 2026-05-23 | 更新 analyze.cjs 启发式：Scenario A 区分 A1（structuredClone，v0.16.0 修复）与 A2（PerformanceMeasure，待发布），建议加上 heap snapshot 看 measureEntryBuffer。 |
 

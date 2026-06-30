@@ -102,7 +102,7 @@ If the path-matching for exemptions uses a simple string check (e.g., `path.ends
 
 Additionally: if the exempt check fails due to a regex bug, the 429 response has `Content-Type: application/json`. An EventSource client expects `text/event-stream` and would NOT parse the JSON body — it would just see a connection failure with no retry hint. The `Retry-After` header is the saving grace here (EventSource polyfills can read it), but native `EventSource` ignores non-2xx status codes and simply retries after its built-in reconnect interval.
 
-**Recommendation:** 
+**Recommendation:**
 1. Ensure the exempt path matching uses a pattern like `/\/session\/[^/]+\/events$/` (not just string equality)
 2. Document that SSE exemption is critical for reconnect behavior and test it explicitly
 3. Consider adding `Content-Type: text/event-stream` with an SSE-formatted error for 429s on paths matching the events pattern (defense in depth)
@@ -156,7 +156,7 @@ This is the most impactful finding for developer experience. Without SDK-side re
 - Integration scripts that batch operations would need custom retry wrappers
 - The `Retry-After` header value is computed but never consumed
 
-**Recommendation:** 
+**Recommendation:**
 1. SDK should expose `retryAfterMs` on `DaemonHttpError` (parsed from either the response body or the `Retry-After` header)
 2. Consider adding opt-in auto-retry for 429 (configurable via `DaemonClientOptions.retryOn429: boolean | { maxRetries: number }`)
 3. At minimum, document the retry contract in the SDK's JSDoc so consumers know to handle it

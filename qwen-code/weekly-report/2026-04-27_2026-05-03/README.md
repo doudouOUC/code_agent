@@ -2,9 +2,9 @@
 
 **主题**: monitor 工具 / Monitor 权限、background agent、telemetry OTLP 起步、sdk-python 发布 CI
 
-**统计**: 11 PRs — 10 merged / 0 open / 1 closed  
-**代码量**: +14,853 / -698，130 个文件变更  
-**类型**: fix ×5, feat ×4, chore ×1, other ×1  
+**统计**: 11 PRs — 10 merged / 0 open / 1 closed
+**代码量**: +14,853 / -698，130 个文件变更
+**类型**: fix ×5, feat ×4, chore ×1, other ×1
 **范围 (scope)**: core ×3, telemetry ×3, ci ×2, gitignore ×1, sdk-python ×1
 
 **本周最大改动**:
