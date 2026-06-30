@@ -68,7 +68,7 @@
 
 ## 个人 PR 说明
 
-> 来源：GitHub PR body、merged diff、文件列表和当前状态；必要时参考历史归档。这里压缩成“做什么 / 最终实现方案”，便于快速阅读。
+> 来源：merged diff、文件列表、patch 和当前状态；GitHub PR body 只作为目标线索。这里压缩成“做什么 / 最终实现方案”，便于快速阅读。
 
 | PR | 做什么 | 最终实现方案 |
 |---|---|---|
@@ -83,9 +83,9 @@
 | [#5258](https://github.com/QwenLM/qwen-code/pull/5258) | 把 #5218 的停止语义推广到所有 ACP 工具权限取消，不只限于 `ask_user_question`。 | 当权限 vote 解析为 cancelled、reject option 映射到 `Cancel`、或权限请求通道失败时，记录被拒工具并跳过同一模型响应里的后续工具；嵌套 Agent 权限取消也 fail-closed 中止父 Agent turn，并用 daemon/WebShell HTTP/SSE E2E 验证取消后两个 shell sentinel 都不会落盘，已于 06-19 合入。 |
 | [#5260](https://github.com/QwenLM/qwen-code/pull/5260) | 给 `qwen serve` 增加 ACP 权限/`ask_user_question` 单次响应超时配置，解决 5 分钟固定等待不可调的问题。 | 新增 `--permission-response-timeout-ms`，从 CLI 透传到 `ServeOptions` / `createAcpSessionBridge` 覆盖 bridge 默认 5 分钟；`0` 表示无限等待；启动时拒绝非有限/负数/非整数，bridge 将超大值 clamp 到 Node timer 上限，补 serve/runQwenServe/server/bridge tests，已于 06-18 合入。 |
 
-## 个人 PR 最终实现对齐
+## 个人 PR 最终实现文档
 
-> 2026-06-22 对照 GitHub 当前 PR diff 校准。周报正文已经承载每个个人 PR 的最终实现方案；历史归档文件只保留为证据，不作为阅读主入口。
+> 2026-06-30 对照 GitHub 当前 PR changed files 和 patch 重新整理。已建立深读记录的 PR，其完整中文最终实现文档放在本周 `implementations/` 目录。
 
 - 已按最终实现校准：#5141
 - 直接按 merged diff 写入正文：#5144、#5165、#5174、#5179、#5183、#5218、#5258、#5260
