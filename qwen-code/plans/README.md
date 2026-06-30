@@ -5,7 +5,7 @@
 ## 当前口径
 
 - 每周 PR 汇总入口在 [`../weekly-report/`](../weekly-report/)。
-- 每个周目录的 `README.md` 记录逐 PR 的“做什么 / 最终实现方案”摘要。
+- 每个周目录的 `README.md` 记录逐 PR 的“解决了什么问题 / 怎么做的”摘要。
 - 已深读并整理的 PR，完整中文最终实现文档放在对应周目录的 `implementations/` 下。
 - 最终实现说明以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 与本目录历史 plan 只能作为意图线索。
 

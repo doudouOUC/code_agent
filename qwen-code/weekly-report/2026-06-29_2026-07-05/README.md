@@ -68,9 +68,9 @@
 
 ---
 
-## PR 最终实现方案与 feature 处理
+## PR 解决问题、实现方式与 feature 处理
 
-| PR | 做什么 | 最终实现方案（open/closed 只登记当前观察） | 对应 feature 文档 |
+| PR | 解决了什么问题 | 怎么做的（open/closed 只登记当前观察） | 对应 feature 文档 |
 |---|---|---|---|
 | [#4943](https://github.com/QwenLM/qwen-code/pull/4943) | 增加 `--safe-mode` / `QWEN_CODE_SAFE_MODE`，一键禁用用户自定义以排障。 | 在 config/gemini/UI/skills/subagents/agent tool 等入口加 safe-mode gate，跳过 QWEN/AGENTS、hooks、extensions、custom skills、MCP、subagents 和 conditional rules，并显示 SAFE MODE 提示。 | 已补 [diagnostic-skills.md](../../feature/diagnostic-skills.md)。 |
 | [#5777](https://github.com/QwenLM/qwen-code/pull/5777) | Chrome extension 复活为 daemon-direct 架构。 | side panel 直连本地 `qwen serve`，浏览器工具以 client-hosted MCP 经 daemon WebSocket 反向暴露，替代 Native Messaging host。 | 已在上周补 [daemon-serve-mode/](../../feature/daemon-serve-mode/) 与客户端/SDK文档，本轮只登记。 |
@@ -88,7 +88,13 @@
 | [#5978](https://github.com/QwenLM/qwen-code/pull/5978) | 引入 adapter-facing `ChannelAgentBridge` 抽象。 | adapters/router/channel start 依赖窄 bridge contract；`AcpBridge` 继续作为 standalone 实现，并修 session cleanup、restore/create race 和 bridge swap listener。 | 已补 [channel-adapters.md](../../feature/channel-adapters.md)。 |
 | [#5980](https://github.com/QwenLM/qwen-code/pull/5980) | open：auth-modified env vars 优先级高于系统 env。 | 调整 environment/settings/provider install 解析。 | open，若合入归 [auth-providers.md](../../feature/auth-providers.md)。 |
 | [#5981](https://github.com/QwenLM/qwen-code/pull/5981) | qc-helper 技能补 daemon mode 文档并修 system settings path。 | 更新 bundled `qc-helper/SKILL.md`。 | 技能文档小修，只在矩阵登记。 |
-| #5982-#5988 | closed：channels/sdk/cli/acp/core/desktop/sandbox 一批修复或重构草稿。 | 分支均关闭未合入；多为候选修复或拆分尝试。 | closed，不作为 feature 实现统计。 |
+| [#5982](https://github.com/QwenLM/qwen-code/pull/5982) | closed：channels 侧 memory leak、race condition、稳定性修复草稿。 | 分支关闭未合入；保留为候选修复观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
+| [#5983](https://github.com/QwenLM/qwen-code/pull/5983) | closed：TypeScript SDK type safety 与 backpressure 草稿。 | 分支关闭未合入；保留为候选修复观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
+| [#5984](https://github.com/QwenLM/qwen-code/pull/5984) | closed：CLI performance / correctness 修复草稿。 | 分支关闭未合入；保留为候选修复观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
+| [#5985](https://github.com/QwenLM/qwen-code/pull/5985) | closed：ACP bridge stable session API 与 cleanup 草稿。 | 分支关闭未合入；保留为候选修复观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
+| [#5986](https://github.com/QwenLM/qwen-code/pull/5986) | closed：core type safety / performance refactor 草稿。 | 分支关闭未合入；保留为候选重构观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
+| [#5987](https://github.com/QwenLM/qwen-code/pull/5987) | closed：desktop build-time secrets 移除与 download verification 草稿。 | 分支关闭未合入；保留为候选安全修复观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
+| [#5988](https://github.com/QwenLM/qwen-code/pull/5988) | closed：CLI sandbox 拆分为 per-backend modules 的重构草稿。 | 分支关闭未合入；保留为候选重构观察，不作为已落地实现。 | closed，不作为 feature 实现统计。 |
 | [#5989](https://github.com/QwenLM/qwen-code/pull/5989) | 防止 serve fast path 静态拉入 ACP runtime。 | request helper 改用轻量子路径，新增 source import graph 与 bundle metafile 静态闭包回归测试。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md)。 |
 | [#5991](https://github.com/QwenLM/qwen-code/pull/5991) | open：裸 `/loop` autonomous mode。 | 增加 autonomous loop resolver、skill 文案和 session/non-interactive 接线。 | open，若合入归 [loop-wakeup.md](../../feature/loop-wakeup.md)。 |
 | [#5992](https://github.com/QwenLM/qwen-code/pull/5992) | WebShell 工具输出优先展示后端 raw file diff。 | 当 payload 同时有 structured old/new diff 与 `rawOutput.fileDiff` 时优先 raw hunk，避免大文件重算 diff 噪音。 | 已补 [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md)。 |
@@ -129,6 +135,6 @@
 | [permission-system.md](../../feature/permission-system.md) | #5791 #6009 | 补 `ask_user_question` 多选自定义输入 Enter 行为，以及 Stop hook 过滤 thought parts 的 hook 输入边界。 |
 | 已有覆盖不重复展开 | #5777 #5890 #5960 #5963 | 已在 2026-06-28 / 上周覆盖矩阵中写入对应 feature，本轮按北京时间昨日口径复核登记。 |
 | 只登记、不新增专题 | #5860 #5973 #5981 #5994 #6002 #6016 | CI/release/docs-only/TUI 局部 UX 修复，不改变长期 feature 合约。 |
-| open / closed 观察 | #5974 #5980 #5982-#5988 #5991 #5998 #5999 #6003 #6005 #6006 #6011 #6012 #6013 #6017 #6018 #6019 #6021 #6022 | open 只登记后续归属；closed/superseded 不作为已落地实现统计。 |
+| open / closed 观察 | #5974 #5980 #5982 #5983 #5984 #5985 #5986 #5987 #5988 #5991 #5998 #5999 #6003 #6005 #6006 #6011 #6012 #6013 #6017 #6018 #6019 #6021 #6022 | open 只登记后续归属；closed/superseded 不作为已落地实现统计。 |
 
 _日增量整理于 2026-06-30_

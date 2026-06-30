@@ -66,11 +66,11 @@
 
 ---
 
-## 个人 PR 说明
+## 个人 PR 解决问题与实现方式
 
-> 来源：merged diff、文件列表、patch 和当前状态；GitHub PR body 只作为目标线索。这里压缩成“做什么 / 最终实现方案”，便于快速阅读。
+> 来源：merged diff、文件列表、patch 和当前状态；GitHub PR body 只作为目标线索。这里压缩成“解决了什么问题 / 怎么做的”，便于快速阅读。
 
-| PR | 做什么 | 最终实现方案 |
+| PR | 解决了什么问题 | 怎么做的 |
 |---|---|---|
 | [#5141](https://github.com/QwenLM/qwen-code/pull/5141) | 让一小类安全的单文件 `sed -i` 替换命令走编辑确认和 file history 记录，补 `/rewind` 对 shell 原地编辑的缺口。 | 新增 sed edit parser，shell 确认阶段读取目标文件并模拟替换生成文件 diff；执行前重新读取做 stale-content guard，写入前调用 `FileHistoryService.trackEdit()`，再通过 `FileSystemService.writeTextFile()` 落盘；不支持的 sed 形式继续走原 shell 路径，同时隐藏这类 shell-backed edit 的修改入口并补 core/CLI focused tests，已于 06-18 合入。 |
 | [#5144](https://github.com/QwenLM/qwen-code/pull/5144) | 把 daemon developer docs 全量刷新为英文，并重新核对当前 `main` 的 daemon 实现面。 | 重写 `docs/developers/daemon/00-20`、daemon 导航、TUI adapter、serve protocol 和用户 serve 文档；按源码核对 event schema、capability tags、startup flags、error taxonomy、resync passthrough、MCP pool 和 web UI wording，并用 prettier、中文残留扫描、Node 计数检查、build/typecheck 验证。 |

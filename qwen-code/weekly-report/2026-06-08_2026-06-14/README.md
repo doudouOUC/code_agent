@@ -40,11 +40,11 @@
 
 ---
 
-## PR 说明
+## PR 解决问题与实现方式
 
-> 来源：merged diff、文件列表、patch 和当前状态；GitHub PR body 只作为目标线索。这里压缩成“做什么 / 最终实现方案”，便于快速阅读。
+> 来源：merged diff、文件列表、patch 和当前状态；GitHub PR body 只作为目标线索。这里压缩成“解决了什么问题 / 怎么做的”，便于快速阅读。
 
-| PR | 做什么 | 最终实现方案 |
+| PR | 解决了什么问题 | 怎么做的 |
 |---|---|---|
 | [#4861](https://github.com/QwenLM/qwen-code/pull/4861) | 为 `qwen serve` 增加可选的分层 HTTP rate limit，保护 daemon HTTP 面。 | 新增 `rateLimit.ts` token bucket 和 Express middleware，CLI/配置接入 `--rate-limit`，按 prompt / mutation / read 三档限流；health、SSE、heartbeat、ACP 豁免，异常 fail-open，测试覆盖 bucket refill、分层 key 和路由豁免。 |
 | [#4862](https://github.com/QwenLM/qwen-code/pull/4862) | 补 daemon 连接压力测试，并整理 perf/baseline 测试 harness。 | 抽出 `_daemon-harness`、benchmark/report helper 和 mock ACP child；新增 `QWEN_LOADTEST_ENABLED=1` 门控的连接、prompt、SSE、crash recovery、resource snapshot 场景，避免默认 CI 跑重型压力测试。 |
