@@ -68,9 +68,9 @@
 
 ## 个人 PR 说明
 
-> 来源：GitHub PR body、diff 文件列表、`.qwen` plan 文档和当前状态；这里压缩成“做什么 / 怎么做”，便于快速阅读。
+> 来源：GitHub PR body、merged diff、文件列表和当前状态；必要时参考历史归档。这里压缩成“做什么 / 最终实现方案”，便于快速阅读。
 
-| PR | 做什么 | 怎么做 |
+| PR | 做什么 | 最终实现方案 |
 |---|---|---|
 | [#5141](https://github.com/QwenLM/qwen-code/pull/5141) | 让一小类安全的单文件 `sed -i` 替换命令走编辑确认和 file history 记录，补 `/rewind` 对 shell 原地编辑的缺口。 | 新增 sed edit parser，shell 确认阶段读取目标文件并模拟替换生成文件 diff；执行前重新读取做 stale-content guard，写入前调用 `FileHistoryService.trackEdit()`，再通过 `FileSystemService.writeTextFile()` 落盘；不支持的 sed 形式继续走原 shell 路径，同时隐藏这类 shell-backed edit 的修改入口并补 core/CLI focused tests，已于 06-18 合入。 |
 | [#5144](https://github.com/QwenLM/qwen-code/pull/5144) | 把 daemon developer docs 全量刷新为英文，并重新核对当前 `main` 的 daemon 实现面。 | 重写 `docs/developers/daemon/00-20`、daemon 导航、TUI adapter、serve protocol 和用户 serve 文档；按源码核对 event schema、capability tags、startup flags、error taxonomy、resync passthrough、MCP pool 和 web UI wording，并用 prettier、中文残留扫描、Node 计数检查、build/typecheck 验证。 |
@@ -83,12 +83,12 @@
 | [#5258](https://github.com/QwenLM/qwen-code/pull/5258) | 把 #5218 的停止语义推广到所有 ACP 工具权限取消，不只限于 `ask_user_question`。 | 当权限 vote 解析为 cancelled、reject option 映射到 `Cancel`、或权限请求通道失败时，记录被拒工具并跳过同一模型响应里的后续工具；嵌套 Agent 权限取消也 fail-closed 中止父 Agent turn，并用 daemon/WebShell HTTP/SSE E2E 验证取消后两个 shell sentinel 都不会落盘，已于 06-19 合入。 |
 | [#5260](https://github.com/QwenLM/qwen-code/pull/5260) | 给 `qwen serve` 增加 ACP 权限/`ask_user_question` 单次响应超时配置，解决 5 分钟固定等待不可调的问题。 | 新增 `--permission-response-timeout-ms`，从 CLI 透传到 `ServeOptions` / `createAcpSessionBridge` 覆盖 bridge 默认 5 分钟；`0` 表示无限等待；启动时拒绝非有限/负数/非整数，bridge 将超大值 clamp 到 Node timer 上限，补 serve/runQwenServe/server/bridge tests，已于 06-18 合入。 |
 
-## 个人 PR Plan 对齐
+## 个人 PR 最终实现对齐
 
-> 2026-06-22 对照 GitHub 当前 PR diff；找到的 plan 已同步最终实现差异。
+> 2026-06-22 对照 GitHub 当前 PR diff 校准。周报正文已经承载每个个人 PR 的最终实现方案；历史归档文件只保留为证据，不作为阅读主入口。
 
-- 已对齐 plan：#5141 → [`plans/#5141-simulated-sed-file-history.md`](plans/#5141-simulated-sed-file-history.md)
-- 未找到现成 plan：#5144、#5165、#5174、#5179、#5183、#5218、#5258、#5260（分支 diff 中未包含 `.qwen/design/`、`.qwen/e2e-tests/`、`.qwen/plans/`）
-- #5162 为 wrong-base closed PR，diff 中出现的 `.qwen/design/`、`.qwen/e2e-tests/` 来自被错误带入的历史改动，不作为 #5162 的有效 plan
+- 已按最终实现校准：#5141
+- 直接按 merged diff 写入正文：#5144、#5165、#5174、#5179、#5183、#5218、#5258、#5260
+- #5162 为 wrong-base closed PR，diff 中出现的 `.qwen/design/`、`.qwen/e2e-tests/` 来自被错误带入的历史改动，不作为 #5162 的有效实现依据
 
 _W25 最终版 · 个人 PR 说明更新于 2026-06-22；全作者概览补充于 2026-06-23_

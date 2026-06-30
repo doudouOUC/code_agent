@@ -42,9 +42,9 @@
 
 ## PR 说明
 
-> 来源：W24 PR 计划记录、PR body、GitHub diff 文件列表和当前状态；这里压缩成“做什么 / 怎么做”，便于快速阅读。
+> 来源：GitHub PR body、merged diff、文件列表和当前状态；必要时参考历史归档。这里压缩成“做什么 / 最终实现方案”，便于快速阅读。
 
-| PR | 做什么 | 怎么做 |
+| PR | 做什么 | 最终实现方案 |
 |---|---|---|
 | [#4861](https://github.com/QwenLM/qwen-code/pull/4861) | 为 `qwen serve` 增加可选的分层 HTTP rate limit，保护 daemon HTTP 面。 | 新增 `rateLimit.ts` token bucket 和 Express middleware，CLI/配置接入 `--rate-limit`，按 prompt / mutation / read 三档限流；health、SSE、heartbeat、ACP 豁免，异常 fail-open，测试覆盖 bucket refill、分层 key 和路由豁免。 |
 | [#4862](https://github.com/QwenLM/qwen-code/pull/4862) | 补 daemon 连接压力测试，并整理 perf/baseline 测试 harness。 | 抽出 `_daemon-harness`、benchmark/report helper 和 mock ACP child；新增 `QWEN_LOADTEST_ENABLED=1` 门控的连接、prompt、SSE、crash recovery、resource snapshot 场景，避免默认 CI 跑重型压力测试。 |
@@ -70,11 +70,11 @@
 | [#5108](https://github.com/QwenLM/qwen-code/pull/5108) | 避免 saved-session 回放时把已截断 edit/write diff 当作 raw output 再次回放，减少 web-shell 误渲染完整 diff 的风险。 | daemon replay 对截断 diff 只发 preview content，不再塞 raw output；web-shell transcript adapter 保留规范化 tool content，`ToolGroup` 忽略已截断 raw diff fallback，并在无 diff 时展示省略预览。 |
 | [#5111](https://github.com/QwenLM/qwen-code/pull/5111) | 为 active tool result history 增加累计字符预算，避免多轮大型工具结果在 provider history 中持续膨胀。 | 新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`（默认 500000，`-1` 禁用）；provider request 前把 pending ToolResult 当虚拟尾部计入总量，超过阈值就用现有 microcompaction 清理较早 compactable results，保留近期结果；同时更新 settings schema、用户文档和 focused tests，已于 06-15 合入。 |
 
-## Plan 对齐
+## 最终实现对齐
 
-> 2026-06-16 对照 GitHub 当前 PR diff；已有 plan 已同步状态、代码量和最终实现差异。
+> 2026-06-16 对照 GitHub 当前 PR diff 校准。周报正文已经承载每个 PR 的最终实现方案；历史归档文件只保留为证据，不作为阅读主入口。
 
-- 已对齐 plan：#4861、#4862、#4871、#4897、#4906、#4924、#4954、#4965、#5006、#5031、#5033、#5057
-- 未找到现成 plan：#5042、#5044、#5047、#5056、#5085、#5105、#5107、#5108、#5111（分支 diff 中未包含 `.qwen/design/`、`.qwen/e2e-tests/`、`.qwen/plans/`）；#4886/#4986 为关闭的 merge/chore PR，未保留独立 plan
+- 已按最终实现校准：#4861、#4862、#4871、#4897、#4906、#4924、#4954、#4965、#5006、#5031、#5033、#5057
+- 直接按 merged diff / closed 状态写入正文：#5042、#5044、#5047、#5056、#5085、#5105、#5107、#5108、#5111；#4886/#4986 为关闭的 merge/chore PR，只保留未落地说明
 
 _W24 最终版 · 状态回填于 2026-06-16_

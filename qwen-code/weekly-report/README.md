@@ -1,6 +1,6 @@
 # qwen-code PR 记录
 
-我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，以及近期需要按全作者口径复核的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“做什么 / 怎么做”摘要；如该 PR 有单独 plan 文档，则放在对应周目录的 `plans/` 下。
+我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，以及近期需要按全作者口径复核的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“做什么 / 最终实现方案”摘要；最终口径以 merged diff、PR body 和关闭状态为准。历史归档文件只作为证据保留，不再作为周报主入口。
 
 **时间范围**: 2026-04-06 ~ 2026-06-29（持续更新）
 **总计**: 256 PRs（W15–W25 按周索引 + W27 06-29 日增量合计）

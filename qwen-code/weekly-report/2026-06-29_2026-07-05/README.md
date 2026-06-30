@@ -68,9 +68,9 @@
 
 ---
 
-## PR 说明与 feature 处理
+## PR 最终实现方案与 feature 处理
 
-| PR | 做什么 | 怎么做 | 对应 feature 文档 |
+| PR | 做什么 | 最终实现方案（open/closed 只登记当前观察） | 对应 feature 文档 |
 |---|---|---|---|
 | [#4943](https://github.com/QwenLM/qwen-code/pull/4943) | 增加 `--safe-mode` / `QWEN_CODE_SAFE_MODE`，一键禁用用户自定义以排障。 | 在 config/gemini/UI/skills/subagents/agent tool 等入口加 safe-mode gate，跳过 QWEN/AGENTS、hooks、extensions、custom skills、MCP、subagents 和 conditional rules，并显示 SAFE MODE 提示。 | 已补 [diagnostic-skills.md](../../feature/diagnostic-skills.md)。 |
 | [#5777](https://github.com/QwenLM/qwen-code/pull/5777) | Chrome extension 复活为 daemon-direct 架构。 | side panel 直连本地 `qwen serve`，浏览器工具以 client-hosted MCP 经 daemon WebSocket 反向暴露，替代 Native Messaging host。 | 已在上周补 [daemon-serve-mode/](../../feature/daemon-serve-mode/) 与客户端/SDK文档，本轮只登记。 |
