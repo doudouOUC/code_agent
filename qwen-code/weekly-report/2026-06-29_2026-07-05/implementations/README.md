@@ -13,7 +13,12 @@
 | [#6013](https://github.com/QwenLM/qwen-code/pull/6013) | ✅ merged | fix(cli): Keep serve health responsive before runtime load | [pr-6013.md](pr-6013.md) |
 | [#6021](https://github.com/QwenLM/qwen-code/pull/6021) | ✅ merged | fix(cli): Handle ACP read_file for managed local paths | [pr-6021.md](pr-6021.md) |
 | [#6026](https://github.com/QwenLM/qwen-code/pull/6026) | ✅ merged | fix(core): Allow subagents to exit plan mode | [pr-6026.md](pr-6026.md) |
-| [#6031](https://github.com/QwenLM/qwen-code/pull/6031) | 🟡 open | feat(cli): Add daemon-managed channel worker for serve --channel | [pr-6031.md](pr-6031.md) |
-| [#6058](https://github.com/QwenLM/qwen-code/pull/6058) | 🟡 open | feat(daemon): Add session archive support | [pr-6058.md](pr-6058.md) |
+| [#6031](https://github.com/QwenLM/qwen-code/pull/6031) | ✅ merged | feat(cli): Add daemon-managed channel worker for serve --channel | [pr-6031.md](pr-6031.md) |
+| [#6058](https://github.com/QwenLM/qwen-code/pull/6058) | ✅ merged | feat(daemon): Add session archive support | [pr-6058.md](pr-6058.md) |
+| [#6087](https://github.com/QwenLM/qwen-code/pull/6087) | ✅ merged | feat(core): Disallow plan lifecycle tools in subagents | [pr-6087.md](pr-6087.md) |
+| [#6098](https://github.com/QwenLM/qwen-code/pull/6098) | ✅ merged | feat(cli): Harden daemon-managed channel worker | [pr-6098.md](pr-6098.md) |
+| [#6117](https://github.com/QwenLM/qwen-code/pull/6117) | 🟡 open | feat(cli): show description and level in /skills ACP output | [pr-6117.md](pr-6117.md) |
+| [#6138](https://github.com/QwenLM/qwen-code/pull/6138) | 🟡 open | feat(core): Add leader approval for plan-required teammates | [pr-6138.md](pr-6138.md) |
+| [#6141](https://github.com/QwenLM/qwen-code/pull/6141) | 🟡 open | fix(diff): show whitespace-only edits instead of 'No changes detected' | [pr-6141.md](pr-6141.md) |
 
-_按个人 PR 口径更新于 2026-07-01_
+_按个人 PR 口径更新于 2026-07-02_

@@ -343,7 +343,7 @@ sequenceDiagram
     loop monitor 事件
         T->>R: emitEvent(monitorId, line)
         R->>R: dispatchNotification: entry.ownerAgentId 命中
-        R->>Q: agentNotificationCallbacks[agentId](modelText)
+        R->>Q: agentNotificationCallbacks for modelText
         Q-->>S: queueExternalInput({kind:notification})
         Note over R,P: 不走全局 notificationCallback → 父 UI 不被污染
     end
