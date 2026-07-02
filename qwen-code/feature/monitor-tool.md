@@ -247,7 +247,7 @@ monitor 的默认权限链：
 
 1. `monitor.ts:getDefaultPermission`（`monitor.ts:169`）：AST 判定 `isShellCommandReadOnlyAST(safetyCommand)`，只读 → `allow`，否则 → `ask`；AST 异常 → 兜底 `ask`（#3792 补的 `debugLogger.warn`，此前是静默 catch）。
 2. `permission-manager.ts:evaluate`（`187`）：`decision==='default'` 且属于 `SHELL_TOOL_NAMES` 且有 command 时，调 `resolveDefaultPermission(command)`（`permission-manager.ts:413`）——AST 只读 → `allow`，否则 → `ask`，确保 shell-like 工具**永不返回 default**。
-3. **命令替换不硬拒**（#4093/#4386）：`$()`、反引号、`<()`、`>()` 不在此硬 deny，而是和其他非只读命令一样 fall through 到 `ask`，由用户/YOLO 决定；告警通过 `getConfirmationDetails` 的 `buildShellExecWarnings` 在确认框展示（`monitor.ts:264-267`）。理由：硬 deny 既无法被 YOLO 覆盖，又与 shell 工具路径不一致。
+3. **命令替换不硬拒**（#4093）：`$()`、反引号、`<()`、`>()` 不在此硬 deny，而是和其他非只读命令一样 fall through 到 `ask`，由用户/YOLO 决定；告警通过 `getConfirmationDetails` 的 `buildShellExecWarnings` 在确认框展示（`monitor.ts:264-267`）。理由：硬 deny 既无法被 YOLO 覆盖，又与 shell 工具路径不一致。
 4. **monitor 命令归一化**：`normalizePermissionContext`（`permission-manager.ts:441`）对 `toolName==='monitor'` 的 command 取 `normalizeMonitorCommand(cmd).safetyCommand`，剥掉 shell wrapper、保留 env 赋值与 `-c` 脚本，使权限分析看到真实可执行文本。
 
 ### 3.5 sleep 拦截与空闲等待

@@ -350,6 +350,13 @@ sequenceDiagram
 - **用户入口**：`/stats skills` 复用 session stats snapshot 渲染交互式与非交互输出；daemon 路径通过 `GET /session/:id/stats` 暴露给 Web Shell / SDK / 运维工具。
 - **兼容性**：SDK 类型将 `skills` 标成 optional。新客户端连旧 daemon 时不强制依赖该 block，旧客户端连新 daemon 也只会忽略 additive 字段。
 
+### #6117 /skills ACP/non-interactive list 输出
+
+- **问题**：interactive `/skills` 打开管理 dialog，但 ACP/non-interactive 没有 dialog UI，旧 fallback 列表缺少 description 和 level，且容易与 dialog 的排序、禁用过滤、本地化标签漂移。
+- **最终实现**：`skillsCommand` 在 interactive 保持 `{ type: 'dialog', dialog: 'skills_manage' }`；ACP/non-interactive 读取 `skillManager.listSkills()`，过滤 `userInvocable === false` 与 disabled skills，按 priority 降序、name 升序输出只读列表。
+- **输出字段**：每行显示 skill name、单行 description 和本地化 level label；无 description/level 时不留下空括号或尾随空格。
+- **复用点**：`skill-level-label.ts:levelLabel()` 被 `SkillsList.tsx` 与 command fallback 共用，降低 dialog/list 文案漂移。
+
 ## 7. 已知限制 / 后续
 
 结合这些 PR 的 review 与现状：

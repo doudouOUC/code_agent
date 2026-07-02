@@ -505,6 +505,6 @@ sequenceDiagram
 - `eventBus.ts:subscribe`：`state_resync_required`——`epoch_reset`（`lastEventId >= nextId`，`replayFrom=0`）与 `ring_evicted`（`earliestInRing > lastEventId+1`）两条 gap 检测。
 - SDK `events.ts:reduceDaemonSessionEvent`：`awaitingResync` 一向闩 + `RESYNC_PASSTHROUGH_TYPES` 白名单。
 
-### #5174/#5211 — daemon_status capability and baseline
+### #5174 — daemon_status capability
 
 - #5174 注册 `daemon_status` baseline capability，新增 `GET /daemon/status` summary/full JSON surface。

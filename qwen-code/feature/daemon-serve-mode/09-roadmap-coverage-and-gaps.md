@@ -168,7 +168,7 @@ capability registry → DaemonSessionClient → typed events
 | 运行时 MCP server 增删（T2.8）| ✅ →dmbm | [#4552](https://github.com/QwenLM/qwen-code/pull/4552) | [06](06-mcp-guardrails-and-pool.md) |
 | acp-bridge 抽包 seam（F1）| ✅ →dmbm | #4295/#4298/#4304/#4319/#4334/#4445 | [07](07-acp-bridge-and-permission.md) |
 | 4 策略多客户端权限仲裁（F3）| ✅ →dmbm | [#4335](https://github.com/QwenLM/qwen-code/pull/4335) | [07](07-acp-bridge-and-permission.md) |
-| 扩展端点 recap/btw/shell/tasks/stats/rewind/hooks/extensions/settings + daemon logger | ✅ →dmbm | #4504/#4610/#4576/#4578/#4559/#4606/#4816/#4820/#4822/#4832/#4834 | [08](08-extension-endpoints.md) |
+| 扩展端点 recap/btw/shell/tasks/stats/rewind/hooks/extensions/settings + daemon logger | ✅ →dmbm | #4504/#4610/#4576/#4578/#4559/#4606/#4816/#4820/#4822/#4832 | [08](08-extension-endpoints.md) |
 | **read-only 状态路由**（`/workspace/{mcp,skills,providers,extensions,hooks}` + `/session/:id/{context,context-usage,supported-commands,tasks,stats,hooks}`）| ✅ →main/→dmbm | [#4241](https://github.com/QwenLM/qwen-code/pull/4241) + follow-ups #4515/#4822/#4832 | [01](01-http-server-and-middleware.md) 路由表 + [04](04-capabilities-and-protocol.md) 覆盖矩阵 + [08](08-extension-endpoints.md) |
 | **preflight/env 诊断路由** + closed errorKind 分类 | ✅ →main | [#4251](https://github.com/QwenLM/qwen-code/pull/4251) | ⚠️ **未文档化** |
 | **workspace memory/agents CRUD + generate** | ✅ →main/→dmbm | [#4249](https://github.com/QwenLM/qwen-code/pull/4249) + follow-up `workspace_agent_generate` | ⚠️ **部分未文档化**（01/04 提及，缺少单独 CRUD 深入）|

@@ -201,7 +201,7 @@ stateDiagram-v2
 
 **archive / unarchive**（#6058）：`POST /sessions/archive` 把 active JSONL 从 `chats/` 移到 `chats/archive/`，`POST /sessions/unarchive` 反向恢复。archive 是状态转换而不是删除：file history、subagent transcript 和 runtime sidecar 保留；live session archive 会先 strict close 并要求 agent close handler flush recording，失败则不移动 JSONL。`SessionArchiveCoordinator` 对同一 session id 提供 exclusive/shared gate，避免 archive 与 load/resume/prompt/delete 并发踩踏。archived session load/resume 返回 `409 session_archived`，active/archive 双写返回 `409 session_conflict`。
 
-**daemon-managed channel worker**（#6031/#6098）：`qwen serve --channel <name>|all` 在 daemon runtime ready 后 fork internal `channel daemon-worker`。worker 经 TS SDK + `DaemonChannelBridge` 回连 daemon，channel session create/load 强制 `sessionScope:'thread'`，并把 pidfile ownership、requested/connected channels、worker pid 和 `/daemon/status.runtime.channelWorker` 暴露给管理面。#6098 增加 ready 后有界重启、15s heartbeat / 45s stale kill、partial-connect issue、stale pid 清理、日志脱敏与 buffer 上限；ready 前仍 fail-fast，避免 serve 启动时静默丢 channel。
+**daemon-managed channel worker**（#6031/#6098/#6146）：`qwen serve --channel <name>|all` 在 daemon runtime ready 后 fork internal `channel daemon-worker`。worker 经 TS SDK + `DaemonChannelBridge` 回连 daemon，channel session create/load 强制 `sessionScope:'thread'`，并把 pidfile ownership、requested/connected channels、worker pid 和 `/daemon/status.runtime.channelWorker` 暴露给管理面。#6098 增加 ready 后有界重启、15s heartbeat / 45s stale kill、partial-connect issue、stale pid 清理、日志脱敏与 buffer 上限；#6146 再把 worker stderr 与 ACP child stderr 的 credential redaction 抽成 `redactLogCredentials()`，覆盖 bearer/API key/secret env/JSON secret/URL credential 等模式，并在 stderr terminal 与 daemon log file 两条路径同时生效；ready 前仍 fail-fast，避免 serve 启动时静默丢 channel。
 
 ```mermaid
 sequenceDiagram

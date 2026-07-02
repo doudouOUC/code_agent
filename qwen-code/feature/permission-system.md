@@ -1,7 +1,7 @@
 # 权限系统技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的工具调用权限子系统。
-> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）已在 `main`。
+> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）与 plan-required teammate leader approval（#6138）已在 `main`。
 
 ---
 
@@ -545,8 +545,10 @@ stateDiagram-v2
 - `tools/enterPlanMode.ts` / `tools/exitPlanMode.ts`：runtime guard 返回错误 ToolResult，不修改 approval mode 或 plan gate state。
 - `core/coreToolScheduler.ts`：plan-mode 阻断非只读工具时，对 subagent/SDK 使用“直接把计划交回 caller”的 reminder，而不是引导进入交互式 approval flow。
 
-### #6138（open）— plan-required teammate leader approval 观察
+### #6138 — plan-required teammate leader approval
 
-- open PR 仅登记当前 diff：`agent(plan_mode_required:true)` 会以 team teammate 身份启动在 plan mode，调用 `exit_plan_mode` 后由 `TeamManager.requestPlanApproval` 把 plan envelope 发给 leader。
-- `team_plan_approval` 是 leader-only tool；teammate/subagent runtime 下不可用。批准时会根据 leader 当前 approval mode 恢复 teammate 执行态，`AUTO` 或 untrusted `AUTO_EDIT`/`YOLO` 降级到 `DEFAULT`。
-- 合入前本方案不把它作为 main 已落地能力；后续需结合 merged diff 再展开 team permission flow。
+- `tools/agent/agent.ts`：新增 `plan_mode_required` 参数，仅对 named teammate 生效；teammate 启动时进入 `ApprovalMode.PLAN`，并把 identity 标记为 plan-required。
+- `agents/team/TeamManager.ts`：维护 pending approval map，`requestPlanApproval()` 生成 opaque request id，把 teammate-authored plan 包在 `<team_plan_approval_request>` envelope 中发送给 leader，并把 payload 标为不可信数据。
+- `tools/team-plan-approval.ts`：新增 leader-only approve/reject tool；teammate/subagent runtime 下 fail-closed，避免子 agent 自批。
+- `core/coreToolScheduler.ts` / `agents/runtime/subagent-plan-tool-policy.ts`：等待 leader 批准期间只允许 `exit_plan_mode` 与 claim-only `task_update(status:"in_progress")`，其他工具返回 pre-approval blocked message。
+- 批准后根据 leader 当前 approval mode 恢复 teammate 执行态；`AUTO` 或 untrusted `AUTO_EDIT`/`YOLO` 降级到 `DEFAULT`，leader 仍在 `PLAN` 时拒绝批准并保留 pending。

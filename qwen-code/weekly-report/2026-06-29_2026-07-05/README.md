@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-06-29 ~ 2026-07-05 (W27 日增量)
 
-> 本文件已整理 2026-06-29、2026-06-30 与 2026-07-01（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-01 窗口为北京时间 `2026-07-01 00:00:00` ~ `23:59:59`，对应 UTC `2026-06-30T16:00:00Z` ~ `2026-07-01T15:59:59Z`。口径为 `QwenLM/qwen-code` 中由 @doudouOUC 创建、更新、关闭或合入的 PR；open PR 只登记当前 diff 观察，不按已落地 main 能力写入 feature 正文。
+> 本文件已整理 2026-06-29、2026-06-30、2026-07-01 与 2026-07-02（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-02 窗口为北京时间 `2026-07-02 00:00:00` ~ `23:59:59`，对应 UTC `2026-07-01T16:00:00Z` ~ `2026-07-02T15:59:59Z`。口径为 `QwenLM/qwen-code` 中由 @doudouOUC 创建、更新、关闭或合入的 PR；本页只保留 author 为 @doudouOUC 的 PR。
 
-**主题**: telemetry 文档/schema 对齐、subagent output-token display、serve fast-path guard、ChannelAgentBridge、daemon-managed channel worker、session archive、subagent plan lifecycle policy、skills ACP 输出、plan-required teammate approval、whitespace-only diff
+**主题**: telemetry 文档/schema 对齐、subagent output-token display、serve fast-path guard、ChannelAgentBridge、daemon-managed channel worker、session archive、subagent plan lifecycle policy、skills ACP 输出、plan-required teammate approval、whitespace-only diff、worker stderr credential redaction、turn_complete SSE barrier、bridge session listing
 
-**PR 统计**: 16 PRs - 13 merged / 3 open / 0 closed
-**当前已合并 PR 代码量**: +20,986 / -2,621，226 个文件变更
-**全量代码量**: +23,742 / -2,868，277 个文件变更
-**类型分布**: fix ×8, feat ×7, docs ×1
-**范围 (scope)**: cli/serve ×7, daemon/session ×2, channels ×3, telemetry ×1, ui/background-agent ×1, ACP/file boundary ×1, core/permissions ×2, core/team-agents ×1, core/diff ×1, cli/skills ×1
+**PR 统计**: 19 PRs - 19 merged / 0 open / 0 closed
+**当前已合并 PR 代码量**: +25,390 / -2,916，298 个文件变更
+**全量代码量**: +25,390 / -2,916，298 个文件变更
+**类型分布**: fix ×9, feat ×9, docs ×1
+**范围 (scope)**: cli/serve ×8, daemon/session ×2, channels ×5, telemetry ×1, ui/background-agent ×1, ACP/file boundary ×1, acp-bridge/logging ×1, core/permissions ×3, core/team-agents ×1, core/diff ×1, cli/skills ×1
 
 ---
 
@@ -29,9 +29,12 @@
 | [#6058](https://github.com/QwenLM/qwen-code/pull/6058) | ✅ merged | @doudouOUC | feat(daemon): Add session archive support | +5543/-1323 | 41 | 06-30 08:23 | 07-01 08:24 |
 | [#6087](https://github.com/QwenLM/qwen-code/pull/6087) | ✅ merged | @doudouOUC | feat(core): Disallow plan lifecycle tools in subagents | +966/-58 | 17 | 06-30 16:10 | 07-01 04:43 |
 | [#6098](https://github.com/QwenLM/qwen-code/pull/6098) | ✅ merged | @doudouOUC | feat(cli): Harden daemon-managed channel worker | +2541/-238 | 15 | 07-01 03:24 | 07-01 13:29 |
-| [#6117](https://github.com/QwenLM/qwen-code/pull/6117) | 🟡 open | @doudouOUC | feat(cli): show description and level in /skills ACP output | +194/-99 | 6 | 07-01 09:23 | - |
-| [#6138](https://github.com/QwenLM/qwen-code/pull/6138) | 🟡 open | @doudouOUC | feat(core): Add leader approval for plan-required teammates | +2396/-93 | 37 | 07-01 15:00 | - |
-| [#6141](https://github.com/QwenLM/qwen-code/pull/6141) | 🟡 open | @doudouOUC | fix(diff): show whitespace-only edits instead of 'No changes detected' | +166/-55 | 8 | 07-01 15:56 | - |
+| [#6117](https://github.com/QwenLM/qwen-code/pull/6117) | ✅ merged | @doudouOUC | feat(cli): show description and level in /skills ACP output | +194/-99 | 6 | 07-01 09:23 | 07-01 20:12 |
+| [#6138](https://github.com/QwenLM/qwen-code/pull/6138) | ✅ merged | @doudouOUC | feat(core): Add leader approval for plan-required teammates | +3212/-118 | 43 | 07-01 15:00 | 07-01 23:46 |
+| [#6141](https://github.com/QwenLM/qwen-code/pull/6141) | ✅ merged | @doudouOUC | fix(diff): show whitespace-only edits instead of 'No changes detected' | +174/-61 | 8 | 07-01 15:56 | 07-01 20:14 |
+| [#6146](https://github.com/QwenLM/qwen-code/pull/6146) | ✅ merged | @doudouOUC | feat(cli): add credential redaction for worker stderr forwarding | +432/-6 | 7 | 07-01 23:39 | 07-02 12:55 |
+| [#6165](https://github.com/QwenLM/qwen-code/pull/6165) | ✅ merged | @doudouOUC | fix(channels): replace setTimeout(0) drain with turn_complete SSE barrier | +128/-11 | 2 | 07-02 05:34 | 07-02 08:59 |
+| [#6182](https://github.com/QwenLM/qwen-code/pull/6182) | ✅ merged | @doudouOUC | feat(channels): add listSessions to ChannelAgentBridge | +264/-0 | 6 | 07-02 09:43 | 07-02 10:49 |
 
 ---
 
@@ -52,9 +55,12 @@
 | [#6058](https://github.com/QwenLM/qwen-code/pull/6058) | daemon 需要 archive/unarchive session，把旧会话移出 active 列表但不删除 transcript。 | 以 `chats/` vs `chats/archive/` 的 JSONL 位置表达 active/archived；新增 REST、ACP vendor methods、HTTP-over-ACP、capability、SDK types/client，拒绝 archived load/resume，并用 `SessionArchiveCoordinator` 串行化 archive/delete/load/prompt 竞态。 | 已补 [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) 与 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md)。 |
 | [#6087](https://github.com/QwenLM/qwen-code/pull/6087) | subagent/team agent 仍可能调用 `enter_plan_mode` / `exit_plan_mode`，打断父会话的 plan 生命周期或伪造已获主用户批准的状态。 | 新增 `subagent-plan-tool-policy.ts`，在 AgentCore、WorkflowOrchestrator、tool-search、Enter/ExitPlanModeTool 和 CoreToolScheduler 多层阻断 plan lifecycle tools；scheduler 在 plan-mode 阻塞时对 subagent/SDK 返回“直接交回计划”的 reminder。 | 已补 [permission-system.md](../../feature/permission-system.md)。 |
 | [#6098](https://github.com/QwenLM/qwen-code/pull/6098) | daemon-managed channel worker 需要生产级稳定性：异常退出、无心跳、日志泄密、pidfile stale 和部分 channel 连接都需可诊断。 | supervisor 增加 ready 后重启策略（5 分钟窗口 3 次，1s/5s/15s backoff）、15s heartbeat/45s stale kill、stdout/stderr 脱敏与有界 buffer、snapshot error redaction、partial-connect issue、pidfile workerPid 清理和永久失败升级。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md)；也复核 [channel-adapters.md](../../feature/channel-adapters.md)。 |
-| [#6117](https://github.com/QwenLM/qwen-code/pull/6117) | open：ACP/non-interactive 下 `/skills` 只能回退到简陋列表，缺少 description 和 level；interactive 与 ACP 行为也容易漂移。 | 当前分支让 `/skills` 在 interactive 仍打开 dialog，ACP/non-interactive 返回只读列表；列表按 priority 排序，过滤 disabled / non-user-invocable skill，显示 description 与本地化 level，并抽出 `levelLabel` 供 dialog/list 共用。 | open，仅登记 CLI skills 输出观察，暂不写入 feature 正文。 |
-| [#6138](https://github.com/QwenLM/qwen-code/pull/6138) | open：计划型 teammate 需要先提交 plan 给 leader 批准，否则 team agent 可以在 plan mode 下直接执行。 | 当前分支新增 `plan_mode_required` agent 参数、`team_plan_approval` leader-only tool、TeamManager pending approval map、teammate plan envelope、pre-approval tool gate；teammate 只允许 `exit_plan_mode` 和 claim-only `task_update`，批准后按 leader 当前安全 mode 恢复。 | open，仅登记 core/team agents 观察；合入后再补 permission/team feature 正文。 |
-| [#6141](https://github.com/QwenLM/qwen-code/pull/6141) | open：edit/write/shell 等工具对 whitespace-only 改动使用 `ignoreWhitespace:true` 生成 diff 时会显示 “No changes detected”。 | 当前分支抽出 `createPatchSmart` / `structuredPatchSmart`：先用默认 ignoreWhitespace 生成干净 diff，若无 hunk 则 fallback 到 `ignoreWhitespace:false`；edit/notebook/write/shell/modifiable diff 统一走该 helper。 | open，仅登记 core diff 工具观察；合入后再决定是否单独成 feature。 |
+| [#6117](https://github.com/QwenLM/qwen-code/pull/6117) | ACP/non-interactive 下 `/skills` 只能回退到简陋列表，缺少 description 和 level；interactive 与 ACP 行为也容易漂移。 | `/skills` 在 interactive 仍打开 dialog；ACP/non-interactive 返回只读列表，按 priority/name 排序，过滤 disabled / non-user-invocable skill，显示 description 与本地化 level；`levelLabel()` 被 dialog/list 共享。 | 已补 [diagnostic-skills.md](../../feature/diagnostic-skills.md) 的命令/技能注册输出口径。 |
+| [#6138](https://github.com/QwenLM/qwen-code/pull/6138) | 计划型 teammate 需要先提交 plan 给 leader 批准，否则 team agent 可以在 plan mode 下直接执行。 | 新增 `plan_mode_required` agent 参数、`team_plan_approval` leader-only tool、TeamManager pending approval map、teammate plan envelope、pre-approval tool gate；teammate 只允许 `exit_plan_mode` 和 claim-only `task_update`，批准后按 leader 当前安全 mode 恢复。 | 已补 [permission-system.md](../../feature/permission-system.md) 的 team plan approval。 |
+| [#6141](https://github.com/QwenLM/qwen-code/pull/6141) | edit/write/shell 等工具对 whitespace-only 改动使用 `ignoreWhitespace:true` 生成 diff 时会显示 “No changes detected”。 | 抽出 `createPatchSmart` / `structuredPatchSmart`：先用默认 ignoreWhitespace 生成干净 diff，若无 hunk 则 fallback 到 `ignoreWhitespace:false`；edit/notebook/write/shell/modifiable diff 统一走该 helper。 | 作为 core diff 工具修复登记在本周实现文档。 |
+| [#6146](https://github.com/QwenLM/qwen-code/pull/6146) | worker stderr 透传路径可能把 bearer token、API key、proxy credential、secret env 等敏感值写入 daemon stderr 或日志。 | 新增 `redactLogCredentials()`，覆盖 Bearer/QQBot/Authorization/API key/env secret/JSON secret/URL credential/DingTalk token 等模式；ACP child stderr forwarder 和 daemon channel worker stderr pipe 均逐行脱敏、64 KiB 有界截断，并把安全行回调给 daemon log。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md) 与 channel worker hardening 说明。 |
+| [#6165](https://github.com/QwenLM/qwen-code/pull/6165) | `DaemonChannelBridge.prompt()` 依赖 `setTimeout(0)` 等待 late SSE chunk，存在时序猜测。 | `DaemonChannelBridge` 增加 per-session turn barrier；`turn_complete` 解析为确定性完成屏障，`turn_error` 先记录协议错误再释放屏障；drop/cancel/stop 都先 resolve，避免 prompt 等待泄漏；非 SSE prompt 路径仍保留 one-tick fallback。 | 已补 [channel-adapters.md](../../feature/channel-adapters.md)。 |
+| [#6182](https://github.com/QwenLM/qwen-code/pull/6182) | channel adapter/诊断工具无法枚举 bridge 当前附着的 daemon sessions。 | `ChannelAgentBridge` 增加 optional `listSessions()` 与 `BridgeSessionInfo`；`DaemonChannelBridge` 从内部 `sessions` map 和 `activePrompts` set 返回快照；daemon-worker facade 在 bridge 支持时透传该方法。 | 已补 [channel-adapters.md](../../feature/channel-adapters.md)。 |
 
 ## PR 对应 feature 覆盖
 
@@ -62,11 +68,11 @@
 |---|---|---|
 | [telemetry-observability/](../../feature/telemetry-observability/) | #5960 | 复核 telemetry 文档/schema 与当前实现对齐，周报按个人 PR 口径登记。 |
 | [background-agent-resume.md](../../feature/background-agent-resume.md) | #5972 | 补 subagent output-token 展示口径。 |
-| [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md) | #5977 #5989 #5995 #6013 #6031 #6058 #6098 | 补 standalone serve shim、serve fast-path source/bundle guard、首个 `/health` 前 runtime defer、daemon channel worker、session archive 和 worker hardening。 |
+| [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md) | #5977 #5989 #5995 #6013 #6031 #6058 #6098 #6146 | 补 standalone serve shim、serve fast-path source/bundle guard、首个 `/health` 前 runtime defer、daemon channel worker、session archive、worker hardening 和 stderr credential redaction。 |
 | [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #6058 | 补 active/archive JSONL 状态、archive/unarchive 路由和竞态门控。 |
 | [daemon-serve-mode/05-workspace-files-and-fs-boundary.md](../../feature/daemon-serve-mode/05-workspace-files-and-fs-boundary.md) | #6021 | 补 ACP managed local read fallback 与结构化错误渲染边界。 |
-| [channel-adapters.md](../../feature/channel-adapters.md) | #5978 #6031 #6098 | #5978 落地 `ChannelAgentBridge`；#6031 落地 daemon-managed worker；#6098 补 worker hardening。 |
-| [permission-system.md](../../feature/permission-system.md) | #6026 #6087 #6138(open) | 补 subagent approval-mode override、plan lifecycle tool 阻断；#6138 只登记 open 观察。 |
-| open 观察 | #6117 #6138 #6141 | 仅登记当前 diff，合入后再写入 feature 正文。 |
+| [channel-adapters.md](../../feature/channel-adapters.md) | #5978 #6031 #6098 #6165 #6182 | #5978 落地 `ChannelAgentBridge`；#6031 落地 daemon-managed worker；#6098 补 worker hardening；#6165 补 turn_complete prompt barrier；#6182 补 bridge session listing。 |
+| [permission-system.md](../../feature/permission-system.md) | #6026 #6087 #6138 | 补 subagent approval-mode override、plan lifecycle tool 阻断与 plan-required teammate leader approval。 |
+| [diagnostic-skills.md](../../feature/diagnostic-skills.md) | #6117 | 补 `/skills` ACP/non-interactive 输出 description 与 level 的口径。 |
 
-_日增量按个人 PR 口径更新于 2026-07-02_
+_日增量按个人 PR 口径更新于 2026-07-03_
