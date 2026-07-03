@@ -4,7 +4,6 @@
 
 | PR | 状态 | 标题 | 文档 |
 |---|---|---|---|
-| [#5960](https://github.com/QwenLM/qwen-code/pull/5960) | ✅ merged | docs(telemetry): comprehensive documentation update to match current implementation | [pr-5960.md](pr-5960.md) |
 | [#5972](https://github.com/QwenLM/qwen-code/pull/5972) | ✅ merged | fix(ui): display output tokens instead of cumulative API throughput for subagents | [pr-5972.md](pr-5972.md) |
 | [#5977](https://github.com/QwenLM/qwen-code/pull/5977) | ✅ merged | fix(standalone): Route serve shim through cli-entry | [pr-5977.md](pr-5977.md) |
 | [#5978](https://github.com/QwenLM/qwen-code/pull/5978) | ✅ merged | feat(channels): Add channel agent bridge abstraction | [pr-5978.md](pr-5978.md) |

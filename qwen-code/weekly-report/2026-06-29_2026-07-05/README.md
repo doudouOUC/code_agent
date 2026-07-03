@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-06-29 ~ 2026-07-05 (W27 日增量)
 
-> 本文件已整理 2026-06-29、2026-06-30、2026-07-01 与 2026-07-02（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-02 窗口为北京时间 `2026-07-02 00:00:00` ~ `23:59:59`，对应 UTC `2026-07-01T16:00:00Z` ~ `2026-07-02T15:59:59Z`。口径为 `QwenLM/qwen-code` 中由 @doudouOUC 创建、更新、关闭或合入的 PR；本页只保留 author 为 @doudouOUC 的 PR。
+> 本文件已整理 2026-06-29、2026-06-30、2026-07-01 与 2026-07-02（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-02 窗口为北京时间 `2026-07-02 00:00:00` ~ `23:59:59`，对应 UTC `2026-07-01T16:00:00Z` ~ `2026-07-02T15:59:59Z`。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在本周窗口内的 PR；只在本周合入、但创建时间不在本周窗口内的 PR 不计入本周统计。
 
-**主题**: telemetry 文档/schema 对齐、subagent output-token display、serve fast-path guard、ChannelAgentBridge、daemon-managed channel worker、session archive、subagent plan lifecycle policy、skills ACP 输出、plan-required teammate approval、whitespace-only diff、worker stderr credential redaction、turn_complete SSE barrier、bridge session listing
+**主题**: subagent output-token display、serve fast-path guard、ChannelAgentBridge、daemon-managed channel worker、session archive、subagent plan lifecycle policy、skills ACP 输出、plan-required teammate approval、whitespace-only diff、worker stderr credential redaction、turn_complete SSE barrier、bridge session listing
 
-**PR 统计**: 19 PRs - 19 merged / 0 open / 0 closed
-**当前已合并 PR 代码量**: +25,390 / -2,916，298 个文件变更
-**全量代码量**: +25,390 / -2,916，298 个文件变更
-**类型分布**: fix ×9, feat ×9, docs ×1
-**范围 (scope)**: cli/serve ×8, daemon/session ×2, channels ×5, telemetry ×1, ui/background-agent ×1, ACP/file boundary ×1, acp-bridge/logging ×1, core/permissions ×3, core/team-agents ×1, core/diff ×1, cli/skills ×1
+**PR 统计**: 18 PRs - 18 merged / 0 open / 0 closed
+**当前已合并 PR 代码量**: +24,998 / -2,751，289 个文件变更
+**全量代码量**: +24,998 / -2,751，289 个文件变更
+**类型分布**: fix ×9, feat ×9
+**范围 (scope)**: channels ×5, cli/serve ×4, core/permissions ×3, daemon/session ×1, ui/background-agent ×1, ACP/file boundary ×1, cli/skills ×1, core/diff ×1, acp-bridge/logging ×1
 
 ---
 
@@ -16,7 +16,6 @@
 
 | PR | 状态 | 作者 | 标题 | 变更 | 文件 | 创建(UTC) | 合并/关闭(UTC) |
 |---|---|---|---|---:|---:|---|---|
-| [#5960](https://github.com/QwenLM/qwen-code/pull/5960) | ✅ merged | @doudouOUC | docs(telemetry): comprehensive documentation update to match current implementation | +392/-165 | 9 | 06-28 12:46 | 06-28 21:10 |
 | [#5972](https://github.com/QwenLM/qwen-code/pull/5972) | ✅ merged | @doudouOUC | fix(ui): display output tokens instead of cumulative API throughput for subagents | +108/-81 | 21 | 06-29 02:09 | 06-29 07:38 |
 | [#5977](https://github.com/QwenLM/qwen-code/pull/5977) | ✅ merged | @doudouOUC | fix(standalone): Route serve shim through cli-entry | +157/-5 | 2 | 06-29 03:52 | 06-29 07:10 |
 | [#5978](https://github.com/QwenLM/qwen-code/pull/5978) | ✅ merged | @doudouOUC | feat(channels): Add channel agent bridge abstraction | +1661/-274 | 36 | 06-29 03:58 | 06-29 10:42 |
@@ -42,7 +41,6 @@
 
 | PR | 解决了什么问题 | 最终怎么实现（open 只登记当前观察） | 对应 feature 文档 |
 |---|---|---|---|
-| [#5960](https://github.com/QwenLM/qwen-code/pull/5960) | telemetry 文档/schema 与当前实现重新对齐。 | 刷新 developer docs、telemetry constants/loggers 与相关测试，修正 `qwen-code.tool_output_truncated` 事件命名。 | 已在上周补 [telemetry-observability/](../../feature/telemetry-observability/)，本轮只登记。 |
 | [#5972](https://github.com/QwenLM/qwen-code/pull/5972) | subagent/background agent token 展示改为 output tokens，避免把 API 吞吐量显示成百万 token。 | CLI/web-shell/webui 多个 agent card/status 面统一读 `outputTokens`，旧 payload fallback 到 `totalTokens`。 | 已补 [background-agent-resume.md](../../feature/background-agent-resume.md) 与 WebUI 文档。 |
 | [#5977](https://github.com/QwenLM/qwen-code/pull/5977) | standalone 包中的 `qwen serve` 走 `cli-entry.js` fast path。 | 打包脚本让 serve shim 调 `lib/cli-entry.js`，非 serve 保持 `node --expose-gc lib/cli.js`，并跳过 npm-only artifacts。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md)。 |
 | [#5978](https://github.com/QwenLM/qwen-code/pull/5978) | 引入 adapter-facing `ChannelAgentBridge` 抽象。 | adapters/router/channel start 依赖窄 bridge contract；`AcpBridge` 继续作为 standalone 实现，并修 session cleanup、restore/create race 和 bridge swap listener。 | 已补 [channel-adapters.md](../../feature/channel-adapters.md)。 |
@@ -66,7 +64,6 @@
 
 | feature 文档 | 本日新增/复核 PR | 文档动作 |
 |---|---|---|
-| [telemetry-observability/](../../feature/telemetry-observability/) | #5960 | 复核 telemetry 文档/schema 与当前实现对齐，周报按个人 PR 口径登记。 |
 | [background-agent-resume.md](../../feature/background-agent-resume.md) | #5972 | 补 subagent output-token 展示口径。 |
 | [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md) | #5977 #5989 #5995 #6013 #6031 #6058 #6098 #6146 | 补 standalone serve shim、serve fast-path source/bundle guard、首个 `/health` 前 runtime defer、daemon channel worker、session archive、worker hardening 和 stderr credential redaction。 |
 | [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #6058 | 补 active/archive JSONL 状态、archive/unarchive 路由和竞态门控。 |
