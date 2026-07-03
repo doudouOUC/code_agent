@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-06-29 ~ 2026-07-05 (W27 日增量)
 
-> 本文件已整理 2026-06-29、2026-06-30、2026-07-01 与 2026-07-02（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-02 窗口为北京时间 `2026-07-02 00:00:00` ~ `23:59:59`，对应 UTC `2026-07-01T16:00:00Z` ~ `2026-07-02T15:59:59Z`。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在本周窗口内的 PR；只在本周合入、但创建时间不在本周窗口内的 PR 不计入本周统计。
+> 本文件已整理 2026-06-29、2026-06-30、2026-07-01、2026-07-02 与 2026-07-03（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-03 窗口为北京时间 `2026-07-03 00:00:00` ~ `23:59:59`，对应 UTC `2026-07-02T16:00:00Z` ~ `2026-07-03T15:59:59Z`。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在本周窗口内的 PR；只在本周合入、但创建时间不在本周窗口内的 PR 不计入本周统计。
 
-**主题**: subagent output-token display、serve fast-path guard、ChannelAgentBridge、daemon-managed channel worker、session archive、subagent plan lifecycle policy、skills ACP 输出、plan-required teammate approval、whitespace-only diff、worker stderr credential redaction、turn_complete SSE barrier、bridge session listing
+**主题**: subagent output-token display、serve fast-path guard、ChannelAgentBridge、daemon-managed channel worker、session archive、subagent plan lifecycle policy、skills ACP 输出、plan-required teammate approval、whitespace-only diff、worker stderr credential redaction、turn_complete SSE barrier、bridge session listing、skills.disabled status、daemon dashboard、daemon NDJSON perf、daemon status activity
 
-**PR 统计**: 18 PRs - 18 merged / 0 open / 0 closed
-**当前已合并 PR 代码量**: +24,998 / -2,751，289 个文件变更
-**全量代码量**: +24,998 / -2,751，289 个文件变更
-**类型分布**: fix ×9, feat ×9
-**范围 (scope)**: channels ×5, cli/serve ×4, core/permissions ×3, daemon/session ×1, ui/background-agent ×1, ACP/file boundary ×1, cli/skills ×1, core/diff ×1, acp-bridge/logging ×1
+**PR 统计**: 22 PRs - 19 merged / 1 open / 2 closed
+**当前已合并 PR 代码量**: +26,207 / -2,799，314 个文件变更
+**全量代码量**: +28,173 / -2,840，343 个文件变更
+**类型分布**: fix ×11, feat ×11
+**范围 (scope)**: cli/serve ×8, channels ×5, core/permissions ×3, daemon/session ×1, ui/background-agent ×1, ACP/file boundary ×1, cli/skills ×1, core/diff ×1, acp-bridge/logging ×1
 
 ---
 
@@ -34,6 +34,10 @@
 | [#6146](https://github.com/QwenLM/qwen-code/pull/6146) | ✅ merged | @doudouOUC | feat(cli): add credential redaction for worker stderr forwarding | +432/-6 | 7 | 07-01 23:39 | 07-02 12:55 |
 | [#6165](https://github.com/QwenLM/qwen-code/pull/6165) | ✅ merged | @doudouOUC | fix(channels): replace setTimeout(0) drain with turn_complete SSE barrier | +128/-11 | 2 | 07-02 05:34 | 07-02 08:59 |
 | [#6182](https://github.com/QwenLM/qwen-code/pull/6182) | ✅ merged | @doudouOUC | feat(channels): add listSessions to ChannelAgentBridge | +264/-0 | 6 | 07-02 09:43 | 07-02 10:49 |
+| [#6233](https://github.com/QwenLM/qwen-code/pull/6233) | ❌ closed | @doudouOUC | fix(serve): surface skills.disabled user setting in /workspace/skills endpoint | +86/-8 | 10 | 07-03 05:56 | 07-03 12:17 |
+| [#6253](https://github.com/QwenLM/qwen-code/pull/6253) | ❌ closed | @doudouOUC | feat(serve): Add daemon status dashboard | +1766/-32 | 15 | 07-03 08:24 | 07-03 12:07 |
+| [#6263](https://github.com/QwenLM/qwen-code/pull/6263) | ✅ merged | @doudouOUC | fix(serve): Optimize daemon NDJSON stream handling | +1209/-48 | 25 | 07-03 11:29 | 07-03 15:27 |
+| [#6270](https://github.com/QwenLM/qwen-code/pull/6270) | 🟡 open | @doudouOUC | feat(serve): Add runtime.activity fields to daemon status API | +114/-1 | 4 | 07-03 12:38 | open |
 
 ---
 
@@ -59,6 +63,10 @@
 | [#6146](https://github.com/QwenLM/qwen-code/pull/6146) | worker stderr 透传路径可能把 bearer token、API key、proxy credential、secret env 等敏感值写入 daemon stderr 或日志。 | 新增 `redactLogCredentials()`，覆盖 Bearer/QQBot/Authorization/API key/env secret/JSON secret/URL credential/DingTalk token 等模式；ACP child stderr forwarder 和 daemon channel worker stderr pipe 均逐行脱敏、64 KiB 有界截断，并把安全行回调给 daemon log。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md) 与 channel worker hardening 说明。 |
 | [#6165](https://github.com/QwenLM/qwen-code/pull/6165) | `DaemonChannelBridge.prompt()` 依赖 `setTimeout(0)` 等待 late SSE chunk，存在时序猜测。 | `DaemonChannelBridge` 增加 per-session turn barrier；`turn_complete` 解析为确定性完成屏障，`turn_error` 先记录协议错误再释放屏障；drop/cancel/stop 都先 resolve，避免 prompt 等待泄漏；非 SSE prompt 路径仍保留 one-tick fallback。 | 已补 [channel-adapters.md](../../feature/channel-adapters.md)。 |
 | [#6182](https://github.com/QwenLM/qwen-code/pull/6182) | channel adapter/诊断工具无法枚举 bridge 当前附着的 daemon sessions。 | `ChannelAgentBridge` 增加 optional `listSessions()` 与 `BridgeSessionInfo`；`DaemonChannelBridge` 从内部 `sessions` map 和 `activePrompts` set 返回快照；daemon-worker facade 在 bridge 支持时透传该方法。 | 已补 [channel-adapters.md](../../feature/channel-adapters.md)。 |
+| [#6233](https://github.com/QwenLM/qwen-code/pull/6233) | `/workspace/skills` 没有把用户 `skills.disabled` 设置透给客户端，禁用 skill 仍会出现在 Web Shell 和 webui 命令列表。 | workspace skill wire type 增加 optional `disabled`；status mapper 命中 disabled names 时输出 `status: disabled` 与 `disabled: true`；Web Shell、webui mapper 和 hook 过滤 disabled skill。 | 已补 [diagnostic-skills.md](../../feature/diagnostic-skills.md) 与实现文档；closed 未合入。 |
+| [#6253](https://github.com/QwenLM/qwen-code/pull/6253) | daemon status JSON 缺少可直接打开的可视化排障入口，Web Shell 内也没有 status dashboard。 | 新增 standalone `/dashboard` inline HTML 页面和 Web Shell `DashboardDialog`；页面消费 `/daemon/status`，支持 Summary/Full、自动刷新、bearer token；路由继承 `/demo` 的 loopback/pre-auth 与非 loopback bearer 策略，并加 CSP/XFO。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md)；closed 未合入。 |
+| [#6263](https://github.com/QwenLM/qwen-code/pull/6263) | daemon/ACP child NDJSON stdio receive path 对跨 chunk 大消息可能做重复 whole-buffer split，且缺少 event-loop lag 与 pipe payload size 观测。 | `@qwen-code/acp-bridge` 新增 incremental `ndJsonStream`；daemon child 路径使用本地 stream 和 byte hooks，非 daemon 保持 SDK stream；daemon 与 ACP child 启动 event-loop lag monitor，OTel 暴露 daemon/acp lag gauge 与 daemon pipe histogram，`/daemon/status` 增加 optional `runtime.perf`。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md) 与 telemetry/observability 说明。 |
+| [#6270](https://github.com/QwenLM/qwen-code/pull/6270) | `/daemon/status` 缺少 active prompt、last activity 与 idle duration；full workspace status 的 MCP summary 也缺少 server health 聚合。 | `runtime.activity` 增加 `activePrompts`、`lastActivityAt`、`idleSinceMs`，bootstrap status 返回稳定默认值；MCP section summary 统计 connected/errored/disabled servers。 | 已补 [daemon-serve-mode/README.md](../../feature/daemon-serve-mode/README.md)；open 当前观察。 |
 
 ## PR 对应 feature 覆盖
 
@@ -70,6 +78,7 @@
 | [daemon-serve-mode/05-workspace-files-and-fs-boundary.md](../../feature/daemon-serve-mode/05-workspace-files-and-fs-boundary.md) | #6021 | 补 ACP managed local read fallback 与结构化错误渲染边界。 |
 | [channel-adapters.md](../../feature/channel-adapters.md) | #5978 #6031 #6098 #6165 #6182 | #5978 落地 `ChannelAgentBridge`；#6031 落地 daemon-managed worker；#6098 补 worker hardening；#6165 补 turn_complete prompt barrier；#6182 补 bridge session listing。 |
 | [permission-system.md](../../feature/permission-system.md) | #6026 #6087 #6138 | 补 subagent approval-mode override、plan lifecycle tool 阻断与 plan-required teammate leader approval。 |
-| [diagnostic-skills.md](../../feature/diagnostic-skills.md) | #6117 | 补 `/skills` ACP/non-interactive 输出 description 与 level 的口径。 |
+| [diagnostic-skills.md](../../feature/diagnostic-skills.md) | #6117 #6233 | 补 `/skills` ACP/non-interactive 输出 description 与 level 的口径；#6233 记录 `/workspace/skills` disabled wire/filtering 方案（closed 未合入）。 |
+| [telemetry-observability/README.md](../../feature/telemetry-observability/README.md) | #6263 | 补 daemon/ACP event-loop lag gauge 与 daemon pipe message byte histogram。 |
 
-_日增量按个人 PR 口径更新于 2026-07-03_
+_日增量按个人 PR 口径更新于 2026-07-04_

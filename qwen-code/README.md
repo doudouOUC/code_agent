@@ -40,4 +40,4 @@ qwen-code/
 2. 查一个能力：先看 `feature/README.md` 找专题，再进入对应 feature 文档。
 3. 查描述是否准确：看 `description-accuracy.md`，必要时回到周报实现文档交叉验证。
 
-_更新于 2026-06-30_
+_更新于 2026-07-04_

@@ -357,6 +357,13 @@ sequenceDiagram
 - **输出字段**：每行显示 skill name、单行 description 和本地化 level label；无 description/level 时不留下空括号或尾随空格。
 - **复用点**：`skill-level-label.ts:levelLabel()` 被 `SkillsList.tsx` 与 command fallback 共用，降低 dialog/list 文案漂移。
 
+### #6233 /workspace/skills disabled wire 字段
+
+- **问题**：`GET /workspace/skills` 只反映 SKILL frontmatter 的 `disable-model-invocation`，没有把用户 settings 中的 `skills.disabled` 传给 Web Shell / webui。用户在 `/skills` dialog 中禁用的 skill 仍可能出现在 slash autocomplete 和 command list。
+- **最终实现方案**：workspace skill wire type 增加 optional `disabled?: boolean`；`mapSkillConfigToStatus()` 命中 disabled name 时输出 `status: 'disabled'` 与 `disabled: true`，未禁用项不输出该字段以保持 additive 兼容。
+- **消费端**：Web Shell skill list、webui `mapWorkspaceSkills()` 与 `useDaemonSkills()` 都按 `!skill.disabled` 过滤，避免 status 字段的其它非 ok 状态被误当成用户禁用。
+- **状态**：该 PR closed 未合入，本节只记录 diff 方案；已合入的 #6117 仍是当前 main 中 `/skills` ACP/non-interactive 输出的主要依据。
+
 ## 7. 已知限制 / 后续
 
 结合这些 PR 的 review 与现状：
@@ -368,4 +375,5 @@ sequenceDiagram
 - **`/stuck` 仅支持 macOS/Linux**：body 的 `ps -axo`/`grep`/`sample`/`/proc` 等命令在 Windows/PowerShell 不可用（Copilot review 指出），作者明确「暂不采纳，对齐上游 claude-code 行为，按需后续补 PowerShell 等价命令」。
 - **prompt 技能效果取决于模型遵循度**：`/stuck` 的 PID 白名单、脱敏、跨平台分支，`/batch` 的分块上限、单消息并行、空匹配 guard，全部是**写在 prompt 里的约束**，并非代码强制。模型若不遵循（如把非数字参数拼进 shell、或忘记脱敏），约束即失效。这是 prompt 技能范式相对代码命令的根本权衡。
 - **`allowedTools` 暂无运行时 gating**：v1 仅作文档与 cron 过滤；若未来开启工具门禁，需先做 `allowedTools → ToolNames` 的别名归一（如 `task → agent`），并修正 `edit_file` 之类非规范名，否则会静默失效。
+- **#6233 disabled wire 仍是 closed 方案**：`/workspace/skills.disabled` 字段和客户端过滤逻辑未随 #6233 合入 main；若后续重做，需要重新核对当前 status schema、Web Shell mapper 和 `/skills` dialog 的真实禁用来源。
 - **skill stats 只统计真实 body load**：#5826 有意排除 MCP prompt、文件命令 fallback 等路径；如果后续要回答“所有类技能入口”的使用情况，需要另建更宽口径的 command/source telemetry，不能复用当前 `skills` block 直接解释。

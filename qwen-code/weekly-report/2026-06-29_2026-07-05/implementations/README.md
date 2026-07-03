@@ -22,5 +22,9 @@
 | [#6146](https://github.com/QwenLM/qwen-code/pull/6146) | ✅ merged | feat(cli): add credential redaction for worker stderr forwarding | [pr-6146.md](pr-6146.md) |
 | [#6165](https://github.com/QwenLM/qwen-code/pull/6165) | ✅ merged | fix(channels): replace setTimeout(0) drain with turn_complete SSE barrier | [pr-6165.md](pr-6165.md) |
 | [#6182](https://github.com/QwenLM/qwen-code/pull/6182) | ✅ merged | feat(channels): add listSessions to ChannelAgentBridge | [pr-6182.md](pr-6182.md) |
+| [#6233](https://github.com/QwenLM/qwen-code/pull/6233) | ❌ closed | fix(serve): surface skills.disabled user setting in /workspace/skills endpoint | [pr-6233.md](pr-6233.md) |
+| [#6253](https://github.com/QwenLM/qwen-code/pull/6253) | ❌ closed | feat(serve): Add daemon status dashboard | [pr-6253.md](pr-6253.md) |
+| [#6263](https://github.com/QwenLM/qwen-code/pull/6263) | ✅ merged | fix(serve): Optimize daemon NDJSON stream handling | [pr-6263.md](pr-6263.md) |
+| [#6270](https://github.com/QwenLM/qwen-code/pull/6270) | 🟡 open | feat(serve): Add runtime.activity fields to daemon status API | [pr-6270.md](pr-6270.md) |
 
-_按个人 PR 口径更新于 2026-07-03_
+_按个人 PR 口径更新于 2026-07-04_

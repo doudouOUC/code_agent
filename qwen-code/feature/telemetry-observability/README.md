@@ -474,6 +474,14 @@ sequenceDiagram
 |---|---|---|---|
 | #5960 | telemetry docs refresh + event constant | 上游 developer docs 补齐未记录的 events/metrics/spans，修正 `diff_stat` attribute schema 描述，并把硬编码 `tool_output_truncated` 提取为 `EVENT_TOOL_OUTPUT_TRUNCATED = 'qwen-code.tool_output_truncated'` | Docs/schema |
 
+### 6.7 daemon event-loop lag 与 pipe payload metrics
+
+| PR | 子主题 | 作用 | Phase |
+|---|---|---|---|
+| #6263 | daemon NDJSON perf observability | 新增 `startEventLoopLagMonitor()`，用 `monitorEventLoopDelay` 读取 mean/p50/p99/max；注册 `qwen-code.daemon.event_loop.lag` 与 `qwen-code.acp.event_loop.lag` OTel gauge；daemon-child pipe payload size 通过 `qwen-code.daemon.pipe.message_bytes` histogram 记录 inbound/outbound。 | Daemon perf |
+
+#6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程把 event-loop snapshot 与 pipe byte 聚合同时接到 `/daemon/status.runtime.perf`，ACP child event-loop lag 不进入 status JSON，只通过 OTel gauge 和 forwarded stderr stall warning 暴露。这样 status endpoint 保持 daemon-local 诊断语义，跨进程细节仍交给 telemetry backend。
+
 ---
 
 ## 7. 已知限制 / 后续
@@ -497,3 +505,5 @@ sequenceDiagram
 9. **daemon 遥测分支标注为历史语境**：早期文档中的 `daemon_mode_b_main` 标注表示原始落地位置。#4490 已在 2026-06-11 将 daemon feature batch 合入 `main`，#5047 又补了 daemon ACP trace continuity；继续维护时应以当前 `main` 的 `daemon-tracing.ts` / `Session.ts` / `runtime-config.ts` 为准。
 
 10. **`tool_output_truncated` 事件名有兼容性变更（#5960）**：#5960 把原先 hardcoded、未加命名空间的 `tool_output_truncated` 改为 `qwen-code.tool_output_truncated`，与其它 event constants 对齐。代码侧更一致，但下游 collector/dashboard/filter 如果按旧事件名筛选，需要同时迁移 filter。
+
+11. **#6263 的 child lag 只走 telemetry/stderr**：`/daemon/status.runtime.perf` 只表示 daemon 进程；ACP child event-loop lag 不在 status JSON 内。dashboard 若只读 `/daemon/status`，不能把 child 卡顿误判为缺失数据，需要同时看 OTel gauge 或 stderr stall warning。

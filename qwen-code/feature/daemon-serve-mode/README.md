@@ -203,6 +203,10 @@ stateDiagram-v2
 
 **daemon-managed channel worker**（#6031/#6098/#6146）：`qwen serve --channel <name>|all` 在 daemon runtime ready 后 fork internal `channel daemon-worker`。worker 经 TS SDK + `DaemonChannelBridge` 回连 daemon，channel session create/load 强制 `sessionScope:'thread'`，并把 pidfile ownership、requested/connected channels、worker pid 和 `/daemon/status.runtime.channelWorker` 暴露给管理面。#6098 增加 ready 后有界重启、15s heartbeat / 45s stale kill、partial-connect issue、stale pid 清理、日志脱敏与 buffer 上限；#6146 再把 worker stderr 与 ACP child stderr 的 credential redaction 抽成 `redactLogCredentials()`，覆盖 bearer/API key/secret env/JSON secret/URL credential 等模式，并在 stderr terminal 与 daemon log file 两条路径同时生效；ready 前仍 fail-fast，避免 serve 启动时静默丢 channel。
 
+**status / dashboard / perf surface**（#6253/#6263/#6270）：`/daemon/status` 继续作为 daemon 诊断聚合端点扩展。#6263 增加 optional `runtime.perf`，只暴露 daemon 进程 event-loop lag snapshot 与 daemon-child pipe inbound/outbound byte 统计；ACP child lag 留在 OTel gauge 与 forwarded stderr stall warning，避免把 child-only 观测塞进 status JSON。#6270 在 `runtime.activity` 增加 `activePrompts`、`lastActivityAt`、`idleSinceMs`，bootstrap status 返回稳定 `0/null/null`，并给 full workspace MCP section summary 补 `serversConnected`、`serversErrored`、`serversDisabled`。#6253 的 closed diff 设计了只读 `/dashboard` inline HTML 与 Web Shell `DashboardDialog`，消费同一 `/daemon/status`，并沿用 `/demo` 的 loopback pre-auth / non-loopback bearer 边界。
+
+**daemon/ACP NDJSON hot path**（#6263）：daemon 与 ACP child 的 stdio 通路改用 `@qwen-code/acp-bridge` 内的 incremental `ndJsonStream`，逐 chunk 扫描 newline，只把跨 chunk 尾段留在 pending，避免大消息 split 时重复处理整段 buffer。收发 hook 记录 payload bytes，hook 异常不影响传输；非 daemon 路径继续使用 SDK stream，降低兼容风险。
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -433,6 +437,10 @@ sequenceDiagram
 | #5989 | fast-path source import guard | 修 request helper 通过兼容 re-export 静态触达 ACP runtime 的回归；fast path 只引用轻量 ACP bridge 子路径，新增 source-level import graph 与 bundle metafile guard，确保 ACP runtime 留在 dynamic import 边界之后。 |
 | #5995 | fast-path bundle closure guard | 将真实 bundle 的重检查移出 CLI 单测，新增 `check:serve-fast-path-bundle` / CI guard，按 esbuild metafile 追踪 pre-listen static output imports，禁止 ACP bridge runtime、core shell runtime 和重 vendor 包进入静态闭包。 |
 | #6013 | health-before-runtime guard | `runQwenServe` 在首个 bootstrap `/health` flush 后再启动完整 runtime，并用 fallback timer 覆盖无 health probe 场景；headless YOLO warning 保持轻量路径，避免 core runtime import 阻塞首个 health 响应。 |
+| #6233 | workspace skills disabled status | `/workspace/skills` wire type 增加 optional `disabled` 并让 Web Shell/webui 过滤 disabled skill；closed 未合入，仅记录方案。 |
+| #6253 | daemon status dashboard | 新增 standalone `/dashboard` inline HTML 与 Web Shell `DashboardDialog`，消费 `/daemon/status` 并继承 loopback/non-loopback 鉴权边界；closed 未合入，仅记录方案。 |
+| #6263 | NDJSON stream perf + observability | daemon child ACP stdio path 使用 incremental NDJSON stream，新增 event-loop lag monitor、daemon pipe byte metrics 与 `/daemon/status.runtime.perf`。 |
+| #6270 | daemon status activity | `/daemon/status.runtime.activity` 暴露 active prompt 数、最近活动时间和 idle duration，并给 MCP workspace summary 补 server health 计数；open 当前观察。 |
 
 ---
 
@@ -619,6 +627,10 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #5989 | source import guard | request helper 避免静态拉入 ACP runtime，source graph / bundle metafile 回归测试保护 lazy runtime split。 |
 | #5995 | bundle closure guard | CI 中用 esbuild metafile 检查 pre-listen static closure，禁止 ACP/core/vendor 重模块进入 fast path。 |
 | #6013 | health-before-runtime guard | 首个 `/health` 响应 flush 前不启动完整 runtime，fallback timer 保证无 probe 时仍会加载 runtime。 |
+| #6233 | workspace skills disabled status | `/workspace/skills` 增加 disabled wire 字段并驱动客户端过滤；closed 未合入。 |
+| #6253 | status dashboard | `/dashboard` inline page 与 Web Shell dashboard dialog 读取 `/daemon/status`；closed 未合入。 |
+| #6263 | NDJSON perf / runtime.perf | daemon ACP stdio 用 incremental NDJSON stream，event-loop lag 与 pipe byte stats 进入 OTel 和 status。 |
+| #6270 | runtime.activity | `/daemon/status` 增加 active prompt、last activity、idle duration 以及 MCP server summary；open。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 
