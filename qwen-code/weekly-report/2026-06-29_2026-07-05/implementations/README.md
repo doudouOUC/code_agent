@@ -26,5 +26,12 @@
 | [#6253](https://github.com/QwenLM/qwen-code/pull/6253) | ❌ closed | feat(serve): Add daemon status dashboard | [pr-6253.md](pr-6253.md) |
 | [#6263](https://github.com/QwenLM/qwen-code/pull/6263) | ✅ merged | fix(serve): Optimize daemon NDJSON stream handling | [pr-6263.md](pr-6263.md) |
 | [#6270](https://github.com/QwenLM/qwen-code/pull/6270) | 🟡 open | feat(serve): Add runtime.activity fields to daemon status API | [pr-6270.md](pr-6270.md) |
+| [#6292](https://github.com/QwenLM/qwen-code/pull/6292) | ✅ merged | fix(acp): pass per-session settings explicitly instead of racing on this.settings | [pr-6292.md](pr-6292.md) |
+| [#6296](https://github.com/QwenLM/qwen-code/pull/6296) | 🟡 open | fix(serve): resolve false auth warning in preflight when API key is set via settings | [pr-6296.md](pr-6296.md) |
+| [#6297](https://github.com/QwenLM/qwen-code/pull/6297) | ✅ merged | feat(daemon): Add session export endpoint | [pr-6297.md](pr-6297.md) |
+| [#6305](https://github.com/QwenLM/qwen-code/pull/6305) | 🟡 open | feat(daemon): Add session organization | [pr-6305.md](pr-6305.md) |
+| [#6309](https://github.com/QwenLM/qwen-code/pull/6309) | 🟡 open | feat(acp): Batch session load replay | [pr-6309.md](pr-6309.md) |
+| [#6310](https://github.com/QwenLM/qwen-code/pull/6310) | ✅ merged | perf(cli): cache LoadedSettings per workspace with stat-based invalidation | [pr-6310.md](pr-6310.md) |
+| [#6314](https://github.com/QwenLM/qwen-code/pull/6314) | 🟡 open | feat(acp-bridge): Add EventBus subscriber byte cap | [pr-6314.md](pr-6314.md) |
 
-_按个人 PR 口径更新于 2026-07-04_
+_按个人 PR 口径更新于 2026-07-05_

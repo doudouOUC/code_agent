@@ -12,8 +12,8 @@
 | # | 子文档 | 覆盖 |
 |---|---|---|
 | 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、deadline / 权限响应超时 / access log |
-| 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、state_resync、协议帧 serverTimestamp/provenance/errorKind |
-| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive |
+| 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、state_resync、协议帧 serverTimestamp/provenance/errorKind |
+| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵 |
 | 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写 |
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
@@ -203,9 +203,11 @@ stateDiagram-v2
 
 **daemon-managed channel worker**（#6031/#6098/#6146）：`qwen serve --channel <name>|all` 在 daemon runtime ready 后 fork internal `channel daemon-worker`。worker 经 TS SDK + `DaemonChannelBridge` 回连 daemon，channel session create/load 强制 `sessionScope:'thread'`，并把 pidfile ownership、requested/connected channels、worker pid 和 `/daemon/status.runtime.channelWorker` 暴露给管理面。#6098 增加 ready 后有界重启、15s heartbeat / 45s stale kill、partial-connect issue、stale pid 清理、日志脱敏与 buffer 上限；#6146 再把 worker stderr 与 ACP child stderr 的 credential redaction 抽成 `redactLogCredentials()`，覆盖 bearer/API key/secret env/JSON secret/URL credential 等模式，并在 stderr terminal 与 daemon log file 两条路径同时生效；ready 前仍 fail-fast，避免 serve 启动时静默丢 channel。
 
-**status / dashboard / perf surface**（#6253/#6263/#6270）：`/daemon/status` 继续作为 daemon 诊断聚合端点扩展。#6263 增加 optional `runtime.perf`，只暴露 daemon 进程 event-loop lag snapshot 与 daemon-child pipe inbound/outbound byte 统计；ACP child lag 留在 OTel gauge 与 forwarded stderr stall warning，避免把 child-only 观测塞进 status JSON。#6270 在 `runtime.activity` 增加 `activePrompts`、`lastActivityAt`、`idleSinceMs`，bootstrap status 返回稳定 `0/null/null`，并给 full workspace MCP section summary 补 `serversConnected`、`serversErrored`、`serversDisabled`。#6253 的 closed diff 设计了只读 `/dashboard` inline HTML 与 Web Shell `DashboardDialog`，消费同一 `/daemon/status`，并沿用 `/demo` 的 loopback pre-auth / non-loopback bearer 边界。
+**status / dashboard / perf surface**（#6253/#6263/#6270/#6296）：`/daemon/status` 继续作为 daemon 诊断聚合端点扩展。#6263 增加 optional `runtime.perf`，只暴露 daemon 进程 event-loop lag snapshot 与 daemon-child pipe inbound/outbound byte 统计；ACP child lag 留在 OTel gauge 与 forwarded stderr stall warning，避免把 child-only 观测塞进 status JSON。#6270 在 `runtime.activity` 增加 `activePrompts`、`lastActivityAt`、`idleSinceMs`，bootstrap status 返回稳定 `0/null/null`，并给 full workspace MCP section summary 补 `serversConnected`、`serversErrored`、`serversDisabled`。#6296 修正 preflight auth 的 false warning：env var 未命中时读取 live `Config` 的 resolved `generationConfig.apiKey`，使 settings apiKey / provider envKey / CLI flag 与实际 session 启动口径一致。#6253 的 closed diff 设计了只读 `/dashboard` inline HTML 与 Web Shell `DashboardDialog`，消费同一 `/daemon/status`，并沿用 `/demo` 的 loopback pre-auth / non-loopback bearer 边界。
 
 **daemon/ACP NDJSON hot path**（#6263）：daemon 与 ACP child 的 stdio 通路改用 `@qwen-code/acp-bridge` 内的 incremental `ndJsonStream`，逐 chunk 扫描 newline，只把跨 chunk 尾段留在 pending，避免大消息 split 时重复处理整段 buffer。收发 hook 记录 payload bytes，hook 异常不影响传输；非 daemon 路径继续使用 SDK stream，降低兼容风险。
+
+**session export / organization / load replay / settings cache**（#6297/#6305/#6309/#6310）：#6297 新增 `session_export` capability 和 `GET /session/:id/export`，复用 CLI export formatter 返回 HTML/Markdown/JSON/JSONL attachment，并在 SDK 与 Web Shell 侧栏增加 capability-gated download。#6305 新增 `session_organization` capability，把 group catalog 与 per-session pin/group 状态存在 project sidecar `session-organization.v1.json`，默认 recent list 保持不变，只有 `view=organized` 才返回置顶/分组视图。#6309 给 daemon-owned `session/load` 增加 response-mode replay，bridge 从 ACP response seed snapshot，不再把历史帧逐条扇出到 live EventBus 或 replay ring；direct ACP 默认 streamed replay 保持兼容。#6310 在 ACP session 创建路径引入 workspace LRU `loadSettingsCached()`，以 settings 文件、`.env`、realpath 和 IDE trust fingerprint 失效，减少长驻 child 对同一 cwd 的同步重复 settings load。
 
 ```mermaid
 sequenceDiagram
@@ -441,6 +443,12 @@ sequenceDiagram
 | #6253 | daemon status dashboard | 新增 standalone `/dashboard` inline HTML 与 Web Shell `DashboardDialog`，消费 `/daemon/status` 并继承 loopback/non-loopback 鉴权边界；closed 未合入，仅记录方案。 |
 | #6263 | NDJSON stream perf + observability | daemon child ACP stdio path 使用 incremental NDJSON stream，新增 event-loop lag monitor、daemon pipe byte metrics 与 `/daemon/status.runtime.perf`。 |
 | #6270 | daemon status activity | `/daemon/status.runtime.activity` 暴露 active prompt 数、最近活动时间和 idle duration，并给 MCP workspace summary 补 server health 计数；open 当前观察。 |
+| #6296 | preflight auth resolved key | preflight auth env var 未命中时读取 live Config resolved API key，消除 settings/provider envKey 配置下的 false warning；open 当前观察。 |
+| #6297 | session export | `GET /session/:id/export` 返回 HTML/Markdown/JSON/JSONL attachment，SDK/Web Shell 支持 capability-gated 下载。 |
+| #6305 | session organization | group CRUD、session pin/group sidecar、organized list view、ACP/SDK/Web Shell 分组 UI；open 当前观察。 |
+| #6309 | batch load replay | daemon REST load 用 response-mode replay seed bridge snapshot，避免历史帧走 live fanout/ring；open 当前观察。 |
+| #6310 | settings cache | ACP session 创建入口使用 workspace LRU `loadSettingsCached()`，stat fingerprint 失效。 |
+| #6314 | EventBus byte cap | per-subscriber live serialized-byte cap、byte warning 和 `queue_bytes_overflow` eviction；open 当前观察。 |
 
 ---
 
@@ -631,6 +639,12 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #6253 | status dashboard | `/dashboard` inline page 与 Web Shell dashboard dialog 读取 `/daemon/status`；closed 未合入。 |
 | #6263 | NDJSON perf / runtime.perf | daemon ACP stdio 用 incremental NDJSON stream，event-loop lag 与 pipe byte stats 进入 OTel 和 status。 |
 | #6270 | runtime.activity | `/daemon/status` 增加 active prompt、last activity、idle duration 以及 MCP server summary；open。 |
+| #6296 | preflight auth | preflight auth cell 改用 resolved API key fallback，settings/provider envKey 配置不再误报；open。 |
+| #6297 | session export | daemon session transcript 导出 REST/SDK/Web Shell 下载。 |
+| #6305 | session organization | project sidecar 存 group/pin 状态，organized list opt-in；open。 |
+| #6309 | batch load replay | load replay 可由 ACP response 批量返回并 seed bridge snapshot，减少 live fanout/ring churn；open。 |
+| #6310 | settings cache | workspace 级 settings cache 降低 session 创建同步重复加载。 |
+| #6314 | EventBus byte cap | 慢 subscriber 的 live byte backlog 受 daemon-owned 预算约束；open。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 

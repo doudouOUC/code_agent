@@ -11,9 +11,9 @@
 
 | 主题 | 文档 | 关键 PR | 一句话 |
 |---|---|---|---|
-| daemon/serve 模式 | [daemon-serve-mode/](daemon-serve-mode/) | epic #4175 / #3803 / #5977 / #5989 / #5995 / #6013 / #6031 / #6058 / #6098 / #6146 / #6253 / #6263 / #6270 | Mode B：agent core 常驻 HTTP daemon，多客户端经 REST+SSE 并发附着，ACP bridge 解耦；近期补 standalone serve fast path、daemon-managed channel worker、session archive、worker hardening、stderr credential redaction、dashboard、NDJSON perf 和 status activity。 |
+| daemon/serve 模式 | [daemon-serve-mode/](daemon-serve-mode/) | epic #4175 / #3803 / #5977 / #5989 / #5995 / #6013 / #6031 / #6058 / #6098 / #6146 / #6253 / #6263 / #6270 / #6296 / #6297 / #6305 / #6309 / #6310 / #6314 | Mode B：agent core 常驻 HTTP daemon，多客户端经 REST+SSE 并发附着，ACP bridge 解耦；近期补 standalone serve fast path、daemon-managed channel worker、session archive、worker hardening、stderr credential redaction、dashboard、NDJSON perf、status activity、preflight auth、session export、session organization、batch load replay、settings cache 和 EventBus byte cap。 |
 | telemetry 可观测性 | [telemetry-observability/](telemetry-observability/) | epic #3731 / #4384 / #5960 / #6263 | 层级 span 树、上下文传播、OTLP 路由、敏感属性门控、daemon 端到端追踪、event-loop lag / pipe metrics 和 telemetry 文档/schema 对齐。 |
-| Channel adapters | [channel-adapters.md](channel-adapters.md) | #5978 / #6031 / #6098 / #6165 / #6182 | `ChannelAgentBridge` adapter-facing 合约，把 channel adapter 从具体 `AcpBridge` 实现中解耦；daemon-managed channel worker 由 `qwen serve --channel` 托管，并补 prompt turn barrier 与 session listing。 |
+| Channel adapters | [channel-adapters.md](channel-adapters.md) | #5978 / #6031 / #6098 / #6165 / #6182 / #6309 | `ChannelAgentBridge` adapter-facing 合约，把 channel adapter 从具体 `AcpBridge` 实现中解耦；daemon-managed channel worker 由 `qwen serve --channel` 托管，并补 prompt turn barrier、session listing 与 batch load replay 的 bridge snapshot 口径。 |
 | conversation rewind | [conversation-rewind.md](conversation-rewind.md) | #3441 #4064 #4216 #4122 #3622 #4580 #4820 #4897 #5057 #5141 | double-ESC/`/rewind` 回退历史、文件恢复、snapshot 持久化、supported `sed -i` tracking、HTTP rewind 端点与 resume 边界。 |
 | 原子文件写 | [atomic-file-write.md](atomic-file-write.md) | #4096 #4333 #4431 | temp+rename+fsync 原子写，铺开到 credentials、memory、config、JSONL，并补 uid 保留边界。 |
 | CLI 启动性能 | [cli-startup-performance.md](cli-startup-performance.md) | #3318 #3319 #3297 #3232 | API 预连接、早期输入捕获、工具懒注册与启动 profiler。 |
@@ -38,4 +38,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/)（见其 07 子文档）。
 - 每篇「已知限制」综合 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-07-04_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-07-05_
