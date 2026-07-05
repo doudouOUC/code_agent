@@ -39,7 +39,7 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 | [#4689](https://github.com/QwenLM/qwen-code/pull/4689) | — | 并行 subAgent 文本流已通过 per-parentToolCallId keyed map 隔离：`transcript.ts` reducer 用 `activeAssistantBlockByParent` 按 `parentToolCallId` 维护独立 active block pointer，scoped `clearActiveText` 不打断其他 subAgent，`finishAssistant` 遍历 map 清 streaming。 |
 | [#4702](https://github.com/QwenLM/qwen-code/pull/4702) | — | WebUI `DaemonSessionProvider` 对所有 resync reason（含 `ring_evicted`）统一提前调 `store.reset()`，自动恢复 transcript；移除误导性 "Reload the session to recover." 提示文案。 |
 | [#4820](https://github.com/QwenLM/qwen-code/pull/4820) | — | 新增 `session_rewound` SSE 事件——rewind 成功后 `entry.events.publish({type:'session_rewound', data:{sessionId, promptId, targetTurnIndex, filesChanged, filesFailed}})` 走 per-session EventBus 推送，使其他已附着客户端实时感知回退操作。 |
-| [#6314](https://github.com/QwenLM/qwen-code/pull/6314) | W27 follow-up | 每 subscriber 增加 live serialized-byte backlog cap，`slow_client_warning` 带 byte telemetry，累计 live bytes 超 daemon-owned 预算时只驱逐该 subscriber 并返回 `client_evicted{reason:'queue_bytes_overflow'}`。 |
+| [#6314](https://github.com/QwenLM/qwen-code/pull/6314) | W27 follow-up | 每 subscriber 增加 live serialized-byte backlog cap，`slow_client_warning` 带 byte telemetry，累计 live bytes 超 daemon-owned 预算时只驱逐该 subscriber 并返回 `client_evicted{reason:'queue_bytes_overflow'}`。已合入 main。 |
 
 
 ---

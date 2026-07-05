@@ -42,6 +42,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **trace ↔ debug log 关联**：debug 日志行注入 `trace_id` / `span_id`，见 `utils/debugLogger.ts:getTraceContext`。
 - **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
+- **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传，见 `telemetry/daemon-tracing.ts`（`daemon_mode_b_main`）。
 
 ---
