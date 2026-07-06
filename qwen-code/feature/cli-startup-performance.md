@@ -265,6 +265,7 @@ sequenceDiagram
 | #3318 | MERGED | API 预连接（#3223） | `apiPreconnect.ts` fire-and-forget `HEAD` 预热共享 undici dispatcher；新增 dashscope 白名单与子域伪造守卫；以 undici 自带 fetch 规避版本错配 |
 | #3319 | MERGED | 早期输入捕获（#3224） | `earlyInputCapture.ts` 缓冲 + 终端响应过滤 + 64KB 上限；`setImmediate` 在 `KeypressProvider` 挂载后重放，排空置于 React 之外以兼容 StrictMode |
 | #3085 | CLOSED（已拆分） | 预连接 + 早期输入捕获合并版 | 拆分为 #3318 + #3319 分别合入；原始 `isDefaultBaseUrl` 子域伪造缺陷在 #3318 修正 |
+| #6349 | OPEN | session start profiler（#6312） | `GeminiClient.startChat()` opt-in JSONL stage timing，记录 tool warm、history、system instruction、hook、setTools 等阶段；不记录 prompt/path/session id/tool name |
 
 epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 
@@ -299,6 +300,14 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **装配点**：`packages/cli/index.ts` 顶部 `initStartupProfiler()` **先于** `import './src/gemini.js'`（注释 "Must run before any other imports to capture the earliest possible T0"）。`gemini.tsx:main()` 内 `profileCheckpoint('main_entry')`/`after_parse_arguments`/`after_load_settings`/`after_sandbox_check`/`after_load_cli_config`/`after_initialize_app`/`before_render`，`finalizeStartupProfile(config.getSessionId())` 在 `before_render` 之后调用。
 - **测试**：`startupProfiler.test.ts` 覆盖关闭/sandbox 外/启用三态，验证 checkpoint 收集、`durationMs >= 0`、JSON 落盘路径含 sessionId、幂等 finalize、write 失败不抛异常。
 - **边界**：默认仅 sandbox 子进程采集（避免外层 + 子进程重复报告），普通运行需 `SANDBOX=1` 或 `QWEN_CODE_PROFILE_STARTUP_OUTER=1`；零开销原则——未启用时仅一次环境变量比较。
+
+### #6349 session start profiler（OPEN，当前方案记录）
+
+- **问题**：#6312 后续优化需要 `GeminiClient.startChat()` 内部阶段耗时；CLI startup profiler 只能看到更粗的进程启动阶段，无法判断 system instruction、history、tool syncing 或 SessionStart hook 哪个主导 session 初始化成本。
+- **实现模式**：`session-start-profiler.ts` 仅在 `QWEN_CODE_PROFILE_SESSION_START=1` 时启用，把 JSONL 记录写到 runtime output dir 的 `session-start-perf/`；禁用时不写文件、不读高精度时钟。
+- **装配点**：`client.ts:GeminiClient.startChat()` 用 profiler 包住 `tool_registry_warm`、`resume_deferred_tool_reveal`、`deferred_reminder_resolution`、`initial_chat_history`、`skill_reminder_seed`、`system_instruction`、`gemini_chat_construct`、`orphan_tool_use_repair`、`session_start_hook`、`session_start_context_apply` 和 `set_tools`。
+- **隐私边界**：只记录静态 stage name、source、success、总耗时、阶段耗时和聚合计数；不记录 prompt、path、session id、model response、hook output 或 tool name。
+- **状态**：该 PR 仍 open，本文只记录当前 diff 方案；合入后需要按最终实现复核。
 
 ### #3085（CLOSED，已拆分）
 - 为 #3318 + #3319 的合并版 PR，已关闭。原始 `isDefaultBaseUrl` 使用裸 `startsWith` 存在子域伪造缺陷（`dashscope.aliyuncs.com.evil.com` 误命中），在 #3318 修正为 `=== || startsWith(default + '/')`。

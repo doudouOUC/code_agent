@@ -209,6 +209,8 @@ stateDiagram-v2
 
 **session export / organization / load replay / settings isolation/cache**（#6292/#6297/#6305/#6309/#6310）：#6292 先修 ACP session 创建/加载/恢复入口的 settings 隔离：`newSession`、`loadSession`、`unstable_resumeSession` 在请求开始时各自加载 workspace settings，并显式传入 `newSessionConfig()` 与 `createAndStoreSession()`，避免并发请求通过共享 `this.settings` 串 workspace 或 runtime output dir。#6297 新增 `session_export` capability 和 `GET /session/:id/export`，复用 CLI export formatter 返回 HTML/Markdown/JSON/JSONL attachment，并在 SDK 与 Web Shell 侧栏增加 capability-gated download。#6305 新增 `session_organization` capability，把 group catalog 与 per-session pin/group 状态存在 project sidecar `session-organization.v1.json`，默认 recent list 保持不变，只有 `view=organized` 才返回置顶/分组视图。#6309 给 daemon-owned `session/load` 增加 response-mode replay，bridge 从 ACP response seed snapshot，不再把历史帧逐条扇出到 live EventBus 或 replay ring；direct ACP 默认 streamed replay 保持兼容。#6310 在 ACP session 创建路径引入 workspace LRU `loadSettingsCached()`，以 settings 文件、`.env`、realpath 和 IDE trust fingerprint 失效，减少长驻 child 对同一 cwd 的同步重复 settings load。
 
+**multi-workspace Phase 1 registry**（#6394）：为后续 daemon multi-workspace 建立内部 single-runtime registry，但不启用 public 多 workspace 行为。`WorkspaceRuntime` 聚合 primary workspace 的 bridge、workspace service、REST route fsFactory 和 client-MCP sender registry；`WorkspaceRegistry` 暴露 `primary`、`list()` 与 exact `getByWorkspaceCwd()`。现有 route schema、SDK type、`/capabilities` 与 legacy `app.locals.fsFactory/boundWorkspace` 保持兼容。daemon log/telemetry identity 改为 daemon-scoped（`serve-<pid>.log` / `daemon:<pid>`），workspace hash 作为 metadata；多个显式 `--workspace` 在 boot 阶段失败，单个值或单元素数组仍按 primary workspace 处理。
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -453,6 +455,13 @@ sequenceDiagram
 | #6325 | prompt queue status | `/daemon/status.runtime.activity` 增加 pending/queued prompt counters，`runtime.perf.promptQueueWait` 暴露 FIFO wait 聚合，帮助区分共享 session 排队与 daemon hang。 |
 | #6335 | large pipe frame measurement | `ndJsonStream` observer 把成功收发的大 ACP pipe frame 交给 daemon observer 做低敏 source-class 归因与限速日志/telemetry，不改变公开协议和 transport 行为。 |
 
+### W28 2026-07-06 daemon / serve follow-up
+
+| PR | 子主题 | 一句话作用 |
+| --- | --- | --- |
+| #6370 | ACP `/tmp` local fallback read | POSIX ACP fallback roots 默认追加 `/tmp`，并用 `QWEN_ACP_LOCAL_READ_ROOTS` 追加绝对路径；普通 `read_file` 外部路径权限不变。 |
+| #6394 | workspace runtime registry | Phase 1 single-runtime registry 聚合 primary workspace runtime，daemon identity 改为 daemon-scoped，重复显式 `--workspace` boot 失败。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -649,6 +658,8 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #6309 | batch load replay | load replay 可由 ACP response 批量返回并 seed bridge snapshot，减少 live fanout/ring churn。 |
 | #6310 | settings cache | workspace 级 settings cache 降低 session 创建同步重复加载。 |
 | #6314 | EventBus byte cap | 慢 subscriber 的 live byte backlog 受 daemon-owned 预算约束。 |
+| #6370 | ACP `/tmp` fallback | ACP local fallback read roots 覆盖 POSIX `/tmp`，但不改变普通 `read_file` 默认权限策略。 |
+| #6394 | workspace registry | internal single-runtime registry 为后续 multi-workspace 路由做边界，public 行为仍保持单 workspace。 |
 
 > F3（#4335，permission mediation 四策略实现）先合入 `daemon_mode_b_main`（2026-05-20），后随 #4490 进入 main。详见 [07-acp-bridge-and-permission.md](07-acp-bridge-and-permission.md) 及 [permission-system.md](../permission-system.md)。
 

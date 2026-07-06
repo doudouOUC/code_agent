@@ -499,3 +499,11 @@ sequenceDiagram
 - `acpAgent.ts`：ACP 工具读取接入该 fallback，保持 serve 模式与本地工具的受管本地根 allowlist 一致。
 - `core/src/utils/errors.ts` 与 `read-file.ts` / `edit.ts` / `write-file.ts` / `fileUtils.ts`：统一 plain object 和 structured JSON 错误渲染，避免用户只看到 `[object Object]`。
 - 测试覆盖 `acpAgent.test.ts`、`service/filesystem.test.ts`、core tool/error/fileUtils 单测，以及 serve fast-path bundle check/package script 回归。
+
+### #6370 — ACP `/tmp` local fallback read（@doudouOUC）
+
+- `acpAgent.ts`：在 ACP-only local read fallback roots 中，POSIX 平台默认追加 `/tmp`，覆盖 `/tmp/datastudio_cli_extract/...` 等客户端 workspace boundary 会拒绝、但 daemon 本地可读的临时产物。
+- `QWEN_ACP_LOCAL_READ_ROOTS`：新增 append-only escape hatch，只把 `path.delimiter` 分隔的绝对路径追加到默认 fallback roots，空项和相对路径被忽略。
+- `read-file.ts`：普通 `read_file` 默认权限策略保持不变，外部 `/tmp` 读取仍按原 ask/permission flow 处理；#6370 只扩大 ACP boundary error 后的 local fallback 面。
+- 安全边界：fallback 仍由 `AcpFileSystemService` 做 realpath/subpath 校验，未命中 roots 或非 workspace-boundary 错误不会降级成本地读。
+- 测试覆盖 `acpAgent.test.ts` 的默认 roots/env roots 和 `service/filesystem.test.ts` 的 fallback safety。
