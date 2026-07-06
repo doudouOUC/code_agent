@@ -1,4 +1,4 @@
-# qwen-code PRs · 2026-06-29 ~ 2026-07-05 (W27 日增量)
+# qwen-code PRs · 2026-06-29 ~ 2026-07-05 (W27 周报)
 
 > 本文件已整理 2026-06-29、2026-06-30、2026-07-01、2026-07-02、2026-07-03、2026-07-04 与 2026-07-05（Asia/Shanghai）的 @doudouOUC 个人 PR。2026-07-05 窗口为北京时间 `2026-07-05 00:00:00` ~ `23:59:59`，对应 UTC `2026-07-04T16:00:00Z` ~ `2026-07-05T15:59:59Z`。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在本周窗口内的 PR；只在本周合入、但创建时间不在本周窗口内的 PR 不计入本周统计。
 
@@ -101,4 +101,4 @@
 | [diagnostic-skills.md](../../feature/diagnostic-skills.md) | #6117 #6233 | 补 `/skills` ACP/non-interactive 输出 description 与 level 的口径；#6233 记录 `/workspace/skills` disabled wire/filtering 方案（closed 未合入）。 |
 | [telemetry-observability/README.md](../../feature/telemetry-observability/README.md) | #6263 #6335 | 补 daemon/ACP event-loop lag gauge、daemon pipe message byte histogram 与大帧低敏归因日志。 |
 
-_日增量按个人 PR 口径更新于 2026-07-06_
+_周报按个人 PR 口径更新于 2026-07-06_
