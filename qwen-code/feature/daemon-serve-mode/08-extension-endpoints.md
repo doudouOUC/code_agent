@@ -77,6 +77,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #5826 | feat(cli): Add skill usage stats | 2026-06-25 | session stats 增加 skills block，`/stats skills` 展示真实 skill body load 的成功/失败和按技能分组统计。 |
 | #5892 | fix(core): tree-kill PTY shell tree on Windows | 2026-06-26 | Windows interactive-shell PTY teardown 改为 `taskkill /f /t` tree-kill，并在正常完成后 guarded reap 防 ConPTY 残留 shell。 |
 | #5903 | feat(acp): support /cd command in ACP sessions | 2026-06-27 | 新增 server-side ACP session cwd update：HTTP `POST /session/:id/cd` 校验路径/trust/sandbox/client 后更新 per-session logical cwd 并广播 `session_cwd_changed`。 |
+| #6407 | fix(daemon): Handle settings reload events outside transcript | 2026-07-06 | `settings_reloaded` 作为 workspace settings refresh signal 进入 SDK/WebUI，reload 诊断只打筛选后的 console debug，不再写 transcript。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -370,6 +371,12 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 - `generate-settings-schema.ts` 把 `minimum` 写入 VS Code settings JSON schema。
 
 因此 negative cleanup period、`0` 或负数 recap-away threshold 不再能被持久化成看似有效的配置；runtime 的防御性 clamp/默认值仍保留，但不再承担第一道用户输入校验。HTTP API 拒绝后不写 settings，也不会广播 `settings_changed`。
+
+### settings reload event（#6407）
+
+`settings_reloaded` 不是用户输入的聊天内容，也不是普通 debug block。#6407 在 SDK normalizer 里把它映射为 `workspace.settings.changed`，`key` 固定为 `settings_reloaded`，`scope` 为 `workspace`，payload 作为 `value` 保留给 workspace signal 消费。这样 Web Shell 的 settings version 能刷新，但 transcript 不再出现 `settings_reloaded (unrecognized daemon event)`。
+
+WebUI 侧的 `DaemonSessionProvider` 在 normalize/filter 前对 reload 事件打 `console.debug('[DaemonSessionProvider] settings reloaded:', data)`。日志数据由 helper 筛选：只保留 `eventId`、`env.updatedKeys`、`env.removedKeys`、`changedKeys`、`childReloaded`、`sessionsRefreshed`、`sessionsSkipped`、`childError`；数组元素只保留 string，非 object payload 只记录 `payload: 'non-object'`。这保证 reload 诊断可查，同时不把原始 payload 写入聊天 transcript。
 
 ---
 

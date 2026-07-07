@@ -150,6 +150,8 @@ private async *iterateEvents(opts, release) {
 - **assist**：`followup_suggestion`
 - **cross-client**：`prompt_cancelled`
 
+补充：#6407 后，`settings_reloaded` 这类 daemon reload 通知不会进入 transcript debug block；SDK UI normalizer 将它映射为 `workspace.settings.changed` signal，WebUI 仅输出筛选后的 `console.debug` 诊断字段。
+
 每种事件类型对应一个 `Data` interface + `Event` type alias（如 `DaemonPermissionRequestData` → `DaemonPermissionRequestEvent = DaemonEventEnvelope<'permission_request', DaemonPermissionRequestData>`）。
 
 ### 类型窄化：`asKnownDaemonEvent()`
