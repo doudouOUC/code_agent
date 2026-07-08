@@ -11,6 +11,11 @@
 | [#6407](https://github.com/QwenLM/qwen-code/pull/6407) | ✅ merged | fix(daemon): Handle settings reload events outside transcript | [pr-6407.md](pr-6407.md) |
 | [#6409](https://github.com/QwenLM/qwen-code/pull/6409) | ✅ merged | fix(core): Gate large PDF text extraction | [pr-6409.md](pr-6409.md) |
 | [#6410](https://github.com/QwenLM/qwen-code/pull/6410) | ✅ merged | feat(cli): Add Phase 2a workspace foundation | [pr-6410.md](pr-6410.md) |
-| [#6416](https://github.com/QwenLM/qwen-code/pull/6416) | 🟡 open | feat(cli): Add serve env isolation and total admission | [pr-6416.md](pr-6416.md) |
+| [#6416](https://github.com/QwenLM/qwen-code/pull/6416) | ✅ merged | feat(cli): Add serve env isolation and total admission | [pr-6416.md](pr-6416.md) |
+| [#6482](https://github.com/QwenLM/qwen-code/pull/6482) | ✅ merged | feat(serve): Bound replay snapshot history | [pr-6482.md](pr-6482.md) |
+| [#6502](https://github.com/QwenLM/qwen-code/pull/6502) | ✅ merged | fix(session): detect and mark broken history chains instead of silently truncating | [pr-6502.md](pr-6502.md) |
+| [#6511](https://github.com/QwenLM/qwen-code/pull/6511) | ✅ merged | feat(cli): Enable multi-workspace session routing | [pr-6511.md](pr-6511.md) |
+| [#6525](https://github.com/QwenLM/qwen-code/pull/6525) | 🟡 open | feat(serve): Add cursor-paged transcript replay endpoint | [pr-6525.md](pr-6525.md) |
+| [#6540](https://github.com/QwenLM/qwen-code/pull/6540) | 🟡 open | feat(cli): Add session owner index for workspace runtimes | [pr-6540.md](pr-6540.md) |
 
-_按个人 PR 口径更新于 2026-07-08_
+_按个人 PR 口径更新于 2026-07-09_

@@ -93,6 +93,8 @@ heartbeat(sessionId)                    heartbeat()
 
 seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 `Last-Event-ID: 0` 视为"从 ring buffer 起点 replay"。如果更早事件已被 ring eviction（默认 8000 帧），客户端收到 retained suffix 后从 live 继续。
 
+#6482 后，`load()` 的 replay snapshot 是 bounded live window，不再是完整 transcript。snapshot 可能以 id-less `history_truncated` 开头；SDK/UI 把它作为 transcript status 渲染，并继续应用 retained replay。#6525 open 方案给 full active persisted transcript 增加独立 API：`DaemonClient.getSessionTranscriptPage(sessionId, { cursor, limit })` 调 `GET /session/:id/transcript`，返回 id-less replay frames，不 attach client、不 seed EventBus、不返回 `lastEventId`。
+
 ### SSE 订阅与并发 guard
 
 `events()` 是唯一对外入口（`subscribeEvents()` 标记 `@deprecated`）。内部 `openEventSubscription()`（L406-457）实现 **lazy acquire / release guard**：
@@ -142,7 +144,7 @@ private async *iterateEvents(opts, release) {
 - **会话生命周期**：`session_update`、`session_died`、`session_closed`、`session_metadata_updated`
 - **权限协调**：`permission_request`、`permission_resolved`、`permission_already_resolved`、`permission_partial_vote`、`permission_forbidden`
 - **模型/审批**：`model_switched`、`model_switch_failed`、`approval_mode_changed`
-- **流控/重连**：`state_resync_required`、`replay_complete`、`client_evicted`、`slow_client_warning`、`stream_error`
+- **流控/重连**：`state_resync_required`、`history_truncated`、`replay_complete`、`client_evicted`、`slow_client_warning`、`stream_error`
 - **非阻塞 / mid-turn prompt**：`turn_complete`、`turn_error`、`mid_turn_message_injected`
 - **MCP guardrail**：`mcp_budget_warning`、`mcp_child_refused_batch`、`mcp_server_added`、`mcp_server_removed`
 - **workspace 变更**：`memory_changed`、`agent_changed`、`tool_toggled`、`workspace_initialized`、`settings_changed`、`extensions_changed`
@@ -150,7 +152,7 @@ private async *iterateEvents(opts, release) {
 - **assist**：`followup_suggestion`
 - **cross-client**：`prompt_cancelled`
 
-补充：#6407 后，`settings_reloaded` 这类 daemon reload 通知不会进入 transcript debug block；SDK UI normalizer 将它映射为 `workspace.settings.changed` signal，WebUI 仅输出筛选后的 `console.debug` 诊断字段。
+补充：#6407 后，`settings_reloaded` 这类 daemon reload 通知不会进入 transcript debug block；SDK UI normalizer 将它映射为 `workspace.settings.changed` signal，WebUI 仅输出筛选后的 `console.debug` 诊断字段。#6482 后，`history_truncated` 是 known event，payload 校验失败才走 debug fallback；合法 marker 投影为状态行，不设置 `awaitingResync`。#6511 后，capabilities/status types 允许 additive `multi_workspace_sessions`、`workspaces[]` 和 session limits，但 SDK 仍不新增 workspace-specific client。
 
 每种事件类型对应一个 `Data` interface + `Event` type alias（如 `DaemonPermissionRequestData` → `DaemonPermissionRequestEvent = DaemonEventEnvelope<'permission_request', DaemonPermissionRequestData>`）。
 
