@@ -16,6 +16,11 @@
 | [#6502](https://github.com/QwenLM/qwen-code/pull/6502) | ✅ merged | fix(session): detect and mark broken history chains instead of silently truncating | [pr-6502.md](pr-6502.md) |
 | [#6511](https://github.com/QwenLM/qwen-code/pull/6511) | ✅ merged | feat(cli): Enable multi-workspace session routing | [pr-6511.md](pr-6511.md) |
 | [#6525](https://github.com/QwenLM/qwen-code/pull/6525) | 🟡 open | feat(serve): Add cursor-paged transcript replay endpoint | [pr-6525.md](pr-6525.md) |
-| [#6540](https://github.com/QwenLM/qwen-code/pull/6540) | 🟡 open | feat(cli): Add session owner index for workspace runtimes | [pr-6540.md](pr-6540.md) |
+| [#6540](https://github.com/QwenLM/qwen-code/pull/6540) | ✅ merged | feat(cli): Add session owner index for workspace runtimes | [pr-6540.md](pr-6540.md) |
+| [#6558](https://github.com/QwenLM/qwen-code/pull/6558) | ✅ merged | feat(cli): List persisted sessions for trusted workspaces | [pr-6558.md](pr-6558.md) |
+| [#6567](https://github.com/QwenLM/qwen-code/pull/6567) | ✅ merged | feat(cli): Add workspace-qualified core REST routes | [pr-6567.md](pr-6567.md) |
+| [#6585](https://github.com/QwenLM/qwen-code/pull/6585) | ✅ merged | feat(core): render PDF pages to images when text extraction overflows or fails | [pr-6585.md](pr-6585.md) |
+| [#6598](https://github.com/QwenLM/qwen-code/pull/6598) | ✅ merged | feat(cli): Add channel worker settings reload for serve --channel | [pr-6598.md](pr-6598.md) |
+| [#6621](https://github.com/QwenLM/qwen-code/pull/6621) | 🟡 open | feat(cli): workspace-qualified ACP transport (daemon multi-workspace phase 4) | [pr-6621.md](pr-6621.md) |
 
-_按个人 PR 口径更新于 2026-07-09_
+_按个人 PR 口径更新于 2026-07-10_

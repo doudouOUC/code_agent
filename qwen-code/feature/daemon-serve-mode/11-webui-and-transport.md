@@ -19,6 +19,7 @@
 | PR | 作者 | 状态 | 子主题 |
 |----|------|------|--------|
 | #5183 | @doudouOUC | merged | mid-turn rich content 在 Web Shell 当前 turn 只注入 text 时保留 image payload，不让图片消息丢失。 |
+| #6621 | @doudouOUC | open | workspace-qualified ACP transport：`/workspaces/:workspace/acp` per-runtime ACP mount，legacy `/acp` 继续绑定 primary。 |
 
 ---
 
@@ -248,6 +249,22 @@ sequenceDiagram
 
 ---
 
+## workspace-qualified ACP transport（#6621 open）
+
+Phase 3 已把 core REST surface 扩展为 `/workspaces/:workspace/...`，但 ACP transport 在 #6621 前仍只有 legacy `/acp`，并且固定绑定 primary workspace。#6621 open 方案新增 `/workspaces/:workspace/acp`，让 ACP-native client 可以直接连接 trusted secondary workspace runtime。
+
+实现边界：
+
+- HTTP POST / GET(SSE) / DELETE 复用 legacy `/acp` 的 handler，但先解析 workspace selector；selector 先 workspace id，再 encoded absolute cwd。
+- primary selector 复用 legacy primary mount；trusted non-primary runtime 创建独立 `AcpDispatcher` 与 `ConnectionRegistry`，并绑定该 runtime 的 bridge、workspace service、fsFactory、device-flow registry、remember lane 和 client-MCP sender registry。
+- 单一 WebSocket upgrade listener 识别 `/workspaces/<selector>/acp` path，完成共享 security checks 后再路由到对应 runtime mount。
+- unknown selector 返回 `workspace_mismatch`，untrusted non-primary workspace 返回 `untrusted_workspace`。
+- CDP bridge runtime-MCP wiring 保持 primary-only；non-primary mount 的 CDP hooks 是 no-op。
+
+该 PR 仍 open，本文只登记当前 diff 方案。当前 diff 的 capability tag 是 `workspace_qualified_acp`，仅 multi-workspace daemon 广告；未合入前，实际 main 上 ACP transport 仍以 legacy `/acp` primary workspace 为准。
+
+---
+
 ## 已知限制 / v0.16-alpha scope
 
 ### SDK daemon UI 剩余 ~5% 缺口
@@ -265,6 +282,7 @@ sequenceDiagram
 | SSE 断点续传 | RFD Phase 4，deferred |
 | `fs/*` + `terminal/*` agent->client 转发 | permission 路径已验证机制，其余为 mechanical follow-up |
 | REST `/acp` 完全等价 | 需先补齐 acp-bridge 能力（文件 I/O / device-flow / agents / memory） |
+| workspace-qualified ACP | #6621 open 方案已设计 `/workspaces/:workspace/acp`，未合入前 legacy `/acp` 仍是 primary-only |
 
 ### web-shell 局限
 
@@ -287,7 +305,7 @@ sequenceDiagram
 | web-shell | `packages/web-shell/client/` |
 | Web Shell static hosting | `packages/cli/src/serve/webShellStatic.ts` |
 | /demo 调试页 | `packages/cli/src/serve/demo.ts` |
-| ACP HTTP 传输 | `packages/cli/src/serve/acpHttp/` |
+| ACP HTTP 传输 | `packages/cli/src/serve/acp-http/` |
 | ACP HTTP 设计文档 | `docs/design/daemon-acp-http/README.md` |
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
