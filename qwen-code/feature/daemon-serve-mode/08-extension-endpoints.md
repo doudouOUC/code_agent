@@ -47,6 +47,8 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | `/workspace/extensions` | GET | 仅全局 bearer | extension 安装元信息与能力计数。 |
 | `/extensions/*` | GET/POST/PUT/DELETE | 读 bearer / 写 `mutate(strict)` | #6638 open：V2 user-level extension artifact 管理与 async operation status。 |
 | `/workspaces/:workspace/extensions/*` | GET/PUT/DELETE/POST | 读 bearer / 写 `mutate(strict)` | #6638 open：workspace projection、activation override 与 runtime refresh；不拥有 artifact mutation。 |
+| `/workspace-registrations` | GET/DELETE | 读 bearer / delete `mutate(strict)` | #6716 open：persistent dynamic workspace desired-state 列表与忘记记录；delete 不卸载 active runtime。 |
+| `/workspaces/:workspace/sessions`, `/session-groups`, `/session/:id/organization` | GET/PATCH | 读 bearer / mutation `mutate()` | #6717/#6724：untrusted secondary persisted-only catalog；trusted secondary organization mutation。 |
 | `/session/:id/recap` | POST | `mutate()`（非 strict） | 与 `/prompt` 同 posture：花 token、不改状态。 |
 | `/session/:id/btw` | POST | `mutate()`（非 strict） | 同上。 |
 | `/session/:id/shell` | POST | `mutate()`（非 strict） | 同上；真正的安全边界是 cwd 服务端固定 + bearer（见 shell 小节）。 |
@@ -84,7 +86,10 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #6407 | fix(daemon): Handle settings reload events outside transcript | 2026-07-06 | `settings_reloaded` 作为 workspace settings refresh signal 进入 SDK/WebUI，reload 诊断只打筛选后的 console debug，不再写 transcript。 |
 | #6525 | feat(serve): Add cursor-paged transcript replay endpoint | 2026-07-10 | `GET /session/:id/transcript` + `qwen/status/session/transcript` + SDK `getSessionTranscriptPage()`；分页读取 active JSONL，不触碰 live replay window。 |
 | #6567 | feat(cli): Add workspace-qualified core REST routes | 2026-07-09 | `/workspaces/:workspace/...` plural routes 覆盖 file/status/settings/permissions/trust/lifecycle/MCP/tools/memory/agents/session organization。 |
-| #6638 | feat(cli): workspace-qualified extensions REST | open | `extension_management_v2` open 方案：user-level artifact store、workspace activation policy、global `/extensions/*` 与 workspace projection routes。 |
+| #6638 | feat(serve): add extension management v2 | open | `extension_management_v2` open 方案：user-level artifact store、workspace activation policy、global `/extensions/*` 与 workspace projection routes。 |
+| #6716 | feat(serve): persist dynamic workspace registrations | open | persistent dynamic workspace desired-state store、`persist:true` add workspace、`GET/DELETE /workspace-registrations` 与 lazy workspace-qualified ACP mount。 |
+| #6717 | feat(serve): Expose read-only untrusted session catalogs | 2026-07-11 | untrusted secondary workspace persisted-only session/session-group catalog，不 merge live、不启动 ACP。 |
+| #6724 | fix(cli): Scope session organization mutations by workspace | 2026-07-11 | trusted secondary workspace `PATCH /workspaces/:workspace/session/:id/organization`。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -245,6 +250,24 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 - session list、session groups、organization、archive/unarchive/delete。
 
 legacy `/workspace/...` 继续绑定 primary workspace；plural route 才按 selected runtime dispatch。写类 route 仍走 strict mutate/auth 与原有 workspace fs write guard，不因为 selector 是 secondary workspace 而降低权限。
+
+---
+
+## persistent workspace registration（#6716 open）
+
+#6716 open 方案把 #6625 的进程内 `POST /workspaces` 扩成 opt-in 持久化 desired-state。客户端只有看到 `persistent_workspace_registration` capability 才应发送 `persist:true`。store 位于 user-level `${QWEN_HOME}/daemon/workspaces/<primary-scope-hash>.json`，按 canonical primary workspace 隔离；读取时拒绝 symlink、非普通文件、过大文件、schema/primary mismatch、重复路径和超限条目，写入用进程内队列、`proper-lockfile` 和原子 rename。
+
+新增端点：
+
+- `POST /workspaces {cwd, persist?: boolean}`：`persist:false` 保持动态注册；`persist:true` 会写 store，并在 runtime/registry 失败时回滚已写记录。
+- `GET /workspace-registrations`：返回 store snapshot、entry id、cwd、active、persisted。
+- `DELETE /workspace-registrations/:id`：删除 store entry；如果该 workspace 当前 active，响应 `restartRequired:true`，但不卸载 runtime。
+
+## untrusted catalog 与 workspace organization mutation（#6717/#6724）
+
+#6717 在 workspace-qualified session routes 上增加一个窄的 read-only catalog：registered untrusted secondary workspace 可读取 persisted sessions 和 session groups，包括 archived、organized、group、parent-session、cursor/page-size 语义，但 `mergeLive:false`，不查询 bridge、不 spawn ACP、不 load settings，也不写 debug log session。这个面用于信任前的历史可见性，不允许 session attach、transcript、settings/runtime-backed read 或 mutation。
+
+#6724 给 trusted secondary workspace 补齐 organization mutation：`PATCH /workspaces/:workspace/session/:id/organization` 复用 legacy body/response，但 session existence、group validation 和 sidecar update 都绑定 selected runtime。legacy `PATCH /session/:id/organization` 保持 primary-only。
 
 ---
 

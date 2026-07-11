@@ -24,7 +24,10 @@
 | [#6621](https://github.com/QwenLM/qwen-code/pull/6621) | ✅ merged | feat(cli): workspace-qualified ACP transport (daemon multi-workspace phase 4) | [pr-6621.md](pr-6621.md) |
 | [#6625](https://github.com/QwenLM/qwen-code/pull/6625) | ✅ merged | feat(web-shell): workspace management sidebar with dynamic registration (daemon multi-workspace phase 4) | [pr-6625.md](pr-6625.md) |
 | [#6631](https://github.com/QwenLM/qwen-code/pull/6631) | ✅ merged | feat(cli): List archived and organized sessions for non-primary workspaces | [pr-6631.md](pr-6631.md) |
-| [#6635](https://github.com/QwenLM/qwen-code/pull/6635) | 🟡 open | feat(cli): group daemon channel workers by workspace (phase 4b) | [pr-6635.md](pr-6635.md) |
-| [#6638](https://github.com/QwenLM/qwen-code/pull/6638) | 🟡 open | feat(cli): workspace-qualified extensions REST (daemon multi-workspace) | [pr-6638.md](pr-6638.md) |
+| [#6635](https://github.com/QwenLM/qwen-code/pull/6635) | ✅ merged | feat(cli): group daemon channel workers by workspace (phase 4b) | [pr-6635.md](pr-6635.md) |
+| [#6638](https://github.com/QwenLM/qwen-code/pull/6638) | 🟡 open | feat(serve): add extension management v2 | [pr-6638.md](pr-6638.md) |
+| [#6716](https://github.com/QwenLM/qwen-code/pull/6716) | 🟡 open | feat(serve): persist dynamic workspace registrations | [pr-6716.md](pr-6716.md) |
+| [#6717](https://github.com/QwenLM/qwen-code/pull/6717) | ✅ merged | feat(serve): Expose read-only untrusted session catalogs | [pr-6717.md](pr-6717.md) |
+| [#6724](https://github.com/QwenLM/qwen-code/pull/6724) | ✅ merged | fix(cli): Scope session organization mutations by workspace | [pr-6724.md](pr-6724.md) |
 
-_按个人 PR 口径更新于 2026-07-11_
+_按个人 PR 口径更新于 2026-07-12_

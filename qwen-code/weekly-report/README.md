@@ -2,9 +2,9 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文最终实现文档放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-**时间范围**: 2026-04-06 ~ 2026-07-10（持续更新）
-**总计**: 257 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28 见对应周目录（W28 当前个人增量 +41,051 / -3,787，444 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-07-11（持续更新）
+**总计**: 260 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28 见对应周目录（W28 当前个人增量 +46,130 / -4,165，498 个文件变更）
 
 ## 按周
 
@@ -22,11 +22,11 @@
 | [2026-06-08 ~ 2026-06-14](2026-06-08_2026-06-14/) (W24 最终版) | 23 | 20/0/3 | 见周目录 | rate limiting、prompt queue backpressure、direct shell opt-in、tool result 持久化、TRACEPARENT、rewind 测试补强、file history snapshot、Agent 权限弹窗、tool call id 修复 |
 | [2026-06-15 ~ 2026-06-21](2026-06-15_2026-06-21/) (W25 最终版) | 10 | 9/0/1 | 见周目录 | sed edit file history、daemon docs English refresh、monitor notification batch drain、daemon status API、model provider 选择持久化、mid-turn 图片保留、ACP 取消停止语义、serve 权限超时配置 |
 | [2026-06-29 ~ 2026-07-05](2026-06-29_2026-07-05/) (W27 周报) | 31 | 29/0/2 | +39,985/-3,521 | serve fast-path guard、daemon channel worker/session archive、skills ACP 输出、plan-required teammate approval、worker stderr redaction、ChannelAgentBridge session listing、daemon dashboard/status/perf、session export/organization、prompt queue status、large pipe frame measurement |
-| [2026-07-06 ~ 2026-07-12](2026-07-06_2026-07-12/) (W28 周内累计) | 22 | 20/2/0 | +41,051/-3,787 | session start profiler、ACP `/tmp` fallback、大文本/PDF 读取、Phase 2a/2b/3/4 multi-workspace sessions + REST/ACP、bounded/paged transcript、workspace management sidebar、non-primary archived/organized session list、channel worker reload/grouping、extension management v2 |
+| [2026-07-06 ~ 2026-07-12](2026-07-06_2026-07-12/) (W28 周内累计) | 25 | 23/2/0 | +46,130/-4,165 | session start profiler、ACP `/tmp` fallback、大文本/PDF 读取、Phase 2a/2b/3/4 multi-workspace sessions + REST/ACP、bounded/paged transcript、workspace management sidebar、non-primary archived/organized/untrusted session catalog、channel worker reload/grouping、extension management v2、persistent workspace registration |
 
 ## 类型分布
 
-feat ×132, fix ×85, refactor ×12, other ×8, docs ×8, chore ×6, perf ×3, test ×2, merge ×1
+feat ×134, fix ×86, refactor ×12, other ×8, docs ×8, chore ×6, perf ×3, test ×2, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 
