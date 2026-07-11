@@ -19,7 +19,8 @@
 | PR | 作者 | 状态 | 子主题 |
 |----|------|------|--------|
 | #5183 | @doudouOUC | merged | mid-turn rich content 在 Web Shell 当前 turn 只注入 text 时保留 image payload，不让图片消息丢失。 |
-| #6621 | @doudouOUC | open | workspace-qualified ACP transport：`/workspaces/:workspace/acp` per-runtime ACP mount，legacy `/acp` 继续绑定 primary。 |
+| #6621 | @doudouOUC | merged | workspace-qualified ACP transport：`/workspaces/:workspace/acp` per-runtime ACP mount，legacy `/acp` 继续绑定 primary。 |
+| #6625 | @doudouOUC | merged | Web Shell workspace management sidebar 与 dynamic workspace registration。 |
 
 ---
 
@@ -172,6 +173,12 @@ sequenceDiagram
 | --- | --- | --- |
 | #5183 | mid-turn image message 不丢。 | 对 mid-turn rich content 做能力分流：当前 turn 只注入 text，可保留 image payload 到下一轮普通 prompt。 |
 
+## Web Shell workspace management（#6625）
+
+#6625 把 Web Shell sidebar 从 primary session list 升级为 workspace management surface。多 workspace capability 存在时，sidebar 按 workspace 渲染 collapsible section：每个 workspace 显示 cwd、primary badge、trust 状态和自己的 sessions；trusted workspace 可展开、刷新、创建/查看 session，untrusted workspace 保持可见但禁用操作。单 workspace daemon 保留简化 session list，只补 add-workspace 入口。
+
+新增 `AddWorkspaceDialog` 通过 SDK `DaemonClient.addWorkspace(cwd)` 调 `POST /workspaces`。daemon route 要求 cwd 是绝对路径、realpath 后存在且为目录，并拒绝重复、in-flight duplicate、parent/child nested workspace 和超过 25 个 workspace 的注册。注册成功后，WebUI workspace provider 的 `refreshCapabilities({ force:true })` 绕过 cached capabilities promise，立即拿到新的 `workspaces[]`。
+
 ---
 
 ## 时序图：WebUI 连接 daemon + SSE 消费 + control-plane RPC
@@ -249,19 +256,20 @@ sequenceDiagram
 
 ---
 
-## workspace-qualified ACP transport（#6621 open）
+## workspace-qualified ACP transport（#6621）
 
-Phase 3 已把 core REST surface 扩展为 `/workspaces/:workspace/...`，但 ACP transport 在 #6621 前仍只有 legacy `/acp`，并且固定绑定 primary workspace。#6621 open 方案新增 `/workspaces/:workspace/acp`，让 ACP-native client 可以直接连接 trusted secondary workspace runtime。
+Phase 3 已把 core REST surface 扩展为 `/workspaces/:workspace/...`，但 ACP transport 在 #6621 前仍只有 legacy `/acp`，并且固定绑定 primary workspace。#6621 新增 `/workspaces/:workspace/acp`，让 ACP-native client 可以直接连接 trusted secondary workspace runtime。
 
 实现边界：
 
 - HTTP POST / GET(SSE) / DELETE 复用 legacy `/acp` 的 handler，但先解析 workspace selector；selector 先 workspace id，再 encoded absolute cwd。
-- primary selector 复用 legacy primary mount；trusted non-primary runtime 创建独立 `AcpDispatcher` 与 `ConnectionRegistry`，并绑定该 runtime 的 bridge、workspace service、fsFactory、device-flow registry、remember lane 和 client-MCP sender registry。
-- 单一 WebSocket upgrade listener 识别 `/workspaces/<selector>/acp` path，完成共享 security checks 后再路由到对应 runtime mount。
+- primary selector 复用 legacy primary mount；trusted non-primary runtime 创建独立 `AcpDispatcher` 与 `ConnectionRegistry`，并绑定该 runtime 的 bridge、workspace service、fsFactory、remember lane 和 client-MCP sender registry。
+- OAuth device-flow registry 保持 daemon-global/shared；auth-flow events best-effort fanout 到 primary 和 trusted secondary bridge，一个 bridge 失败不阻塞其他 bridge。
+- 单一 WebSocket upgrade listener 使用 raw request target 识别 `/workspaces/<selector>/acp` path，在 normalize 前拒绝 dot-segment、反斜杠和异常编码，再路由到对应 runtime mount。
 - unknown selector 返回 `workspace_mismatch`，untrusted non-primary workspace 返回 `untrusted_workspace`。
-- CDP bridge runtime-MCP wiring 保持 primary-only；non-primary mount 的 CDP hooks 是 no-op。
+- CDP tunnel 保持 primary-only；workspace-scoped CDP 未在本 PR 中解决。
 
-该 PR 仍 open，本文只登记当前 diff 方案。当前 diff 的 capability tag 是 `workspace_qualified_acp`，仅 multi-workspace daemon 广告；未合入前，实际 main 上 ACP transport 仍以 legacy `/acp` primary workspace 为准。
+capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi-workspace sessions enabled 时广告；legacy `/acp` 保持 primary workspace 兼容。
 
 ---
 
@@ -282,7 +290,7 @@ Phase 3 已把 core REST surface 扩展为 `/workspaces/:workspace/...`，但 AC
 | SSE 断点续传 | RFD Phase 4，deferred |
 | `fs/*` + `terminal/*` agent->client 转发 | permission 路径已验证机制，其余为 mechanical follow-up |
 | REST `/acp` 完全等价 | 需先补齐 acp-bridge 能力（文件 I/O / device-flow / agents / memory） |
-| workspace-qualified ACP | #6621 open 方案已设计 `/workspaces/:workspace/acp`，未合入前 legacy `/acp` 仍是 primary-only |
+| workspace-qualified ACP | #6621 已提供 `/workspaces/:workspace/acp`，legacy `/acp` 仍是 primary-only |
 
 ### web-shell 局限
 
@@ -310,4 +318,4 @@ Phase 3 已把 core REST surface 扩展为 `/workspaces/:workspace/...`，但 AC
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-11_

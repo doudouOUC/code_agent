@@ -8,7 +8,7 @@
 
 Channel adapter 让 qwen-code 可以从本地 TUI 之外的消息通道接收用户输入。adapter 不应该依赖某个具体 bridge 实现，否则后续要切到 daemon-backed bridge、测试 fake bridge 或多 channel bridge 时，所有 adapter 都会被迫跟着底层类名和生命周期细节变化。
 
-#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon。
+#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 open 方案把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings。
 
 ---
 
@@ -52,6 +52,14 @@ TypeScript 插件如果显式把 adapter 构造参数标成 `AcpBridge`，应迁
 
 能力 `channel_reload` 只有在 `getChannelWorkerSnapshot` 和 `reloadChannelWorker` 两个 deps 都被 wire 时才广告；route 也使用同一条件注册，避免客户端看到 capability 但调用 route 404。
 
+### 3.2 multi-workspace channel worker grouping（#6635 open）
+
+#6635 open 方案把 selected channels 先解析为 workspace groups：显式 cwd 或 workspace-scoped channel config 归属对应 trusted workspace；user/system scope 无 cwd 的 channel 视为 ambiguous；未注册 cwd 返回 mismatch；untrusted workspace fail fast。`--channel all` 暂保持 primary-only v1，避免自动展开所有 workspace channel 改变既有语义。
+
+每个 trusted workspace group 启动一个 `ChannelWorkerSupervisor`，worker 绑定 runtime workspace cwd、`QWEN_DAEMON_WORKSPACE` 和 `runtime.env.effectiveEnv`，webhook config 也从 owner workspace 读取。`ChannelWorkerGroup` 管理多个 supervisors：start 顺序执行并在失败时回滚；restart 是 daemon-wide fail-closed transaction，任一 worker restart 失败会 stop 整组，避免混合 generation 继续对外服务；webhook dispatch 按 channel owner 路由，找不到 worker 时返回 `channel_worker_unavailable`。
+
+兼容面：单 workspace 时 pidfile/status 保持旧字段；multi-workspace 时 pidfile `workers[]` 记录 `workspaceId/workspaceCwd/channels/workerPid`，`/daemon/status.runtime.channelWorkers[]` 暴露完整列表，旧 `channelWorker` 与 reload response 仍指 primary 或首个 worker。
+
 ---
 
 ## 4. 涉及 PR
@@ -65,11 +73,12 @@ TypeScript 插件如果显式把 adapter 构造参数标成 `AcpBridge`，应迁
 | #6182 | merged | adapter/诊断工具无法枚举 bridge 当前 sessions。 | `ChannelAgentBridge` 增加 optional `listSessions()`；`DaemonChannelBridge` 返回 session id、workspace 和 `hasActivePrompt` snapshot；daemon-worker facade 按 optional method 透传。 |
 | #6309 | open | 大历史 session load 逐帧 child-to-daemon replay 会污染 live fanout 与 ring。 | daemon bridge 可请求 response-mode replay，并用 ACP response 中的私有 replay payload seed snapshot；direct ACP 默认 streamed replay 兼容。 |
 | #6598 | merged | channel settings 变更需要重启整个 daemon 才能生效。 | `ChannelWorkerSupervisor.restart()` relaunch worker 并重读 settings；新增 strict HTTP reload route、SDK helper、CLI `qwen channel reload` 和条件能力 `channel_reload`。 |
+| #6635 | open | multi-workspace daemon 中 channel worker 仍绑定 primary workspace，secondary workspace channel 会读错 env/settings/status。 | selected channels 按 owning trusted workspace 分组，每组一个 supervisor；`ChannelWorkerGroup` 提供 fail-closed group restart、webhook owner routing、pidfile `workers[]` 与 status `channelWorkers[]`。 |
 
 ---
 
 ## 5. 已知限制 / 后续
 
 1. 多账号隔离、平台风控和长期 worker 调度仍需要后续 PR 单独落地。
-2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing 和 settings reload，但多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
+2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing 和 settings reload；workspace grouping 仍是 #6635 open 方案，多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
 3. 新插件应优先面向 `ChannelAgentBridge` 编程，只有 standalone ACP-backed 路径才需要知道 `AcpBridge`。

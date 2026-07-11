@@ -40,18 +40,20 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | 端点 | 方法 | 门控 | 说明 |
 | --- | --- | --- | --- |
 | `/session/:id/tasks` | GET | 仅全局 bearer（无 `mutate`） | 只读快照，与其他 `GET /workspace/*` 状态路由同级。 |
-| `/session/:id/transcript` | GET | 仅全局 bearer（无 `mutate`） | #6525 open 方案：active persisted transcript 分页 replay，不 attach client、不改 live EventBus。 |
+| `/session/:id/transcript` | GET | 仅全局 bearer（无 `mutate`） | #6525：active persisted transcript 分页 replay，不 attach client、不改 live EventBus。 |
 | `/workspaces/:workspace/...` | GET/POST/DELETE/PATCH | 读 bearer / 写 `mutate(strict)` | #6567：workspace-qualified core REST；selector 先 workspace id、再 encoded absolute cwd。 |
 | `/session/:id/stats` | GET | 仅全局 bearer | 模型/token/工具/文件统计快照。 |
 | `/workspace/hooks` / `/session/:id/hooks` | GET | 仅全局 bearer | hook 配置与运行时诊断，可能暴露 hook command/url，按敏感诊断面对待。 |
 | `/workspace/extensions` | GET | 仅全局 bearer | extension 安装元信息与能力计数。 |
+| `/extensions/*` | GET/POST/PUT/DELETE | 读 bearer / 写 `mutate(strict)` | #6638 open：V2 user-level extension artifact 管理与 async operation status。 |
+| `/workspaces/:workspace/extensions/*` | GET/PUT/DELETE/POST | 读 bearer / 写 `mutate(strict)` | #6638 open：workspace projection、activation override 与 runtime refresh；不拥有 artifact mutation。 |
 | `/session/:id/recap` | POST | `mutate()`（非 strict） | 与 `/prompt` 同 posture：花 token、不改状态。 |
 | `/session/:id/btw` | POST | `mutate()`（非 strict） | 同上。 |
 | `/session/:id/shell` | POST | `mutate()`（非 strict） | 同上；真正的安全边界是 cwd 服务端固定 + bearer（见 shell 小节）。 |
 | `/session/:id/rewind` | POST | `mutate(strict)` | 会截断 session + 恢复文件，按危险变更处理。 |
 | `/workspace/settings` | GET/POST | 读 bearer / 写 `mutate(strict)` | 仅在 host 注入 `persistSetting` 时注册；写只允许 workspace scope。 |
 
-四者都先过中间件链（Origin-strip → CORS → hostAllowlist → bearerAuth → json）。`mutate()`（非 strict）在「配了 token / `--require-auth`」时由全局 bearer 兜底；在「loopback 无 token 开发态」时 passthrough（保留零配置体验）。**没有任何一个用 `mutate({strict:true})`**——它们都被归类为「token 成本而非状态变更」，与写文件/改 MCP/device-flow 那批 strict 路由刻意区分。
+所有端点都先过中间件链（Origin-strip → CORS → hostAllowlist → bearerAuth → json）。只读诊断面只要求全局 bearer；`recap` / `btw` / `shell` 这类只花 token、不改 daemon/workspace 持久状态的控制面使用非 strict `mutate()`；`rewind`、settings 写入、workspace-qualified mutation 和 extension V2 artifact/activation mutation 使用 `mutate(strict)`。
 
 ---
 
@@ -80,8 +82,9 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #5892 | fix(core): tree-kill PTY shell tree on Windows | 2026-06-26 | Windows interactive-shell PTY teardown 改为 `taskkill /f /t` tree-kill，并在正常完成后 guarded reap 防 ConPTY 残留 shell。 |
 | #5903 | feat(acp): support /cd command in ACP sessions | 2026-06-27 | 新增 server-side ACP session cwd update：HTTP `POST /session/:id/cd` 校验路径/trust/sandbox/client 后更新 per-session logical cwd 并广播 `session_cwd_changed`。 |
 | #6407 | fix(daemon): Handle settings reload events outside transcript | 2026-07-06 | `settings_reloaded` 作为 workspace settings refresh signal 进入 SDK/WebUI，reload 诊断只打筛选后的 console debug，不再写 transcript。 |
-| #6525 | feat(serve): Add cursor-paged transcript replay endpoint | open | `GET /session/:id/transcript` + `qwen/status/session/transcript` + SDK `getSessionTranscriptPage()`；分页读取 active JSONL，不触碰 live replay window。 |
+| #6525 | feat(serve): Add cursor-paged transcript replay endpoint | 2026-07-10 | `GET /session/:id/transcript` + `qwen/status/session/transcript` + SDK `getSessionTranscriptPage()`；分页读取 active JSONL，不触碰 live replay window。 |
 | #6567 | feat(cli): Add workspace-qualified core REST routes | 2026-07-09 | `/workspaces/:workspace/...` plural routes 覆盖 file/status/settings/permissions/trust/lifecycle/MCP/tools/memory/agents/session organization。 |
+| #6638 | feat(cli): workspace-qualified extensions REST | open | `extension_management_v2` open 方案：user-level artifact store、workspace activation policy、global `/extensions/*` 与 workspace projection routes。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -221,11 +224,11 @@ config.getMonitorRegistry().getAll()         → serializeMonitorTask (kind:'mon
 
 ---
 
-## transcript page（#6525 open，完整 active transcript 的只读 replay）
+## transcript page（#6525，完整 active transcript 的只读 replay）
 
-#6482 后，`POST /session/:id/load` 只承诺 bounded live replay snapshot；完整 active persisted transcript 不再适合一次性塞回 `/load`。#6525 open 方案新增 `GET /session/:id/transcript`，让客户端按 cursor page 拉取 id-less `session_update` replay frames。
+#6482 后，`POST /session/:id/load` 只承诺 bounded live replay snapshot；完整 active persisted transcript 不再适合一次性塞回 `/load`。#6525 新增 `GET /session/:id/transcript`，让客户端按 cursor page 拉取 id-less `session_update` replay frames。
 
-实现上，route 校验 session id / `limit` / `cursor` 后调用 bridge `getSessionTranscriptPage()`，bridge 再走 ACP child 的只读 ext-method `qwen/status/session/transcript`。core `SessionTranscriptReader` 在第一页冻结 active JSONL snapshot size，后续 cursor 绑定文件身份、snapshot size、position、leafUuid 和 replay state，并用进程内 HMAC key 签名防篡改；daemon 重启后旧 cursor 不承诺继续可用。该 route 不 attach client、不 seed EventBus、不创建 live session、不返回 `lastEventId`，因此不会改变 live SSE replay window。文件被删除、截断、替换或 archive 后，后续页返回 409，客户端应从第一页重开；snapshot 超过 256 MiB 时在建索引前返回结构化 too-large 错误。
+实现上，route 校验 session id / `limit` / `cursor` 后调用 bridge `getSessionTranscriptPage()`，bridge 再走 ACP child 的只读 ext-method `qwen/status/session/transcript`。core `SessionTranscriptReader` 在第一页冻结 active JSONL snapshot size，后续 cursor 绑定 session、文件身份、snapshot size、position、leafUuid 和 replay state，并用 workspace project 目录持久 HMAC key 签名防篡改。该 route 不 attach client、不 seed EventBus、不创建 live session、不返回 `lastEventId`，因此不会改变 live SSE replay window。文件被删除、截断、替换或 archive 后，后续页返回 409，客户端应从第一页重开；snapshot 超过 256 MiB 时在建索引前返回结构化 too-large 错误。
 
 ## workspace-qualified core REST（#6567）
 
@@ -323,6 +326,23 @@ legacy `/workspace/...` 继续绑定 primary workspace；plural route 才按 sel
 - extension 来源需要经过 allowlist/URL 校验；拒绝 credentials、private network/local link 等高风险来源。
 - mutation 异步排队执行，HTTP 接受不等于 UI 立即可见；完成后广播 `extensions_changed`，workspace/provider hooks 重新拉取状态。
 - active sessions 会刷新 extension-derived commands/hooks/settings 视图，避免新装/禁用后 web-shell 和 ACP daemon session 看到不同 command set。
+
+### extension management v2（#6638 open）
+
+#6638 open diff 新增 `extension_management_v2`，并保留旧 `workspace_extensions` 作为 primary compatibility/diagnostic surface。V2 不采用早期 workspace-qualified extensions 方案名：核心模型是 user-level artifact + workspace activation policy，而不是每个 workspace 拥有自己的安装物。
+
+资源拆分：
+
+- user-level artifact：安装目录在 `QWEN_HOME/extensions`，由 `ExtensionStore` 唯一写入。
+- activation policy：按 exact workspace override（enabled/disabled）、内部 exact inherit mask、V1 path rule 和 global default 计算 effective state。
+- store state：`~/.qwen/extension-store/state.json`、`state.previous.json`、staging、trash、journal 和 recovery；支持 V1 import/projection/downgrade。
+
+HTTP surface 分两组：
+
+- global `/extensions/*`：catalog、install、check updates、update、delete、default activation、operation status。
+- workspace `/workspaces/:workspace/extensions/*`：effective view、workspace activation override、clear override、runtime refresh；workspace route 不直接安装/更新/删除 artifact。
+
+慢操作返回 `202 Accepted` + `operationId`，operation history 只在 daemon 本地保留且 terminal records capped；store generation 才是权威状态。prep queue 并发 2，commit queue 单并发；prepared update 携带 artifact generation，stale same-artifact commit 返回 `extension_conflict`。workspace activation/refresh 仍要求 trusted workspace，read projection 可按既有 trust 策略降级。
 
 
 ---

@@ -34,10 +34,11 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#6416](https://github.com/QwenLM/qwen-code/pull/6416) | merged | env/admission guardrail | runtime-local env snapshot 与 daemon-wide `--max-total-sessions` fresh-session admission |
 | [#6482](https://github.com/QwenLM/qwen-code/pull/6482) | merged | bounded replay snapshot | `/load` 只承诺 byte-capped live replay window，旧窗口裁剪时前置 `history_truncated` |
 | [#6511](https://github.com/QwenLM/qwen-code/pull/6511) | merged | multi-workspace live routing | 多 workspace sessions-only runtime，live session route 先 resolve owner runtime |
-| [#6525](https://github.com/QwenLM/qwen-code/pull/6525) | open | cursor-paged transcript | `GET /session/:id/transcript` 按 frozen active JSONL snapshot 分页返回 id-less replay frames |
+| [#6525](https://github.com/QwenLM/qwen-code/pull/6525) | merged | cursor-paged transcript | `GET /session/:id/transcript` 按 frozen active JSONL snapshot 分页返回 id-less replay frames |
 | [#6540](https://github.com/QwenLM/qwen-code/pull/6540) | merged | owner index / restore expansion | registry-owned session owner index，trusted non-primary load/resume 与 `session_workspace_conflict` |
 | [#6558](https://github.com/QwenLM/qwen-code/pull/6558) | merged | non-primary persisted listing | trusted non-primary workspace session list 合并 active persisted sessions 与 live summaries |
 | [#6567](https://github.com/QwenLM/qwen-code/pull/6567) | merged | workspace-qualified REST sessions | `/workspaces/:workspace/...` core REST 与 workspace-qualified session organization/list/archive/delete routes |
+| [#6631](https://github.com/QwenLM/qwen-code/pull/6631) | merged | non-primary archived/organized listing | trusted non-primary workspace session list 支持 archived、organized 与 group filter |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
@@ -341,9 +342,9 @@ flowchart TD
 
 **与 ring replay 的关系**：ring 仍服务 SSE 短期追赶（`Last-Event-ID` 重连）；compaction engine 提供**正交的全会话恢复路径**。`restoreSession` 返回新增字段 `compactedReplay` + `liveJournal` + `lastEventId`（`BridgeRestoredSession`，`bridgeTypes.ts`，所有字段 optional 保持向后兼容）；`resume` 只返回 `lastEventId`（不回放）。客户端用 `compactedReplay + liveJournal` 立即还原 transcript，然后以 `lastEventId` 接入 SSE 流获取后续实时帧。
 
-**bounded replay snapshot（#6482）**：`/load` 的 `compactedReplay` 是 live in-memory snapshot，不再承诺全量 transcript。`TurnBoundaryCompactionEngine` 按 completed turn / restore event segment 维护 replay window，并受 `--compacted-replay-max-bytes` 约束；默认 4 MiB，最大 256 MiB。旧 replay 被丢弃时，snapshot 首帧是 id-less `history_truncated` marker，客户端把它渲染为状态提示后继续应用 retained replay，不把它当成 `state_resync_required`。完整 active persisted transcript 不再塞进 `/load`，#6525 open 方案通过 `GET /session/:id/transcript` 做 cursor-paged replay：第一页冻结 JSONL snapshot size，后续 cursor 绑定文件身份、snapshot position、leafUuid 与 replay state，并用进程内 HMAC 防篡改；ACP child 只读转换成 id-less `session_update` frames，不 attach client、不 seed EventBus、不改变 live replay window。snapshot 超过 256 MiB 时建索引前结构化拒绝。
+**bounded replay snapshot（#6482）**：`/load` 的 `compactedReplay` 是 live in-memory snapshot，不再承诺全量 transcript。`TurnBoundaryCompactionEngine` 按 completed turn / restore event segment 维护 replay window，并受 `--compacted-replay-max-bytes` 约束；默认 4 MiB，最大 256 MiB。旧 replay 被丢弃时，snapshot 首帧是 id-less `history_truncated` marker，客户端把它渲染为状态提示后继续应用 retained replay，不把它当成 `state_resync_required`。完整 active persisted transcript 不再塞进 `/load`，#6525 通过 `GET /session/:id/transcript` 做 cursor-paged replay：第一页冻结 JSONL snapshot size，后续 cursor 绑定 session、文件身份、snapshot position、leafUuid 与 replay state，并用 workspace project 目录持久 HMAC key 签名；ACP child 只读转换成 id-less `session_update` frames，不 attach client、不 seed EventBus、不改变 live replay window。snapshot 超过 256 MiB 时建索引前结构化拒绝。
 
-**multi-workspace session routing（#6511/#6540/#6558/#6567）**：multi-runtime daemon 中，legacy `workspaceCwd` 仍指 primary workspace；显式 `cwd` 创建 session 时通过 `WorkspaceRegistry` 精确解析 runtime，unknown/untrusted 分别返回 `workspace_mismatch` / `untrusted_workspace`。live session 路由（events/prompt/cancel/permission/heartbeat/detach/pending/close/status）先 resolve owner runtime 再触碰 bridge，miss 不 fallback primary，ambiguous fail closed。#6540 把 owner scan 抽成 registry-owned `WorkspaceSessionOwnerIndex`，并让 trusted non-primary workspace 可以显式 load/resume persisted session；跨 runtime 同 id restore/live 冲突返回 `409 session_workspace_conflict`。#6558 让 trusted non-primary session list 在 active recent view 下合并 persisted sessions 与 live summaries，archived/organized/grouped view 仍拒绝。#6567 再把 session organization/list/archive/delete 等 core REST 迁到 `/workspaces/:workspace/...` plural surface，selector 支持 workspace id 和 encoded absolute cwd。
+**multi-workspace session routing（#6511/#6540/#6558/#6567/#6631）**：multi-runtime daemon 中，legacy `workspaceCwd` 仍指 primary workspace；显式 `cwd` 创建 session 时通过 `WorkspaceRegistry` 精确解析 runtime，unknown/untrusted 分别返回 `workspace_mismatch` / `untrusted_workspace`。live session 路由（events/prompt/cancel/permission/heartbeat/detach/pending/close/status）先 resolve owner runtime 再触碰 bridge，miss 不 fallback primary，ambiguous fail closed。#6540 把 owner scan 抽成 registry-owned `WorkspaceSessionOwnerIndex`，并让 trusted non-primary workspace 可以显式 load/resume persisted session；跨 runtime 同 id restore/live 冲突返回 `409 session_workspace_conflict`。#6558 让 trusted non-primary session list 在 active recent view 下合并 persisted sessions 与 live summaries。#6567 再把 session organization/list/archive/delete 等 core REST 迁到 `/workspaces/:workspace/...` plural surface，selector 支持 workspace id 和 encoded absolute cwd。#6631 补齐 trusted non-primary archived/organized/grouped list：读取 selected workspace 的 `chats/archive/` 与 organization sidecar，`view=organized&archiveState=archived` 只返回 archived，unknown group id 对齐 primary 返回 `group_not_found`。
 
 ---
 
@@ -530,9 +531,9 @@ sequenceDiagram
 - `routes/session.ts` / `routes/sse-events.ts` / `routes/permission.ts`：session create、events、prompt、cancel、permission、heartbeat、detach、pending、close、status 按 owner runtime dispatch。
 - `routes/capabilities.ts` / `daemon-status.ts`：多 runtime 时 additive 发布 `multi_workspace_sessions`、`workspaces[]` 和 session limits；legacy `workspaceCwd` 保持 primary。
 
-### #6525(open) — cursor-paged transcript replay
+### #6525 — cursor-paged transcript replay
 
-- `session-transcript-reader.ts`：冻结 active JSONL snapshot，按 active parent chain 分页，cursor 绑定 session/file/snapshot/position/leafUuid/replay state 并用进程内 HMAC 签名；snapshot 超过 256 MiB 时拒绝建索引。
+- `session-transcript-reader.ts`：冻结 active JSONL snapshot，按 active parent chain 分页，cursor 绑定 session/file/snapshot/position/leafUuid/replay state 并用 workspace project 目录持久 HMAC key 签名；snapshot 超过 256 MiB 时拒绝建索引。
 - `acpAgent.ts`：`qwen/status/session/transcript` 只读 status method，把 page records 转 id-less `session_update` replay frames。
 - `routes/session.ts`：`GET /session/:id/transcript` 不 attach client、不 seed EventBus、不返回 `lastEventId`；invalid cursor/limit、snapshot unavailable、archive conflict 都有结构化错误。
 - `DaemonClient.ts`：新增 `getSessionTranscriptPage(sessionId, { cursor, limit })`。
@@ -547,9 +548,14 @@ sequenceDiagram
 ### #6558 — trusted non-primary persisted session listing
 
 - `routes/session.ts`：non-primary workspace session list 先探测 active persisted sessions；有 persisted 数据时走 `listWorkspaceSessionsForResponse()` 合并 live summary，否则保持 live-only fallback。
-- `routes/session.ts`：non-primary 仍只支持 active recent view，archived/organized/grouped 查询返回 `non_primary_session_list_option_not_supported`。
 - `routes/session.ts`：numeric cursor 与 live cursor 不混用，避免分页中途出现 persisted session 后跳页或重复。
 - `multi-workspace-sessions.test.ts`：覆盖 workspace id、encoded cwd、persisted/live merge、pagination、unknown/untrusted workspace 和 fallback。
+
+### #6631 — trusted non-primary archived / organized listing
+
+- `routes/session.ts`：trusted non-primary workspace session list 支持 `archiveState=archived`、`view=organized` 和 `group` filter，读取 selected workspace 的 archive 目录与 organization sidecar。
+- `routes/session.ts`：`view=organized&archiveState=archived` 不混入 live summary；group filter 不带 organized view 仍返回 `invalid_session_group_filter`。
+- `multi-workspace-sessions.test.ts`：覆盖 archived、organized、unknown group `group_not_found` 与 untrusted rejection。
 
 ### #6567 — workspace-qualified core REST session routes
 

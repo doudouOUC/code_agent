@@ -93,9 +93,13 @@ heartbeat(sessionId)                    heartbeat()
 
 seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 `Last-Event-ID: 0` 视为"从 ring buffer 起点 replay"。如果更早事件已被 ring eviction（默认 8000 帧），客户端收到 retained suffix 后从 live 继续。
 
-#6482 后，`load()` 的 replay snapshot 是 bounded live window，不再是完整 transcript。snapshot 可能以 id-less `history_truncated` 开头；SDK/UI 把它作为 transcript status 渲染，并继续应用 retained replay。#6525 open 方案给 full active persisted transcript 增加独立 API：`DaemonClient.getSessionTranscriptPage(sessionId, { cursor, limit })` 调 `GET /session/:id/transcript`，返回 id-less replay frames，不 attach client、不 seed EventBus、不返回 `lastEventId`；cursor 由 daemon 进程内 HMAC 签名，不能当作跨重启长期 bookmark。
+#6482 后，`load()` 的 replay snapshot 是 bounded live window，不再是完整 transcript。snapshot 可能以 id-less `history_truncated` 开头；SDK/UI 把它作为 transcript status 渲染，并继续应用 retained replay。#6525 给 full active persisted transcript 增加独立 API：`DaemonClient.getSessionTranscriptPage(sessionId, { cursor, limit })` 调 `GET /session/:id/transcript`，返回 id-less replay frames，不 attach client、不 seed EventBus、不返回 `lastEventId`；cursor 由 workspace project 目录持久 HMAC key 签名并绑定文件 snapshot，不能当作跨文件替换的长期 bookmark。
 
-#6567 后，`DaemonClient.workspaceById(id)` / `workspaceByCwd(cwd)` 返回 `WorkspaceDaemonClient`，把 selector 封进 `/workspaces/:workspace/...` 路由。该 client 覆盖 workspace file/status/settings/trust/permissions/MCP/tools/memory/agents/session list/group/archive/delete/reload/init 等 core REST helper；legacy `DaemonClient` 方法仍默认指向 primary workspace。客户端应先检查 `workspace_qualified_rest_core`，该能力随 workspace settings/persist route deps 条件广告。#6598 后，`DaemonClient.reloadChannelWorker()` 调 `POST /workspace/channel/reload`，用于 `qwen serve --channel` 场景下 relaunch channel worker 并重读 settings；客户端应先检查 `channel_reload` capability。
+#6567 后，`DaemonClient.workspaceById(id)` / `workspaceByCwd(cwd)` 返回 `WorkspaceDaemonClient`，把 selector 封进 `/workspaces/:workspace/...` 路由。该 client 覆盖 workspace file/status/settings/trust/permissions/MCP/tools/memory/agents/session list/group/archive/delete/reload/init 等 core REST helper；legacy `DaemonClient` 方法仍默认指向 primary workspace。客户端应先检查 `workspace_qualified_rest_core`，该能力随 workspace settings/persist route deps 条件广告。#6625 新增 `DaemonClient.addWorkspace(cwd)`，WebUI workspace provider 成功注册后强制刷新 capabilities，以拿到新增 `workspaces[]`。
+
+#6598 后，`DaemonClient.reloadChannelWorker()` 调 `POST /workspace/channel/reload`，用于 `qwen serve --channel` 场景下 relaunch channel worker 并重读 settings；客户端应先检查 `channel_reload` capability。#6635 open 方案扩展 status/type 面：`/daemon/status.runtime.channelWorkers[]` 与 SDK `DaemonChannelWorkerGroupSnapshot` 表达每个 workspace 的 worker，兼容 `channelWorker`/reload response 仍返回 primary 或首个 snapshot。
+
+#6638 open 方案给 SDK 增加 extension management v2 helpers：global `extensionCatalog()`、`installUserExtension()`、`checkUserExtensionUpdates()`、`updateUserExtension()`、`uninstallUserExtension()`、`setExtensionDefaultActivation()`、`extensionOperation()`、`waitForExtensionOperation()`，以及 `WorkspaceDaemonClient.workspaceExtensions()`、`setExtensionActivation()`、`clearExtensionActivation()`、`refreshExtensionRuntime()`。`waitForExtensionOperation()` 的 timeout 只停止客户端等待，不取消 daemon 已接受的操作。
 
 ### SSE 订阅与并发 guard
 
@@ -154,7 +158,7 @@ private async *iterateEvents(opts, release) {
 - **assist**：`followup_suggestion`
 - **cross-client**：`prompt_cancelled`
 
-补充：#6407 后，`settings_reloaded` 这类 daemon reload 通知不会进入 transcript debug block；SDK UI normalizer 将它映射为 `workspace.settings.changed` signal，WebUI 仅输出筛选后的 `console.debug` 诊断字段。#6482 后，`history_truncated` 是 known event，payload 校验失败才走 debug fallback；合法 marker 投影为状态行，不设置 `awaitingResync`。#6511 后，capabilities/status types 允许 additive `multi_workspace_sessions`、`workspaces[]` 和 session limits；#6567 后 SDK 才新增 workspace-specific `WorkspaceDaemonClient`，但仍要求客户端 gate on 条件能力 `workspace_qualified_rest_core`。#6598 的 `channel_reload` 是条件能力，只在 daemon 实际 wire channel worker reload deps 时出现。
+补充：#6407 后，`settings_reloaded` 这类 daemon reload 通知不会进入 transcript debug block；SDK UI normalizer 将它映射为 `workspace.settings.changed` signal，WebUI 仅输出筛选后的 `console.debug` 诊断字段。#6482 后，`history_truncated` 是 known event，payload 校验失败才走 debug fallback；合法 marker 投影为状态行，不设置 `awaitingResync`，并可用 `fullTranscriptAvailable` 暗示 #6525 transcript page 能补全。#6511 后，capabilities/status types 允许 additive `multi_workspace_sessions`、`workspaces[]` 和 session limits；#6567 后 SDK 才新增 workspace-specific `WorkspaceDaemonClient`，但仍要求客户端 gate on 条件能力 `workspace_qualified_rest_core`。#6598 的 `channel_reload` 是条件能力，只在 daemon 实际 wire channel worker reload deps 时出现；#6638 的 `extension_management_v2` 是 open diff additive 能力，legacy `workspace_extensions` 仍只代表诊断/compat surface。
 
 每种事件类型对应一个 `Data` interface + `Event` type alias（如 `DaemonPermissionRequestData` → `DaemonPermissionRequestEvent = DaemonEventEnvelope<'permission_request', DaemonPermissionRequestData>`）。
 
