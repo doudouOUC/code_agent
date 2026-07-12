@@ -21,8 +21,11 @@
 | #5183 | @doudouOUC | merged | mid-turn rich content 在 Web Shell 当前 turn 只注入 text 时保留 image payload，不让图片消息丢失。 |
 | #6621 | @doudouOUC | merged | workspace-qualified ACP transport：`/workspaces/:workspace/acp` per-runtime ACP mount，legacy `/acp` 继续绑定 primary。 |
 | #6625 | @doudouOUC | merged | Web Shell workspace management sidebar 与 dynamic workspace registration。 |
-| #6716 | @doudouOUC | open | dynamic workspace registration 的 persistent desired-state、启动恢复和 lazy workspace-qualified ACP mount。 |
+| #6716 | @doudouOUC | merged | dynamic workspace registration 的 persistent desired-state、启动恢复和 lazy workspace-qualified ACP mount。 |
 | #6717 | @doudouOUC | merged | Web Shell 可查看 untrusted secondary workspace 的 persisted-only session catalog。 |
+| #6740 | @doudouOUC | merged | untrusted secondary workspace 可通过 workspace-qualified persisted transcript reader 查看 active transcript page。 |
+| #6743 | @doudouOUC | merged | chat recording durable write failure 通过 `recording_stopped` 进入 WebUI warning/status。 |
+| #6745 | @doudouOUC | open | removable secondary workspace 的 runtime removal、busy snapshot 与 force confirmation flow。 |
 
 ---
 
@@ -181,9 +184,15 @@ sequenceDiagram
 
 新增 `AddWorkspaceDialog` 通过 SDK `DaemonClient.addWorkspace(cwd)` 调 `POST /workspaces`。daemon route 要求 cwd 是绝对路径、realpath 后存在且为目录，并拒绝重复、in-flight duplicate、parent/child nested workspace 和超过 25 个 workspace 的注册。注册成功后，WebUI workspace provider 的 `refreshCapabilities({ force:true })` 绕过 cached capabilities promise，立即拿到新的 `workspaces[]`。
 
-#6716 open 方案把 `addWorkspace` 扩展成可选持久化注册：Web Shell 只有看到 `persistent_workspace_registration` capability 时才展示/发送 persist 选项；daemon 把 secondary workspace desired-state 写入 user-level store，并在重启时恢复 runtime。`GET /workspace-registrations` 用于列出持久记录，`DELETE /workspace-registrations/:id` 只删除 desired-state，不卸载当前 active runtime。它还把 workspace-qualified ACP route 改成 app 启动时即挂载的 lazy resolver，避免动态注册后 plural ACP mount 不存在。
+#6716 把 `addWorkspace` 扩展成可选持久化注册：Web Shell 只有看到 `persistent_workspace_registration` capability 时才展示/发送 persist 选项；daemon 把 secondary workspace desired-state 写入 user-level store，并在重启时恢复 runtime。`GET /workspace-registrations` 用于列出持久记录，`DELETE /workspace-registrations/:id` 只删除 desired-state，不卸载当前 active runtime。它还把 workspace-qualified ACP route 改成 app 启动时即挂载的 lazy resolver，避免动态注册后 plural ACP mount 不存在。
 
 #6717 让 untrusted secondary workspace 在 sidebar 中可展开查看 persisted-only session catalog。UI 不选择该 workspace、不打开 session、不做 10 秒 polling；只用非交互 read-only row 显示 session displayName/短 id 和创建时间，并提示需要 trust 后才能打开。trusted workspace 和 untrusted primary 的行为不变。
+
+#6740 在 REST 层允许 registered untrusted secondary workspace 读取 active persisted transcript page。Web Shell 仍不把 untrusted workspace 当成可执行 workspace，不选择、不 prompt、不 ACP attach；如果 UI 提供“查看历史”入口，应通过 `WorkspaceDaemonClient.getSessionTranscriptPage()` 直接拉 workspace-qualified REST，并按 #6769 open 的 page/cursor bounds 处理 `transcript_page_too_large`。
+
+#6743 让 `recording_stopped` 成为 WebUI known signal：当 daemon 报告 recording durable append 已失败并停止 recorder 时，provider 把它渲染为 session warning/status，而不是未知 debug block。该事件不包含本地 path/errno，适合在浏览器端直接显示通用“记录已停止”语义。
+
+#6745 open 方案给 workspace sidebar 增加 remove flow。UI 先检查 capabilities 是否包含 `workspace_runtime_removal` 且 workspace row `removable:true`；普通 remove 遇到 `workspace_busy` 时显示 activity snapshot，并要求用户显式 force 后才发送 `force:true`。成功后刷新 capabilities/workspace list；删除 persistent alias 不代表删除项目文件、settings、transcripts 或 archive。
 
 ---
 

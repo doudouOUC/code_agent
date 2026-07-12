@@ -26,8 +26,13 @@
 | [#6631](https://github.com/QwenLM/qwen-code/pull/6631) | ✅ merged | feat(cli): List archived and organized sessions for non-primary workspaces | [pr-6631.md](pr-6631.md) |
 | [#6635](https://github.com/QwenLM/qwen-code/pull/6635) | ✅ merged | feat(cli): group daemon channel workers by workspace (phase 4b) | [pr-6635.md](pr-6635.md) |
 | [#6638](https://github.com/QwenLM/qwen-code/pull/6638) | 🟡 open | feat(serve): add extension management v2 | [pr-6638.md](pr-6638.md) |
-| [#6716](https://github.com/QwenLM/qwen-code/pull/6716) | 🟡 open | feat(serve): persist dynamic workspace registrations | [pr-6716.md](pr-6716.md) |
+| [#6716](https://github.com/QwenLM/qwen-code/pull/6716) | ✅ merged | feat(serve): persist dynamic workspace registrations | [pr-6716.md](pr-6716.md) |
 | [#6717](https://github.com/QwenLM/qwen-code/pull/6717) | ✅ merged | feat(serve): Expose read-only untrusted session catalogs | [pr-6717.md](pr-6717.md) |
 | [#6724](https://github.com/QwenLM/qwen-code/pull/6724) | ✅ merged | fix(cli): Scope session organization mutations by workspace | [pr-6724.md](pr-6724.md) |
+| [#6740](https://github.com/QwenLM/qwen-code/pull/6740) | ✅ merged | feat(serve): add workspace persisted transcript reader | [pr-6740.md](pr-6740.md) |
+| [#6741](https://github.com/QwenLM/qwen-code/pull/6741) | 🟡 open | feat(cli): Add runtime daemon channel control | [pr-6741.md](pr-6741.md) |
+| [#6743](https://github.com/QwenLM/qwen-code/pull/6743) | ✅ merged | fix: Make chat recording failures durable and visible | [pr-6743.md](pr-6743.md) |
+| [#6745](https://github.com/QwenLM/qwen-code/pull/6745) | 🟡 open | feat(serve): support runtime workspace removal | [pr-6745.md](pr-6745.md) |
+| [#6769](https://github.com/QwenLM/qwen-code/pull/6769) | 🟡 open | feat(serve): Bound persisted transcript pages | [pr-6769.md](pr-6769.md) |
 
-_按个人 PR 口径更新于 2026-07-12_
+_按个人 PR 口径更新于 2026-07-13_

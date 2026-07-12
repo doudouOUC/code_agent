@@ -14,6 +14,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **metadata**：`displayName` 重命名 + `session_metadata_updated` 扇出（#4240）。
 - **load / resume**：`session/load`（回放完整历史）vs `session/resume`（不回放），`pendingRestoreEvents` 缓冲、并发 restore 的 coalesce 合并与跨动作 `RestoreInProgressError`（#4222）。
 - **archive / unarchive**：active transcript 位于 `chats/`，archived transcript 位于 `chats/archive/`；archive 是状态转换，不删除 transcript，load/resume archived session 会要求先 unarchive（#6058）。
+- **persisted transcript / recording failure**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录（#6525/#6740/#6743）。
+- **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745 open）。
 
 核心工厂闭包 `createHttpAcpBridge`（`packages/acp-bridge/src/bridge.ts:643`，约 4666 行），HTTP 路由层在 `packages/cli/src/serve/server.ts`。会话的并发安全建立在一个反复出现的不变式上：**所有改写 `byId` / `attachCount` / `defaultEntry` 的关键步骤都在 async 函数 `await` 之前的同步前缀里完成**，使得跨微任务边界的竞争（reaper vs attach、close vs spawn）天然原子。
 
@@ -41,6 +43,10 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#6631](https://github.com/QwenLM/qwen-code/pull/6631) | merged | non-primary archived/organized listing | trusted non-primary workspace session list 支持 archived、organized 与 group filter |
 | [#6717](https://github.com/QwenLM/qwen-code/pull/6717) | merged | untrusted read-only catalog | untrusted secondary workspace 可读 persisted-only sessions/session-groups，不 merge live、不启动 ACP |
 | [#6724](https://github.com/QwenLM/qwen-code/pull/6724) | merged | workspace-scoped organization mutation | trusted secondary workspace 支持 `PATCH /workspaces/:workspace/session/:id/organization` |
+| [#6740](https://github.com/QwenLM/qwen-code/pull/6740) | merged | workspace persisted transcript reader | `GET /workspaces/:workspace/session/:id/transcript` 只读分页 selected workspace active JSONL |
+| [#6743](https://github.com/QwenLM/qwen-code/pull/6743) | merged | recording failure stop | durable append 失败后停止 recorder，阻止缺 parent 的后续记录，并广播 `recording_stopped` |
+| [#6745](https://github.com/QwenLM/qwen-code/pull/6745) | open | runtime workspace removal | removable secondary runtime hot removal，drain sessions/ACP/memory/channel |
+| [#6769](https://github.com/QwenLM/qwen-code/pull/6769) | open | workspace transcript byte bounds | workspace transcript route 增加 source/response/cursor byte budgets |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
