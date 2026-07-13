@@ -161,7 +161,7 @@ flowchart TD
 | POST | `/session/:id/model` | `mutate()` | `session_set_model` | L2003 | |
 | POST | `/session/:id/recap` | `mutate()` | `session_recap` | L2034 | **无路由侧 abort**（cosmetic） |
 | POST | `/session/:id/btw` | `mutate()` | `session_btw` | L2086 | `res.once('close')` abort（L2111） |
-| POST | `/session/:id/shell` | `mutate()` | — | L2142 | socket-close abort（L2156） |
+| POST | `/session/:id/shell` | `mutate(strict)` | — | L2142 | server-side shell；socket-close abort（L2156） |
 | GET | `/session/:id/rewind/snapshots` | bearer | `session_rewind` | L2078 | 列可回退 prompt 快照 |
 | POST | `/session/:id/rewind` | `mutate(strict)` | `session_rewind` | L2097 | 按 `promptId` 回退；忙碌 session 返回 409 |
 | POST | `/session/:id/approval-mode` | `mutate(strict)` | `session_approval_mode_control` | L2194 | 校验 `APPROVAL_MODES` |

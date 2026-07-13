@@ -7,6 +7,8 @@
 
 ## 1. 背景与动机
 
+本节说明 rewind 能力解决的用户问题、文件回退与 checkpointing 的边界，以及 daemon 多工作区接入后需要额外保证的 session owner 路由语义。
+
 ### 1.1 用户痛点（#3186）
 
 多轮对话型 CLI agent 在实际使用中经常出现「跑偏」：模型在第 N 轮做出错误假设、选错工具、或用户自己的 prompt 写错了，导致后续若干轮全部建立在错误前提之上。在 conversation rewind 之前，用户唯一的补救手段是：
@@ -477,6 +479,7 @@ sequenceDiagram
 | **#5044** | rewind selector / confirm 测试覆盖 | 补 selector 导航/取消、restore fallback、restoring 按键 guard，以及 code/conversation/both/no-client/compressed/file-restore-failure 等 confirm 分支测试 |
 | **#5057** | snapshot 更新即时持久化 | `trackEdit` 新增或修复备份后立即追加最新 snapshot record，避免进程在下一轮 snapshot 前退出丢最后一轮文件历史 |
 | **#5141** | supported `sed -i` file-history tracking | 把安全单文件 `sed -i` 替换命令模拟成 edit confirmation：预览 diff、写前 `trackEdit`、stale guard、`FileSystemService.writeTextFile()` 落盘；不支持的 sed 仍走 shell path |
+| **#6826** | multi-workspace daemon rewind owner routing | `GET /session/:id/rewind/snapshots` 与 `POST /session/:id/rewind` 先按 live owner runtime 分发；`rewindFiles` 只接受可选 boolean；SDK rewind 即使配置 ACP transport 也强制走 REST。 |
 
 ---
 
@@ -550,6 +553,12 @@ sequenceDiagram
 - `acpAgent.ts` 扩展 `rewindSession` handler，接受 `promptId`（新）或 `targetTurnIndex`（旧），向后兼容。
 - SDK 新增 `DaemonClient.getRewindSnapshots`/`rewindSession` + `DaemonSessionClient.getRewindSnapshots`/`rewind`；类型 `DaemonRewindSnapshotInfo`/`DaemonRewindResult`；reducer 新增 `rewindCount`/`lastRewind` 视图状态。
 - `rewindCommand.ts` 收窄 `supportedModes: ['interactive']`——daemon 客户端应用 HTTP 端点替代 TUI 对话框。
+
+### #6826 — multi-workspace daemon rewind owner routing
+
+- singular daemon route 不新增 workspace selector，而是用 live session owner resolver 选择 owning runtime：secondary live session 的 rewind snapshots 和 rewind 都调用 secondary `runtime.bridge`，不再被 primary-only guard 拦截。
+- `POST /session/:id/rewind` 保持 strict mutation auth；`rewindFiles` 从宽松 truthy/falsy 改为可选 boolean，非法类型返回 `400 invalid_rewind_files_flag`。
+- TS SDK 的 rewind API 强制走 authenticated REST，即使 client 配置 ACP HTTP/WS transport 也不走 ACP，避免绕开 REST owner-routing 与 mutation auth。
 
 ### #4871 — `/restore` 迁移到 FileHistoryService
 
