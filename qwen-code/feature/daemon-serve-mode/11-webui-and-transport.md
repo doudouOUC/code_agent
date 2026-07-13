@@ -192,7 +192,7 @@ sequenceDiagram
 
 #6743 让 `recording_stopped` 成为 WebUI known signal：当 daemon 报告 recording durable append 已失败并停止 recorder 时，provider 把它渲染为 session warning/status，而不是未知 debug block。该事件不包含本地 path/errno，适合在浏览器端直接显示通用“记录已停止”语义。
 
-#6745 open 方案给 workspace sidebar 增加 remove flow。UI 先检查 capabilities 是否包含 `workspace_runtime_removal` 且 workspace row `removable:true`；普通 remove 遇到 `workspace_busy` 时显示 activity snapshot，并要求用户显式 force 后才发送 `force:true`。成功后刷新 capabilities/workspace list；删除 persistent alias 不代表删除项目文件、settings、transcripts 或 archive。
+#6745 open 方案给 workspace sidebar 增加 remove flow。UI 先检查 capabilities 是否包含 `workspace_runtime_removal` 且 workspace row `removable:true`；普通 remove 遇到 `workspace_busy` 时显示 activity snapshot，并要求用户显式 force 后才发送 `force:true`。如果当前 session 属于目标 workspace，force 按钮禁用，避免 UI 自己拆掉当前执行面。成功后刷新 capabilities/workspace list，并必要时回落到 primary workspace；删除 persistent alias 不代表删除项目文件、settings、transcripts 或 archive。
 
 ---
 

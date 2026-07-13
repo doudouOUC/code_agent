@@ -62,13 +62,13 @@ TypeScript 插件如果显式把 adapter 构造参数标成 `AcpBridge`，应迁
 
 ### 3.3 runtime daemon channel control（#6741 open）
 
-#6741 open 方案新增 `ChannelWorkerManager` 和 `channel_control` capability，把 channel worker selection 变成 daemon runtime resource。入口包括：
+#6741 open 方案新增 `ChannelWorkerManager` 和 `channel_control` capability，把 channel worker selection 变成 daemon runtime resource。runtime selection 是临时控制态：`PUT` 不写 settings 或 boot options，daemon 重启后仍回到 `qwen serve --channel` 的启动选择，或在未传该参数时保持 disabled。入口包括：
 
 - HTTP：`GET /workspace/channel` 查询 selection/worker snapshot，`PUT /workspace/channel` 设置或替换 selection，`DELETE /workspace/channel` 停止并清空 selection，`POST /workspace/channel/reload` 沿用 reload 语义。
 - SDK：channel control helpers 与既有 `reloadChannelWorker()` 分层，客户端先 gate `channel_control` / `channel_reload`。
 - CLI：`qwen channel set`、`qwen channel status`、`qwen channel stop` 走 daemon API。
 
-manager 串行化 lifecycle mutation，并复用 #6635 的 worker group reconcile：未变化 workspace worker 保持运行，新增/删除 group 做精确启动/停止；替换失败回滚到旧 selection、PID file 和 webhook routing state。worker shutdown 还保留 PID lease 直到 child exit 被确认，避免 stale exit race 下重复 worker。
+manager 串行化 lifecycle mutation，并复用 #6635 的 worker group reconcile：未变化 workspace worker 保持运行，新增/删除 group 做精确启动/停止；替换失败回滚到旧 selection、PID file 和 webhook routing state。worker callbacks 带 generation，替换前 worker 的 late ready/exit 只记录日志，不覆盖当前状态；daemon drain/shutdown 返回 `daemon_draining`。worker shutdown 还保留 PID lease 直到 child exit 被确认，避免 stale exit race 下重复 worker。
 
 ---
 

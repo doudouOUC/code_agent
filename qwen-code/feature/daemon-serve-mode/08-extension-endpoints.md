@@ -397,7 +397,7 @@ HTTP surface 分两组：
 - global `/extensions/*`：catalog、install、check updates、update、delete、default activation、operation status。
 - workspace `/workspaces/:workspace/extensions/*`：effective view、workspace activation override、clear override、runtime refresh；workspace route 不直接安装/更新/删除 artifact。
 
-慢操作返回 `202 Accepted` + `operationId`，operation history 只在 daemon 本地保留且 terminal records capped；store generation 才是权威状态。prep queue 并发 2，commit queue 单并发；prepared update 携带 artifact generation，stale same-artifact commit 返回 `extension_conflict`。workspace activation/refresh 仍要求 trusted workspace，read projection 可按既有 trust 策略降级。
+慢操作返回 `202 Accepted` + `operationId`，operation history 只在 daemon 本地保留且 terminal records capped；store generation 才是权威状态。prep queue 并发 2，commit queue 单并发；prepared update 携带 artifact generation，stale same-artifact commit 返回 `extension_conflict`。workspace activation/refresh 仍要求 trusted workspace，read projection 可按既有 trust 策略降级。install 需要显式 consent 和初始 activation；GitHub/npm 下载接入 network policy，拒绝 credential、private network 和 local link 等高风险来源；CLI enable/disable/install/link/uninstall 会打印 committed warning。
 
 
 ---
