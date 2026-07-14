@@ -269,6 +269,6 @@ Stage 1.5 是**增量迁移，非大重写**：
 | #5144 | PR | ✅ MERGED 2026-06-15 | daemon developer docs English refresh + main 实现面核对 |
 | #4563 | PR | ✅ MERGED | #4563 base dmbm(DaemonWorkspaceService refactor，06-06 合入)|
 | #4516 | PR | ❌ CLOSED 未合入 | dmbm（compress/_meta 砍了）|
-| #4515 | PR | ❌ CLOSED / 部分后续落地 | 原 stats/export PR 未合入；stats 后续已落地，export 仍未落地 |
+| #4515 / #6297 / #6844 | PR | ✅ 后续落地 | 原 stats/export PR 未合入；stats 后续已落地，primary export 由 #6297 落地，workspace-qualified export 由 #6844 落地 |
 | #4156 #4554 | issue | 🔧 OPEN | Mode A 3-phase；OTel daemon e2e |
 | #4548 | issue | ✅ CLOSED | 由 #4559 实现 |
