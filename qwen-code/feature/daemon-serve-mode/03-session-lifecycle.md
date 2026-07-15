@@ -17,7 +17,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **persisted transcript / recording failure**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录（#6525/#6740/#6743）。
 - **multi-workspace owner-routed legacy session actions**：metadata、recap、BTW、mid-turn、task cancel、goal clear、rewind/shell、continue/language/artifact 等 singular legacy route 先解析 live owner runtime，再调用 owning bridge；URL/响应 shape 保持兼容（#6798/#6826/#6833）。
 - **workspace-qualified Voice admission**：legacy 与 workspace-qualified Voice REST/WS 共用进程级 admission coordinator；runtime removal 会把 active Voice lease 计入 busy activity，force removal/shutdown 只 abort 目标 runtime 的 Voice work（#6839）。
-- **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745 open）。
+- **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745）。
 
 核心工厂闭包 `createHttpAcpBridge`（`packages/acp-bridge/src/bridge.ts:643`，约 4666 行），HTTP 路由层在 `packages/cli/src/serve/server.ts`。会话的并发安全建立在一个反复出现的不变式上：**所有改写 `byId` / `attachCount` / `defaultEntry` 的关键步骤都在 async 函数 `await` 之前的同步前缀里完成**，使得跨微任务边界的竞争（reaper vs attach、close vs spawn）天然原子。
 
@@ -47,8 +47,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#6724](https://github.com/QwenLM/qwen-code/pull/6724) | merged | workspace-scoped organization mutation | trusted secondary workspace 支持 `PATCH /workspaces/:workspace/session/:id/organization` |
 | [#6740](https://github.com/QwenLM/qwen-code/pull/6740) | merged | workspace persisted transcript reader | `GET /workspaces/:workspace/session/:id/transcript` 只读分页 selected workspace active JSONL |
 | [#6743](https://github.com/QwenLM/qwen-code/pull/6743) | merged | recording failure stop | durable append 失败后停止 recorder，阻止缺 parent 的后续记录，并广播 `recording_stopped` |
-| [#6745](https://github.com/QwenLM/qwen-code/pull/6745) | open | runtime workspace removal | removable secondary runtime hot removal，drain sessions/ACP/memory/channel |
-| [#6769](https://github.com/QwenLM/qwen-code/pull/6769) | open | workspace transcript byte bounds | workspace transcript route 增加 source/response/cursor byte budgets |
+| [#6745](https://github.com/QwenLM/qwen-code/pull/6745) | merged | runtime workspace removal | removable secondary runtime hot removal，drain sessions/ACP/memory/channel |
+| [#6769](https://github.com/QwenLM/qwen-code/pull/6769) | merged | workspace transcript byte bounds | workspace transcript route 增加 source/response/cursor byte budgets |
 | [#6798](https://github.com/QwenLM/qwen-code/pull/6798) | merged | legacy action owner routing | metadata、recap、BTW、mid-turn、task cancel、goal clear 按 live owner runtime dispatch |
 | [#6826](https://github.com/QwenLM/qwen-code/pull/6826) | merged | rewind/shell owner routing | rewind snapshots、rewind、shell 按 live owner runtime dispatch，SDK rewind 强制 REST |
 | [#6833](https://github.com/QwenLM/qwen-code/pull/6833) | merged | continue/language/artifact owner routing | continue、language、artifact add/delete 按 owning runtime dispatch |

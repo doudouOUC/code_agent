@@ -41,16 +41,16 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | --- | --- | --- | --- |
 | `/session/:id/tasks` | GET | 仅全局 bearer（无 `mutate`） | 只读快照，与其他 `GET /workspace/*` 状态路由同级。 |
 | `/session/:id/transcript` | GET | 仅全局 bearer（无 `mutate`） | #6525：active persisted transcript 分页 replay，不 attach client、不改 live EventBus。 |
-| `/workspaces/:workspace/session/:id/transcript` | GET | 仅全局 bearer（无 `mutate`） | #6740：selected workspace persisted-only transcript pager；registered untrusted secondary 可读，不启动 ACP；#6769 open 增加 byte bounds。 |
+| `/workspaces/:workspace/session/:id/transcript` | GET | 仅全局 bearer（无 `mutate`） | #6740：selected workspace persisted-only transcript pager；registered untrusted secondary 可读，不启动 ACP；#6769 增加 byte bounds。 |
 | `/workspaces/:workspace/...` | GET/POST/DELETE/PATCH | 读 bearer / 写 `mutate(strict)` | #6567：workspace-qualified core REST；selector 先 workspace id、再 encoded absolute cwd。 |
 | `/session/:id/stats` | GET | 仅全局 bearer | 模型/token/工具/文件统计快照。 |
 | `/workspace/hooks` / `/session/:id/hooks` | GET | 仅全局 bearer | hook 配置与运行时诊断，可能暴露 hook command/url，按敏感诊断面对待。 |
 | `/workspace/extensions` | GET | 仅全局 bearer | extension 安装元信息与能力计数。 |
 | `/extensions/*` | GET/POST/PUT/DELETE | 读 bearer / 写 `mutate(strict)` | #6825：V2 user-level extension artifact 管理、transactional store 与 async operation status。 |
 | `/workspaces/:workspace/extensions/*` | GET/PUT/DELETE/POST | 读 bearer / 写 `mutate(strict)` | #6825：workspace projection、activation override 与 runtime refresh；不拥有 artifact mutation。 |
-| `/workspace/channel` / `/workspace/channel/reload` | GET/PUT/DELETE；POST reload | 读 bearer / 写 `mutate(strict)` | #6741 open：runtime channel selection status/set/stop；reload 仍走 #6598 的 `POST /workspace/channel/reload`。 |
+| `/workspace/channel` / `/workspace/channel/reload` | GET/PUT/DELETE；POST reload | 读 bearer / 写 `mutate(strict)` | #6741：runtime channel selection status/set/stop；reload 仍走 #6598 的 `POST /workspace/channel/reload`。 |
 | `/workspace-registrations` | GET/DELETE | 读 bearer / delete `mutate(strict)` | #6716：persistent dynamic workspace desired-state 列表与忘记记录；delete 不卸载 active runtime。 |
-| `/workspaces/:workspace` | DELETE | `mutate(strict)` | #6745 open：hot remove removable secondary runtime；drain sessions/ACP/memory/channel，force 可越过 busy guard。 |
+| `/workspaces/:workspace` | DELETE | `mutate(strict)` | #6745：hot remove removable secondary runtime；drain sessions/ACP/memory/channel，force 可越过 busy guard。 |
 | `/workspaces/:workspace/sessions`, `/session-groups`, `/session/:id/organization` | GET/PATCH | 读 bearer / mutation `mutate()` | #6717/#6724：untrusted secondary persisted-only catalog；trusted secondary organization mutation。 |
 | `/session/:id/recap` | POST | `mutate()`（非 strict） | 与 `/prompt` 同 posture：花 token、不改状态。 |
 | `/session/:id/btw` | POST | `mutate()`（非 strict） | 同上。 |
@@ -97,9 +97,9 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #6717 | feat(serve): Expose read-only untrusted session catalogs | 2026-07-11 | untrusted secondary workspace persisted-only session/session-group catalog，不 merge live、不启动 ACP。 |
 | #6724 | fix(cli): Scope session organization mutations by workspace | 2026-07-11 | trusted secondary workspace `PATCH /workspaces/:workspace/session/:id/organization`。 |
 | #6740 | feat(serve): add workspace persisted transcript reader | 2026-07-12 | `GET /workspaces/:workspace/session/:id/transcript` selected workspace active transcript pager。 |
-| #6741 | feat(cli): Add runtime daemon channel control | open | `GET/PUT/DELETE /workspace/channel` runtime selection control，reload 保持 `POST /workspace/channel/reload`。 |
-| #6745 | feat(serve): support runtime workspace removal | open | `DELETE /workspaces/:workspace` removable secondary runtime hot removal。 |
-| #6769 | feat(serve): Bound persisted transcript pages | open | workspace transcript source/response/cursor byte bounds 与 `transcript_page_too_large`。 |
+| #6741 | feat(cli): Add runtime daemon channel control | merged | `GET/PUT/DELETE /workspace/channel` runtime selection control，reload 保持 `POST /workspace/channel/reload`。 |
+| #6745 | feat(serve): support runtime workspace removal | merged | `DELETE /workspaces/:workspace` removable secondary runtime hot removal。 |
+| #6769 | feat(serve): Bound persisted transcript pages | merged | workspace transcript source/response/cursor byte bounds 与 `transcript_page_too_large`。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -273,17 +273,17 @@ legacy `/workspace/...` 继续绑定 primary workspace；plural route 才按 sel
 - `GET /workspace-registrations`：返回 store snapshot、entry id、cwd、active、persisted。
 - `DELETE /workspace-registrations/:id`：删除 store entry；如果该 workspace 当前 active，响应 `restartRequired:true`，但不卸载 runtime。
 
-## workspace persisted transcript（#6740 / #6769 open）
+## workspace persisted transcript（#6740 / #6769）
 
 #6740 在 #6525 singular transcript route 之外新增 workspace-qualified reader：`GET /workspaces/:workspace/session/:id/transcript`。它从 selected workspace 的 active persisted JSONL 生成 replay page，不 attach client、不启动 ACP、不查询 live bridge、不加载 workspace settings，也不创建旧 persisted cursor-key 文件。能力 `workspace_persisted_transcript` 无条件广告，但每次请求仍按 workspace selector 和 trust policy 校验；registered untrusted secondary workspace 可读，untrusted primary 继续拒绝。
 
 cursor 使用 daemon-lifetime per-workspace in-memory signing key，因此适合当前 daemon 生命周期内分页，不作为跨重启 bookmark。SDK `WorkspaceDaemonClient.getSessionTranscriptPage()` 强制走 native REST，避免 replaceable ACP transport 触发执行型路径。
 
-#6769 open 方案给该 route 增加 byte bounds：每页最多读取 4 MiB persisted source records，serialized response 最多 32 MiB，request/response cursor 最多 64 KiB。`limit` 只是 record-count ceiling；单个 aggregate record 或 response 过大返回 `413 transcript_page_too_large`，oversized replay cursor 则以 terminal partial page 结束。
+#6769 给该 route 增加 byte bounds：每页最多读取 4 MiB persisted source records，serialized response 最多 32 MiB，request/response cursor 最多 64 KiB。`limit` 只是 record-count ceiling；单个 aggregate record 或 response 过大返回 `413 transcript_page_too_large`，oversized replay cursor 则以 terminal partial page 结束。
 
-## runtime channel control（#6741 open）
+## runtime channel control（#6741）
 
-#6741 open 方案把 channel worker selection 从 boot-only `--channel` 提升为 daemon runtime resource。`channel_control` capability 表示 runtime manager 已 wire，客户端可用：
+#6741 把 channel worker selection 从 boot-only `--channel` 提升为 daemon runtime resource。`channel_control` capability 表示 runtime manager 已 wire，客户端可用：
 
 - `GET /workspace/channel`：查询当前 committed selection 与 worker/group snapshot。
 - `PUT /workspace/channel`：启用或替换 selection。
@@ -292,9 +292,9 @@ cursor 使用 daemon-lifetime per-workspace in-memory signing key，因此适合
 
 manager 串行化 lifecycle mutation，复用 workspace worker group reconcile，保留未变化 worker，并把 PID file 与 webhook routing 的 committed state 当作原子提交对象；新 selection 启动失败时回滚到旧 selection。CLI `qwen channel set/status/stop` 和 SDK helpers 都通过该 HTTP surface。
 
-## runtime workspace removal（#6745 open）
+## runtime workspace removal（#6745）
 
-#6745 open 方案新增 `DELETE /workspaces/:workspace` 和 `workspace_runtime_removal` capability。capability 的 workspace rows 增加 `removable`，只有动态/可移除 secondary runtime 可删；primary 和显式启动 workspace 不可删。
+#6745 新增 `DELETE /workspaces/:workspace` 和 `workspace_runtime_removal` capability。capability 的 workspace rows 增加 `removable`，只有动态/可移除 secondary runtime 可删；primary 和显式启动 workspace 不可删。
 
 删除流程是两阶段 drain：先关 admission/ACP/worker gates，检查 live sessions、pending prompts/starts、ACP connections、memory tasks、sub-session launchers 和 channel workers；非 force 时有 activity 返回 `409 workspace_busy`。可删除时清理 workspace-owned sessions、ACP mount、remember/memory lane、sub-session launcher、bridge child、channel worker，并释放 registry path。它还会忘记该 runtime 的所有 persistent registration alias，但不会删除工作区文件、settings、transcripts 或 archives。
 
