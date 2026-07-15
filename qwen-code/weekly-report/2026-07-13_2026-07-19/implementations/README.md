@@ -1,0 +1,26 @@
+# 2026-07-13_2026-07-19 PR 最终实现文档索引
+
+仅保留 @doudouOUC 个人 PR 的最终实现文档。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
+
+| PR | 状态 | 标题 | 文档 |
+|---|---|---|---|
+| [#6798](https://github.com/QwenLM/qwen-code/pull/6798) | ✅ merged | fix(serve): route session actions to the owning workspace | [pr-6798.md](pr-6798.md) |
+| [#6825](https://github.com/QwenLM/qwen-code/pull/6825) | ✅ merged | feat(serve): add extension management v2 | [pr-6825.md](pr-6825.md) |
+| [#6826](https://github.com/QwenLM/qwen-code/pull/6826) | ✅ merged | feat(serve): support multi-workspace rewind and shell | [pr-6826.md](pr-6826.md) |
+| [#6833](https://github.com/QwenLM/qwen-code/pull/6833) | ✅ merged | fix(serve): Route session continue, language, and artifacts by owner | [pr-6833.md](pr-6833.md) |
+| [#6839](https://github.com/QwenLM/qwen-code/pull/6839) | ✅ merged | feat(serve): Add workspace-qualified Voice | [pr-6839.md](pr-6839.md) |
+| [#6844](https://github.com/QwenLM/qwen-code/pull/6844) | ✅ merged | feat(serve): Add workspace-qualified session export | [pr-6844.md](pr-6844.md) |
+| [#6846](https://github.com/QwenLM/qwen-code/pull/6846) | ✅ merged | feat(core): add PDF vision bridge fallback | [pr-6846.md](pr-6846.md) |
+| [#6864](https://github.com/QwenLM/qwen-code/pull/6864) | ✅ merged | fix(core): Classify shell timeouts as tool errors | [pr-6864.md](pr-6864.md) |
+| [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | ✅ merged | feat(core): emit liveness heartbeats for silent foreground shell commands | [pr-6876.md](pr-6876.md) |
+| [#6907](https://github.com/QwenLM/qwen-code/pull/6907) | 🟡 open | feat(daemon): Trace cold first-session startup | [pr-6907.md](pr-6907.md) |
+| [#6910](https://github.com/QwenLM/qwen-code/pull/6910) | 🟡 open | feat(web-shell): add archived session export | [pr-6910.md](pr-6910.md) |
+| [#6911](https://github.com/QwenLM/qwen-code/pull/6911) | ✅ merged | feat(cli): Add archived session export | [pr-6911.md](pr-6911.md) |
+| [#6912](https://github.com/QwenLM/qwen-code/pull/6912) | ✅ merged | fix(web-shell): Harden non-primary session archive actions | [pr-6912.md](pr-6912.md) |
+| [#6945](https://github.com/QwenLM/qwen-code/pull/6945) | 🟡 open | feat(cli): add daemon Todo stop guard | [pr-6945.md](pr-6945.md) |
+| [#6950](https://github.com/QwenLM/qwen-code/pull/6950) | 🟡 open | fix(cli): Preserve channel startup failure details | [pr-6950.md](pr-6950.md) |
+| [#6961](https://github.com/QwenLM/qwen-code/pull/6961) | 🟡 open | feat(daemon): Aggregate deep health across workspaces | [pr-6961.md](pr-6961.md) |
+| [#6967](https://github.com/QwenLM/qwen-code/pull/6967) | 🟡 open | fix(core): Require explicit approval to exit Plan mode | [pr-6967.md](pr-6967.md) |
+| [#6969](https://github.com/QwenLM/qwen-code/pull/6969) | 🟡 open | feat(cli): Add bounded daemon log rotation | [pr-6969.md](pr-6969.md) |
+
+_按个人 PR 口径更新于 2026-07-16_

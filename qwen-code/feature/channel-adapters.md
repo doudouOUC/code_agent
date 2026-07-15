@@ -8,7 +8,7 @@
 
 Channel adapter 让 qwen-code 可以从本地 TUI 之外的消息通道接收用户输入。adapter 不应该依赖某个具体 bridge 实现，否则后续要切到 daemon-backed bridge、测试 fake bridge 或多 channel bridge 时，所有 adapter 都会被迫跟着底层类名和生命周期细节变化。
 
-#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker。
+#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 open 方案把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI。
 
 ---
 
@@ -38,7 +38,7 @@ flowchart LR
 
 TypeScript 插件如果显式把 adapter 构造参数标成 `AcpBridge`，应迁移到 `ChannelAgentBridge`；运行时 JavaScript 插件保持结构兼容。这样现有 standalone ACP-backed 启动路径不被破坏，同时新 adapter 或测试 double 可以只实现 contract。
 
-#5978 本身没有实现 `qwen serve --channel` 或 daemon-managed worker；它先把 adapter 合约提前收窄，降低后续 bridge 替换的耦合成本。#6031 已把 daemon-managed worker 合入 main：serve 进程 fork internal `channel daemon-worker`，worker 使用 TS SDK + `DaemonChannelBridge` 回连 daemon，并强制 thread-scoped daemon session，避免污染默认 single session。#6098 则把该 worker 从“能启动”加固到“能运行”：ready 后有界重启、IPC heartbeat/stale kill、partial-connect issue、pidfile workerPid 清理和日志脱敏。#6165 用 `turn_complete` / `turn_error` 释放 per-session barrier，主路径不再靠 `setTimeout(0)` 猜测 SSE chunk drain；#6182 让 `DaemonChannelBridge` 从内部 `sessions` map 和 `activePrompts` set 构造 session snapshot，并由 daemon-worker facade optional 透传。#6309 对 load replay 的影响是 bridge 可以从 ACP response seed 当前 snapshot，随后 channel/ACP stream attach 再从 snapshot 发 replayed `session/update`，而不是在 restore 期间把历史帧逐条推进 live EventBus。#6598 给 worker supervisor 增加 `restart()`，对外暴露 HTTP/SDK/CLI reload 面，支持不重启 daemon 的 settings reload。#6741 把 selection lifecycle 抽到 `ChannelWorkerManager`，daemon 即使启动时未带 `--channel`，也能后续通过 API 设置 selection。
+#5978 本身没有实现 `qwen serve --channel` 或 daemon-managed worker；它先把 adapter 合约提前收窄，降低后续 bridge 替换的耦合成本。#6031 已把 daemon-managed worker 合入 main：serve 进程 fork internal `channel daemon-worker`，worker 使用 TS SDK + `DaemonChannelBridge` 回连 daemon，并强制 thread-scoped daemon session，避免污染默认 single session。#6098 则把该 worker 从“能启动”加固到“能运行”：ready 后有界重启、IPC heartbeat/stale kill、partial-connect issue、pidfile workerPid 清理和日志脱敏。#6165 用 `turn_complete` / `turn_error` 释放 per-session barrier，主路径不再靠 `setTimeout(0)` 猜测 SSE chunk drain；#6182 让 `DaemonChannelBridge` 从内部 `sessions` map 和 `activePrompts` set 构造 session snapshot，并由 daemon-worker facade optional 透传。#6309 对 load replay 的影响是 bridge 可以从 ACP response seed 当前 snapshot，随后 channel/ACP stream attach 再从 snapshot 发 replayed `session/update`，而不是在 restore 期间把历史帧逐条推进 live EventBus。#6598 给 worker supervisor 增加 `restart()`，对外暴露 HTTP/SDK/CLI reload 面，支持不重启 daemon 的 settings reload。#6741 把 selection lifecycle 抽到 `ChannelWorkerManager`，daemon 即使启动时未带 `--channel`，也能后续通过 API 设置 selection。#6950 open 方案在 worker startup IPC 中保留 adapter `connect()` failures，避免 dynamic channel control 只返回 generic startup failure。
 
 ### 3.1 daemon-managed channel worker reload（#6598）
 
@@ -70,6 +70,12 @@ TypeScript 插件如果显式把 adapter 构造参数标成 `AcpBridge`，应迁
 
 manager 串行化 lifecycle mutation，并复用 #6635 的 worker group reconcile：未变化 workspace worker 保持运行，新增/删除 group 做精确启动/停止；替换失败回滚到旧 selection、PID file 和 webhook routing state。worker callbacks 带 generation，替换前 worker 的 late ready/exit 只记录日志，不覆盖当前状态；daemon drain/shutdown 返回 `daemon_draining`。worker shutdown 还保留 PID lease 直到 child exit 被确认，避免 stale exit race 下重复 worker。
 
+### 3.4 startup failure diagnostics（#6950 open）
+
+#6950 open 方案补齐 adapter `connect()` 失败的诊断链路。worker child 捕获每个 adapter `connect()` rejection 后，发送 `channel_startup_failure` IPC，并等待 parent `channel_startup_report_ack` 再继续尝试下一个 adapter；ACK 才是 supervisor 已处理的边界，避免 worker 同步退出时只剩 generic “No channels connected.”。
+
+failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optional adapter `code` 和 message；parent 再次校验、净化控制字符、redact daemon token/sensitive env/generic credentials，并按 Unicode code point 截断。单个 startup 最多保留 64 条，超过后设置 `startupFailuresTruncated`。partial connect 仍 ready，snapshot 暴露 failures；dynamic all-fail 返回 `502 channel_worker_start_failed`，body 带 workspace-annotated attempted failures 和 rollback 后 state，后续 GET 不保留失败 attempt。
+
 ---
 
 ## 4. 涉及 PR
@@ -85,11 +91,12 @@ manager 串行化 lifecycle mutation，并复用 #6635 的 worker group reconcil
 | #6598 | merged | channel settings 变更需要重启整个 daemon 才能生效。 | `ChannelWorkerSupervisor.restart()` relaunch worker 并重读 settings；新增 strict HTTP reload route、SDK helper、CLI `qwen channel reload` 和条件能力 `channel_reload`。 |
 | #6635 | merged | multi-workspace daemon 中 channel worker 仍绑定 primary workspace，secondary workspace channel 会读错 env/settings/status。 | selected channels 按 owning trusted workspace 分组，每组一个 supervisor；`ChannelWorkerGroup` 提供 fail-closed group restart、webhook owner routing、pidfile `workers[]` 与 status `channelWorkers[]`。 |
 | #6741 | merged | daemon 启动后无法启用、替换、查询或停止 channel worker selection。 | 新增 runtime `ChannelWorkerManager`、`channel_control` capability、HTTP/SDK/CLI selection control，并在替换失败时回滚旧 worker group/pidfile/webhook state。 |
+| #6950 | open | adapter `connect()` 失败原因在 worker 启动边界丢失。 | 新增 startup failure IPC + ACK，snapshot/HTTP/SDK/CLI 暴露 bounded redacted failures；dynamic all-fail 返回 `channel_worker_start_failed` 和 attempted failures。 |
 
 ---
 
 ## 5. 已知限制 / 后续
 
 1. 多账号隔离、平台风控和长期 worker 调度仍需要后续 PR 单独落地。
-2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing、settings reload、workspace grouping 和 #6741 runtime selection control；多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
+2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing、settings reload、workspace grouping、#6741 runtime selection control 和 #6950 startup failure diagnostics；多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
 3. 新插件应优先面向 `ChannelAgentBridge` 编程，只有 standalone ACP-backed 路径才需要知道 `AcpBridge`。

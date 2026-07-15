@@ -28,6 +28,8 @@
 | #6745 | @doudouOUC | merged | removable secondary workspace 的 runtime removal、busy snapshot 与 force confirmation flow。 |
 | #6825 | @doudouOUC | merged | Extension Management V2 的 catalog/projection/action/warning surface 接入 TUI/Web Shell/SDK。 |
 | #6839 | @doudouOUC | merged | workspace-qualified Voice 的 selected runtime settings/transcribe/stream 与 workspace removal activity。 |
+| #6910 | @doudouOUC | open | Web Shell archived rows 按 capability/trust 暴露 Export，并走 owning workspace client。 |
+| #6912 | @doudouOUC | merged | Web Shell non-primary archive/unarchive action identity、busy state 与 reconcile hardening。 |
 
 ---
 
@@ -199,6 +201,8 @@ sequenceDiagram
 #6825 把 Extension Management V2 暴露给客户端层：Web Shell/TUI 不再只消费 legacy `/workspace/extensions` 诊断快照，而是通过 SDK 的 global catalog、operation polling 和 workspace projection/activation helpers 展示 user-level artifact 与 per-workspace activation 的分离状态。mutation 被 daemon 接受后返回 operation id；UI 必须把 `succeeded_with_warnings` 当作“持久状态已提交但 runtime refresh/settings sync/cleanup 失败”的可操作 warning，而不是静默成功或强制回滚。workspace projection 需要展示 default、override、effective、desired generation 与 applied generation，避免用户把 artifact 安装状态误读成某个 workspace 已生效。
 
 #6839 对 Web Shell 的直接影响不是新增 secondary workspace Voice 控件，而是让 workspace runtime lifecycle 能看见 Voice activity。workspace sidebar 的 removal/busy flow 需要展示 `activity.voiceSessions`：普通 remove 遇到 active Voice work 返回 busy，force remove 只 abort 目标 runtime 的 Voice stream/lease，不影响其它 workspace；成功后刷新 workspace/capabilities。客户端若要启用 selected workspace Voice 设置或 batch transcription，应同时 gate `workspace_qualified_voice` 和对应 legacy Voice 能力。
+
+#6912 修正 Web Shell session row 的 identity：merged active/archived collection、React key、current selection、busy state、unread/export state 都使用 `(workspaceCwd, sessionId)`，不能只用 session id。secondary active row 只在 trusted 且 capability 足够时显示 Archive；trusted archived row 可以 Unarchive；操作完成后同时 reconcile primary 与 selected workspace 的 active/archived catalog，并展示 daemon response 的 `errors[]`。#6910 在此基础上给 archived row 增加 Export：只有 `workspace_archived_session_export` 存在且 row workspace trusted 时才显示，点击后调用 row owning workspace 的 `WorkspaceDaemonClient.exportArchivedSession()`，避免同 id session 从 primary 或 active route 导出错内容。
 
 ---
 

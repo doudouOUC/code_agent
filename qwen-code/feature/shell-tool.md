@@ -1,7 +1,7 @@
 # Shell 工具执行语义技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat，均按当前 open diff 复核。
+> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat。
 
 ---
 
@@ -111,8 +111,8 @@ timer 清理与 trailing flush、timeout warning 一样集中在三类路径：s
 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
-| [#6864](https://github.com/QwenLM/qwen-code/pull/6864) | open | shell timeout error semantics | 前台 shell timeout 从成功输出改为结构化 `EXECUTION_TIMEOUT` 错误，协议/JSON/Anthropic/speculative/batch offload 都读取 error envelope。 |
-| [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | open | silent shell heartbeat | 静默前台 shell 命令周期性发 `ShellProgressData`，ACP/stream-json 可见，TUI/模型上下文不受影响。 |
+| [#6864](https://github.com/QwenLM/qwen-code/pull/6864) | merged | shell timeout error semantics | 前台 shell timeout 从成功输出改为结构化 `EXECUTION_TIMEOUT` 错误，协议/JSON/Anthropic/speculative/batch offload 都读取 error envelope。 |
+| [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | merged | silent shell heartbeat | 静默前台 shell 命令周期性发 `ShellProgressData`，ACP/stream-json 可见，TUI/模型上下文不受影响。 |
 
 ---
 
@@ -121,4 +121,4 @@ timer 清理与 trailing flush、timeout warning 一样集中在三类路径：s
 - #6864 不改变非零退出码语义，也不处理后台 shell timeout 自动提升。
 - #6876 不向 ACP 流式转发命令输出，只提供 liveness heartbeat。
 - MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍是后续项。
-- 两个 PR 当前仍为 open；本文记录当前 diff 的最终实现观察，合入后需再次核对状态和统计。
+- 两个 PR 均已合入；后续 MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍需单独设计。

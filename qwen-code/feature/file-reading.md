@@ -1,7 +1,7 @@
 # 文件读取 / 大文本范围 / PDF 预算技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback；#6846 仍为 open，按当前 diff 记录。
+> 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback。
 
 ---
 
@@ -103,7 +103,7 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 
 `processSingleFileContent()` 在 render 成功后把页面转为 image parts；如果没有显式 `pages` 且只渲染了前 N 页，会追加文本提示，说明后续页可能因 byte cap 或 per-read page cap 被省略，要求用户用 `pages` 读取后续范围。缺少 `pdftoppm`、password-protected/corrupt/invalid PDF 或无输出时，返回结构化错误提示，不静默吞掉页面。
 
-### 3.5 PDF vision bridge fallback（#6846 open）
+### 3.5 PDF vision bridge fallback（#6846）
 
 #6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用于“纯文本主模型 + configured vision bridge”的场景。它不改变普通图片读取，也不改变 vision-capable 主模型或 native-PDF 模型路径。
 
@@ -165,7 +165,7 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 | [#6404](https://github.com/QwenLM/qwen-code/pull/6404) | merged | large text range reads | 大文本按有界行范围读取，贯通 core/ACP/read_file/read_many_files/@file，并保留非文本大小保护。 |
 | [#6409](https://github.com/QwenLM/qwen-code/pull/6409) | merged | large PDF text extraction budget | 大型 PDF 不带 `pages` 时返回 guidance/reference，显式页码读取保留并加 token guard。 |
 | [#6585](https://github.com/QwenLM/qwen-code/pull/6585) | merged | PDF page image fallback | `pdftotext` 失败或超预算时，vision-capable 路径用 `pdftoppm` 生成 bounded JPEG page image parts，并提示被 page/byte cap 省略的页。 |
-| [#6846](https://github.com/QwenLM/qwen-code/pull/6846) | open | PDF vision bridge fallback | 纯文本主模型配置 vision bridge 时，PDF 抽取失败或单页超预算可转为最多 4 页的有损、不可信视觉转录；失败恢复原 PDF error 并保留 disclosure。 |
+| [#6846](https://github.com/QwenLM/qwen-code/pull/6846) | merged | PDF vision bridge fallback | 纯文本主模型配置 vision bridge 时，PDF 抽取失败或单页超预算可转为最多 4 页的有损、不可信视觉转录；失败恢复原 PDF error 并保留 disclosure。 |
 
 ---
 
@@ -175,4 +175,4 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 - partial-range `file_unchanged` dedup、Claude-style line-numbered output 和远程 ACP server E2E 仍是后续项。
 - PDF text extraction 依赖本机 `pdftotext`，image fallback 依赖 `pdftoppm`；二者都来自 poppler-utils，缺失时 direct read 会提示安装依赖。
 - PDF 输出 token guard 只能控制提取文本进入 tool result 的上限，不改变自动压缩阈值或 native PDF-capable model 的行为。
-- #6846 当前仍为 open；合入后需复核最终 stats、bridge notice 文案和 ACP/export 序列化是否与当前 diff 一致。
+- #6846 已合入；后续可继续补 token-aware 大文本输出预算和 PDF bridge E2E 覆盖。

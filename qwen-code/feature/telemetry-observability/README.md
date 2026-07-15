@@ -263,6 +263,8 @@ getActiveSpanTraceContext()  // 优先取当前 active span 的 traceId/spanId
 
 **daemon 日志**：`emitDaemonLog(body, attrs)` 经 `@opentelemetry/api-logs` 发 `qwen-code.daemon.error` 事件；所有 daemon 遥测 API 都包了 `try/catch` 且 SDK 未初始化时静默——遵循「遥测绝不影响请求处理」原则。
 
+#6907（open）把 cold first-session startup 拆进同一棵 daemon trace：`POST /session` 的 HTTP span 会回填 deferred runtime wait timing；bridge 侧增加 `channel.wait` span，标记 reused / joined / spawned-on-request，并为 channel 生成诊断 UUID；`session/new` 请求携带 traceparent，ACP child 在 `Session.startChat()` 周围记录 `qwen-code.daemon.session_start` 子 span 和阶段耗时。这样首个 session 的慢启动能区分 daemon runtime、channel preheat/attach、ACP child bootstrap 与 core chat 初始化，而不是只看到一个长 HTTP route duration。
+
 **配置解耦**：daemon 分支新增 `runtime-config.ts:TelemetryRuntimeConfig` 接口，`initializeTelemetry` 改为接收该接口而非具体 `Config`（`sdk.ts` 签名改动），便于 daemon / SDK 等非完整 `Config` 场景复用遥测初始化。
 
 ### 3.7 GenAI 语义双发 / TTFT / retry 可见性
@@ -468,6 +470,8 @@ sequenceDiagram
 | #4628 | client_id + 权限 span | `qwen-code.client_id` 属性 + permission route span | Daemon |
 | #4630 | daemon/ACP tool span | 在 daemon/ACP 路径补 tool span + `session.id` | Daemon |
 | #5047 | daemon ACP trace continuity | 从 daemon bridge active span 派生 ACP prompt traceparent，修 deferred span 的 session 归因 | Daemon |
+| #6907 | cold first-session startup trace | deferred runtime wait、`channel.wait`、`session_start` stage timing 与 session-start profiler `sessionId` | Daemon |
+| #6969 | bounded daemon log status | stable daemon/access log rotation 的 mode/health/issues/drop counters 进入 `/daemon/status`，辅助和 OTel trace/log 对照 | Daemon logs |
 
 ### 6.6 文档/schema 对齐与事件名规范化
 
@@ -508,3 +512,5 @@ sequenceDiagram
 10. **`tool_output_truncated` 事件名有兼容性变更（#5960）**：#5960 把原先 hardcoded、未加命名空间的 `tool_output_truncated` 改为 `qwen-code.tool_output_truncated`，与其它 event constants 对齐。代码侧更一致，但下游 collector/dashboard/filter 如果按旧事件名筛选，需要同时迁移 filter。
 
 11. **#6263 的 child lag 只走 telemetry/stderr**：`/daemon/status.runtime.perf` 只表示 daemon 进程；ACP child event-loop lag 不在 status JSON 内。dashboard 若只读 `/daemon/status`，不能把 child 卡顿误判为缺失数据，需要同时看 OTel gauge 或 stderr stall warning。
+
+12. **#6907 cold-start span 仍是 open 观察口径**：当前文档按 PR diff 记录字段与 span 分层；若后续合入前重命名 `channel.wait` / `session_start` 属性或 profiler 字段，需要同步回改 dashboard 查询和本节命名。

@@ -29,6 +29,7 @@
 | #4628 | MERGED | client_id + 权限 span | `qwen-code.client_id` 属性 + 校验 + permission route span | `daemon_mode_b_main` |
 | #4682 | MERGED | daemon 路由覆盖扩展 | 扩展 `resolveDaemonTelemetryRoute` 覆盖所有写路由（除 heartbeat）；修复尾部斜杠不匹配 + workspace sessions regex 过度匹配 | `daemon_mode_b_main` |
 | #4749 | MERGED | daemon OTel metrics + structured log | 11 个 OTel metric instruments（Counter/Histogram/ObservableGauge）覆盖 HTTP 请求、session/channel 生命周期、prompt 队列等待与执行时长、bridge 错误、SSE 活跃连接、堆内存；扩展 `BridgeTelemetry` 接口增加 `metrics` 子对象；`emitDaemonLog` 泛化支持自定义事件名与 severity；`service.instance.id` Resource 属性 + `forceFlushMetrics()` 预关闭快照 | `daemon_mode_b_main` |
+| #6907 | OPEN | cold first-session startup trace | deferred runtime wait、`channel.wait`、`session_start` stage timing 与 profiler `sessionId`，把首个 session 启动耗时拆进 daemon trace | `main` diff |
 
 ---
 
@@ -146,6 +147,10 @@ function getTraceContext(): TraceContext | null {
 ### prompt.dispatch span（bridge 侧）
 
 `bridge.ts`（`daemon_mode_b_main`, L2248）在 FIFO prompt 队列的 worker 内开 `prompt.dispatch` span（经 `telemetry.withSpan` → `withDaemonBridgeSpan` → span 名 `qwen-code.daemon.bridge`）。属性：`qwen-code.daemon.bridge.operation = 'prompt.dispatch'`、`session.id`、`qwen-code.daemon.prompt.queue_wait_ms = Date.now() - queuedAt`（**排队等待耗时**，量化 FIFO 队头阻塞）、可选 `qwen-code.client_id`。span 内调 `telemetry.injectPromptContext(normalized)` 把 traceparent 注入转发给 agent 的 `PromptRequest._meta`（见下节）。
+
+### cold first-session startup span（#6907，open）
+
+#6907 把 `POST /session` 冷启动拆成三层：route 层记录 deferred runtime wait 并把等待耗时回填到 HTTP span；bridge 层增加 `channel.wait` span，区分复用已有 channel、加入 in-flight spawn、还是本请求触发 spawn，并写入 channel 诊断 UUID；ACP child 收到 `session/new` traceparent 后，在 `Session.startChat()` 周围开 `qwen-code.daemon.session_start` span，记录 `newSession`、settings/bootstrap、`startChat()` 等阶段耗时。JSONL session-start profiler 同步带可选 `sessionId`，便于把本地 profiler 与 OTel trace 对齐。
 
 ---
 
@@ -334,6 +339,7 @@ sequenceDiagram
 ### #4556 — daemon prompt lifecycle spans
 
 - `daemon-tracing.ts:withDaemonBridgeSpan` / `createDaemonBridgeTelemetry`：bridge 侧 span 工厂，封装 `channel.spawn` / `channel.initialize` / `session.new` / `prompt.dispatch` / `session.cancel` / `session.close` 六类 operation。
+- `daemon-tracing.ts`（#6907 open）：`channel.wait` span 与 deferred runtime wait 属性用于解释 cold first-session startup，避免把 runtime/channel/ACP/core 初始化都压在 route duration 里。
 - `daemon-tracing.ts:injectDaemonTraceContext` / `extractDaemonTraceContext`：W3C `traceparent` 经 `_meta` 保留键的注入与提取（含手工兜底解析）。
 - `daemon-tracing.ts:stripReservedTraceMeta`：反伪造——总先剥掉客户端自带保留键再 inject。
 - `daemon-tracing.ts:captureDaemonTelemetryContext` / `runWithDaemonTelemetryContext`：FIFO 上下文捕获/还原，解决 prompt 队列延迟执行后 active context 丢失。
