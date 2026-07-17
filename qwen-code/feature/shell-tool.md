@@ -1,7 +1,7 @@
 # Shell 工具执行语义技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat。
+> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat、#7053 shell safety tri-state classification。
 
 ---
 
@@ -11,6 +11,7 @@ Shell 工具是 qwen-code 中最容易长时间运行、产生大量输出或完
 
 - #6864 解决 timeout 被当作成功的问题。旧实现把 timeout 摘要放在成功 `ToolResult` 的 `response.output` 里，导致 UI/JSON/ACP/Anthropic/speculative 路径都可能把被终止的命令显示为成功。
 - #6876 解决静默命令没有活性信号的问题。命令 spawn 后长时间无输出时，headless gateway 看不到任何事件，无法区分“命令仍在运行”和“执行链已死”。
+- #7053 解决 shell safety 事实层过于粗糙的问题。旧 boolean 只能表达“只读/非只读”，无法把明确写操作和静态未知分开；Plan mode 后续需要单独处理 unknown，scheduler 也不能先 unwrap wrapper 再把不确定命令当成同步只读。
 
 ---
 
@@ -95,7 +96,31 @@ timer 清理与 trailing flush、timeout warning 一样集中在三类路径：s
 
 ---
 
-## 5. 验证方式
+## 5. Shell safety 三态分类（#7053 open）
+
+### 5.1 三态事实层
+
+`packages/core/src/utils/shellAstParser.ts` 新增 `classifyShellCommandSafety(command)`，返回 `read-only`、`write`、`unknown`。聚合规则固定为 `write > unknown > read-only`：
+
+- `read-only`：当前规则能证明所有实际执行路径都是只读。
+- `write`：存在明确文件、Git、进程或系统状态修改证据，不要求命令最终执行成功。
+- `unknown`：parser、语法、wrapper、env、substitution、动态执行、外部 helper 或规则覆盖不足导致无法证明安全。
+
+AST 中出现 `ERROR` 节点直接归 unknown。command/process substitution 会给外层加 unknown floor，但 substitution 内部若发现明确 writer 仍提升到 write。control flow 扫描所有可能分支；function definition 本身不是执行 body；纯 assignment 和 `cd` 保持兼容行为。
+
+### 5.2 规则收敛与 fallback
+
+`packages/core/src/utils/shell-safety-rules.ts` 集中维护 sed/awk scanner、shell pattern helper、direct writer 判定和 option parser。规则显式识别 file/process writers、output redirection、Git mutation family，以及 `find`、`sed`、`awk`、`sort`、`tree`、`uniq`、`tee`、`dd` 的写入参数；动态执行、外部脚本、解释器/wrapper、pager、Git signature/textconv/helper、ripgrep preprocessor、hostname helper、archive search helper、未知 Git global option 和大小写不匹配命令都归 unknown。
+
+三态 API 遇到 parser load/runtime failure 时返回 unknown，不再用 regex fallback 制造确定性。旧 boolean API `isShellCommandReadOnlyAST()` 仍兼容历史行为：只有三态结果为 `read-only` 时返回 true；parser 无法加载或抛错时才使用原 regex fallback；语法错误 AST 是正常 unknown，不走 fallback。
+
+### 5.3 调度与权限影响
+
+`CoreToolScheduler` 的同步只读判断改为检查原始命令，不再先 `stripShellWrapper(command)`。因此 `git log`、`ls` 仍可并发，`bash -c 'git status'` 这类 wrapper 会保守排队，`sort -o output input`、`npm install` 等明确写/unknown 命令继续阻断后续 shell。
+
+权限 manager 当前仍消费 boolean 兼容 API，所以 #7053 不直接改变默认权限 routing，也不等价于 Plan mode unknown 一次性审批已落地。它只是把事实层拆成 read-only/write/unknown，供后续策略把 unknown 和明确写操作分开处理。
+
+## 6. 验证方式
 
 - `packages/core/src/tools/shell.test.ts`: timeout result、partial output、startup abort、heartbeat cadence、payload shape、disable knob、timer cleanup。
 - `packages/core/src/core/coreToolScheduler.test.ts`: timeout error envelope、large error offload、heartbeat forwarding without live-output replacement。
@@ -104,21 +129,24 @@ timer 清理与 trailing flush、timeout warning 一样集中在三类路径：s
 - `packages/cli/src/nonInteractive/io/BaseJsonOutputAdapter.test.ts`、`StreamJsonOutputAdapter.test.ts`: JSON timeout detail 与 stream-json `tool_progress`。
 - `packages/cli/src/ui/AppContainer.test.tsx`、`useToolScheduler.test.ts`: speculative error display 与 TUI 忽略 heartbeat。
 - `packages/sdk-typescript/test/unit/daemonUi.test.ts`: web-shell normalizer 丢弃 heartbeat frame。
+- `packages/core/src/utils/shellAstParser.test.ts`、`shellReadOnlyChecker.test.ts`、`shell-ast-parser-lazy.test.ts`: 三态 shell safety、parser/fallback、bounded scanner 和 sync checker 兼容语义。
 
 ---
 
-## 6. 涉及 PR
+## 7. 涉及 PR
 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
 | [#6864](https://github.com/QwenLM/qwen-code/pull/6864) | merged | shell timeout error semantics | 前台 shell timeout 从成功输出改为结构化 `EXECUTION_TIMEOUT` 错误，协议/JSON/Anthropic/speculative/batch offload 都读取 error envelope。 |
 | [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | merged | silent shell heartbeat | 静默前台 shell 命令周期性发 `ShellProgressData`，ACP/stream-json 可见，TUI/模型上下文不受影响。 |
+| [#7053](https://github.com/QwenLM/qwen-code/pull/7053) | open | shell safety tri-state classification | 新增 read-only/write/unknown 三态分类、bounded sed/awk/git 等规则和 wrapper 保守调度；当前不直接改变权限 routing。 |
 
 ---
 
-## 7. 已知限制 / 后续
+## 8. 已知限制 / 后续
 
 - #6864 不改变非零退出码语义，也不处理后台 shell timeout 自动提升。
 - #6876 不向 ACP 流式转发命令输出，只提供 liveness heartbeat。
+- #7053 只提供事实层三态分类，Plan mode 对 unknown shell 的一次性审批仍需后续 PR 接入。
 - MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍是后续项。
-- 两个 PR 均已合入；后续 MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍需单独设计。
+- #6864/#6876 均已合入；#7053 仍为 open diff，后续 MCP tool progress、subagent heartbeat 透传、TUI 可视化增强和 unknown approval routing 仍需单独设计。
