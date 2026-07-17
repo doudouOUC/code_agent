@@ -8,7 +8,7 @@
 
 ## 概述
 
-Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP/SSE daemon 把任意客户端（CLI、webui、SDK、远程）送来的 `path` 字符串落到本机磁盘上，且必须证明每一次落盘都严格限制在 `boundWorkspace`（`1 daemon = 1 workspace`）之内**。攻击面包括 `..` 文本穿越、绝对路径逃逸、符号链接逃逸（含悬挂符号链接、多跳链、环）、TOCTOU（解析后到写入前的 swap）、Windows 专属路径绕过（NTFS ADS、8.3 短名、UNC、DOS 设备名）、以及并发写撕裂。
+Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP/SSE daemon 把任意客户端（CLI、webui、SDK、远程）送来的 `path` 字符串落到本机磁盘上，且必须证明每一次落盘都严格限制在本次 route 选中的 workspace root（legacy primary 的 `boundWorkspace`，或 workspace-qualified route 的 selected runtime cwd）之内**。攻击面包括 `..` 文本穿越、绝对路径逃逸、符号链接逃逸（含悬挂符号链接、多跳链、环）、TOCTOU（解析后到写入前的 swap）、Windows 专属路径绕过（NTFS ADS、8.3 短名、UNC、DOS 设备名）、以及并发写撕裂。
 
 代码分三层，每层各司其职、互不越权：
 
@@ -76,7 +76,7 @@ const absolute = path.resolve(boundCanonical, input);                       // L
 if (!isWithinRoot(absolute, boundCanonical)) → path_outside_workspace       // L330
 ```
 
-`canonicalizeBoundWorkspaceCached`（`paths.ts:194`）是 module-level memo（`CANONICAL_BOUND_CACHE`，L193），把 `boundWorkspace → canonical` 缓存，省掉每请求一次 `realpathSync.native`。因 `1 daemon = 1 workspace`，稳态缓存大小恰为 1；realpath 是函数式（路径不动则规范形不变），故 entry 永不需淘汰。
+`canonicalizeBoundWorkspaceCached`（`paths.ts:194`）是 module-level memo（`CANONICAL_BOUND_CACHE`，L193），把 `boundWorkspace → canonical` 缓存，省掉每请求一次 `realpathSync.native`。早期单 workspace daemon 稳态缓存大小通常为 1；multi-workspace 后缓存按 selected runtime root 增长，但 key 仍是规范 workspace root，realpath 是函数式（路径不动则规范形不变），故 entry 不依赖请求态。
 
 `isWithinRoot`（来自 `@qwen-code/qwen-code-core`）是**廉价纯文本前置**：在不付出任何 FS syscall 的前提下挡掉显式 `..` 逃逸（`path.resolve` 已把 `..` 折叠，若结果文本上不在 root 下即拒）。这一步先于 `realpath`，是 fail-fast。
 

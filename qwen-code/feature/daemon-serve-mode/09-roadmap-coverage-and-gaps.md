@@ -14,6 +14,8 @@
 
 因此，本文后续矩阵中大量 `→dmbm` 结论是**原始 2026-05-31 状态**，不再代表 mainline 交付状态。#5144（2026-06-15 merged）随后刷新 upstream daemon developer docs，并按当前 main 重新核对 daemon event schema、serve capabilities、startup flags、error taxonomy、resync behavior、MCP pool behavior 和 web UI wording。
 
+#7019（2026-07-16 open）又把 multi-workspace hardening 文档作为当前口径补齐：一个 daemon 可管理多个 isolated workspace runtime，第一项 workspace 是 primary / legacy default；后续 route 和 capability 应按 process-global、legacy-primary、workspace-qualified、live-session-owner、persisted-workspace 五类 ownership 判断，不再沿用本文早期“1 daemon = 1 workspace”的设计前提。
+
 ---
 
 ## 1. 设计与路线图来源

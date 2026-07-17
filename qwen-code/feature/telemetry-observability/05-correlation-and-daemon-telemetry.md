@@ -30,6 +30,7 @@
 | #4682 | MERGED | daemon 路由覆盖扩展 | 扩展 `resolveDaemonTelemetryRoute` 覆盖所有写路由（除 heartbeat）；修复尾部斜杠不匹配 + workspace sessions regex 过度匹配 | `daemon_mode_b_main` |
 | #4749 | MERGED | daemon OTel metrics + structured log | 11 个 OTel metric instruments（Counter/Histogram/ObservableGauge）覆盖 HTTP 请求、session/channel 生命周期、prompt 队列等待与执行时长、bridge 错误、SSE 活跃连接、堆内存；扩展 `BridgeTelemetry` 接口增加 `metrics` 子对象；`emitDaemonLog` 泛化支持自定义事件名与 severity；`service.instance.id` Resource 属性 + `forceFlushMetrics()` 预关闭快照 | `daemon_mode_b_main` |
 | #6907 | OPEN | cold first-session startup trace | deferred runtime wait、`channel.wait`、`session_start` stage timing 与 profiler `sessionId`，把首个 session 启动耗时拆进 daemon trace | `main` diff |
+| #7003 | OPEN | legacy session workspace telemetry | 48 条 legacy session/permission route catalog、handler-resolved workspace hash late bind、SSE request metrics 隔离 | `main` diff |
 
 ---
 
@@ -83,14 +84,14 @@ function getTraceContext(): TraceContext | null {
 
 `server.ts:daemonTelemetryMiddleware(boundWorkspace)`（`daemon_mode_b_main`, L331，装载于 L959 `app.use(...)`）是一个 Express 中间件工厂：
 
-- **闭包内一次性**算出 `workspaceHash = hashDaemonWorkspace(boundWorkspace)`（`daemon-tracing.ts:hashDaemonWorkspace` = `SHA-256(workspace)[:16]`，**不落明文路径**）。
+- 早期版本在闭包内一次性算出 `workspaceHash = hashDaemonWorkspace(boundWorkspace)`（`daemon-tracing.ts:hashDaemonWorkspace` = `SHA-256(workspace)[:16]`，**不落明文路径**）。#7003 后，legacy session route 的 workspace hash 可以在 handler 解析 owner runtime 后 late-bind；process-global 或无法解析 owner 的请求仍不写明文 path。
 - 每请求先过 `resolveDaemonTelemetryRoute(req)`（见下）；**返回 `undefined` 的路由直接 `next()` 放行、不开 span**（白名单制，避免给健康检查等噪声路由建 span）。
 - 读 `CLIENT_ID_HEADER`（`'x-qwen-client-id'`，L3134）做**软校验**（见 client_id 一节）。
 - 调 `withDaemonRequestSpan(opts, fn)`，`fn` 把 `next()` 包进一个 Promise：监听 `res` 的 `'finish'` / `'close'`（用 `done` 标志去重，`finish()` 只跑一次），收尾时 `recordDaemonHttpResponse(span, res.statusCode)`；`next()` **同步**抛错则 `recordDaemonError(span, error)` 并 reject；尾部 `.catch(next)` 把异步错误交回 Express 错误链。
 
 ### 路由归一：resolveDaemonTelemetryRoute（基数控制）
 
-`server.ts:resolveDaemonTelemetryRoute(req)`（`daemon_mode_b_main`, L280）是一张**显式路由白名单**，对每个匹配返回**模板化**的 `route` 字符串与抽出的 id。
+`server.ts:resolveDaemonTelemetryRoute(req)`（`daemon_mode_b_main`, L280）是一张**显式路由白名单**，对每个匹配返回**模板化**的 `route` 字符串与抽出的 id。#7003 将其扩展为 legacy session/permission telemetry catalog：48 条 explicit route 中，7 条可在进入 handler 前 pre-resolve workspace，41 条必须等 handler 通过 session/runtime resolver 选中 owner 后再写入 workspace hash。
 
 > **尾部斜杠归一化**（#4682）：匹配前先 `req.path.replace(/\/$/, '') || '/'` 去尾部斜杠，避免 `/session/abc/prompt/` 这类请求因多一个 `/` 而静默不匹配、丢失 span。
 
@@ -114,7 +115,9 @@ function getTraceContext(): TraceContext | null {
 
 > **regex 修正**（#4682）：`GET /workspace/:id/sessions` 的匹配从 `.+` 收紧为 `[^/]+`，防止跨路径段过度匹配。
 
-**基数关键**：`http.route` 永远写**模板**（`:id` 占位），真实的 sessionId / requestId 落到**专属属性**（`session.id` / `qwen-code.daemon.permission.request_id`）。这样 `http.route` 维度有界（≈15 个值），不会被 UUID 撑爆时序基数；需要按具体 session 下钻时再用专属属性过滤。
+**基数关键**：`http.route` 永远写**模板**（`:id` 占位），真实的 sessionId / requestId 落到**专属属性**（`session.id` / `qwen-code.daemon.permission.request_id`）。这样 `http.route` 维度只随显式 catalog 增长，不会被 UUID 撑爆时序基数；需要按具体 session 下钻时再用专属属性过滤。
+
+**workspace 归因关键（#7003）**：handler-resolved route 在 `requireSessionRuntime`、session create/load/resume、export/transcript resolver 等路径拿到 selected runtime 后，调用 `setDaemonTelemetryWorkspace(res, runtime.workspaceCwd)` 写入 `qwen-code.workspace.hash`。unresolved、ambiguous、workspace mismatch、session not found 等情况不 fallback primary，以免把未知 owner 的请求误归到 primary workspace。`GET /session/:id/events` 这类长连接仍保留 request span，但从普通 request latency metrics 中排除，避免 SSE lifetime 污染短请求延迟直方图。
 
 ### route span：withDaemonRequestSpan
 
@@ -151,6 +154,12 @@ function getTraceContext(): TraceContext | null {
 ### cold first-session startup span（#6907，open）
 
 #6907 把 `POST /session` 冷启动拆成三层：route 层记录 deferred runtime wait 并把等待耗时回填到 HTTP span；bridge 层增加 `channel.wait` span，区分复用已有 channel、加入 in-flight spawn、还是本请求触发 spawn，并写入 channel 诊断 UUID；ACP child 收到 `session/new` traceparent 后，在 `Session.startChat()` 周围开 `qwen-code.daemon.session_start` span，记录 `newSession`、settings/bootstrap、`startChat()` 等阶段耗时。JSONL session-start profiler 同步带可选 `sessionId`，便于把本地 profiler 与 OTel trace 对齐。
+
+### legacy session workspace telemetry（#7003，open）
+
+#7003 专门处理 multi-workspace 后的 legacy route attribution：`/session/:id/*`、`/sessions/*`、`/permission/*` 中大量 route 的真实 owner 只有 handler 执行时才能知道，因此不能在 middleware 入口盲写 primary workspace hash。实现把 route 分成 pre-resolved 与 handler-resolved 两类，后者由 handler 在成功解析 selected runtime 后 late-bind workspace hash；如果解析结果是 ambiguous/mismatch/not found，则 span 仍保留 route、sessionId、permissionRequestId 等低基数字段，但不带 workspace hash。
+
+这保持了两个边界：遥测失败或缺 owner 不能改变 HTTP 行为；workspace hash 是 hash 后的低敏归因字段，不暴露 cwd 明文，也不把 process-global route 强行解释成某个 workspace。
 
 ---
 

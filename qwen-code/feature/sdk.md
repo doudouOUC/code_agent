@@ -52,7 +52,7 @@ flowchart TB
         EV --> NM
     end
 
-    DAEMON["qwen serve 守护进程<br/>(HTTP + SSE, 1 daemon = 1 workspace)"]
+    DAEMON["qwen serve 守护进程<br/>(HTTP + SSE, primary legacy + multi-workspace runtimes)"]
     DC <-->|"HTTP: POST /session, /prompt, ..."| DAEMON
     DC <==>|"SSE: GET /session/:id/events<br/>(DaemonEvent 帧流)"| DAEMON
 

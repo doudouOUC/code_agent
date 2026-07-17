@@ -43,7 +43,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
-- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传，见 `telemetry/daemon-tracing.ts`（`daemon_mode_b_main`）。
+- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash，见 `telemetry/daemon-tracing.ts` 与 serve telemetry middleware。
 
 ---
 
@@ -472,6 +472,7 @@ sequenceDiagram
 | #5047 | daemon ACP trace continuity | 从 daemon bridge active span 派生 ACP prompt traceparent，修 deferred span 的 session 归因 | Daemon |
 | #6907 | cold first-session startup trace | deferred runtime wait、`channel.wait`、`session_start` stage timing 与 session-start profiler `sessionId` | Daemon |
 | #6969 | bounded daemon log status | stable daemon/access log rotation 的 mode/health/issues/drop counters 进入 `/daemon/status`，辅助和 OTel trace/log 对照 | Daemon logs |
+| #7003 | legacy session workspace telemetry | 48 条 legacy session/permission route catalog + handler-resolved workspace hash attribution；unresolved/ambiguous 不 fallback primary，SSE request spans 与普通 latency metrics 分离 | Daemon |
 
 ### 6.6 文档/schema 对齐与事件名规范化
 

@@ -38,6 +38,8 @@
 | #4191 | capability registry + protocol versions | `capabilities.ts:SERVE_CAPABILITY_REGISTRY`(L37) |
 | #5174 | daemon status API | `GET /daemon/status` summary/full 诊断面；普通 bearer 鉴权，full 模式逐 section 降级 |
 | #4861 | per-tier HTTP rate limiting（T3.4） | `rateLimiter.ts`：token-bucket per-tier（prompt/mutation/read）、key 策略（loopback=clientId / non-loopback=IP+clientId）、fail-open 10K cap、sampled logging、graceful shutdown drain |
+| #7003 | legacy session workspace telemetry | `daemonTelemetryMiddleware` route catalog、handler-resolved workspace hash late bind、SSE request metric exclusion |
+| #7005 | primary-only ownership guard | `withPrimaryOnlyLiveSession()`、branch/fork/cd explicit primary-only guard、secondary owner fail-closed response |
 
 ---
 
@@ -112,6 +114,12 @@ flowchart TD
 
 无论哪种位置，CORS deny + host allowlist 都先于 `/health` 生效。`/demo` 还硬编码了 `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` 防点击劫持（L790-794）。#6961 后 `/health?deep=1` 不再只读 primary bridge，而是聚合 `WorkspaceRegistry.listManaged()` 里所有 runtime（含 draining）的 session、pending permission、active prompt、latest activity 与任一 live channel，并 additive 返回 `workspaceCount`；但它仍是 getter/counter snapshot，**不 ping 子进程**，检测不出"wedged 但仍计数"的会话。
 
+### legacy route telemetry ownership（#7003）
+
+#7003 把 daemon request telemetry 从“路径级 span”推进到“路由 ownership 可归因”。`daemonTelemetryMiddleware` 维护 48 条 legacy `/session`、`/sessions`、`/permission` route catalog，其中 7 条可在进入 handler 前 pre-resolve workspace，41 条必须等 handler 通过 session/runtime resolver 选中 owner 后再 late-bind `qwen-code.workspace.hash`。这个 late bind 由 `setDaemonTelemetryWorkspace(res, runtime.workspaceCwd)` 完成，覆盖 `requireSessionRuntime`、session create/load/resume、export/transcript resolver 等入口。
+
+归因规则是 fail-closed：unresolved、ambiguous、workspace mismatch、session not found 等场景不写 primary hash，避免把未知 owner 的请求误归到 primary workspace。`GET /session/:id/events` 这类长连接仍有 request span，但从普通 request latency metrics 中剥离，避免 SSE lifetime 污染短请求延迟分布；`/health` 与 daemon status 等 process-global 面继续保持 daemon-global 口径。
+
 ## 路由表（method | path | 门控 | capability | 说明）
 
 > 门控列：`bearer` = 仅全局 `bearerAuth`（无 `mutate`）；`mutate()` = 非 strict 门（集中化标记，no-token loopback 仍可达）；`mutate(strict)` = 严格门（no-token loopback → `401 token_required`）。capability 列对应 `capabilities.ts:SERVE_CAPABILITY_REGISTRY`。
@@ -151,6 +159,9 @@ flowchart TD
 | GET | `/session/:id/tasks` | bearer | `session_tasks` | L1607 | |
 | GET | `/session/:id/hooks` | bearer | `session_hooks` | L1543 | session 运行时 hook 诊断 |
 | POST | `/session/:id/prompt` | `mutate()` | `session_prompt` | L1625 | **非阻塞 202**；deadline 见 §超时 |
+| POST | `/session/:id/branch` | `mutate()` | `session_branch` | #4812/#7005 | primary-only live-session route；secondary owner 返回 `400 non_primary_session_route_not_supported` |
+| POST | `/session/:id/fork` | `mutate()` | — | #7005 | primary-only live-session route；不经 owner bridge fallback |
+| POST | `/session/:id/cd` | `mutate()` | — | #7005 | primary-only live-session route；用于 legacy cwd mutation，secondary owner fail-closed |
 | POST | `/session/:id/heartbeat` | `mutate()` | `client_heartbeat` | L1742 | per-client 心跳 |
 | POST | `/session/:id/detach` | `mutate()` | `session_close` | L1773 | 仅减引用 |
 | POST | `/session/:id/cancel` | `mutate()` | `session_cancel` | L1794 | |

@@ -6,7 +6,7 @@
 
 ## 概述
 
-Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve` 进程绑定单一工作区（`boundWorkspace`，#3803 §02 "1 daemon = 1 workspace"），内部用一张 `byId: Map<sessionId, SessionEntry>` 登记所有活跃会话，并通过 **ACP core 子进程**（`AcpChannel`）真正承载模型/工具状态。#6394/#6410/#6511 后，daemon 还可以注册多个 sessions-only workspace runtime：primary workspace 继续承载 legacy surface，non-primary runtime 只打开 live session 闭环。本篇覆盖会话的完整生命周期：
+Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve` 进程绑定单一工作区（`boundWorkspace`），内部用一张 `byId: Map<sessionId, SessionEntry>` 登记所有活跃会话，并通过 **ACP core 子进程**（`AcpChannel`）真正承载模型/工具状态。#6394/#6410/#6511 之后，一个 daemon 可以注册多个 isolated workspace runtime：primary workspace 继续承载 legacy default surface，non-primary runtime 先从 sessions-only live 闭环扩展到 workspace-qualified REST/ACP/catalog/export/Voice。本篇覆盖会话的完整生命周期：
 
 - **spawn / attach**：新建 vs 复用，由 `sessionScope`（`single` / `thread`）与 `effectiveScope = req.sessionScope ?? default` 决定（#4209）。
 - **引用计数与心跳**：`attachCount`（attach-after-spawn 计数）、`clientIds`（per-client refcount）、`recordHeartbeat`（last-seen 簿记，#4235）。
@@ -15,7 +15,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **load / resume**：`session/load`（回放完整历史）vs `session/resume`（不回放），`pendingRestoreEvents` 缓冲、并发 restore 的 coalesce 合并与跨动作 `RestoreInProgressError`（#4222）。
 - **archive / unarchive / archived export**：active transcript 位于 `chats/`，archived transcript 位于 `chats/archive/`；archive 是状态转换，不删除 transcript，load/resume archived session 会要求先 unarchive；archived export 可只读 selected trusted workspace 的 archive JSONL，不改变 archive 状态（#6058/#6911）。
 - **persisted transcript / recording failure**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录（#6525/#6740/#6743）。
-- **multi-workspace owner-routed legacy session actions**：metadata、recap、BTW、mid-turn、task cancel、goal clear、rewind/shell、continue/language/artifact 等 singular legacy route 先解析 live owner runtime，再调用 owning bridge；URL/响应 shape 保持兼容（#6798/#6826/#6833）。
+- **multi-workspace owner-routed legacy session actions**：metadata、recap、BTW、mid-turn、task cancel、goal clear、rewind/shell、continue/language/artifact 等 singular legacy route 先解析 live owner runtime，再调用 owning bridge；URL/响应 shape 保持兼容（#6798/#6826/#6833）。branch/fork/cd 是显式例外，继续 primary-only，secondary owner fail-closed（#7005）。
 - **workspace-qualified Voice admission**：legacy 与 workspace-qualified Voice REST/WS 共用进程级 admission coordinator；runtime removal 会把 active Voice lease 计入 busy activity，force removal/shutdown 只 abort 目标 runtime 的 Voice work（#6839）。
 - **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745）。
 - **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先（#6945 open）。
@@ -57,6 +57,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#6911](https://github.com/QwenLM/qwen-code/pull/6911) | merged | workspace archived session export | selected trusted workspace archived JSONL full export，不 unarchive、不 fallback primary |
 | [#6912](https://github.com/QwenLM/qwen-code/pull/6912) | merged | Web Shell non-primary archive hardening | UI row identity 改为 `(workspaceCwd, sessionId)`，secondary archive/unarchive 按 owning workspace reconcile |
 | [#6945](https://github.com/QwenLM/qwen-code/pull/6945) | open | daemon Todo stop guard | 成功 top-level Todo write 后自然 stop 可 bounded continuation，最多两次 automatic primary-model stream |
+| [#7005](https://github.com/QwenLM/qwen-code/pull/7005) | open | primary-only live-session guard | branch/fork/cd 明确只支持 primary live session；secondary owner 返回 `non_primary_session_route_not_supported`，不调用 bridge |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
@@ -548,6 +549,7 @@ sequenceDiagram
 - `workspace-registry.ts`：workspace id/cwd lookup、primary fallback、live session owner resolution。
 - `routes/session.ts` / `routes/sse-events.ts` / `routes/permission.ts`：session create、events、prompt、cancel、permission、heartbeat、detach、pending、close、status 按 owner runtime dispatch。
 - `routes/capabilities.ts` / `daemon-status.ts`：多 runtime 时 additive 发布 `multi_workspace_sessions`、`workspaces[]` 和 session limits；legacy `workspaceCwd` 保持 primary。
+- #7005 之后，branch/fork/cd 不跟随 owner-aware 扩展，而是显式 primary-only live-session route：handler 先解析 owner，若 session 属于 secondary runtime 则返回 `400 non_primary_session_route_not_supported` 并记录 warning，不 fallback primary、不调用 secondary bridge。
 
 ### #6525 — cursor-paged transcript replay
 
@@ -647,3 +649,4 @@ sequenceDiagram
 - `bridge.ts:computeUniqueBranchTitle`：`${baseName} (branch)` → `${baseName} (branch 2)` → … 去重。
 - `bridgeTypes.ts:BranchSessionRequest`/`BranchSessionResponse` 类型 + SDK `DaemonClient.branchSession` / `DaemonSessionClient.branch`。
 - 连接断开保护：`res.writable` false 时 kill 新 session（防孤儿积累）。
+- #7005 后 branch/fork/cd 归入 primary-only live-session guard：这些操作保留 legacy primary bridge 语义，不因 multi-workspace owner routing 自动扩展到 secondary runtime；secondary live session 命中时返回稳定 400 code，便于 Web Shell/SDK 显示明确不支持而不是误报 not found 或执行到错 workspace。
