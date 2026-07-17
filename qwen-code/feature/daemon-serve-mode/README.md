@@ -23,6 +23,8 @@
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调 |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport |
 
+> #6378 收口后的 ownership 与一致性补充审计见 [daemon multi-workspace 一致性设计](../daemon-multi-workspace/)；该专题聚焦 user permission、global Skill destination/source、root/lifecycle、Web Shell/Voice target binding 与 daemon-global rate-limit identity，不重复本目录的能力演进历史。
+
 ---
 
 ## 1. 背景与动机
