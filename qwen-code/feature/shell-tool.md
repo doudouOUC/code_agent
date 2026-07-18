@@ -1,7 +1,7 @@
 # Shell 工具执行语义技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat、#7053 shell safety tri-state classification。
+> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat、#7053 shell safety tri-state classification、#7172 Plan-mode shell safety routing。
 
 ---
 
@@ -11,7 +11,8 @@ Shell 工具是 qwen-code 中最容易长时间运行、产生大量输出或完
 
 - #6864 解决 timeout 被当作成功的问题。旧实现把 timeout 摘要放在成功 `ToolResult` 的 `response.output` 里，导致 UI/JSON/ACP/Anthropic/speculative 路径都可能把被终止的命令显示为成功。
 - #6876 解决静默命令没有活性信号的问题。命令 spawn 后长时间无输出时，headless gateway 看不到任何事件，无法区分“命令仍在运行”和“执行链已死”。
-- #7053 解决 shell safety 事实层过于粗糙的问题。旧 boolean 只能表达“只读/非只读”，无法把明确写操作和静态未知分开；Plan mode 后续需要单独处理 unknown，scheduler 也不能先 unwrap wrapper 再把不确定命令当成同步只读。
+- #7053 解决 shell safety 事实层过于粗糙的问题。旧 boolean 只能表达“只读/非只读”，无法把明确写操作和静态未知分开；scheduler 也不能先 unwrap wrapper 再把不确定命令当成同步只读。
+- #7172 在 #7053 的事实层之上接入 Plan mode 策略：模型在 Plan mode 发起的 shell/monitor 命令按 read-only/write/unknown 分流，只读沿用既有权限，明确写入直接拒绝，unknown 走一次性精确审批且审批后重放前必须校验计划和命令未漂移。
 
 ---
 
@@ -96,7 +97,7 @@ timer 清理与 trailing flush、timeout warning 一样集中在三类路径：s
 
 ---
 
-## 5. Shell safety 三态分类（#7053 open）
+## 5. Shell safety 三态分类（#7053）
 
 ### 5.1 三态事实层
 
@@ -118,9 +119,33 @@ AST 中出现 `ERROR` 节点直接归 unknown。command/process substitution 会
 
 `CoreToolScheduler` 的同步只读判断改为检查原始命令，不再先 `stripShellWrapper(command)`。因此 `git log`、`ls` 仍可并发，`bash -c 'git status'` 这类 wrapper 会保守排队，`sort -o output input`、`npm install` 等明确写/unknown 命令继续阻断后续 shell。
 
-权限 manager 当前仍消费 boolean 兼容 API，所以 #7053 不直接改变默认权限 routing，也不等价于 Plan mode unknown 一次性审批已落地。它只是把事实层拆成 read-only/write/unknown，供后续策略把 unknown 和明确写操作分开处理。
+权限 manager 的默认非 Plan routing 仍消费 boolean 兼容 API：read-only 走默认 allow，write/unknown 走 ask。#7053 本身只把事实层拆成 read-only/write/unknown；#7172 当前 diff 才在 Plan mode 模型发起的 shell/monitor 调用上消费三态事实并做策略分流。
 
-## 6. 验证方式
+## 6. Plan mode shell safety routing（#7172 open）
+
+### 6.1 三态策略
+
+#7172 open diff 新增 `plan-mode-shell-policy`，只作用于 Plan mode 中模型发起的 `run_shell_command` / `monitor` 调用，不改变用户手动 `!command`、普通执行态或既有 permission rule 的语义。策略把 #7053 的事实层收敛为三类结果：
+
+- `read-only`：继续进入既有权限 manager 与默认只读放行路径，保持 `git status`、`ls`、`rg` 这类只读命令在 Plan mode 中可用于调查。
+- `write`：在 permission UI 之前直接拒绝，向模型返回 Plan-mode shell blocked result，避免模型在计划阶段执行 `npm install`、`rm`、重定向写文件、`git commit` 等明确改写动作。
+- `unknown`：发起一次性精确审批，审批对象绑定原始命令、工具名、当前 `cwd`、approval mode、permission policy、Plan revision 与 raw invocation。
+
+### 6.2 一次性审批与重放校验
+
+unknown 审批不是新增一条持久权限规则，而是针对这一次 raw shell invocation 的 allow/deny。用户允许后，host 在真正执行前重新校验：
+
+- 仍处于同一个 Plan revision，避免模型在审批期间改写计划后复用旧批准。
+- `cwd`、permission policy、tool name、command、raw request 和 invocation id 均与审批时一致。
+- host 没有注入 `rewritten` / `newContent` / `persistent` / 未展示 option 等额外信息。
+
+任一条件漂移都会取消这次执行，模型需要重新发起命令。这个 fencing 保证 unknown shell 的放行粒度是“这条命令、这次请求、这个计划版本”，而不是“以后所有相似命令”。
+
+### 6.3 覆盖面
+
+路由结果在 ACP session、stream-json、dual-output、subagent/team agent、background task、teammate 和 speculation gate 中保持一致：Plan mode write shell 都返回 blocked，unknown 都需要可见的一次性批准，read-only 仍按原权限系统处理。TUI 的 shell confirmation message 同步压缩为适合 Plan-mode unknown 的布局，避免把原始命令、风险说明和 allow/deny 按钮挤出确认框。
+
+## 7. 验证方式
 
 - `packages/core/src/tools/shell.test.ts`: timeout result、partial output、startup abort、heartbeat cadence、payload shape、disable knob、timer cleanup。
 - `packages/core/src/core/coreToolScheduler.test.ts`: timeout error envelope、large error offload、heartbeat forwarding without live-output replacement。
@@ -130,23 +155,27 @@ AST 中出现 `ERROR` 节点直接归 unknown。command/process substitution 会
 - `packages/cli/src/ui/AppContainer.test.tsx`、`useToolScheduler.test.ts`: speculative error display 与 TUI 忽略 heartbeat。
 - `packages/sdk-typescript/test/unit/daemonUi.test.ts`: web-shell normalizer 丢弃 heartbeat frame。
 - `packages/core/src/utils/shellAstParser.test.ts`、`shellReadOnlyChecker.test.ts`、`shell-ast-parser-lazy.test.ts`: 三态 shell safety、parser/fallback、bounded scanner 和 sync checker 兼容语义。
+- `packages/core/src/core/plan-mode-shell-policy.test.ts`、`coreToolScheduler.test.ts`、`packages/cli/src/acp-integration/session/permissionUtils.test.ts`、`Session.test.ts`、`SubAgentTracker.test.ts`: Plan mode shell read-only/write/unknown 分流、一次性审批 fencing、subagent/team/background/speculation 覆盖。
+- `packages/cli/src/nonInteractive/io/StreamJsonOutputAdapter.dualOutput.test.ts`、`nonInteractiveCli.test.ts`、`dualOutput/DualOutputBridge.test.ts`、`ToolConfirmationMessage.test.tsx`: stream-json/dual-output/TUI 确认框和非交互输出的 Plan-mode shell routing 表达。
 
 ---
 
-## 7. 涉及 PR
+## 8. 涉及 PR
 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
 | [#6864](https://github.com/QwenLM/qwen-code/pull/6864) | merged | shell timeout error semantics | 前台 shell timeout 从成功输出改为结构化 `EXECUTION_TIMEOUT` 错误，协议/JSON/Anthropic/speculative/batch offload 都读取 error envelope。 |
 | [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | merged | silent shell heartbeat | 静默前台 shell 命令周期性发 `ShellProgressData`，ACP/stream-json 可见，TUI/模型上下文不受影响。 |
-| [#7053](https://github.com/QwenLM/qwen-code/pull/7053) | open | shell safety tri-state classification | 新增 read-only/write/unknown 三态分类、bounded sed/awk/git 等规则和 wrapper 保守调度；当前不直接改变权限 routing。 |
+| [#7053](https://github.com/QwenLM/qwen-code/pull/7053) | merged | shell safety tri-state classification | 新增 read-only/write/unknown 三态分类、bounded sed/awk/git 等规则和 wrapper 保守调度；默认非 Plan routing 仍保持兼容 allow/ask。 |
+| [#7172](https://github.com/QwenLM/qwen-code/pull/7172) | open | Plan-mode shell routing | Plan mode 中模型发起的 shell/monitor 按三态分流：read-only 走既有权限，write 直接拒绝，unknown 走一次性精确审批并在执行前做 Plan revision/cwd/policy/raw invocation fencing。 |
 
 ---
 
-## 8. 已知限制 / 后续
+## 9. 已知限制 / 后续
 
 - #6864 不改变非零退出码语义，也不处理后台 shell timeout 自动提升。
 - #6876 不向 ACP 流式转发命令输出，只提供 liveness heartbeat。
-- #7053 只提供事实层三态分类，Plan mode 对 unknown shell 的一次性审批仍需后续 PR 接入。
+- #7172 仍是 open diff；当前文档记录的是该 PR 的当前实现，合入前仍需以后续 review/CI 结果为准。
+- #7172 不处理用户手动 `!command`，也不把 unknown approval 持久化成规则；speculative interactive approval 仍保持 fail-closed。
 - MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍是后续项。
-- #6864/#6876 均已合入；#7053 仍为 open diff，后续 MCP tool progress、subagent heartbeat 透传、TUI 可视化增强和 unknown approval routing 仍需单独设计。
+- #6864/#6876/#7053 均已合入；MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍需单独设计。

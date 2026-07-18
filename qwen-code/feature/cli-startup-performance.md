@@ -23,6 +23,8 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。
+
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
 度量先行（profiler）是这一系列优化的方法论基础：先有可复现的 checkpoint 报告，才能验证每一项优化的收益，避免「凭感觉优化」。
@@ -161,6 +163,14 @@ normalizedInput === normalizedDefault
 **派生相位** `computeDerivedPhases()`：`module_load`、`settings_time`、`config_time`、`init_time`、`pre_render`、`to_first_paint`、`to_input_enabled`（真实 TTI）、`config_initialize_dur`、`mcp_first_tool`、`mcp_all_settled`、`gemini_tools_lag`。其中 `gemini_tools_lag` 刻意取**第一个时间戳 ≥ `mcp_first_tool_registered`** 的 `gemini_tools_updated` 事件，避开 `GeminiClient.initialize()`/`SkillTool` 早于 MCP 发现触发的 `setTools()` 造成的误导性负值。
 
 **落盘与 finalize**：`finalizeStartupProfile()` 把报告写到 `~/.qwen/startup-perf/<prefix><timestamp>-<sessionId>.json`（`prefix` 为外层进程的 `outer-`），并向 stderr 打印路径。交互路径在 `AppContainer.tsx:672` 的挂载 effect 内 finalize（这样 `first_paint`/`config_initialize_*`/`input_enabled`/MCP 事件才齐全）；非交互非 stream-json 路径在 `gemini.tsx:1039`（`config.initialize()` + `waitForMcpReady()` 之后）finalize；stream-json 路径延到 `Session.ensureConfigInitialized()` 内 finalize。
+
+### 3.5 ACP channel startup profile 与 TUI static closure 瘦身（#7145/#7182）
+
+#7145 在 ACP initialize 上增加可选 `_meta.qwen.daemon.channelStartupProfile.v = 1` 协商。父进程请求后，child 在 Gemini import 前启用轻量 `acp-startup-profiler`，记录 process/module load、bootstrap config、initialize handler、tool/config setup 和 response transport 等固定 phase/config timing；父进程只接受 bounded v1 profile，并把校验后的 `qwen-code.daemon.acp_startup.*` attributes 写入既有 `channel.initialize` span。缺失、畸形、旧版本或 telemetry 抛错都 fail-open，不改变 readiness、timeout、cleanup、retry 或 Session 语义。
+
+#7182 基于 #7145/P0-A profile 收敛 ACP static closure。`classifyApiError` 从 React hook 移到纯 `packages/cli/src/utils/classify-api-error.ts`，suggestion data contract 移到 `ui/utils/suggestions.ts`；`/init` 覆盖确认、`/approval-mode auto`、`/history expand-now` 的 React-only 依赖改为动作执行时动态导入。`scripts/check-serve-fast-path-bundle.js` 新增 metafile guard，禁止 Ink、React、React Reconciler、Yoga 进入 ACP static closure，同时允许 intentional dynamic import。
+
+同 SHA 2C4G 对照中，#7182 将 ACP import P50 从 115.06ms 降到 52.00ms，`channel.initialize` P50 降 62.64ms，process-to-first-Session P50 降 66.85ms；preheated pairs、pooled cold P95 和 RSS gate 均未回退。该优化不改变 initialize barrier、Config phases、failure semantics、command availability 或 Session behavior，代价是三个低频交互命令首次执行时承担一次动态 import 成本。
 
 ---
 

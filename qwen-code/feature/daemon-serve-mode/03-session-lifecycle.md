@@ -14,11 +14,11 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **metadata**：`displayName` 重命名 + `session_metadata_updated` 扇出（#4240）。
 - **load / resume**：`session/load`（回放完整历史）vs `session/resume`（不回放），`pendingRestoreEvents` 缓冲、并发 restore 的 coalesce 合并与跨动作 `RestoreInProgressError`（#4222）。
 - **archive / unarchive / archived export**：active transcript 位于 `chats/`，archived transcript 位于 `chats/archive/`；archive 是状态转换，不删除 transcript，load/resume archived session 会要求先 unarchive；archived export 可只读 selected trusted workspace 的 archive JSONL，不改变 archive 状态（#6058/#6911）。
-- **persisted transcript / recording failure**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录（#6525/#6740/#6743）。
+- **persisted transcript / recording failure / writer lease**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录；#7166 open diff 进一步把 active transcript 写入收敛到 session-scoped single-writer lease 和 append fencing，避免同一 session 被多个 runtime 同时持久化（#6525/#6740/#6743/#7166）。
 - **multi-workspace owner-routed legacy session actions**：metadata、recap、BTW、mid-turn、task cancel、goal clear、rewind/shell、continue/language/artifact 等 singular legacy route 先解析 live owner runtime，再调用 owning bridge；URL/响应 shape 保持兼容（#6798/#6826/#6833）。branch/fork/cd 是显式例外，继续 primary-only，secondary owner fail-closed（#7005）。
 - **workspace-qualified Voice admission**：legacy 与 workspace-qualified Voice REST/WS 共用进程级 admission coordinator；runtime removal 会把 active Voice lease 计入 busy activity，force removal/shutdown 只 abort 目标 runtime 的 Voice work（#6839）。
 - **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745）。
-- **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先（#6945 open）。
+- **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先（#6945）。
 
 核心工厂闭包 `createHttpAcpBridge`（`packages/acp-bridge/src/bridge.ts:643`，约 4666 行），HTTP 路由层在 `packages/cli/src/serve/server.ts`。会话的并发安全建立在一个反复出现的不变式上：**所有改写 `byId` / `attachCount` / `defaultEntry` 的关键步骤都在 async 函数 `await` 之前的同步前缀里完成**，使得跨微任务边界的竞争（reaper vs attach、close vs spawn）天然原子。
 
@@ -56,8 +56,9 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#6839](https://github.com/QwenLM/qwen-code/pull/6839) | merged | workspace-qualified Voice admission | selected runtime Voice settings/transcribe/stream 与 process-level Voice capacity/drain/removal activity |
 | [#6911](https://github.com/QwenLM/qwen-code/pull/6911) | merged | workspace archived session export | selected trusted workspace archived JSONL full export，不 unarchive、不 fallback primary |
 | [#6912](https://github.com/QwenLM/qwen-code/pull/6912) | merged | Web Shell non-primary archive hardening | UI row identity 改为 `(workspaceCwd, sessionId)`，secondary archive/unarchive 按 owning workspace reconcile |
-| [#6945](https://github.com/QwenLM/qwen-code/pull/6945) | open | daemon Todo stop guard | 成功 top-level Todo write 后自然 stop 可 bounded continuation，最多两次 automatic primary-model stream |
-| [#7005](https://github.com/QwenLM/qwen-code/pull/7005) | open | primary-only live-session guard | branch/fork/cd 明确只支持 primary live session；secondary owner 返回 `non_primary_session_route_not_supported`，不调用 bridge |
+| [#6945](https://github.com/QwenLM/qwen-code/pull/6945) | merged | daemon Todo stop guard | 成功 top-level Todo write 后自然 stop 可 bounded continuation，最多两次 automatic primary-model stream |
+| [#7005](https://github.com/QwenLM/qwen-code/pull/7005) | merged | primary-only live-session guard | branch/fork/cd 明确只支持 primary live session；secondary owner 返回 `non_primary_session_route_not_supported`，不调用 bridge |
+| [#7166](https://github.com/QwenLM/qwen-code/pull/7166) | open | session writer lease | 同一 persisted session 只允许一个 runtime 作为 writer，JSONL append 带 owner token/长度 fencing，live conflict 返回 `session_writer_conflict` |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
@@ -113,6 +114,14 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | `inFlightSpawns` | `bridge.ts:888` | `Map<key, Promise<BridgeSession>>`，single scope 用 workspaceKey 做 coalesce key，thread 用 `key#uuid` |
 | `inFlightRestores` | `bridge.ts:909` | `Map<sessionId, InFlightRestore>`，含 `action`/`promise`/`coalesceState`（`:890-903`） |
 | `pendingRestoreEvents` | `bridge.ts:913` | `Map<sessionId, EventBus>`：restore 期间临时 bus，承接 `session/load` 的回放帧，settle 后并入正式 entry |
+
+### session writer lease（#7166 open）
+
+#7166 open diff 把“谁能写 active transcript”从隐含进程约定提升为显式 lease。创建、restore、resume、fork、worktree restore 与 ACP session 启动都会为 `(runtimeBase, sessionId)` 获取一个 writer owner；owner 记录包含 `ownerId`、`pid`、`hostname` 与时间戳，落在 runtime output 目录的侧车文件里。当前进程可回收本机 stale owner，但遇到外部主机仍持有 lease 时不会自动抢占，避免共享目录或远端 workspace 下出现 split-brain 写入。
+
+写入路径使用 owner token 与文件长度做 fencing：append 前确认当前 owner 仍匹配、JSONL 长度没有被外部改写；一旦 owner 丢失、lease 被替换或 transcript 字节边界变化，recorder 进入 integrity failure，不再继续写入缺 parent 或乱序记录。session transition 也保持旧 recorder/lease 到 commit 点后再切换，防止 load/resume/fork 中途把旧 session 的 writer 提前释放。
+
+live admission 对已有 owner fail-closed。daemon/ACP 路由在打开 persisted session 前先解析 writer 状态；若另一个 live runtime 已持有该 session，返回结构化 `session_writer_conflict`，并通过 status/runtime API 暴露 owner 信息，供 Web Shell、SDK、scheduled task keepalive 和 IDE 端提示用户切换或关闭旧 runtime，而不是在新 runtime 里继续追加。
 
 ### heartbeat 结果/状态类型（`bridgeTypes.ts`）
 

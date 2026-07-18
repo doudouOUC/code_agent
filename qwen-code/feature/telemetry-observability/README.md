@@ -43,7 +43,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
-- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash，见 `telemetry/daemon-tracing.ts` 与 serve telemetry middleware。
+- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup profile helper。
 
 ---
 
@@ -263,7 +263,7 @@ getActiveSpanTraceContext()  // 优先取当前 active span 的 traceId/spanId
 
 **daemon 日志**：`emitDaemonLog(body, attrs)` 经 `@opentelemetry/api-logs` 发 `qwen-code.daemon.error` 事件；所有 daemon 遥测 API 都包了 `try/catch` 且 SDK 未初始化时静默——遵循「遥测绝不影响请求处理」原则。
 
-#6907（open）把 cold first-session startup 拆进同一棵 daemon trace：`POST /session` 的 HTTP span 会回填 deferred runtime wait timing；bridge 侧增加 `channel.wait` span，标记 reused / joined / spawned-on-request，并为 channel 生成诊断 UUID；`session/new` 请求携带 traceparent，ACP child 在 `Session.startChat()` 周围记录 `qwen-code.daemon.session_start` 子 span 和阶段耗时。这样首个 session 的慢启动能区分 daemon runtime、channel preheat/attach、ACP child bootstrap 与 core chat 初始化，而不是只看到一个长 HTTP route duration。
+#6907 已把 cold first-session startup 拆进同一棵 daemon trace：`POST /session` 的 HTTP span 会回填 deferred runtime wait timing；bridge 侧增加 `channel.wait` span，标记 reused / joined / spawned-on-request，并为 channel 生成诊断 UUID；`session/new` 请求携带 traceparent，ACP child 在 `Session.startChat()` 周围记录 `qwen-code.daemon.session_start` 子 span 和阶段耗时。这样首个 session 的慢启动能区分 daemon runtime、channel preheat/attach、ACP child bootstrap 与 core chat 初始化，而不是只看到一个长 HTTP route duration。
 
 **配置解耦**：daemon 分支新增 `runtime-config.ts:TelemetryRuntimeConfig` 接口，`initializeTelemetry` 改为接收该接口而非具体 `Config`（`sdk.ts` 签名改动），便于 daemon / SDK 等非完整 `Config` 场景复用遥测初始化。
 
@@ -513,5 +513,3 @@ sequenceDiagram
 10. **`tool_output_truncated` 事件名有兼容性变更（#5960）**：#5960 把原先 hardcoded、未加命名空间的 `tool_output_truncated` 改为 `qwen-code.tool_output_truncated`，与其它 event constants 对齐。代码侧更一致，但下游 collector/dashboard/filter 如果按旧事件名筛选，需要同时迁移 filter。
 
 11. **#6263 的 child lag 只走 telemetry/stderr**：`/daemon/status.runtime.perf` 只表示 daemon 进程；ACP child event-loop lag 不在 status JSON 内。dashboard 若只读 `/daemon/status`，不能把 child 卡顿误判为缺失数据，需要同时看 OTel gauge 或 stderr stall warning。
-
-12. **#6907 cold-start span 仍是 open 观察口径**：当前文档按 PR diff 记录字段与 span 分层；若后续合入前重命名 `channel.wait` / `session_start` 属性或 profiler 字段，需要同步回改 dashboard 查询和本节命名。
