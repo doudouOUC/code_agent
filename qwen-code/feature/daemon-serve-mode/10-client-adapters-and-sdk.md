@@ -107,6 +107,8 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 
 #6839 给 workspace client 补 Voice surface：读取/更新 selected runtime Voice settings，并通过 `transcribeVoice()` 走 `/workspaces/:workspace/voice/transcribe`。客户端应同时 gate `workspace_qualified_voice` 与原有 Voice 能力；legacy Voice helper 仍绑定 primary。streaming Voice WebSocket 同样使用 workspace-qualified selector，但 Web Shell secondary Voice 控件不是本 PR 的默认 UI 行为。
 
+#7200 给 primary workspace ACP warmup 增加可发现 SDK 面：`DaemonClient.workspaceAcpStatus()` 调 `GET /workspace/acp/status`，`workspaceAcpPreheat(timeoutMs?)` 调 `POST /workspace/acp/preheat?timeoutMs=N`。这两个 helper 即使在 `DaemonClient` 配了 ACP HTTP/WS replaceable transport 时也强制 native REST，因为它们是 daemon control plane 端点，不是会话 ACP 消息。WebUI deferred connect 先 gate `workspace_acp_preheat`，有 `workspace_acp_status` 时先探测 `channelLive`，只有 selected workspace 精确等于 primary workspace 时才预热；status 失败会降级为直接 preheat，preheat 失败只影响 deferred skills warmup，不破坏连接流程。
+
 ### SSE 订阅与并发 guard
 
 `events()` 是唯一对外入口（`subscribeEvents()` 标记 `@deprecated`）。内部 `openEventSubscription()`（L406-457）实现 **lazy acquire / release guard**：

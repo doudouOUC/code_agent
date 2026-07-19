@@ -101,7 +101,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #6745 | feat(serve): support runtime workspace removal | merged | `DELETE /workspaces/:workspace` removable secondary runtime hot removal。 |
 | #6769 | feat(serve): Bound persisted transcript pages | merged | workspace transcript source/response/cursor byte bounds 与 `transcript_page_too_large`。 |
 | #6911 | feat(cli): Add archived session export | 2026-07-15 | `GET /workspaces/:workspace/session/:id/archive/export` selected trusted workspace archived JSONL export。 |
-| #6969 | feat(cli): Add bounded daemon log rotation | open | stable `debug/daemon/daemon.log`、有界 archive、fallback run family、logger status 与 access-log suppression。 |
+| #6969 | feat(cli): Add bounded daemon log rotation | merged | stable `debug/daemon/daemon.log`、有界 archive、fallback run family、logger status 与 access-log suppression。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -601,7 +601,7 @@ if (envelope.text.startsWith('!')) {
 
 `packages/cli/src/serve/daemonLogger.ts`（#4559）给每个 daemon 进程一份结构化落盘日志，**不取代**既有 stderr，而是 tee。`runQwenServe.ts:565` 在 boot 时 `initDaemonLogger({ boundWorkspace })`。
 
-#6969 在此基础上把日志所有权从 per-PID 文件推进为 stable bounded 模型：主写者竞争 `debug/daemon/daemon.log` 的 proper-lockfile，失败的竞争者写 fallback run family；active 文件 10 MiB、最多 4 个 archive，单条 file record 截到 256 KiB，pending queue 截到 4 MiB。`/daemon/status` additive 暴露 logger `mode`、`health`、`runId`、`issues`、drop counters 与 archive metadata；access log 对高频同类请求使用 token bucket suppression，并输出 suppress summary，避免 health/heartbeat 之外的新噪声把 daemon log 撑爆。该 PR 当前仍 open，本文按当前 diff 记录最终意图。
+#6969 在此基础上把日志所有权从 per-PID 文件推进为 stable bounded 模型：主写者竞争 `debug/daemon/daemon.log` 的 proper-lockfile，失败的竞争者写 fallback run family；active 文件 10 MiB、最多 4 个 archive，单条 file record 截到 256 KiB，pending queue 截到 4 MiB。`/daemon/status` additive 暴露 logger `mode`、`health`、`runId`、`issues`、drop counters 与 archive metadata；access log 对高频同类请求使用 token bucket suppression，并输出 suppress summary，避免 health/heartbeat 之外的新噪声把 daemon log 撑爆。该 PR 已合入，本文按 merged diff 记录最终实现。
 
 ### 文件路径与 daemon id
 

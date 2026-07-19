@@ -21,14 +21,17 @@
 | [#6950](https://github.com/QwenLM/qwen-code/pull/6950) | ✅ merged | fix(cli): Preserve channel startup failure details | [pr-6950.md](pr-6950.md) |
 | [#6961](https://github.com/QwenLM/qwen-code/pull/6961) | ✅ merged | feat(daemon): Aggregate deep health across workspaces | [pr-6961.md](pr-6961.md) |
 | [#6967](https://github.com/QwenLM/qwen-code/pull/6967) | ✅ merged | fix(core): Require explicit approval to exit Plan mode | [pr-6967.md](pr-6967.md) |
-| [#6969](https://github.com/QwenLM/qwen-code/pull/6969) | 🟡 open | feat(cli): Add bounded daemon log rotation | [pr-6969.md](pr-6969.md) |
+| [#6969](https://github.com/QwenLM/qwen-code/pull/6969) | ✅ merged | feat(cli): Add bounded daemon log rotation | [pr-6969.md](pr-6969.md) |
 | [#7003](https://github.com/QwenLM/qwen-code/pull/7003) | ✅ merged | feat(serve): Complete legacy session workspace telemetry | [pr-7003.md](pr-7003.md) |
 | [#7005](https://github.com/QwenLM/qwen-code/pull/7005) | ✅ merged | fix(serve): Harden multi-workspace ownership guards | [pr-7005.md](pr-7005.md) |
 | [#7019](https://github.com/QwenLM/qwen-code/pull/7019) | ✅ merged | docs(serve): Close multi-workspace hardening gaps | [pr-7019.md](pr-7019.md) |
 | [#7053](https://github.com/QwenLM/qwen-code/pull/7053) | ✅ merged | refactor(core): Classify shell safety as read-only, write, or unknown | [pr-7053.md](pr-7053.md) |
 | [#7145](https://github.com/QwenLM/qwen-code/pull/7145) | ✅ merged | feat(daemon): Profile ACP channel initialization | [pr-7145.md](pr-7145.md) |
 | [#7166](https://github.com/QwenLM/qwen-code/pull/7166) | 🟡 open | fix(core): Enforce single-writer session persistence | [pr-7166.md](pr-7166.md) |
-| [#7172](https://github.com/QwenLM/qwen-code/pull/7172) | 🟡 open | feat(core): Route Plan-mode shell commands by safety | [pr-7172.md](pr-7172.md) |
-| [#7182](https://github.com/QwenLM/qwen-code/pull/7182) | 🟡 open | perf(cli): Defer TUI runtime from ACP startup | [pr-7182.md](pr-7182.md) |
+| [#7172](https://github.com/QwenLM/qwen-code/pull/7172) | ✅ merged | feat(core): Route Plan-mode shell commands by safety | [pr-7172.md](pr-7172.md) |
+| [#7182](https://github.com/QwenLM/qwen-code/pull/7182) | ✅ merged | perf(cli): Defer TUI runtime from ACP startup | [pr-7182.md](pr-7182.md) |
+| [#7185](https://github.com/QwenLM/qwen-code/pull/7185) | ✅ merged | feat(core): inspect persisted conversation branches | [pr-7185.md](pr-7185.md) |
+| [#7200](https://github.com/QwenLM/qwen-code/pull/7200) | ✅ merged | feat(daemon): Advertise ACP preheat readiness | [pr-7200.md](pr-7200.md) |
+| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | 🟡 open | fix(core): Fence concurrent ACP session writers | [pr-7237.md](pr-7237.md) |
 
 _按个人 PR 口径更新于 2026-07-19_

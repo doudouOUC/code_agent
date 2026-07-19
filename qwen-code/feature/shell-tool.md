@@ -121,11 +121,11 @@ AST 中出现 `ERROR` 节点直接归 unknown。command/process substitution 会
 
 权限 manager 的默认非 Plan routing 仍消费 boolean 兼容 API：read-only 走默认 allow，write/unknown 走 ask。#7053 本身只把事实层拆成 read-only/write/unknown；#7172 当前 diff 才在 Plan mode 模型发起的 shell/monitor 调用上消费三态事实并做策略分流。
 
-## 6. Plan mode shell safety routing（#7172 open）
+## 6. Plan mode shell safety routing（#7172）
 
 ### 6.1 三态策略
 
-#7172 open diff 新增 `plan-mode-shell-policy`，只作用于 Plan mode 中模型发起的 `run_shell_command` / `monitor` 调用，不改变用户手动 `!command`、普通执行态或既有 permission rule 的语义。策略把 #7053 的事实层收敛为三类结果：
+#7172 新增 `plan-mode-shell-policy`，只作用于 Plan mode 中模型发起的 `run_shell_command` / `monitor` 调用，不改变用户手动 `!command`、普通执行态或既有 permission rule 的语义。策略把 #7053 的事实层收敛为三类结果：
 
 - `read-only`：继续进入既有权限 manager 与默认只读放行路径，保持 `git status`、`ls`、`rg` 这类只读命令在 Plan mode 中可用于调查。
 - `write`：在 permission UI 之前直接拒绝，向模型返回 Plan-mode shell blocked result，避免模型在计划阶段执行 `npm install`、`rm`、重定向写文件、`git commit` 等明确改写动作。
@@ -167,7 +167,7 @@ unknown 审批不是新增一条持久权限规则，而是针对这一次 raw s
 | [#6864](https://github.com/QwenLM/qwen-code/pull/6864) | merged | shell timeout error semantics | 前台 shell timeout 从成功输出改为结构化 `EXECUTION_TIMEOUT` 错误，协议/JSON/Anthropic/speculative/batch offload 都读取 error envelope。 |
 | [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | merged | silent shell heartbeat | 静默前台 shell 命令周期性发 `ShellProgressData`，ACP/stream-json 可见，TUI/模型上下文不受影响。 |
 | [#7053](https://github.com/QwenLM/qwen-code/pull/7053) | merged | shell safety tri-state classification | 新增 read-only/write/unknown 三态分类、bounded sed/awk/git 等规则和 wrapper 保守调度；默认非 Plan routing 仍保持兼容 allow/ask。 |
-| [#7172](https://github.com/QwenLM/qwen-code/pull/7172) | open | Plan-mode shell routing | Plan mode 中模型发起的 shell/monitor 按三态分流：read-only 走既有权限，write 直接拒绝，unknown 走一次性精确审批并在执行前做 Plan revision/cwd/policy/raw invocation fencing。 |
+| [#7172](https://github.com/QwenLM/qwen-code/pull/7172) | merged | Plan-mode shell routing | Plan mode 中模型发起的 shell/monitor 按三态分流：read-only 走既有权限，write 直接拒绝，unknown 走一次性精确审批并在执行前做 Plan revision/cwd/policy/raw invocation fencing。 |
 
 ---
 
@@ -175,7 +175,6 @@ unknown 审批不是新增一条持久权限规则，而是针对这一次 raw s
 
 - #6864 不改变非零退出码语义，也不处理后台 shell timeout 自动提升。
 - #6876 不向 ACP 流式转发命令输出，只提供 liveness heartbeat。
-- #7172 仍是 open diff；当前文档记录的是该 PR 的当前实现，合入前仍需以后续 review/CI 结果为准。
 - #7172 不处理用户手动 `!command`，也不把 unknown approval 持久化成规则；speculative interactive approval 仍保持 fail-closed。
 - MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍是后续项。
 - #6864/#6876/#7053 均已合入；MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍需单独设计。

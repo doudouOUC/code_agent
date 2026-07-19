@@ -1,6 +1,6 @@
 # conversation rewind 技术方案
 
-> 适用代码版本：`QwenLM/qwen-code` `main`（截至 2026-06-27，PR #3441/#4064/#4216/#4122/#3622/#4580/#4820/#4871/#4897/#5044/#5057/#5141 已合并）。
+> 适用代码版本：`QwenLM/qwen-code` `main`（截至 2026-07-19，PR #3441/#4064/#4216/#4122/#3622/#4580/#4820/#4871/#4897/#5044/#5057/#5141/#6826/#7185 已合并）。
 > 所有锚点格式为 `文件路径:符号`，行号可能随版本漂移，以符号为准。
 
 ---
@@ -340,6 +340,14 @@ stateDiagram-v2
 
 配套 `rebuildTurnBoundaries`（约 1170）在 `/resume` 后重建 `turnParentUuids`，并**跳过** `notification`/`cron`/`mid_turn_user_message` 子类型——与 #4580 的 UI 侧过滤保持一致（见 3.7）。
 
+### 3.6.1 persisted conversation branch inspection（#7185）
+
+#7185 在 core 新增只读 `inspectConversationBranches(records)`，用于分析 persisted transcript 中由 `uuid`/`parentUuid` 形成的 conversation forest。它不会选择 active branch、不会标记 sibling abandoned、不会修改 JSONL，也不改变 resume/fork/daemon/ACP/CLI 行为；定位是为后续 UI/恢复能力提供独立的读侧拓扑基础。
+
+实现先建立 record index，再识别 semantic leaf：真实 user/assistant/tool result 和恢复有意义的 system record 可以成为 branch tail；custom title、session artifact write 等 metadata-only terminal record 会被折叠并去重，避免生成 phantom branch；rewind、compression、attribution、file-history checkpoint 等 recovery-significant system record 会保留在拓扑里。每条 branch summary 记录 leaf、branch point、depth、updatedAt、用户/助手摘要、tool result 数量与 rewind descendant/sibling 分类。
+
+诊断面覆盖三类 transcript 损坏：missing parent、parent cycle 和同一 UUID 的 conflicting duplicate parent。排序使用 physical leaf order，即使 timestamp 乱序也保持 deterministic；neutral tail 的 updatedAt 使用最后一个被折叠物理 leaf 的时间，避免 metadata 尾记录在 UI 上消失后仍影响分支新鲜度。
+
 
 ### 3.7 compressed-turn 误报修复（#4580，`NOTIFICATION` 类型）
 
@@ -480,6 +488,7 @@ sequenceDiagram
 | **#5057** | snapshot 更新即时持久化 | `trackEdit` 新增或修复备份后立即追加最新 snapshot record，避免进程在下一轮 snapshot 前退出丢最后一轮文件历史 |
 | **#5141** | supported `sed -i` file-history tracking | 把安全单文件 `sed -i` 替换命令模拟成 edit confirmation：预览 diff、写前 `trackEdit`、stale guard、`FileSystemService.writeTextFile()` 落盘；不支持的 sed 仍走 shell path |
 | **#6826** | multi-workspace daemon rewind owner routing | `GET /session/:id/rewind/snapshots` 与 `POST /session/:id/rewind` 先按 live owner runtime 分发；`rewindFiles` 只接受可选 boolean；SDK rewind 即使配置 ACP transport 也强制走 REST。 |
+| **#7185** | persisted conversation branch inspection | 新增只读 `inspectConversationBranches()`，识别 semantic leaves、neutral metadata tail、rewind descendant/sibling 和 missing-parent/cycle/conflicting-parent diagnostics，为后续分支展示/恢复提供读侧拓扑。 |
 
 ---
 
@@ -559,6 +568,13 @@ sequenceDiagram
 - singular daemon route 不新增 workspace selector，而是用 live session owner resolver 选择 owning runtime：secondary live session 的 rewind snapshots 和 rewind 都调用 secondary `runtime.bridge`，不再被 primary-only guard 拦截。
 - `POST /session/:id/rewind` 保持 strict mutation auth；`rewindFiles` 从宽松 truthy/falsy 改为可选 boolean，非法类型返回 `400 invalid_rewind_files_flag`。
 - TS SDK 的 rewind API 强制走 authenticated REST，即使 client 配置 ACP HTTP/WS transport 也不走 ACP，避免绕开 REST owner-routing 与 mutation auth。
+
+### #7185 — persisted conversation branch inspection
+
+- `utils/conversation-branches.ts`：新增 `inspectConversationBranches(records)`，构建 persisted transcript forest 并输出 branch summaries 与 diagnostics；`ConversationBranchSummary` 记录 leaf、branch point、depth、updatedAt、user/assistant summary、tool result count 和 rewind relation。
+- semantic leaf 规则会折叠 custom-title、session-artifact 等 neutral metadata tail，但保留 rewind、compression、attribution、file-history checkpoint 等恢复有意义的 system record。
+- diagnostics 覆盖 missing parent、cycle、duplicate UUID conflicting parent；排序使用 physical leaf order，避免 timestamp 乱序导致结果不稳定。
+- `conversation-branches.test.ts` 覆盖 ordinary sibling、nested fork、neutral tail collapse、rewind descendant/sibling、diagnostics、synthetic prompt/thought filter 和 incident topology。
 
 ### #4871 — `/restore` 迁移到 FileHistoryService
 
