@@ -109,6 +109,8 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 
 #7200 给 primary workspace ACP warmup 增加可发现 SDK 面：`DaemonClient.workspaceAcpStatus()` 调 `GET /workspace/acp/status`，`workspaceAcpPreheat(timeoutMs?)` 调 `POST /workspace/acp/preheat?timeoutMs=N`。这两个 helper 即使在 `DaemonClient` 配了 ACP HTTP/WS replaceable transport 时也强制 native REST，因为它们是 daemon control plane 端点，不是会话 ACP 消息。WebUI deferred connect 先 gate `workspace_acp_preheat`，有 `workspace_acp_status` 时先探测 `channelLive`，只有 selected workspace 精确等于 primary workspace 时才预热；status 失败会降级为直接 preheat，preheat 失败只影响 deferred skills warmup，不破坏连接流程。
 
+#7268 open diff 给 workspace trust 增加 v2 SDK surface。`workspace_trust_hot_reload` capability 存在时，client 可以读取 `GET /workspace/trust?statusVersion=2` 或 selected workspace trust status，区分 `trusted`、`untrusted`、`transition`、`failed`、`blocked` 等状态，并通过 trust request helper 触发同进程 change path。SDK/Web Shell 不应在 transition/failed 时 fallback 到 primary workspace；这些状态意味着 owning runtime 正在或未能完成 generation reconcile，后续 workspace-scoped mutation 必须 fail-closed 或等待下一轮 status。
+
 ### SSE 订阅与并发 guard
 
 `events()` 是唯一对外入口（`subscribeEvents()` 标记 `@deprecated`）。内部 `openEventSubscription()`（L406-457）实现 **lazy acquire / release guard**：
@@ -117,6 +119,8 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 - 若已有 active subscription，`acquire()` 抛出 `Error('Another event subscription is already active...')`（L423）。
 - 放弃（GC）但未 `.next()` 的 generator 不会 block 后续订阅。
 - `release()` 在 `return` / `throw` / iterator 自然结束的 `finally` 中执行（L417, L439, L446）。
+
+#7269 进一步修复 REST SSE transport 的底层 request 生命周期：每次 `RestSseTransport.subscribeEvents()` 都创建 request-local `AbortController` 并登记到 active set，连接超时、caller `AbortSignal` 与 request controller 组合成 fetch signal。无论 consumer 正常 early return、抛错、stream error、connect error 还是 transport `dispose()`，generator `finally` 都会 abort 底层 fetch/TCP 并从 active set 移除；`dispose()` 幂等 abort 所有 active SSE 请求。`parseSseStream` 的 cleanup 改为 cancel body stream，防止 daemon EventBus subscriber 或 pending read 因 iterator 不再消费而悬挂。
 
 实际迭代发生在 `iterateEvents()`（L462-488）：
 

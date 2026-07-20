@@ -19,6 +19,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **workspace-qualified Voice admission**：legacy 与 workspace-qualified Voice REST/WS 共用进程级 admission coordinator；runtime removal 会把 active Voice lease 计入 busy activity，force removal/shutdown 只 abort 目标 runtime 的 Voice work（#6839）。
 - **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745）。
 - **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先（#6945）。
+- **permission prompt cancellation preservation**：ACP permission prompt、Plan unknown shell approval、Stop hook permission 与 background notification 等等待点若被父级 abort，session 终态保持 `cancelled`，并保留已 recovered 的 mid-turn message（#7295）。
 
 核心工厂闭包 `createHttpAcpBridge`（`packages/acp-bridge/src/bridge.ts:643`，约 4666 行），HTTP 路由层在 `packages/cli/src/serve/server.ts`。会话的并发安全建立在一个反复出现的不变式上：**所有改写 `byId` / `attachCount` / `defaultEntry` 的关键步骤都在 async 函数 `await` 之前的同步前缀里完成**，使得跨微任务边界的竞争（reaper vs attach、close vs spawn）天然原子。
 
@@ -60,6 +61,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#7005](https://github.com/QwenLM/qwen-code/pull/7005) | merged | primary-only live-session guard | branch/fork/cd 明确只支持 primary live session；secondary owner 返回 `non_primary_session_route_not_supported`，不调用 bridge |
 | [#7166](https://github.com/QwenLM/qwen-code/pull/7166) | closed | session writer lease | closed 未合入完整方案：同一 persisted session 只允许一个 runtime 作为 writer，JSONL append 带 owner token/长度 fencing，live conflict 返回 `session_writer_conflict` |
 | [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | open | ACP/daemon writer fence P0a | 从 #7166 抽出可独立落地的 writer lease 防线：atomic hard-link owner、owner reload tail、append fencing、live owner reuse、close drain 与稳定错误面 |
+| [#7295](https://github.com/QwenLM/qwen-code/pull/7295) | merged | permission cancel stopReason | 权限等待/Stop hook/background notification 被 parent abort 时报告 `cancelled`，并用 `preserveFallbackOnAbort` 保留 recovered mid-turn message |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |

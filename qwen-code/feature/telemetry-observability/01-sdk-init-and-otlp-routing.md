@@ -1,7 +1,7 @@
 # OTel SDK 初始化与 OTLP 信号路由（深入）
 
 > 子文档；总览见 [README.md](README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 §3.1，进入 function / line 级。
-> 代码基准：`QwenLM/qwen-code@main`。核心文件 `packages/core/src/telemetry/sdk.ts`（全文 630 行）。
+> 代码基准：`QwenLM/qwen-code@main`。核心文件 `packages/core/src/telemetry/sdk.ts`（全文 630 行）。#7276 仍为 open diff：它把本文件描述的同步 heavy implementation 拆到 lazy-loaded `sdk-impl.ts`，本文在对应段落单独标注，不能视为 main 已落地。
 > 引用约定：`file:symbol`（+行号），行号对应 `main` 当前快照，仅作定位锚点。
 
 ---
@@ -41,6 +41,7 @@
 | [#4367](https://github.com/QwenLM/qwen-code/pull/4367) | MERGED | support custom resource attributes + metric cardinality | `service.name/version/session.id` 三重剥离（`sdk.ts:196-213`）+ 一次性告警汇总（`sdk.ts:223-233`） |
 | [#4390](https://github.com/QwenLM/qwen-code/pull/4390) | MERGED | client-side HTTP span + opt-in W3C traceparent | `NOOP_PROPAGATOR`（`sdk.ts:110-118`）+ instrumentation 反馈环守卫（`sdk.ts:368-540`） |
 | [#4482](https://github.com/QwenLM/qwen-code/pull/4482) | MERGED | improve LogToSpan bridge error info and TUI handling | 桥接的 `diagnosticsSink` 注入（`sdk.ts:309-311`） |
+| [#7276](https://github.com/QwenLM/qwen-code/pull/7276) | OPEN | perf(telemetry): lazy-load the SDK and split OTLP exporter chains by protocol | 当前 open diff：`sdk.ts` 变轻量 async facade，heavy NodeSDK/instrumentation/exporter 在 `sdk-impl.ts` 与 protocol-specific exporter modules 中按需动态加载。 |
 
 > 注：`#4390`/`#4482` 不属于「SDK init/路由」核心，但其代码与本文件强耦合（instrumentation、propagator、桥接诊断都在 `initializeTelemetry` 内构造），故一并标注。propagator 与 instrumentation 的完整展开见兄弟子文档「出站 HTTP span 与 traceparent 传播」，本文只覆盖它们在 init 序列中的装配位置。
 
@@ -48,7 +49,9 @@
 
 ## 初始化序列
 
-`initializeTelemetry(config: Config): void`（`sdk.ts:178-554`）是一段 **完全同步** 的函数——它构造好 `NodeSDK` 后调用 `sdk.start()`（同步），不 `await` 任何东西。这点很关键：调用方（CLI 引导期）可以在 Ink 渲染之前同步完成遥测装配，因此此处的 `console.warn`（`sdk.ts:226`）不会与 TUI 交错。
+`initializeTelemetry(config: Config): void`（`sdk.ts:178-554`）在当前 `main` 是一段 **完全同步** 的函数——它构造好 `NodeSDK` 后调用 `sdk.start()`（同步），不 `await` 任何东西。这点很关键：调用方（CLI 引导期）可以在 Ink 渲染之前同步完成遥测装配，因此此处的 `console.warn`（`sdk.ts:226`）不会与 TUI 交错。
+
+> #7276 open diff 会把这个契约改成 async single-flight facade：关闭 telemetry 时 facade 直接短路且不加载 `@opentelemetry/sdk-node`、exporters、instrumentation；开启时动态 import heavy `sdk-impl.ts`，并按 protocol 只加载 HTTP 或 gRPC exporter chain。daemon runtime 在初始化 daemon metrics 前显式 await，普通 Config/startup 入口使用 fire-and-forget，避免默认 disabled path 把 telemetry heavy cluster 带进 ACP static closure。
 
 ### 步骤 0：幂等短路（`sdk.ts:179-181`）
 

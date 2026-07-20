@@ -23,6 +23,7 @@
 | #6625 | @doudouOUC | merged | Web Shell workspace management sidebar 与 dynamic workspace registration。 |
 | #6716 | @doudouOUC | merged | dynamic workspace registration 的 persistent desired-state、启动恢复和 lazy workspace-qualified ACP mount。 |
 | #6717 | @doudouOUC | merged | Web Shell 可查看 untrusted secondary workspace 的 persisted-only session catalog。 |
+| #7268 | @doudouOUC | open | workspace trust hot reload：Web Shell 读取 v2 trust status，展示 applying/failed/blocked，并在 runtime generation reconcile 后刷新 workspace/session 面。 |
 | #6740 | @doudouOUC | merged | untrusted secondary workspace 可通过 workspace-qualified persisted transcript reader 查看 active transcript page。 |
 | #6743 | @doudouOUC | merged | chat recording durable write failure 通过 `recording_stopped` 进入 WebUI warning/status。 |
 | #6745 | @doudouOUC | merged | removable secondary workspace 的 runtime removal、busy snapshot 与 force confirmation flow。 |
@@ -191,6 +192,8 @@ sequenceDiagram
 #6716 把 `addWorkspace` 扩展成可选持久化注册：Web Shell 只有看到 `persistent_workspace_registration` capability 时才展示/发送 persist 选项；daemon 把 secondary workspace desired-state 写入 user-level store，并在重启时恢复 runtime。`GET /workspace-registrations` 用于列出持久记录，`DELETE /workspace-registrations/:id` 只删除 desired-state，不卸载当前 active runtime。它还把 workspace-qualified ACP route 改成 app 启动时即挂载的 lazy resolver，避免动态注册后 plural ACP mount 不存在。
 
 #6717 让 untrusted secondary workspace 在 sidebar 中可展开查看 persisted-only session catalog。UI 不选择该 workspace、不打开 session、不做 10 秒 polling；只用非交互 read-only row 显示 session displayName/短 id 和创建时间，并提示需要 trust 后才能打开。trusted workspace 和 untrusted primary 的行为不变。
+
+#7268 open diff 把 trust 状态从“注册时一次性判断”扩展成可热重载的 v2 status。Web Shell 看到 `workspace_trust_hot_reload` capability 后，应轮询/刷新 selected workspace 的 trust status，区分 stable trusted/untrusted 与 applying、failed、blocked 等过渡/异常状态；过渡期间不把 workspace mutation fallback 到 primary，也不继续使用旧 generation 的 session/action 入口。trust grant/revoke 触发 runtime close/drain/recreate 后，sidebar 需要刷新 capabilities、workspace row、session list 和 busy state；failed/blocked 状态要作为可操作状态呈现，而不是当作普通未信任 workspace 静默折叠。
 
 #6740 在 REST 层允许 registered untrusted secondary workspace 读取 active persisted transcript page。Web Shell 仍不把 untrusted workspace 当成可执行 workspace，不选择、不 prompt、不 ACP attach；如果 UI 提供“查看历史”入口，应通过 `WorkspaceDaemonClient.getSessionTranscriptPage()` 直接拉 workspace-qualified REST，并按 #6769 的 page/cursor bounds 处理 `transcript_page_too_large`。
 
