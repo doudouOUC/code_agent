@@ -22,6 +22,7 @@
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调 |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport |
+| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、修复顺序和验收矩阵 |
 
 ---
 
