@@ -4,7 +4,7 @@
 
 **时间范围**: 2026-04-06 ~ 2026-07-19（持续更新）
 **总计**: 294 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29 见对应周目录（W29 当前个人增量 +73,832 / -11,427，696 个文件变更）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29 见对应周目录（W29 当前个人增量 +74,269 / -11,430，698 个文件变更）
 
 ## 按周
 
@@ -23,7 +23,7 @@
 | [2026-06-15 ~ 2026-06-21](2026-06-15_2026-06-21/) (W25 最终版) | 10 | 9/0/1 | 见周目录 | sed edit file history、daemon docs English refresh、monitor notification batch drain、daemon status API、model provider 选择持久化、mid-turn 图片保留、ACP 取消停止语义、serve 权限超时配置 |
 | [2026-06-29 ~ 2026-07-05](2026-06-29_2026-07-05/) (W27 周报) | 31 | 29/0/2 | +39,985/-3,521 | serve fast-path guard、daemon channel worker/session archive、skills ACP 输出、plan-required teammate approval、worker stderr redaction、ChannelAgentBridge session listing、daemon dashboard/status/perf、session export/organization、prompt queue status、large pipe frame measurement |
 | [2026-07-06 ~ 2026-07-12](2026-07-06_2026-07-12/) (W28 周内累计) | 30 | 29/0/1 | +70,513/-6,343 | session start profiler、ACP `/tmp` fallback、大文本/PDF 读取、Phase 2a/2b/3/4 multi-workspace sessions + REST/ACP、bounded/paged/workspace-qualified transcript、workspace management sidebar、non-primary archived/organized/untrusted session catalog、channel worker reload/grouping/runtime control、extension management v2、persistent registration、runtime removal、recording failure visibility |
-| [2026-07-13 ~ 2026-07-19](2026-07-13_2026-07-19/) (W29 最终版) | 29 | 27/2/0 | +73,832/-11,427 | multi-workspace owner-routed session mutations、Extension Management V2、workspace-qualified Voice/session export、PDF vision bridge fallback、shell timeout/heartbeat、cold first-session tracing、archived export、Todo stop guard、channel startup diagnostics、deep health、Plan exit approval、bounded daemon logs、legacy telemetry、ownership guard hardening、hardening closeout、shell safety tri-state classification、ACP initialize profiling、single-writer sessions、Plan shell routing、ACP startup closure slimming、conversation branch inspection、ACP preheat readiness、ACP writer fencing |
+| [2026-07-13 ~ 2026-07-19](2026-07-13_2026-07-19/) (W29 最终版) | 29 | 27/1/1 | +74,269/-11,430 | multi-workspace owner-routed session mutations、Extension Management V2、workspace-qualified Voice/session export、PDF vision bridge fallback、shell timeout/heartbeat、cold first-session tracing、archived export、Todo stop guard、channel startup diagnostics、deep health、Plan exit approval、bounded daemon logs、legacy telemetry、ownership guard hardening、hardening closeout、shell safety tri-state classification、ACP initialize profiling、single-writer sessions、Plan shell routing、ACP startup closure slimming、conversation branch inspection、ACP preheat readiness、ACP writer fencing |
 
 ## 类型分布
 
