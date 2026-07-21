@@ -150,7 +150,7 @@ private async *iterateEvents(opts, release) {
 | **blocking fallback** | `subscriptionActive === false` | 调 `DaemonClient.prompt()` — 内部开临时 SSE 等结果 |
 | **non-blocking + dispatch** | `subscriptionActive === true` | 调 `promptNonBlocking()` → 202；注册 `_pendingPrompts.set(promptId, {resolve, reject})`；SSE 流中 `_dispatchTurnEvent()` 匹配 → resolve/reject |
 
-`_pendingPrompts`（L84-90）是 `Map<promptId, {resolve, reject}>`——镜像 ACP transport 的 pending-request dispatch table。SSE 流结束时 `_rejectAllPending()`（L507-511）清理所有 pending Promise。
+`_pendingPrompts`（L84-90）是 `Map<promptId, {resolve, reject}>`——镜像 ACP transport 的 pending-request dispatch table。SSE 流结束时 `_rejectAllPending()`（L507-511）清理所有 pending Promise。#7400 后 daemon bridge 对每个 202 accepted prompt 提供 exactly-once terminal：queued removal、deadline、close/kill/crash/shutdown 都会按 `promptId` 发布 `turn_complete` 或 `turn_error`，所以这里的 pending Promise 不需要额外猜测 daemon 内部失败路径。
 
 ---
 
@@ -292,7 +292,7 @@ sequenceDiagram
     DC-->>SDK: yield event
     SDK-->>C: event (渲染增量)
 
-    D->>Bus: broadcastTurnComplete(entry, sessionId, result, promptId)
+    D->>Bus: publishPromptTerminal() → turn_complete / turn_error (exactly-once)
     Bus-->>DC: SSE: turn_complete {promptId, stopReason}
     DC-->>SDK: yield event
     SDK->>SDK: _dispatchTurnEvent() → pending.resolve(result)

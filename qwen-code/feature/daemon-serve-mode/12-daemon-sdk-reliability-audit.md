@@ -12,7 +12,9 @@
 
 ## 0. 结论
 
-审计没有发现 P0，但确认了多项未修复的 P1/P2。Java 侧经过 8 轮审计、TypeScript/daemon 侧经过 7 轮审计；两侧最后一轮均未再发现新的、证据充分的 P0/P1/P2，问题集合在当前范围内收敛。
+审计没有发现 P0，但在基线 commit 上确认了多项 P1/P2。Java 侧经过 8 轮审计、TypeScript/daemon 侧经过 7 轮审计；两侧最后一轮均未再发现新的、证据充分的 P0/P1/P2，问题集合在当前范围内收敛。
+
+> 后续修复状态（2026-07-21）：[#7386](https://github.com/QwenLM/qwen-code/pull/7386) 已合入并闭合 DAEMON-006（detach 幂等）；[#7400](https://github.com/QwenLM/qwen-code/pull/7400) 已合入并闭合 DAEMON-002/003/004/005（accepted prompt exactly-once terminal、bridge-owned deadline、queued removal terminal、last detach draining/teardown flush）。本文保留原始基线证据，同时在对应条目标注当前状态。
 
 这批问题中存在多条能够独立造成“流式输出只剩前半段、卡片提前结束或调用永久等待”的路径：
 
@@ -20,7 +22,7 @@
 2. REST SSE 未禁止内容编码，也没有 body inactivity watchdog，代理缓冲后可能只交付首段。
 3. WebSocket 慢消费者队列满时静默删除最老事件，且该 transport 不支持 replay。
 4. prompt 正式终态可能早于 HTTP 202，被高层 SDK 在 waiter 注册前丢弃。
-5. daemon 的 deadline、排队 prompt 定向取消和最后客户端 detach 路径不保证正式终态。
+5. 基线 daemon 的 deadline、排队 prompt 定向取消和最后客户端 detach 路径不保证正式终态；该组问题已由 #7400 在 bridge terminal state machine 中闭合。
 6. daemon 重启只靠数值游标猜测 epoch，特定时序下会把旧游标误认为当前 epoch。
 
 因此，新增 Java `DaemonSessionClient` 是必要工作，但不是充分修复。Java SDK 能负责 HTTP/SSE、`Accept-Encoding: identity`、`Last-Event-ID`、重连和去重；它无法补回 daemon 从未发布的终态、错误 epoch 下跳过的事件，或已被 daemon 提前关闭的 session。
@@ -66,7 +68,9 @@ flowchart LR
 | 责任侧 | daemon protocol。 |
 | 最小修复 | 每个 session event stream 增加显式、不复用的 epoch token；cursor 持久化为 `(epoch,eventId)`，epoch 不同必须进入 snapshot/resync。 |
 
-### DAEMON-002：已接受 prompt 缺少“恰好一个正式终态”保证
+### DAEMON-002：已接受 prompt 缺少“恰好一个正式终态”保证（已由 #7400 修复）
+
+> 修复状态：#7400 在 `PendingPromptEntry` 上增加 `terminalPublished` latch，并让 agent settle、queued removal、deadline、close/kill/crash/shutdown 都经 `publishPromptTerminal()` 发布 `turn_complete` 或 `turn_error`；测试套件覆盖竞争去重和 teardown 顺序。
 
 | 字段 | 内容 |
 |---|---|
@@ -77,7 +81,9 @@ flowchart LR
 | 责任侧 | daemon bridge。 |
 | 最小修复 | admission 后创建 prompt terminal state machine；每个 `promptId` 只能从 accepted 转到 completed/error/cancelled/deadline 一次，并在 session close 前发布或持久化终态。 |
 
-### DAEMON-003：`prompt_absolute_deadline` 不是绝对 deadline
+### DAEMON-003：`prompt_absolute_deadline` 不是绝对 deadline（已由 #7400 修复）
+
+> 修复状态：#7400 将 route-side timer 迁到 bridge admission/dispatch race。`deadlineMs` 现在覆盖 queue wait + execution，到期发布 `turn_error{code:'prompt_deadline_exceeded'}`、释放 FIFO、清 active state 并 best-effort cancel agent；route 只负责解析和透传 effective deadline。
 
 | 字段 | 内容 |
 |---|---|
@@ -88,7 +94,9 @@ flowchart LR
 | 责任侧 | daemon route + bridge。 |
 | 最小修复 | 将 deadline promise 纳入执行 race；超时后立即完成 prompt terminal，再异步 best-effort 取消/回收不协作 agent。能力标签只能在该语义成立后广告。 |
 
-### DAEMON-004：按 promptId 删除排队 prompt 不产生 prompt terminal
+### DAEMON-004：按 promptId 删除排队 prompt 不产生 prompt terminal（已由 #7400 修复）
+
+> 修复状态：#7400 让 `removePendingPrompt()` 对 queued prompt 同时发布 `pending_prompt_completed{state:'removed'}` 和 `turn_complete{stopReason:'cancelled'}`；后续 FIFO AbortError 由 terminal latch 去重。
 
 | 字段 | 内容 |
 |---|---|
@@ -99,7 +107,9 @@ flowchart LR
 | 责任侧 | daemon bridge。 |
 | 最小修复 | targeted remove 成功必须原子发布 `prompt_terminal{promptId,status:'cancelled'}`；队列 UI 事件可以保留，但不能替代 prompt terminal。 |
 
-### DAEMON-005：最后 detach 与 pending queue 的关闭竞态
+### DAEMON-005：最后 detach 与 pending queue 的关闭竞态（已由 #7400 修复）
+
+> 修复状态：#7400 将 close-on-last-detach、attach rollback 与 idle reaper 的门控从瞬时 `promptActive` 扩展为 `pendingPromptCount`，并把 deferred close 放到 prompt terminal broadcast 之后；close/kill/channel crash/shutdown 在关 EventBus 前 flush active + queued prompt terminal。
 
 | 字段 | 内容 |
 |---|---|
@@ -110,7 +120,9 @@ flowchart LR
 | 责任侧 | daemon session lifecycle。 |
 | 最小修复 | session close 条件同时覆盖 active、queued、terminal flush；无客户端时可进入 draining，但不能丢已接受工作。 |
 
-### DAEMON-006：detach 不是幂等操作
+### DAEMON-006：detach 不是幂等操作（已由 #7386 修复）
+
+> 修复状态：#7386 增加 `attachRefs: Map<clientId,count>`，只有 `releaseAttachRef()` 成功才允许 `detachClient()` 递减 `attachCount`；重复/未知/匿名/owner detach 仍清理 client registration，但不偷减其它 attacher 的 ref。
 
 | 字段 | 内容 |
 |---|---|
@@ -736,11 +748,11 @@ flowchart LR
 ### Phase 1：闭合 daemon contract
 
 1. 引入 `(epoch,eventId)` cursor 和条件能力标签。
-2. 建立 accepted prompt terminal state machine，保证 exactly-one terminal。
-3. 让 absolute deadline 真正参与 race；统一 completed/error/cancelled/deadline terminal。
-4. targeted cancel 对 active/queued prompt 采用同一 promptId 语义。
+2. ✅ #7400 已建立 accepted prompt terminal state machine，保证 exactly-one terminal。
+3. ✅ #7400 已让 absolute deadline 真正参与 bridge race，并统一 completed/error/cancelled/deadline terminal。
+4. 部分闭合：#7400 已让 queued prompt remove 发布 cancelled terminal；完整 active/queued targeted cancel API 语义仍需独立跟进。
 5. 提供 side-effect-free session snapshot/resync API，保留全部 correlation fields。
-6. 修复 attach/detach 幂等性、draining 与 queued prompt 生命周期。
+6. ✅ #7386 已修复 detach 幂等性；#7400 已修复 draining 与 queued prompt terminal 生命周期。
 
 ### Phase 2：修复 TypeScript reference client 与 transports
 
@@ -782,10 +794,10 @@ flowchart LR
 | 每个 SSE 边界断流 | 在任意 frame 后断开并重连 | 使用最新 cursor；事件按 id 去重，最终 transcript 与无断流基线一致。 |
 | daemon epoch 切换 | 持久化旧 cursor，重启 daemon 后产生新事件 | 必须检测 epoch 不同并 snapshot；不能混合 reducer 状态。 |
 | ring eviction | cursor 落后于 earliest retained event | 收到 resync，原子加载无副作用 snapshot，再恢复 live。 |
-| queued targeted cancel | A active、B queued，取消 B | A 不受影响；B 收到一次 cancelled terminal，永不执行。 |
+| queued targeted cancel | A active、B queued，取消 B | A 不受影响；B 收到一次 cancelled terminal，永不执行；#7400 已覆盖 queued remove 路径。 |
 | active targeted cancel | 取消当前 prompt | 收到 cancel-requested advisory 后最终收到一次 cancelled/error terminal。 |
-| non-cooperative deadline | agent 忽略 cancel | deadline 到点即完成 prompt terminal并释放 FIFO；agent 回收在后台完成。 |
-| 最后客户端 detach | A active、B queued 后 detach | 重复 detach 幂等；已接受工作按声明策略 drain 或带 terminal 取消，不得静默丢失。 |
+| non-cooperative deadline | agent 忽略 cancel | deadline 到点即完成 prompt terminal 并释放 FIFO；agent 回收在后台完成。#7400 已覆盖该路径。 |
+| 最后客户端 detach | A active、B queued 后 detach | 重复 detach 幂等；已接受工作按声明策略 drain 或带 terminal 取消，不得静默丢失。#7386/#7400 已分别覆盖 detach 幂等与 pending prompt draining。 |
 | 慢消费者 | 暂停消费并注入 256+ events | transport 反压或明确 overflow/resync；禁止 silent drop-oldest。 |
 | gzip/buffering proxy | 代理默认开启压缩和缓冲 | identity header 生效；无数据超过 inactivity budget 时抛结构化 timeout。 |
 | malformed SSE frame | 插入带 cursor 的非法 JSON/schema | 流失败并 resync；不得越过该 cursor 后继续提交状态。 |
@@ -808,7 +820,7 @@ flowchart LR
 - 两个 Java 模块在跳过现有集成式测试后均能完成 Maven package。
 - 审计前后 qwen-code 工作树保持干净。
 
-绿色测试不推翻本文结论。当前测试没有系统覆盖 terminal-before-202、queued prompt targeted cancel、epoch 数值碰撞、HTTP/WS dispose race、WS slow-consumer overflow、Java timeout 后 orphan reader 等路径。Java 现有部分测试还会调用真实 qwen/model，且只断言结果非 null，空结果或截短结果也可能通过。
+绿色测试不推翻本文结论。#7386/#7400 已补强 daemon 侧 duplicate detach、queued removal terminal、deadline FIFO release、teardown terminal flush 和 last-detach draining 覆盖；当前测试仍没有系统覆盖 terminal-before-202、epoch 数值碰撞、HTTP/WS dispose race、WS slow-consumer overflow、Java timeout 后 orphan reader 等路径。Java 现有部分测试还会调用真实 qwen/model，且只断言结果非 null，空结果或截短结果也可能通过。
 
 ---
 

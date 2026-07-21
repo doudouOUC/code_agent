@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-20 的 #7276 open diff 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -172,11 +172,11 @@ normalizedInput === normalizedDefault
 
 同 SHA 2C4G 对照中，#7182 将 ACP import P50 从 115.06ms 降到 52.00ms，`channel.initialize` P50 降 62.64ms，process-to-first-Session P50 降 66.85ms；preheated pairs、pooled cold P95 和 RSS gate 均未回退。该优化不改变 initialize barrier、Config phases、failure semantics、command availability 或 Session behavior，代价是三个低频交互命令首次执行时承担一次动态 import 成本。
 
-### 3.6 telemetry SDK lazy loading 与 exporter split（#7276 open）
+### 3.6 telemetry SDK lazy loading 与 exporter split（#7276）
 
-#7276 open diff 解决的是 #7182 之后仍残留在 ACP/static startup closure 里的 telemetry cluster。旧路径即使 `telemetry.enabled=false`，也会在模块求值期加载 OpenTelemetry NodeSDK、OTLP HTTP/gRPC exporters、protobuf 与 instrumentation；对 daemon ACP child cold start 来说，这些模块既不产生功能收益，又会增加 import time 与 bundle 体积。
+#7276 解决的是 #7182 之后仍残留在 ACP/static startup closure 里的 telemetry cluster。旧路径即使 `telemetry.enabled=false`，也会在模块求值期加载 OpenTelemetry NodeSDK、OTLP HTTP/gRPC exporters、protobuf 与 instrumentation；对 daemon ACP child cold start 来说，这些模块既不产生功能收益，又会增加 import time 与 bundle 体积。
 
-当前 open diff 把 `packages/core/src/telemetry/sdk.ts` 拆成轻量 facade 和 heavy `sdk-impl.ts`：disabled path 只做同步/快速短路，不 import heavy implementation；enabled path 通过 async single-flight dynamic import 初始化。HTTP exporter、gRPC exporter、OTLP URL helper 与 file exporter 分离，`outfile` 模式不加载 OTLP，HTTP 模式不加载 gRPC，gRPC 模式不加载 HTTP exporter chain。
+最终实现把 `packages/core/src/telemetry/sdk.ts` 拆成轻量 facade 和 heavy `sdk-impl.ts`：disabled path 只做快速短路，不 import heavy implementation；enabled path 通过 async single-flight dynamic import 初始化。HTTP exporter、gRPC exporter、OTLP URL helper 与 file exporter 分离，`outfile` 模式不加载 OTLP，HTTP 模式不加载 gRPC，gRPC 模式不加载 HTTP exporter chain。
 
 装配层也分两类：daemon runtime 在初始化 daemon metrics 前显式 await telemetry init，保证 metrics provider 准备好；Config/startup 这类普通路径使用 fire-and-forget prefetch，避免用户首次 prompt 等待 telemetry import。`scripts/check-serve-fast-path-bundle.js` 扩展 bundle guard，禁止 `@opentelemetry/sdk-node`、grpc/protobuf/exporter 等 telemetry heavy 模块回到 ACP static closure；esbuild 对 NodeSDK 内部 env-var auto exporter require 做 stub，避免 bundler 静态追踪把两条 protocol chain 都拉进来。
 

@@ -1,7 +1,7 @@
 # 最终工具响应预算技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的 Core scheduler、interactive TUI、headless、ACP session、Agent runtime 与 speculative follow-up。
-> 当前记录：#7323 open diff；该方案按当前 PR 代码观察整理，不能视为 `main` 已落地能力。
+> 当前记录：#7323 已合入；该方案按 merged diff、changed files 和当前 `main` 相邻实现整理。
 
 ---
 
@@ -135,15 +135,15 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
-| [#7323](https://github.com/QwenLM/qwen-code/pull/7323) | open | final tool response budget | 增加结构化 persisted-output metadata、共享 finalizer、runtime aggregation boundaries、send-boundary guard 和 Plan mode policy exception。 |
+| [#7323](https://github.com/QwenLM/qwen-code/pull/7323) | merged | final tool response budget | 增加结构化 persisted-output metadata、共享 finalizer、runtime aggregation boundaries、send-boundary guard 和 Plan mode policy exception。 |
 
 ---
 
 ## 7. 已知限制 / 后续
 
-- #7323 当前仍为 open；文档只记录当前 diff 方案。
+- #7323 已合入；文档记录当前 main 的最终实现方案。
 - 不提供精确 token 预算，不改变 provider context window 估算与自动压缩策略。
 - 不保证 artifact path 在远端 UI 中可直接读取；这里只保证模型响应里有可诊断的 path reference。
 - 后续如要在 Ctrl+O transcript 中读取完整 artifact，需要独立设计权限、路径暴露、大小限制和 UI streaming。
 
-_按个人 PR 口径更新于 2026-07-20_
+_按个人 PR 口径更新于 2026-07-21_

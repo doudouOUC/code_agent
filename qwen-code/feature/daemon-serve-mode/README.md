@@ -11,9 +11,9 @@
 
 | # | 子文档 | 覆盖 |
 |---|---|---|
-| 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、deadline / 权限响应超时 / access log |
+| 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、prompt route 202 + bridge-owned deadline / 权限响应超时 / access log |
 | 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、state_resync、协议帧 serverTimestamp/provenance/errorKind |
-| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay |
+| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268 open） |
 | 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写 |
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
@@ -189,7 +189,7 @@ stateDiagram-v2
 
 ### 3.3 会话生命周期与 sessionScope
 
-核心 `packages/acp-bridge/src/bridge.ts`（约 4666 行，`createHttpAcpBridge` 工厂闭包）。会话状态登记在 `byId: Map<sessionId, SessionEntry>`。每个 entry 持有：`events: EventBus`、`channelInfo`（attach 目标 channel + ACP connection）、`attachCount`、`lastHeartbeatAt` / per-client 心跳表、`isDying` / 反 reap tombstone 等。
+核心 `packages/acp-bridge/src/bridge.ts`（`createHttpAcpBridge` 工厂闭包）。会话状态登记在 `byId: Map<sessionId, SessionEntry>`。每个 entry 持有：`events: EventBus`、`channelInfo`（attach 目标 channel + ACP connection）、`attachCount` + `attachRefs`、`pendingPromptCount` + `pendingPromptList`、`lastHeartbeatAt` / per-client 心跳表、`isDying` / 反 reap tombstone 等。
 
 **spawn vs attach**：`bridge.spawnOrAttach({ workspaceCwd, modelServiceId?, clientId?, sessionScope? })`（`POST /session` 调用）。
 
@@ -200,13 +200,13 @@ stateDiagram-v2
 
 **load / resume**（#4222）：`POST /session/:id/load`（ACP `connection.loadSession`，重放完整历史）与 `POST /session/:id/resume`（ACP `connection.unstable_resumeSession`，`unstable_` 前缀因底层 ACP 方法名未定稿）。同 id 的 load↔resume 交叉竞争返回 `409 restore_in_progress`；同动作竞争（load vs load）走 coalesce 合并而非报错。restore 用一个独立的 `pendingRestoreEvents` EventBus 先承接重放，settle 后并入正式 entry。
 
-**close / detach / delete**（#4240 / Wave 2.5 PR 11）：`DELETE /session/:id`（`closeSession`，attach 不计入 `--max-sessions` cap）、`POST /session/:id/detach`（`detachClient`，仅减引用）、`POST /sessions/delete`（批量）、`PATCH /session/:id/metadata`（重命名等）。`closeSession`/`killSession` 标 `isDying` 同步、`kill()` channel、由 `channel.exited` handler 在 OS reap 后做 alive-set 清理；这期间并发 `spawnOrAttach` 能立刻 spawn 一个全新 channel 并重指 `channelInfo`（不必等 OS reap）。
+**close / detach / delete**（#4240 / Wave 2.5 PR 11；#7386/#7400 reliability closeout）：`DELETE /session/:id`（`closeSession`，attach 不计入 `--max-sessions` cap）、`POST /session/:id/detach`（`detachClient`，按 per-client `attachRefs` 释放真实 attach 引用，重复/未知/匿名/owner detach 不偷减 `attachCount`）、`POST /sessions/delete`（批量）、`PATCH /session/:id/metadata`（重命名等）。`closeSession`/`killSession` 标 `isDying` 同步、`kill()` channel、由 `channel.exited` handler 在 OS reap 后做 alive-set 清理；这期间并发 `spawnOrAttach` 能立刻 spawn 一个全新 channel 并重指 `channelInfo`（不必等 OS reap）。所有 teardown 路径会在 `session_closed`/`session_died` 和 `events.close()` 前先 `flushPromptTerminals()`，为 active 与 queued prompt 发布 exactly-once formal terminal。
 
 **archive / unarchive**（#6058）：`POST /sessions/archive` 把 active JSONL 从 `chats/` 移到 `chats/archive/`，`POST /sessions/unarchive` 反向恢复。archive 是状态转换而不是删除：file history、subagent transcript 和 runtime sidecar 保留；live session archive 会先 strict close 并要求 agent close handler flush recording，失败则不移动 JSONL。`SessionArchiveCoordinator` 对同一 session id 提供 exclusive/shared gate，避免 archive 与 load/resume/prompt/delete 并发踩踏。archived session load/resume 返回 `409 session_archived`，active/archive 双写返回 `409 session_conflict`。
 
 **daemon-managed channel worker**（#6031/#6098/#6146/#6598/#6635/#6741/#6950/#7019）：`qwen serve --channel <name>|all` 在 daemon runtime ready 后 fork internal `channel daemon-worker`。worker 经 TS SDK + `DaemonChannelBridge` 回连 daemon，channel session create/load 强制 `sessionScope:'thread'`，并把 pidfile ownership、requested/connected channels、worker pid 和 `/daemon/status.runtime.channelWorker` 暴露给管理面。#6098 增加 ready 后有界重启、15s heartbeat / 45s stale kill、partial-connect issue、stale pid 清理、日志脱敏与 buffer 上限；#6146 再把 worker stderr 与 ACP child stderr 的 credential redaction 抽成 `redactLogCredentials()`，覆盖 bearer/API key/secret env/JSON secret/URL credential 等模式，并在 stderr terminal 与 daemon log file 两条路径同时生效；ready 前仍 fail-fast，避免 serve 启动时静默丢 channel。#6598 新增 `POST /workspace/channel/reload`、SDK `reloadChannelWorker()` 与 CLI `qwen channel reload`，只 stop+start channel worker 让其重读 settings，不重启 daemon 也不拆 live sessions；`channel_reload` capability 仅在 snapshot 与 reload deps 同时 wire 时广告。#6635 把 selected channels 按 owning trusted workspace 分组，每个 workspace 一个 supervisor，并通过 `ChannelWorkerGroup` 提供 fail-closed group restart、webhook owner routing、pidfile `workers[]` 与 `/daemon/status.runtime.channelWorkers[]`；`--channel all` 仍保持 primary-only v1。#6741 在此之上新增 runtime selection manager、`channel_control` capability、`GET/PUT/DELETE /workspace/channel`、SDK helper 和 `qwen channel set/status/stop`，支持 daemon 启动后启用/替换/查询/停止 worker selection，并在替换失败时回滚到旧 selection。#6950 让 worker startup IPC 传回 bounded/redacted adapter `connect()` failures：partial connect 在 snapshot 暴露 `startupFailures`，dynamic all-fail 返回 `502 channel_worker_start_failed` 并带 attempted failures 与 rollback state；#7019 把 channel worker ownership、`--channel all` primary-only 语义和 hardening fail-closed 口径同步到开发文档。
 
-**status / perf / health / log surface + dashboard 方案记录**（#6263/#6270/#6296/#6325/#6416/#6961/#6969；#6253 closed）：`/daemon/status` 继续作为 daemon 诊断聚合端点扩展。#6263 增加 optional `runtime.perf`，只暴露 daemon 进程 event-loop lag snapshot 与 daemon-child pipe inbound/outbound byte 统计；ACP child lag 留在 OTel gauge 与 forwarded stderr stall warning，避免把 child-only 观测塞进 status JSON。#6270 在 `runtime.activity` 增加 `activePrompts`、`lastActivityAt`、`idleSinceMs`，bootstrap status 返回稳定 `0/null/null`，并给 full workspace MCP section summary 补 `serversConnected`、`serversErrored`、`serversDisabled`。#6325 继续补齐 prompt FIFO 可观测性：`runtime.activity.pendingPrompts` 统计所有已接受但未 settle 的 prompts，`queuedPrompts` 统计已接受但尚未 dispatch 的 FIFO 等待项；`runtime.perf.promptQueueWait` 和 metrics ring 同步保留 queue wait count/mean/max/last 与窗口 p95。queued prompts 只是 backpressure signal，不升级为 status issue；多客户端要避免共享 FIFO 时应在 `POST /session` 显式使用 `sessionScope:"thread"`。#6296 修正 preflight auth 的 false warning：env var 未命中时读取 live `Config` 的 resolved `generationConfig.apiKey`，使 settings apiKey / provider envKey / CLI flag 与实际 session 启动口径一致。#6253 的 closed diff 只作为未合入 dashboard 方案记录。#6416 给 status 增加 daemon-wide total admission 的 additive 字段。#6961 把 `GET /health?deep=1` 从 primary-only counter 改为聚合所有 managed runtimes（含 draining），新增 `workspaceCount`，但仍保持 informational counter snapshot。#6969 把 daemon log 收敛为 stable `debug/daemon/daemon.log` + bounded archives/fallback families，并在 status 中暴露 `runId`、log mode/health/issues 和 dropped counters。
+**status / perf / health / log surface + dashboard 方案记录**（#6263/#6270/#6296/#6325/#6416/#6961/#6969；#6253 closed）：`/daemon/status` 继续作为 daemon 诊断聚合端点扩展。#6263 增加 optional `runtime.perf`，只暴露 daemon 进程 event-loop lag snapshot 与 daemon-child pipe inbound/outbound byte 统计；ACP child lag 留在 OTel gauge 与 forwarded stderr stall warning，避免把 child-only 观测塞进 status JSON。#6270 在 `runtime.activity` 增加 `activePrompts`、`lastActivityAt`、`idleSinceMs`，bootstrap status 返回稳定 `0/null/null`，并给 full workspace MCP section summary 补 `serversConnected`、`serversErrored`、`serversDisabled`。#6325 继续补齐 prompt FIFO 可观测性：`runtime.activity.pendingPrompts` 统计所有已接受但未 settle 的 prompts，`queuedPrompts` 统计已接受但尚未 dispatch 的 FIFO 等待项；`runtime.perf.promptQueueWait` 和 metrics ring 同步保留 queue wait count/mean/max/last 与窗口 p95。#7400 后 `pendingPromptCount` 还成为 close-on-last-detach、attach rollback 与 idle reaper 的生命周期门控，覆盖 active + queued 和 FIFO hand-off gap；queued prompts 仍只是 status backpressure signal，不升级为 status issue。多客户端要避免共享 FIFO 时应在 `POST /session` 显式使用 `sessionScope:"thread"`。#6296 修正 preflight auth 的 false warning：env var 未命中时读取 live `Config` 的 resolved `generationConfig.apiKey`，使 settings apiKey / provider envKey / CLI flag 与实际 session 启动口径一致。#6253 的 closed diff 只作为未合入 dashboard 方案记录。#6416 给 status 增加 daemon-wide total admission 的 additive 字段。#6961 把 `GET /health?deep=1` 从 primary-only counter 改为聚合所有 managed runtimes（含 draining），新增 `workspaceCount`，但仍保持 informational counter snapshot。#6969 把 daemon log 收敛为 stable `debug/daemon/daemon.log` + bounded archives/fallback families，并在 status 中暴露 `runId`、log mode/health/issues 和 dropped counters。
 
 **daemon/ACP NDJSON hot path**（#6263/#6335）：daemon 与 ACP child 的 stdio 通路改用 `@qwen-code/acp-bridge` 内的 incremental `ndJsonStream`，逐 chunk 扫描 newline，只把跨 chunk 尾段留在 pending，避免大消息 split 时重复处理整段 buffer。收发 hook 记录 payload bytes，hook 异常不影响传输；非 daemon 路径继续使用 SDK stream，降低兼容风险。#6335 在同一 stream hook 层新增 `onMessageObserved({direction,bytes,message})`，只在成功收发 JSON message 后触发；daemon pipe path 用 `large-pipe-frame-observer.ts` 对 `>=256 KiB` frame 做低敏浅层分类与限速日志/telemetry（source class、method、update count、tool name/provenance、raw output kind 和 capped byte maxima），不记录 payload/session/client/path/prompt/raw output，也不改变 pipe payload、public protocol、SDK、EventBus 或 capability。
 
@@ -555,7 +555,7 @@ sequenceDiagram
     Bus-->>Cl: SSE frame
 ```
 
-prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `errorKind:'prompt_deadline_exceeded'`）与 non-blocking prompt（`NonBlockingPromptAccepted`，立即 202 后经 SSE 跟进）。
+prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBlockingPromptAccepted`，立即 202 后经 SSE 跟进）。#7400 后 route 只解析并向 bridge 透传 effective `deadlineMs`；bridge 在 admission 点 arm deadline，覆盖排队等待与执行，超时经 SSE 发布 `turn_error{code:'prompt_deadline_exceeded'}` 并释放 FIFO。
 
 ### 4.2 多客户端 attach 同一 session + heartbeat + close
 
@@ -637,7 +637,7 @@ prompt 路由还支持 `--prompt-deadline-ms`（绝对超时，超时返回 `err
 | #4527 | CORS | `--allow-origin <pattern>` allowlist（T2.4）。 |
 | #4861 | rate limiting | per-tier token-bucket 限速（prompt/mutation/read），fail-open（T3.4）。 |
 | #4255 #4291 | auth | device-flow 路由 + follow-up（PR 21）。 |
-| #4530 | 超时 | prompt 绝对 deadline + SSE writer idle timeout（T2.9）。 |
+| #4530 / #7400 | 超时 | prompt 绝对 deadline + SSE writer idle timeout（T2.9）；#7400 将 prompt deadline 从 route-side abort timer 迁入 bridge dispatch race，保证 202 后 formal terminal 与 FIFO 释放。 |
 
 ### 文件路由 / 工作区变更
 

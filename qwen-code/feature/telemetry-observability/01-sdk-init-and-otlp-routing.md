@@ -1,30 +1,34 @@
 # OTel SDK 初始化与 OTLP 信号路由（深入）
 
 > 子文档；总览见 [README.md](README.md)。本文 **SUPERSEDES** 总览 `telemetry-observability.md` 的 §3.1，进入 function / line 级。
-> 代码基准：`QwenLM/qwen-code@main`。核心文件 `packages/core/src/telemetry/sdk.ts`（全文 630 行）。#7276 仍为 open diff：它把本文件描述的同步 heavy implementation 拆到 lazy-loaded `sdk-impl.ts`，本文在对应段落单独标注，不能视为 main 已落地。
+> 代码基准：`QwenLM/qwen-code@main`。#7276 已合入后，当前主线由轻量 `packages/core/src/telemetry/sdk.ts` facade、heavy `sdk-impl.ts`、`otlp-urls.ts` 以及按协议拆分的 `sdk-exporters-http.ts` / `sdk-exporters-grpc.ts` 共同组成。
 > 引用约定：`file:symbol`（+行号），行号对应 `main` 当前快照，仅作定位锚点。
 
 ---
 
 ## 概述
 
-`sdk.ts` 是整个 telemetry 子系统的「电源开关 + 配电盘」。它只暴露四个函数（`telemetry/index.ts:17-21` re-export）：
+`sdk.ts` 现在是 telemetry 子系统的轻量「电源开关」：默认 telemetry 关闭时，它只加载 `@opentelemetry/api`、debug logger、session context 和 metrics facade，不静态加载 NodeSDK、instrumentation、HTTP/gRPC exporter 或 protobuf。heavy 装配放在 `sdk-impl.ts`，只在 telemetry enabled 且 `initializeTelemetry()` 真正执行时动态 import。
+
+对外主要函数（由 `telemetry/index.ts` re-export）：
 
 | 导出符号 | 位置 | 职责 |
 |---|---|---|
-| `initializeTelemetry(config)` | `sdk.ts:178` | 幂等地构造并启动 `NodeSDK`，按 signal 路由 exporter，建立 session 根 context，初始化 metrics |
-| `shutdownTelemetry()` | `sdk.ts:570` | 幂等、有界（10s fail-open）地关闭 SDK，并复位所有模块级单例 |
-| `refreshSessionContext(sessionId)` | `sdk.ts:561` | `/clear`、`/resume` 后重建 session 根 context |
-| `isTelemetrySdkInitialized()` | `sdk.ts:124` | 读取 `telemetryInitialized` 标志（敏感属性、log 桥接 traceId 等都依赖它） |
+| `initializeTelemetry(config)` | `sdk.ts` facade | async single-flight：disabled path 直接 resolved；enabled path 动态 import `sdk-impl.ts`，拿到 `NodeSDK` 后启动、建立 session 根 context、开启 shell trace propagation、初始化 metrics |
+| `shutdownTelemetry()` | `sdk.ts` facade | 等待 in-flight init 后幂等、有界（10s fail-open）关闭 SDK，并复位 SDK、metric reader、session context 与 shell trace propagation |
+| `forceFlushMetrics()` | `sdk.ts` facade | 对 active metric reader 做 2s bounded force flush，供 daemon pre-shutdown flush 使用 |
+| `refreshSessionContext(sessionId)` | `sdk.ts` facade | `/clear`、`/resume` 后重建 session 根 context |
+| `isTelemetrySdkInitialized()` | `sdk.ts` facade | 读取 `telemetryInitialized` 标志（敏感属性、log 桥接 traceId 等都依赖它） |
 
-它的设计目标可以概括为四条不变量，本文后续都围绕它们展开：
+它的设计目标可以概括为五条不变量，本文后续都围绕它们展开：
 
-1. **单进程单例**：`sdk` / `telemetryInitialized` / `telemetryShutdownPromise` 三个模块级变量（`sdk.ts:120-122`）构成状态机，init/shutdown 均幂等。
-2. **signal 级路由**：traces / logs / metrics 三个 signal 各自独立选择 `grpc` / `http` / `file` exporter；`outfile` 优先级最高、`http` 支持 per-signal override、`grpc` 只能共用 base endpoint。
-3. **关闭绝不挂死**：`shutdownTelemetry` 用 `Promise.race` 给 `sdk.shutdown()` 套 10s 上限，超时即 fail-open（放进程退出），并在 `finally` 中无条件复位状态。
-4. **诊断绝不污染 UI**：OTel SDK 自身的 `diag` 日志全部改道到 debug 文件（`createDebugLogger('OTEL')`），绝不写 console（Ink TUI 区）。
+1. **disabled path 便宜**：`initializeTelemetry()` 先检查 `telemetryInitialized || !config.getTelemetryEnabled()`；关闭 telemetry 时不触发 `import('./sdk-impl.js')`。
+2. **单进程 single-flight**：`sdk` / `telemetryInitialized` / `telemetryInitPromise` / `telemetryShutdownPromise` 构成状态机；并发 init 共享一个 promise，失败后允许重试。
+3. **signal 级路由 + protocol 级懒加载**：`sdk-impl.ts` 只在 enabled path 加载；HTTP exporter chain 与 gRPC exporter chain 再由 `sdk-impl.ts` 按配置动态 import，`outfile` 不加载任何 OTLP chain。
+4. **关闭绝不挂死**：`shutdownTelemetry` 用 `Promise.race` 给 `sdk.shutdown()` 套 10s 上限，超时即 fail-open（放进程退出），并在 `finally` 中无条件复位状态。
+5. **诊断绝不污染 UI**：OTel SDK 自身的 `diag` 日志全部改道到 debug 文件（`createDebugLogger('OTEL')`），绝不写 console（Ink TUI 区）。
 
-> 一个贯穿全文的「坑」先点名：`config.ts:getTelemetryOtlpEndpoint`（`packages/core/src/config/config.ts:3001-3003`）的实现是 `return this.telemetrySettings.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT;`，而 `DEFAULT_OTLP_ENDPOINT = 'http://localhost:4317'`（`telemetry/index.ts:13`）。这意味着该 getter **永远不返回 `undefined`**。后文「信号路由」「已知限制」两节会精确论证：这一默认值让 §3.5 末尾提到的 `LogToSpanProcessor` 自动接桥、以及 grpc 的「无 endpoint 跳过启动」两条分支，在默认配置下成为 **不可达死代码**。
+> 一个贯穿全文的「坑」仍然存在：`Config.getTelemetryOtlpEndpoint()` 会把未配置 endpoint 兜成 `DEFAULT_OTLP_ENDPOINT = 'http://localhost:4317'`。这意味着在 telemetry enabled 且未设置 outfile 时，`sdk-impl.ts` 里的 base endpoint 解析默认恒为 truthy。后文「信号路由」「已知限制」两节会论证：`LogToSpanProcessor` 自动接桥、以及 grpc 的「无 endpoint 跳过启动」两条分支在默认配置下仍不可达。
 
 ---
 
@@ -41,7 +45,7 @@
 | [#4367](https://github.com/QwenLM/qwen-code/pull/4367) | MERGED | support custom resource attributes + metric cardinality | `service.name/version/session.id` 三重剥离（`sdk.ts:196-213`）+ 一次性告警汇总（`sdk.ts:223-233`） |
 | [#4390](https://github.com/QwenLM/qwen-code/pull/4390) | MERGED | client-side HTTP span + opt-in W3C traceparent | `NOOP_PROPAGATOR`（`sdk.ts:110-118`）+ instrumentation 反馈环守卫（`sdk.ts:368-540`） |
 | [#4482](https://github.com/QwenLM/qwen-code/pull/4482) | MERGED | improve LogToSpan bridge error info and TUI handling | 桥接的 `diagnosticsSink` 注入（`sdk.ts:309-311`） |
-| [#7276](https://github.com/QwenLM/qwen-code/pull/7276) | OPEN | perf(telemetry): lazy-load the SDK and split OTLP exporter chains by protocol | 当前 open diff：`sdk.ts` 变轻量 async facade，heavy NodeSDK/instrumentation/exporter 在 `sdk-impl.ts` 与 protocol-specific exporter modules 中按需动态加载。 |
+| [#7276](https://github.com/QwenLM/qwen-code/pull/7276) | MERGED `2026-07-21` | perf(telemetry): lazy-load the SDK and split OTLP exporter chains by protocol | `sdk.ts` 变轻量 async facade；heavy NodeSDK/instrumentation 装配在 `sdk-impl.ts`；HTTP/gRPC exporter chain 分别在 `sdk-exporters-http.ts` / `sdk-exporters-grpc.ts` 中按需动态加载；`outfile` 不加载 OTLP chain。 |
 
 > 注：`#4390`/`#4482` 不属于「SDK init/路由」核心，但其代码与本文件强耦合（instrumentation、propagator、桥接诊断都在 `initializeTelemetry` 内构造），故一并标注。propagator 与 instrumentation 的完整展开见兄弟子文档「出站 HTTP span 与 traceparent 传播」，本文只覆盖它们在 init 序列中的装配位置。
 
@@ -49,23 +53,27 @@
 
 ## 初始化序列
 
-`initializeTelemetry(config: Config): void`（`sdk.ts:178-554`）在当前 `main` 是一段 **完全同步** 的函数——它构造好 `NodeSDK` 后调用 `sdk.start()`（同步），不 `await` 任何东西。这点很关键：调用方（CLI 引导期）可以在 Ink 渲染之前同步完成遥测装配，因此此处的 `console.warn`（`sdk.ts:226`）不会与 TUI 交错。
+`initializeTelemetry(config: Config): Promise<void>` 现在是 async single-flight facade。它的第一层目标不是立刻构造 NodeSDK，而是**把默认关闭路径做便宜**：telemetry disabled 时直接返回 resolved promise；telemetry enabled 时才动态 import `sdk-impl.ts`，由 `startTelemetrySdk(config)` 组装但不启动 NodeSDK。facade 收到 `{sdk, metricReader}` 后调用 `sdk.start()`，再设置 `telemetryInitialized`、session root context、shell trace propagation 和 metrics。
 
-> #7276 open diff 会把这个契约改成 async single-flight facade：关闭 telemetry 时 facade 直接短路且不加载 `@opentelemetry/sdk-node`、exporters、instrumentation；开启时动态 import heavy `sdk-impl.ts`，并按 protocol 只加载 HTTP 或 gRPC exporter chain。daemon runtime 在初始化 daemon metrics 前显式 await，普通 Config/startup 入口使用 fire-and-forget，避免默认 disabled path 把 telemetry heavy cluster 带进 ACP static closure。
+调用点按风险分层：daemon runtime 在 `initializeDaemonMetrics()` 前显式 `await core.initializeTelemetry(...)`，避免 meter provider 尚未注册时 daemon metrics 永久绑定 noop meter；普通 `Config` constructor / startup prefetch 走 fire-and-forget，span/log 在 init 落定前由 `isTelemetrySdkInitialized()` gate 丢弃，避免首次 prompt 被 telemetry import 阻塞。
 
-### 步骤 0：幂等短路（`sdk.ts:179-181`）
+### 步骤 0：facade 幂等短路与 single-flight
 
 ```ts
 if (telemetryInitialized || !config.getTelemetryEnabled()) {
-  return;
+  return Promise.resolve();
 }
 ```
 
-两条短路：① 已初始化（`telemetryInitialized === true`，`sdk.ts:121`）直接返回，保证「单进程单例」；② `config.getTelemetryEnabled()`（`config.ts:2989-2991`，默认 `false`）为假时整段不执行——遥测默认关闭，零开销。
+两条短路：① 已初始化直接返回，保证「单进程单例」；② `config.getTelemetryEnabled()`（默认 `false`）为假时不动态 import heavy implementation。真正初始化放进 `telemetryInitPromise ??= (async () => { ... })().finally(...)`，并发调用共享同一个 in-flight promise；失败后 promise 清空，可在后续调用重试。
 
-### 步骤 1：Resource 属性同步注入（`sdk.ts:188-213`）
+### 步骤 1：动态 import heavy implementation
 
-这是「资源属性同步注入」的落点。先取出用户合并后的属性，再做 **纵深防御式剥离**：
+enabled path 在 `try` 内 `await import('./sdk-impl.js')`，使 chunk-load failure 只降级 telemetry 而不打断 daemon runtime。`startTelemetrySdk(config)` 返回 `undefined` 表示配置不支持（例如 gRPC protocol 但没有 base endpoint）；否则返回尚未 start 的 `NodeSDK` 和 optional `metricReader`。
+
+### 步骤 2：Resource 属性同步注入（`sdk-impl.ts`）
+
+这是 heavy implementation 的第一个动作。先取出用户合并后的属性，再做 **纵深防御式剥离**：
 
 ```ts
 const userAttrs = config.getTelemetryResourceAttributes() ?? {};   // L188
@@ -87,11 +95,11 @@ const resource = resourceFromAttributes({
 
 要点（function/line 级）：
 
-- **三键剥离**（`sdk.ts:196-201`）：`service.name`、`service.version`、`session.id` 从用户属性中 destructure 剔除。`config.ts:resolveTelemetrySettings`（`telemetry/config.ts:142-158`）经 `stripReservedResourceAttributes` 通常已把 `service.version`/`session.id` 去掉；这里再剥一次是为了防御「绕过 resolver 直接 `new Config()`」的调用方（典型是单测）。`session.id` 尤其不能进 Resource——**Resource 属性会自动附着到每个 metric data point**，会绕过 metric 基数开关（详见兄弟文档「资源属性与基数控制」）。
-- **`service.name` 空白回退**（`sdk.ts:209-210`）：`userServiceName?.trim() || SERVICE_NAME`。`|| `（而非 `??`）同时拦截空串 `""` 与纯空白 `" "`/`"\t"`——settings 不 trim、env 的 `%20` 会 decode 成空格，二者都可能投递空白值，某些后端会拒收空 `service.name`。`SERVICE_NAME = 'qwen-code'`（`constants.ts:7`）。
-- **`service.version` 运行时权威**（`sdk.ts:211-212`，#3813）：用 `config.getCliVersion()`（`config.ts:3409`）回填，用户源的 `service.version` 一律被忽略（防版本伪造）。`getCliVersion()` 返回 `undefined` 时回退 `'unknown'`（单测 `sdk.test.ts:614` 覆盖）。
+- **三键剥离**（`sdk-impl.ts`）：`service.name`、`service.version`、`session.id` 从用户属性中 destructure 剔除。`config.ts:resolveTelemetrySettings` 经 `stripReservedResourceAttributes` 通常已把 `service.version`/`session.id` 去掉；这里再剥一次是为了防御「绕过 resolver 直接 `new Config()`」的调用方（典型是单测）。`session.id` 尤其不能进 Resource——**Resource 属性会自动附着到每个 metric data point**，会绕过 metric 基数开关（详见兄弟文档「资源属性与基数控制」）。
+- **`service.name` 空白回退**（`sdk-impl.ts`）：`userServiceName?.trim() || SERVICE_NAME`。`|| `（而非 `??`）同时拦截空串 `""` 与纯空白 `" "`/`"\t"`——settings 不 trim、env 的 `%20` 会 decode 成空格，二者都可能投递空白值，某些后端会拒收空 `service.name`。`SERVICE_NAME = 'qwen-code'`（`constants.ts:7`）。
+- **`service.version` 运行时权威**（`sdk-impl.ts`，#3813）：用 `config.getCliVersion()` 回填，用户源的 `service.version` 一律被忽略（防版本伪造）。`getCliVersion()` 返回 `undefined` 时回退 `'unknown'`。
 
-### 步骤 2：资源属性告警一次性汇总（`sdk.ts:223-233`，#4367）
+### 步骤 3：资源属性告警一次性汇总（`sdk-impl.ts`，#4367）
 
 ```ts
 const attrWarnings = config.getTelemetryResourceAttributeWarnings() ?? [];   // L223
@@ -101,9 +109,9 @@ if (attrWarnings.length > 0) {
 }
 ```
 
-这是 `initializeTelemetry` 中 **唯一刻意走 `console.warn` 的地方**。理由（见 `sdk.ts:215-222` 注释）：逐条 `diag.warn` 只进 OTEL debug 文件，运维者看不到「我的属性被静默丢了」；而 telemetry init 早于 Ink 渲染，此处 console 不会撞 TUI。`?? []` 防的是 `vi.mock` 把 Config 方法自动 stub 成 `undefined`。
+这是 telemetry init 中 **唯一刻意走 `console.warn` 的地方**。逐条 `diag.warn` 只进 OTEL debug 文件，运维者看不到「我的属性被静默丢了」；这里在 heavy implementation 初始化早期做一次 console summary。`?? []` 防的是 `vi.mock` 把 Config 方法自动 stub 成 `undefined`。
 
-### 步骤 3：路由输入读取与 `useOtlp` 判定（`sdk.ts:235-244`）
+### 步骤 4：路由输入读取与 `useOtlp` 判定（`sdk-impl.ts`）
 
 ```ts
 const otlpEndpoint = config.getTelemetryOtlpEndpoint();              // L235  ← 永不 undefined
@@ -120,9 +128,9 @@ const useOtlp =
 
 详见下一节「信号路由」。这里只强调：`getTelemetryOtlpProtocol()`（`config.ts:3005-3007`）默认 `'grpc'`；`getTelemetryTarget()`（`config.ts:3021-3023`）在路由里 **完全不参与**——`target` 自 #4061/#4066 起仅为信息性配置（决定 GCP/LOCAL 的文档语义），不再驱动 exporter 选择。
 
-### 步骤 4：各 signal exporter 装配（`sdk.ts:246-356`）
+### 步骤 5：各 signal exporter 装配（`sdk-impl.ts`）
 
-先声明四个可选变量（`sdk.ts:246-257`），它们是 union 类型，能同时容纳 grpc / http / file 三种实现：
+先声明四个可选变量，它们是 interface 类型，能同时容纳 grpc / http / file 三种实现：
 
 ```ts
 let spanExporter:  OTLPTraceExporter | OTLPTraceExporterHttp | FileSpanExporter | undefined;
@@ -131,24 +139,26 @@ let metricReader:  PeriodicExportingMetricReader | undefined;
 let logToSpanProcessor: LogToSpanProcessor | undefined;
 ```
 
-随后是三选一的装配块（`useOtlp ? (http|grpc) : outfile ? file : 无`），细节在下一节。注意三种 metric 路径都用 `PeriodicExportingMetricReader({ exportIntervalMillis: 10000 })`（`sdk.ts:316/340/352`），即 10s 周期推送。
+随后是三选一的装配块（`useOtlp ? (http|grpc) : outfile ? file : 无`），细节在下一节。#7276 后这里还有一层 protocol 懒加载：HTTP 分支只有存在有效 traces/logs/metrics URL 时才动态 import `sdk-exporters-http.ts`；gRPC 分支只有 base endpoint 存在时才动态 import `sdk-exporters-grpc.ts`；outfile 分支只用 file exporters，不触发 OTLP chain。三种 metric 路径仍使用 10s 周期的 `PeriodicExportingMetricReader`。
 
-### 步骤 5：反馈环守卫前缀 + propagator 门（`sdk.ts:368-452`）
+### 步骤 6：反馈环守卫前缀 + propagator 门（`sdk-impl.ts`）
 
-- `normalizeOtlpPrefix`（`sdk.ts:368-400`）：把 4 个 OTLP endpoint 配置（base + 3 个 per-signal，`sdk.ts:401-408`）解析成 `{origin, pathname}`，用于后续 instrumentation 的边界安全前缀匹配，杜绝「OTLP 上行请求自身被插桩 → 产生 span → 再次上行」的无限反馈环（#4390）。
-- `matchesOtlpPrefix`（`sdk.ts:417-428`）：origin 精确相等 + path 边界字符（`/` `?` `#` 或结尾）匹配。
-- `textMapPropagator` 门（`sdk.ts:449-452`）：`getOutboundCorrelationPropagateTraceContext()`（`config.ts:3042-3044`，默认 `false`）为假时取 `NOOP_PROPAGATOR`（`sdk.ts:110-118`，`inject` 空操作），出站 `fetch` 不写 `traceparent`；为真时取 `undefined`，让 NodeSDK 保留默认 W3C composite propagator。
+- `normalizeOtlpPrefix`：把 base + 3 个 per-signal OTLP endpoint 配置解析成 `{origin, pathname}`，用于后续 instrumentation 的边界安全前缀匹配，杜绝「OTLP 上行请求自身被插桩 → 产生 span → 再次上行」的无限反馈环（#4390）。
+- `matchesOtlpPrefix`：origin 精确相等 + path 边界字符（`/` `?` `#` 或结尾）匹配。
+- `textMapPropagator` 门：`getOutboundCorrelationPropagateTraceContext()`（默认 `false`）为假时取 `NOOP_PROPAGATOR`（`inject` 空操作），出站 `fetch` 不写 `traceparent`；为真时取 `undefined`，让 NodeSDK 保留默认 W3C composite propagator。
 
 > 这两块的完整语义（反馈环、出站关联）见兄弟子文档，本文止于「它们在 init 序列里的装配顺序」。
 
-### 步骤 6：`NodeSDK` 构造（`sdk.ts:454-542`）
+### 步骤 7：`NodeSDK` 构造（`sdk-impl.ts`）
 
 ```ts
-sdk = new NodeSDK({
+const sdk = new NodeSDK({
   resource,                                                          // L455
   autoDetectResources: false,                                       // L459  (#3807)
   ...(textMapPropagator && { textMapPropagator }),                   // L460
-  spanProcessors: spanExporter ? [new BatchSpanProcessor(spanExporter)] : [], // L461
+  spanProcessors: spanExporter
+    ? [new SessionIdSpanProcessor(), new BatchSpanProcessor(spanExporter)]
+    : [],
   logRecordProcessors: logExporter
     ? [new BatchLogRecordProcessor(logExporter)]
     : logToSpanProcessor
@@ -161,46 +171,54 @@ sdk = new NodeSDK({
 
 function/line 级要点：
 
-- **`autoDetectResources: false`（`sdk.ts:459`，#3807）**：关掉 host/process/env 异步 resource detector。它们会让 Resource 属性处于 pending，并在 detector 落定前的任意一次 resource 属性读取（如 `HttpInstrumentation` 创建 span 时）触发 OTel `diag.error`。关掉后 Resource 完全由步骤 1 同步注入的 `resource` 决定。
-- **`spanProcessors`（`sdk.ts:461`）**：只有 `spanExporter` 存在才挂 `BatchSpanProcessor`，否则空数组（该 signal 静默跳过）。
-- **`logRecordProcessors`（`sdk.ts:462-466`）三元嵌套**：优先 `BatchLogRecordProcessor(logExporter)`；否则若有 `logToSpanProcessor` 用桥接器；都没有则空数组。**注意 `logExporter` 与 `logToSpanProcessor` 互斥**——下一节会证明 `logToSpanProcessor` 默认不可达。
-- **条件展开 `...(x && {x})`（`sdk.ts:460,467`）**：`textMapPropagator`/`metricReader` 为 `undefined` 时根本不出现在 options 里（而非传 `undefined`），交给 NodeSDK 用各自默认值。
+- **`autoDetectResources: false`（#3807）**：关掉 host/process/env 异步 resource detector。它们会让 Resource 属性处于 pending，并在 detector 落定前的任意一次 resource 属性读取（如 `HttpInstrumentation` 创建 span 时）触发 OTel `diag.error`。关掉后 Resource 完全由步骤 2 同步注入的 `resource` 决定。
+- **`spanProcessors`**：只有 `spanExporter` 存在才挂 `SessionIdSpanProcessor` + `BatchSpanProcessor`，否则空数组（该 signal 静默跳过）。
+- **`logRecordProcessors`**：优先 `BatchLogRecordProcessor(logExporter)`；否则若有 `logToSpanProcessor` 用桥接器；都没有则空数组。**注意 `logExporter` 与 `logToSpanProcessor` 互斥**——下一节会证明 `LogToSpanProcessor` 默认不可达。
+- **条件展开 `...(x && {x})`**：`textMapPropagator`/`metricReader` 为 `undefined` 时根本不出现在 options 里（而非传 `undefined`），交给 NodeSDK 用各自默认值。
 
-### 步骤 7：`sdk.start()` 与 session 根 context（`sdk.ts:544-553`）
+### 步骤 8：facade `sdk.start()` 与 session 根 context
 
 ```ts
 try {
-  sdk.start();                                                       // L545 (同步)
-  telemetryInitialized = true;                                       // L547
+  const { startTelemetrySdk } = await import('./sdk-impl.js');
+  const started = await startTelemetrySdk(config);
+  if (!started) return;
+  sdk = started.sdk;
+  sdk.start();
+  telemetryInitialized = true;
+  activeMetricReader = started.metricReader;
   const sessionId = config.getSessionId();
-  setSessionContext(createSessionRootContext(sessionId), sessionId); // L549
-  initializeMetrics(config);                                         // L550
+  setSessionContext(createSessionRootContext(sessionId), sessionId);
+  setShellTracePropagation(config.getOutboundCorrelationPropagateTraceContext());
+  initializeMetrics(config);
 } catch (error) {
-  debugLogger.error('Error starting OpenTelemetry SDK:', error);     // L552
+  debugLogger.error('Error starting OpenTelemetry SDK:', error);
 }
 ```
 
-- `telemetryInitialized = true`（`sdk.ts:547`）在 `start()` 成功后才置位——若 `start()` 抛错则保持 `false`，`isTelemetrySdkInitialized()` 据此对外报告未初始化。
-- `setSessionContext(createSessionRootContext(sessionId), sessionId)`（`sdk.ts:549`）：`createSessionRootContext`（`tracer.ts:260-270`）用 `deriveTraceId(sessionId) = SHA-256(sessionId)[:32]` 造一个 **合成根 context**（非真实 span），写入 `session-context.ts` 的模块级 `sessionRootContext`/`currentSessionId`（`session-context.ts:12-18`）。这保证同 session 内所有真实 span、log 桥接 span、debug 日志行共享同一 traceId。
-- 整段包在 `try/catch`：`start()` 失败只记 debug，不抛——遵循「遥测绝不影响主流程」。
+- `telemetryInitialized = true` 在 `sdk.start()` 成功后才置位——若 dynamic import、assembly 或 `start()` 抛错则保持 `false`，`isTelemetrySdkInitialized()` 据此对外报告未初始化。
+- `activeMetricReader` 只在成功初始化后保存，供 `forceFlushMetrics()` 使用。
+- `setSessionContext(createSessionRootContext(sessionId), sessionId)`：`createSessionRootContext` 用 `deriveTraceId(sessionId) = SHA-256(sessionId)[:32]` 造一个 **合成根 context**（非真实 span），写入 `session-context.ts` 的模块级 `sessionRootContext`/`currentSessionId`。这保证同 session 内所有真实 span、log 桥接 span、debug 日志行共享同一 traceId。
+- `setShellTracePropagation(...)` 跟随 outbound correlation 配置；shutdown 时复位为 false。
+- 整段包在 `try/catch`：初始化失败只记 debug，不抛——遵循「遥测绝不影响主流程」。
 
 ---
 
 ## 信号路由
 
-路由的全部决策集中在 `sdk.ts:235-356`。下面按「判定 → 三大分支」拆解，并精确标注哪些分支默认不可达。
+路由的全部决策集中在 `sdk-impl.ts:startTelemetrySdk()`，HTTP URL 解析拆到 `otlp-urls.ts`，HTTP/gRPC exporter 构造拆到 `sdk-exporters-http.ts` / `sdk-exporters-grpc.ts`。下面按「判定 → 三大分支」拆解，并精确标注哪些分支默认不可达。
 
-### `useOtlp` 判定（`sdk.ts:243-244`）
+### `useOtlp` 判定（`sdk-impl.ts`）
 
 ```
 useOtlp = (!!parsedEndpoint || hasPerSignalEndpoint) && !telemetryOutfile
 ```
 
-- **`!telemetryOutfile` 一票否决**：`outfile` 优先级最高（#4066）。一旦 `getTelemetryOutfile()` 非空，`useOtlp` 必为 `false`，三个 signal 全部走 `File{Span,Log,Metric}Exporter`（`sdk.ts:349-356`）。
-- **`!!parsedEndpoint`**：`parseOtlpEndpoint`（`sdk.ts:128-151`）对空/非法输入返回 `undefined`；对 grpc 返回 `url.origin`（剥 path/query/hash，`sdk.ts:140-143`），对 http 返回 `url.href`（`sdk.ts:145-146`）。**但因为 `getTelemetryOtlpEndpoint()` 永不返回 falsy（默认 `http://localhost:4317`），生产中 `parsedEndpoint` 恒为 truthy**，于是 `useOtlp` 在「无 outfile」时恒为 `true`。
-- `hasPerSignalEndpoint`（`sdk.ts:239-242`）：任一 per-signal endpoint 非空即真。它的存在意义在于「mock `getTelemetryOtlpEndpoint→''` 后仍能让 `useOtlp` 为真」——这是单测进入 http 分支的方式。
+- **`!telemetryOutfile` 一票否决**：`outfile` 优先级最高（#4066）。一旦 `getTelemetryOutfile()` 非空，`useOtlp` 必为 `false`，三个 signal 全部走 `File{Span,Log,Metric}Exporter`，且不动态加载 HTTP/gRPC OTLP exporter chain。
+- **`!!parsedEndpoint`**：`parseOtlpEndpoint` 对空/非法输入返回 `undefined`；对 grpc 返回 `url.origin`（剥 path/query/hash），对 http 返回 `url.href`。**但因为 `getTelemetryOtlpEndpoint()` 永不返回 falsy（默认 `http://localhost:4317`），生产中 `parsedEndpoint` 恒为 truthy**，于是 `useOtlp` 在「无 outfile」时恒为 `true`。
+- `hasPerSignalEndpoint`：任一 per-signal endpoint 非空即真。它的存在意义在于「mock `getTelemetryOtlpEndpoint→''` 后仍能让 `useOtlp` 为真」——这是单测进入 http 分支的方式。
 
-### 分支 A — `protocol === 'http'`（`sdk.ts:260-320`）
+### 分支 A — `protocol === 'http'`（`sdk-impl.ts` + `sdk-exporters-http.ts`）
 
 每个 signal 独立解析 URL，模式都是 `validateUrl(perSignal ?? (parsedEndpoint ? resolveHttpOtlpUrl(parsedEndpoint, signal) : undefined))`：
 
@@ -214,11 +232,11 @@ const logsUrl = validateUrl(
 const metricsUrl = validateUrl(/* ...metrics... */);                             // L273-278
 ```
 
-- **`resolveHttpOtlpUrl(base, signal)`（`sdk.ts:77-90`，#3779）**：核心是 `OTLP_SIGNAL_PATHS`（`sdk.ts:62-66`，`traces→v1/traces` 等）。若 `url.pathname` 去尾斜杠后已以该 signal path 结尾（`sdk.ts:84`），原样返回 `url.href`——这支持 ARMS 那种非标准前缀全路径（如 `/token/api/otlp/traces`）；否则在 pathname 后追加 `/v1/<signal>`（`sdk.ts:88`），保留 query/hash。
+- **`resolveHttpOtlpUrl(base, signal)`（`otlp-urls.ts`，#3779/#7276）**：核心是 `OTLP_SIGNAL_PATHS`（`traces→v1/traces` 等）。若 `url.pathname` 去尾斜杠后已以该 signal path 结尾，原样返回 `url.href`——这支持 ARMS 那种非标准前缀全路径（如 `/token/api/otlp/traces`）；否则在 pathname 后追加 `/v1/<signal>`，保留 query/hash。
 - **per-signal override 仅 HTTP 支持**：override 来自 `getTelemetryOtlpTracesEndpoint()` 等（`config.ts:3009-3019`），优先于 base 推导。单测 `sdk.test.ts:301`（traces 用 override、logs/metrics 用 base 追加）证实。
 - `validateUrl`（`sdk.ts:157-176`）：只接受 `http:`/`https:` 且 host 非空，否则 `diag.error` 后返回 `undefined`（该 signal 静默跳过）。
 
-exporter 装配（`sdk.ts:284-320`）：
+exporter 装配（`sdk-exporters-http.ts:createHttpExporters`）：
 
 ```ts
 if (tracesUrl)  spanExporter = new OTLPTraceExporterHttp({ url: tracesUrl });     // L284-286
@@ -233,10 +251,10 @@ else if (tracesUrl) {        // ★ 自动接桥分支 ★                      
 if (metricsUrl) metricReader = new PeriodicExportingMetricReader({ ... });        // L315-320
 ```
 
-- **`else if (tracesUrl)` 自动接桥（`sdk.ts:289-314`，#3779）**：语义是「有 traces endpoint 但 **无** logs endpoint → 用 `LogToSpanProcessor` 把 LogRecord 转成 span，经一个 **专属** 的 `OTLPTraceExporterHttp` 发出」。专属 exporter（而非复用 `spanExporter`）是为了让桥接器自管 `forceFlush`/`shutdown` 生命周期。`includeSensitiveSpanAttributes`（`sdk.ts:296-297`）透传给桥接器做二次脱敏（`log-to-span-processor.ts:39-46` 的 `SENSITIVE_ATTRIBUTE_KEYS`）；`diagnosticsSink`（`sdk.ts:309-311`，#4482）仅交互模式注入，把桥接诊断导去 debug 文件、不污染 TUI。
+- **`else if (tracesUrl)` 自动接桥（#3779）**：语义是「有 traces endpoint 但 **无** logs endpoint → 用 `LogToSpanProcessor` 把 LogRecord 转成 span，经一个 **专属** 的 `OTLPTraceExporterHttp` 发出」。专属 exporter（而非复用 `spanExporter`）是为了让桥接器自管 `forceFlush`/`shutdown` 生命周期。`includeSensitiveSpanAttributes` 透传给桥接器做二次脱敏；`diagnosticsSink`（#4482）仅交互模式注入，把桥接诊断导去 debug 文件、不污染 TUI。
 - **接桥默认不可达**：`logsUrl` 为假是进入 `else if` 的前提，但 `logsUrl = ... ?? (parsedEndpoint ? resolveHttpOtlpUrl(...,'logs') : undefined)`，而生产中 `parsedEndpoint` 恒 truthy ⇒ `logsUrl` 恒 truthy ⇒ `if (logsUrl)` 恒命中 ⇒ `else if` 永不进入。详见「已知限制」。
 
-### 分支 B — `protocol === 'grpc'`（`sdk.ts:321-348`，默认）
+### 分支 B — `protocol === 'grpc'`（`sdk-impl.ts` + `sdk-exporters-grpc.ts`，默认）
 
 ```ts
 if (!parsedEndpoint) {                                               // L323
@@ -253,10 +271,10 @@ if (!parsedEndpoint) {                                               // L323
 ```
 
 - **不支持 per-signal**：grpc 用 service-based routing，三 signal 共用同一 `parsedEndpoint`（origin），统一 `CompressionAlgorithm.GZIP`。
-- **`if (!parsedEndpoint)` 跳过启动（`sdk.ts:323-330`）也默认不可达**：能走到 grpc 分支说明 `useOtlp === true`；若同时 `parsedEndpoint` 为假，则必是「`hasPerSignalEndpoint===true` 但 base 为空」。可在生产中 `parsedEndpoint` 恒 truthy，故此分支只在单测 mock `getTelemetryOtlpEndpoint→''` + 配 per-signal + grpc 时可达（`sdk.test.ts:471`）。
-- **默认路径就是这里的 `else`**：默认 `protocol='grpc'` + `parsedEndpoint='http://localhost:4317'` ⇒ 无条件创建 span/log/metric 三个 grpc exporter。这也解释了为什么 logs 在默认下永远有原生 exporter、根本用不到桥接。
+- **`if (!parsedEndpoint)` 跳过启动也默认不可达**：能走到 grpc 分支说明 `useOtlp === true`；若同时 `parsedEndpoint` 为假，则必是「`hasPerSignalEndpoint===true` 但 base 为空」。生产中 `parsedEndpoint` 恒 truthy，故此分支只在单测 mock `getTelemetryOtlpEndpoint→''` + 配 per-signal + grpc 时可达。
+- **默认路径就是这里的 `else`**：默认 `protocol='grpc'` + `parsedEndpoint='http://localhost:4317'` ⇒ 动态 import `sdk-exporters-grpc.ts` 并创建 span/log/metric 三个 grpc exporter。这也解释了为什么 logs 在默认下永远有原生 exporter、根本用不到桥接。
 
-### 分支 C — `else if (telemetryOutfile)`（`sdk.ts:349-356`）
+### 分支 C — `else if (telemetryOutfile)`（`sdk-impl.ts`）
 
 ```ts
 spanExporter = new FileSpanExporter(telemetryOutfile);              // L350
@@ -274,41 +292,42 @@ flowchart TD
   START["initializeTelemetry()"] --> READ["读取 otlpEndpoint / protocol / outfile / per-signal"]
   READ --> PARSE["parsedEndpoint = parseOtlpEndpoint(otlpEndpoint, protocol)<br/>★ 因 getTelemetryOtlpEndpoint ?? DEFAULT，恒 truthy ★"]
   PARSE --> USE{"useOtlp = (parsedEndpoint || hasPerSignal) && !outfile ?"}
-  USE -- "false (outfile 设置)" --> FILE["File{Span,Log,Metric}Exporter<br/>sdk.ts:349-356"]
+  USE -- "false (outfile 设置)" --> FILE["File{Span,Log,Metric}Exporter<br/>不加载 OTLP chain"]
   USE -- "true" --> PROTO{"protocol == 'http' ?"}
   PROTO -- "http" --> H1["resolveHttpOtlpUrl 逐 signal<br/>traces/logs/metrics URL"]
   H1 --> H2{"logsUrl 真? (默认恒真)"}
-  H2 -- "真" --> HLOG["OTLPLogExporterHttp<br/>sdk.ts:287-288"]
-  H2 -- "假 (仅 mock parsedEndpoint='' 可达)" --> BRIDGE["LogToSpanProcessor 自动接桥<br/>sdk.ts:289-314 ★默认死代码★"]
+  H2 -- "真" --> HEXP["动态 import sdk-exporters-http<br/>HTTP trace/log/metric exporters"]
+  H2 -- "假 (仅 mock parsedEndpoint='' 可达)" --> BRIDGE["LogToSpanProcessor 自动接桥<br/>sdk-exporters-http ★默认死代码★"]
   PROTO -- "grpc (默认)" --> G1{"parsedEndpoint 真? (默认恒真)"}
-  G1 -- "假 (仅 mock '' 可达)" --> SKIP["warn + return 跳过启动<br/>sdk.ts:323-330 ★默认死代码★"]
-  G1 -- "真" --> GEXP["OTLPTrace/Log/Metric Exporter (gRPC+GZIP)<br/>sdk.ts:332-346"]
+  G1 -- "假 (仅 mock '' 可达)" --> SKIP["warn + return undefined<br/>不加载 gRPC chain ★默认死代码★"]
+  G1 -- "真" --> GEXP["动态 import sdk-exporters-grpc<br/>gRPC+GZIP exporters"]
   FILE --> NODESDK["new NodeSDK(...)"]
-  HLOG --> NODESDK
+  HEXP --> NODESDK
   BRIDGE --> NODESDK
   GEXP --> NODESDK
-  NODESDK --> STARTSDK["sdk.start() → setSessionContext → initializeMetrics"]
+  NODESDK --> STARTSDK["facade sdk.start() → setSessionContext → initializeMetrics"]
 ```
 
 ---
 
 ## 关闭序列
 
-`shutdownTelemetry(): Promise<void>`（`sdk.ts:570-629`）的目标是「关得干净、绝不挂死、可重复调用」。
+`shutdownTelemetry(): Promise<void>` 的目标是「关得干净、绝不挂死、可重复调用」，并且 #7276 后要处理 fire-and-forget init 仍在飞的情况。
 
-### 幂等与前置守卫（`sdk.ts:571-577`）
+### 幂等与前置守卫
 
 ```ts
-if (telemetryShutdownPromise) return telemetryShutdownPromise;   // L571-573  幂等
-if (!telemetryInitialized || !sdk) return;                       // L574-576  未初始化直接返回
-endInteractionSpan('cancelled');                                 // L577      收尾未结束 interaction
+if (telemetryShutdownPromise) return telemetryShutdownPromise;
+const pendingInit = telemetryInitPromise;
+if (!pendingInit && (!telemetryInitialized || !sdk)) return Promise.resolve();
 ```
 
-- **幂等靠缓存的 promise**（`sdk.ts:571-573`）：并发/重复调用拿到同一个 `telemetryShutdownPromise`，不会触发两次 `sdk.shutdown()`。
-- **未初始化短路**（`sdk.ts:574-576`）：`telemetryInitialized` 为假或 `sdk` 为空直接 `return`（注意此处返回 `undefined`，被签名的 `Promise<void>` 自动包装）。
-- **`endInteractionSpan('cancelled')`（`sdk.ts:577`）**：进程退出前把可能仍开着的 interaction span 以 `cancelled` 收尾（来自 `session-tracing.ts`），避免它被 batch processor 在 flush 前漏掉。
+- **幂等靠缓存的 promise**：并发/重复调用拿到同一个 `telemetryShutdownPromise`，不会触发两次 `sdk.shutdown()`。
+- **pending init aware**：若 fire-and-forget init 仍在飞，shutdown 会在自己的 promise 内先 `await pendingInit.catch(() => {})`，再判断是否真的初始化出了 SDK。这样不会因为 `telemetryInitialized` 尚未置 true 就提前 no-op，导致稍后启动成功的 SDK 泄漏。
+- **未初始化短路**：没有 pending init、也没有已初始化 SDK 时直接返回 resolved promise。
+- **`endInteractionSpan('cancelled')`**：确认 SDK 已初始化后，进程退出前把可能仍开着的 interaction span 以 `cancelled` 收尾，避免它被 batch processor 在 flush 前漏掉。
 
-### 有界关闭主体（`sdk.ts:580-627`）
+### 有界关闭主体
 
 主体是一个立即执行的 async IIFE，赋给 `telemetryShutdownPromise`：
 
@@ -334,8 +353,9 @@ telemetryShutdownPromise = (async () => {
   } finally {
     telemetryInitialized = false;                                  // L622
     sdk = undefined;                                               // L623
-    telemetryShutdownPromise = undefined;                          // L624
-    setSessionContext(undefined);                                  // L625
+    telemetryShutdownPromise = undefined;
+    setSessionContext(undefined);
+    setShellTracePropagation(false);
   }
 })();
 ```
@@ -347,9 +367,9 @@ function/line 级要点：
 - **`timer.unref?.()`（`sdk.ts:606`）**：定时器 unref，避免它自己把 Node event loop 吊住、反而阻止进程退出。`?.` 兼容某些 mock 计时器无 `unref`。
 - **超时后 reject 的兜底（`sdk.ts:591-600`）**：若 `sdk.shutdown()` 在 timeout 赢得 race 之后才 reject，这个 reject 已无人 `await`，会变成 unhandled rejection。预挂的 `.catch` 吸收它：仅当 `timedOut` 才 `debugLogger.warn`；未超时则交由下方 `try/catch`（经 `await Promise.race` 抛出）以 `diag.error` 完整记录（`sdk.ts:617-620`）。
 - **`clearTimeout` 双路径（`sdk.ts:609` 与 `618`）**：正常完成与异常都清 timer，避免泄漏。
-- **`finally` 无条件状态复位（`sdk.ts:621-626`）**：无论成功/超时/异常，都把 `telemetryInitialized=false`、`sdk=undefined`、`telemetryShutdownPromise=undefined`、`setSessionContext(undefined)` 全部复位。这意味着关闭后可以再次 `initializeTelemetry`（如测试套件多次 init/shutdown）。`setSessionContext(undefined)`（`session-context.ts:12-18`）清空 session 根 context 与 `currentSessionId`，避免下一轮误用旧 traceId。
+- **`finally` 无条件状态复位**：无论成功/超时/异常，都把 `telemetryInitialized=false`、`sdk=undefined`、`activeMetricReader=undefined`、`telemetryShutdownPromise=undefined`、`setSessionContext(undefined)` 与 `setShellTracePropagation(false)` 全部复位。这意味着关闭后可以再次 `initializeTelemetry`（如测试套件多次 init/shutdown），也避免下一轮误用旧 traceId 或 shell propagation 设置。
 
-> 一个微妙点：`telemetryShutdownPromise` 在 `finally` 里被清回 `undefined`（`sdk.ts:624`），所以「幂等」只在 **本次关闭尚未完成期间** 有效；关闭完成后再调用会因 `!telemetryInitialized`（已 false）在 `sdk.ts:574` 短路返回。两道闸合起来覆盖了「关闭中重复调用」与「关闭后重复调用」两种情形。
+> 一个微妙点：`telemetryShutdownPromise` 在 `finally` 里被清回 `undefined`，所以「幂等」只在 **本次关闭尚未完成期间** 有效；关闭完成后再调用会因没有 pending init 且未初始化而短路返回。两道闸合起来覆盖了「关闭中重复调用」与「关闭后重复调用」两种情形。
 
 ---
 
@@ -401,10 +421,11 @@ sequenceDiagram
     Caller->>SDK: initializeTelemetry(config)
     SDK->>Cfg: getTelemetryEnabled()
     alt 未启用 / 已初始化
-        SDK-->>Caller: return (短路 L179-181)
+        SDK-->>Caller: Promise.resolve()（不 import sdk-impl）
     end
+    SDK->>SDK: dynamic import sdk-impl.ts
     SDK->>Cfg: getTelemetryResourceAttributes()
-    SDK->>SDK: 剥离 service.name/version/session.id (L196-201)
+    SDK->>SDK: 剥离 service.name/version/session.id
     SDK->>Res: resourceFromAttributes({...,service.name,service.version}) (L202-213)
     SDK->>Cfg: getTelemetryResourceAttributeWarnings()
     opt warnings 非空
@@ -422,11 +443,11 @@ sequenceDiagram
     end
     SDK->>SDK: textMapPropagator = NOOP_PROPAGATOR (默认, L449-452)
     SDK->>Node: new NodeSDK({resource, autoDetectResources:false, processors, instrumentations}) (L454-542)
-    SDK->>Node: sdk.start() (L545, 同步)
-    SDK->>SDK: telemetryInitialized = true (L547)
-    SDK->>SCtx: setSessionContext(createSessionRootContext(sessionId)) (L549)
-    SDK->>Met: initializeMetrics(config) (L550)
-    SDK-->>Caller: void
+    SDK->>Node: sdk.start()
+    SDK->>SDK: telemetryInitialized = true
+    SDK->>SCtx: setSessionContext(createSessionRootContext(sessionId))
+    SDK->>Met: initializeMetrics(config)
+    SDK-->>Caller: Promise<void>
 ```
 
 ### 图 ② 关闭：Promise.race 超时 fail-open
@@ -444,8 +465,11 @@ sequenceDiagram
     alt telemetryShutdownPromise 已存在
         SDK-->>Caller: 复用同一 promise (幂等 L571)
     end
-    alt 未初始化 / sdk 为空
-        SDK-->>Caller: return (L574-576)
+    alt 无 pending init 且未初始化 / sdk 为空
+        SDK-->>Caller: Promise.resolve()
+    end
+    opt pending init
+        SDK->>SDK: await telemetryInitPromise.catch(...)
     end
     SDK->>SDK: endInteractionSpan('cancelled') (L577)
     SDK->>Node: Promise.resolve(currentSdk.shutdown()) (L586)
@@ -459,8 +483,8 @@ sequenceDiagram
         SDK->>SDK: clearTimeout + warn "timed out" (L609-613)
         Note over Node: 之后若 reject → 预挂 .catch 吸收 (L591-600)
     end
-    SDK->>SDK: finally: telemetryInitialized=false; sdk=undefined;<br/>telemetryShutdownPromise=undefined (L621-624)
-    SDK->>SCtx: setSessionContext(undefined) (L625)
+    SDK->>SDK: finally: telemetryInitialized=false; sdk=undefined;<br/>activeMetricReader=undefined; telemetryShutdownPromise=undefined
+    SDK->>SCtx: setSessionContext(undefined); setShellTracePropagation(false)
     SDK-->>Caller: void
 ```
 
@@ -470,19 +494,20 @@ sequenceDiagram
 
 | 场景 | 代码位置 | 行为 |
 |---|---|---|
-| 遥测未启用 / 已初始化 | `sdk.ts:179-181` | 直接 `return`，零开销 |
-| `getTelemetryOtlpEndpoint` 非法 URL | `parseOtlpEndpoint` `sdk.ts:147-150` | `diag.error` + 返回 `undefined`（不抛） |
-| per-signal endpoint 非 http(s)/缺 host | `validateUrl` `sdk.ts:161-173` | `diag.error` + 返回 `undefined`，该 signal 静默跳过 |
-| grpc 无 base endpoint（仅 per-signal） | `sdk.ts:323-330` | 双告警（`diag.warn`+`debugLogger.warn`）+ `return` 跳过启动（默认不可达） |
-| 某 signal 无 exporter | `sdk.ts:357` 注释 / `461-466` | 对应 processor 为空数组，静默跳过 |
-| `sdk.start()` 抛错 | `sdk.ts:551-553` | `debugLogger.error`，`telemetryInitialized` 保持 `false` |
-| OTLP exporter 反馈环 | instrumentation hooks `sdk.ts:474-540` | `matchesOtlpPrefix` 命中即 `ignore`；URL 不可解析则 fail-open 但告警（`sdk.ts:395-398`） |
-| `sdk.shutdown()` 挂死 | `sdk.ts:601-613` | 10s 超时 fail-open，仅告警 |
-| `sdk.shutdown()` 超时后才 reject | `sdk.ts:591-600` | 预挂 `.catch` 吸收 unhandled rejection |
-| `sdk.shutdown()` 同步/异步抛错 | `sdk.ts:617-620` | `clearTimeout` + `diag.error`/`debugLogger.error` |
-| 关闭后状态 | `sdk.ts:621-626` finally | 全单例复位 + 清 session context，可再次 init |
-| `refreshSessionContext` 未初始化 | `sdk.ts:561-562` | 直接 `return`（no-op） |
-| `refreshSessionContext` 抛错 | `sdk.ts:563-567` | `try/catch` + `debugLogger.warn`，不抛 |
+| 遥测未启用 / 已初始化 | `sdk.ts` facade | 直接返回 resolved promise，零 heavy import |
+| `sdk-impl.ts` dynamic import / assembly / `sdk.start()` 抛错 | `sdk.ts` facade | `debugLogger.error`，`telemetryInitialized` 保持 `false`，主流程继续 |
+| `getTelemetryOtlpEndpoint` 非法 URL | `sdk-impl.ts:parseOtlpEndpoint` | `diag.error` + 返回 `undefined`（不抛） |
+| per-signal endpoint 非 http(s)/缺 host | `sdk-impl.ts:validateUrl` | `diag.error` + 返回 `undefined`，该 signal 静默跳过 |
+| grpc 无 base endpoint（仅 per-signal） | `sdk-impl.ts` | 双告警（`diag.warn`+`debugLogger.warn`）+ `return undefined` 跳过启动（默认不可达），且不加载 gRPC exporter chain |
+| 某 signal 无 exporter | `sdk-impl.ts` / `sdk-exporters-http.ts` | 对应 processor 为空数组，静默跳过 |
+| OTLP exporter 反馈环 | instrumentation hooks in `sdk-impl.ts` | `matchesOtlpPrefix` 命中即 `ignore`；URL 不可解析则 fail-open 但告警 |
+| shutdown 时 init 仍在飞 | `sdk.ts:shutdownTelemetry` | 先等待 `telemetryInitPromise.catch(...)`，再决定是否关闭已启动 SDK |
+| `sdk.shutdown()` 挂死 | `sdk.ts:shutdownTelemetry` | 10s 超时 fail-open，仅告警 |
+| `sdk.shutdown()` 超时后才 reject | `sdk.ts:shutdownTelemetry` | 预挂 `.catch` 吸收 unhandled rejection |
+| `sdk.shutdown()` 同步/异步抛错 | `sdk.ts:shutdownTelemetry` | `clearTimeout` + `diag.error`/`debugLogger.error` |
+| 关闭后状态 | `sdk.ts:shutdownTelemetry` finally | 全单例复位 + 清 session context + 关闭 shell trace propagation，可再次 init |
+| `refreshSessionContext` 未初始化 | `sdk.ts:refreshSessionContext` | 直接 `return`（no-op） |
+| `refreshSessionContext` 抛错 | `sdk.ts:refreshSessionContext` | `try/catch` + `debugLogger.warn`，不抛 |
 | 非法 telemetry target | `telemetry/config.ts:74-80` | 在配置解析期抛 `FatalConfigError`（早于 init） |
 
 贯穿原则：**遥测路径上的任何错误都被降级为日志，绝不向主流程抛出**（除配置解析期的 `FatalConfigError`，那是用户显式配错、应当 fail-fast）。
@@ -491,7 +516,7 @@ sequenceDiagram
 
 ## 关键设计决策与权衡
 
-1. **`initializeTelemetry` 全同步**：构造 + `sdk.start()` 都同步，调用方可在 Ink 渲染前完成装配，使资源属性告警的 `console.warn` 不撞 TUI。代价是无法 `await` 远端 exporter 握手，但 OTLP exporter 本就是 fire-and-forget batch，无需等待。
+1. **`initializeTelemetry` 是 async facade，heavy init 按需加载**：关闭 telemetry 时只做快速短路，不加载 NodeSDK/exporters/instrumentation；开启时 dynamic import `sdk-impl.ts`，再按 HTTP/gRPC protocol 选择性加载 exporter chain。daemon runtime 在 metrics 初始化前显式 await，普通 Config/startup 路径 fire-and-forget，换取默认 cold path 不被 telemetry 依赖拖慢。
 
 2. **`autoDetectResources: false`（#3807）**：牺牲自动 host/process detector 带来的环境属性，换取「Resource 同步确定、无 pending、无 detector 期 `diag.error`」。需要这些属性的运维者可经 `OTEL_RESOURCE_ATTRIBUTES` 手动补。
 
@@ -560,7 +585,7 @@ vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');   // sdk.t
 | **grpc 跳过启动（死代码）** | L471「warn and skip for gRPC per-signal without base」 | mock `''` + per-signal + grpc → 告警 + 不 start |
 | outfile 优先 | L492「not use OTLP when outfile set」 | File exporter，OTLP 全不建 |
 | 诊断不污染 console（#3986） | L180「route diagnostics to debug log」 | `diag` 改道、console 无输出 |
-| Resource 属性（#4367） | L625-744（session.id 不上 Resource、service.name/version 来源、空白回退、告警汇总、session.id 剥离） | 步骤 1/2 全覆盖 |
+| Resource 属性（#4367） | L625-744（session.id 不上 Resource、service.name/version 来源、空白回退、告警汇总、session.id 剥离） | Resource 注入与告警汇总覆盖 |
 | service.version（#3813） | L540「app version not Node」、L614「fallback to unknown」 | `getCliVersion()` 回填 |
 | propagator 门（#4390） | L745-788（默认 NOOP、opt-in 用默认） | `textMapPropagator` 选择 |
 | instrumentation 反馈环（#4390） | L789-1242（端口/host/path 边界、quote 归一、默认端口、proto 缺失 fail-open、`host:port:port` 剥离等） | `normalizeOtlpPrefix`/`matchesOtlpPrefix`/hooks |
@@ -574,8 +599,8 @@ vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');   // sdk.t
 ## 各 PR 代码贡献
 
 ### #3779 — OTLP routing + shutdown
-- `sdk.ts:resolveHttpOtlpUrl` — 新增 HTTP signal 路径追加逻辑（`OTLP_SIGNAL_PATHS` 常量 + 尾斜杠/全路径检测）
-- `sdk.ts:initializeTelemetry` — HTTP 分支增加 per-signal endpoint override、`LogToSpanProcessor` 自动接桥（含 `diagnosticsSink` 注入）
+- `otlp-urls.ts:resolveHttpOtlpUrl` — 新增 HTTP signal 路径追加逻辑（`OTLP_SIGNAL_PATHS` 常量 + 尾斜杠/全路径检测）；#7276 后该 helper 从 heavy `sdk.ts` 拆成无 OTel 依赖的 leaf module
+- `sdk-impl.ts:startTelemetrySdk` — HTTP 分支增加 per-signal endpoint override、`LogToSpanProcessor` 自动接桥（含 `diagnosticsSink` 注入）
 - `telemetry/config.ts:resolveTelemetrySettings` — 新增 per-signal endpoint 与标准 `OTEL_EXPORTER_OTLP_*` 环境变量解析
 - `docs/developers/development/telemetry.md` — 新增 per-signal endpoint 配置表项与 HTTP 路由说明
 
@@ -597,3 +622,11 @@ vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');   // sdk.t
 - `telemetry/index.ts:TelemetryTarget` — 删除 `QWEN` 枚举值，仅余 `GCP`/`LOCAL`
 - `config.ts:TelemetrySettings` — 删除 `useCollector` 字段；`Config` 删除 `getTelemetryUseCollector()` 方法
 - `telemetry/config.ts:resolveTelemetrySettings` — 删除 `useCollector` 解析；`docs/` 与 `settings.md` 同步清理
+
+### #7276 — lazy SDK facade + protocol exporter split
+- `telemetry/sdk.ts` — 变成轻量 async facade：disabled path resolved promise；enabled path single-flight dynamic import `sdk-impl.ts`；保存 `activeMetricReader` 并新增 bounded `forceFlushMetrics()`；shutdown 等待 in-flight init 后再关闭。
+- `telemetry/sdk-impl.ts` — 承接 heavy NodeSDK/resource/instrumentation/feedback-loop guard 装配；只在 telemetry enabled 时加载。
+- `telemetry/otlp-urls.ts` — 承接 HTTP signal URL resolution，避免 facade 与 heavy implementation 形成循环。
+- `telemetry/sdk-exporters-http.ts`, `sdk-exporters-grpc.ts` — protocol-specific exporter factories；HTTP/gRPC chain 互不静态加载，`outfile` 路径不加载 OTLP chain。
+- `config.ts`, `startup-prefetch.ts`, `run-qwen-serve.ts` — Config/startup prefetch fire-and-forget；daemon runtime 在 `initializeDaemonMetrics()` 前显式 await，避免 noop meter 绑定。
+- `scripts/check-serve-fast-path-bundle.js`, `scripts/sdk-node-exporter-stub.js` — bundle guard + NodeSDK env-var auto exporter stub，防 heavy telemetry 或另一条 protocol chain 回到 ACP static closure。
