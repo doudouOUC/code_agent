@@ -1,7 +1,7 @@
 # 最终工具响应预算技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的 Core scheduler、interactive TUI、headless、ACP session、Agent runtime 与 speculative follow-up。
-> 当前记录：#7323 已合入；该方案按 merged diff、changed files 和当前 `main` 相邻实现整理。
+> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试。该方案按 merged diff、changed files 和当前 `main` 相邻实现整理。
 
 ---
 
@@ -65,6 +65,8 @@ flowchart TD
 
 该字段只服务 runtime 内部预算决策，不进入 hook serialization、ACP wire payload、JSON output、telemetry attributes 或 persisted UI metadata。hook 如果重建 response，不会自动继承 metadata，除非 runtime 显式复制。
 
+#7470 锁定了 `[]` 这个 sentinel 的行为：Shell producer 可能因为输出超过直接模型预算而返回短 preview，但完整输出保存失败或没有生成 artifact。此时必须写 `persistedOutputFiles: []`，表示 producer 已经判断过且没有可复用文件；finalizer 看到空数组后按“无 artifact metadata”路径继续预算，而不是误以为 producer 未判断、再尝试从人类可读 preview 反推完整输出。
+
 ### 3.2 producer-local preview
 
 producer 仍负责本地体验和首层防护，但不再承担最终 aggregate enforcement：
@@ -125,6 +127,7 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 
 - `packages/core/src/utils/tool-response-finalizer.test.ts`: allocation、artifact reuse、persistence failure、surrogate safety、media preservation、Plan mode exception。
 - `packages/core/src/utils/truncation.test.ts`, `packages/core/src/tools/shell.test.ts`, `packages/core/src/tools/mcp-tool.test.ts`: producer preview 与 metadata。
+- `packages/core/src/tools/shell.test.ts`: #7470 增加 Shell truncation without artifact 回归，断言保留短 preview、移除原始超长 model content、返回空 artifact list。
 - `packages/core/src/core/coreToolScheduler.test.ts`: pre/post hook finalization、record/send equality。
 - `packages/cli/src/ui/hooks/useGeminiStream.test.tsx`, `packages/cli/src/nonInteractiveCli.test.ts`, `packages/cli/src/acp-integration/session/Session.test.ts`: interactive/headless/ACP 聚合边界。
 - `packages/core/src/agents/runtime/agent-core.test.ts`, `packages/core/src/followup/speculation.test.ts`, `packages/core/src/core/geminiChat.test.ts`: Agent/speculation/send guard。
@@ -136,14 +139,15 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
 | [#7323](https://github.com/QwenLM/qwen-code/pull/7323) | merged | final tool response budget | 增加结构化 persisted-output metadata、共享 finalizer、runtime aggregation boundaries、send-boundary guard 和 Plan mode policy exception。 |
+| [#7470](https://github.com/QwenLM/qwen-code/pull/7470) | merged | Shell truncation without artifact regression | 为 Shell producer 没有 artifact 但已有短 preview 的路径补测试，固定 `persistedOutputFiles: []` sentinel 和三态语义。 |
 
 ---
 
 ## 7. 已知限制 / 后续
 
-- #7323 已合入；文档记录当前 main 的最终实现方案。
+- #7323/#7470 已合入；文档记录当前 main 的最终实现方案。
 - 不提供精确 token 预算，不改变 provider context window 估算与自动压缩策略。
 - 不保证 artifact path 在远端 UI 中可直接读取；这里只保证模型响应里有可诊断的 path reference。
 - 后续如要在 Ctrl+O transcript 中读取完整 artifact，需要独立设计权限、路径暴露、大小限制和 UI streaming。
 
-_按个人 PR 口径更新于 2026-07-21_
+_按个人 PR 口径更新于 2026-07-22_

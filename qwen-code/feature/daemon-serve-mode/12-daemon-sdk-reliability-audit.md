@@ -1,6 +1,6 @@
 # daemon / SDK 可靠性审计：流式完整性、终态与 Java 客户端
 
-> 审计日期：2026-07-20 至 2026-07-21
+> 审计日期：2026-07-20 至 2026-07-22
 >
 > qwen-code 基线：[`24a1c20dc85d9676e3275f4d304f8dd886b735b9`](https://github.com/QwenLM/qwen-code/commit/24a1c20dc85d9676e3275f4d304f8dd886b735b9)
 >
@@ -15,6 +15,8 @@
 审计没有发现 P0，但在基线 commit 上确认了多项 P1/P2。Java 侧经过 8 轮审计、TypeScript/daemon 侧经过 7 轮审计；两侧最后一轮均未再发现新的、证据充分的 P0/P1/P2，问题集合在当前范围内收敛。
 
 > 后续修复状态（2026-07-21）：[#7386](https://github.com/QwenLM/qwen-code/pull/7386) 已合入并闭合 DAEMON-006（detach 幂等）；[#7400](https://github.com/QwenLM/qwen-code/pull/7400) 已合入并闭合 DAEMON-002/003/004/005（accepted prompt exactly-once terminal、bridge-owned deadline、queued removal terminal、last detach draining/teardown flush）。本文保留原始基线证据，同时在对应条目标注当前状态。
+>
+> 后续修复状态（2026-07-22）：[#7453](https://github.com/QwenLM/qwen-code/pull/7453) 已合入并补齐 #7400 follow-up（running prompt hidden-but-retained、queued terminal 不污染 session state、queued deadline typed error）；[#7458](https://github.com/QwenLM/qwen-code/pull/7458) 当前 open diff 正在闭合 DAEMON-001/007/008（event epoch、compaction attribution、degraded snapshot）；[#7463](https://github.com/QwenLM/qwen-code/pull/7463) 当前 open diff 实现 Java daemon transport alpha。open PR 只表示当前实现方案记录，不能视为 `main` 已落地。
 
 这批问题中存在多条能够独立造成“流式输出只剩前半段、卡片提前结束或调用永久等待”的路径：
 
@@ -57,7 +59,9 @@ flowchart LR
 
 ## 2. Daemon 契约问题
 
-### DAEMON-001：epoch 仅靠数值游标猜测
+### DAEMON-001：epoch 仅靠数值游标猜测（#7458 当前 open diff 修复）
+
+> 修复状态：#7458 当前 open diff 为每个 EventBus mint `eventEpoch`，在 create/load/resume response、non-blocking prompt 202 envelope 和 SSE `X-Qwen-Event-Epoch` header 下发；客户端重连时在 `Last-Event-ID` 旁回传 epoch，daemon 发现 mismatch 后发布 `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}` 并从当前 ring 全量 replay。
 
 | 字段 | 内容 |
 |---|---|
@@ -133,7 +137,9 @@ flowchart LR
 | 责任侧 | daemon lifecycle。 |
 | 最小修复 | 以 client registration 为 source of truth；只有确实移除一次引用时才改变计数，重复 detach 返回相同成功结果。 |
 
-### DAEMON-007：snapshot/compaction 丢失关联字段
+### DAEMON-007：snapshot/compaction 丢失关联字段（#7458 当前 open diff 修复）
+
+> 修复状态：#7458 当前 open diff 让 compaction slot 保留最新 `sessionId`、`promptId`、`originatorClientId` 等 correlation fields，跨 prompt/originator 不合并 attribution，load/resync 后不再把重建事件变成无归属增量。
 
 | 字段 | 内容 |
 |---|---|
@@ -144,7 +150,9 @@ flowchart LR
 | 责任侧 | daemon compaction/snapshot。 |
 | 最小修复 | compaction slot 保存并校验全部 correlation fields；跨 prompt/originator 不允许合并。 |
 
-### DAEMON-008：compaction ingest 失败被静默吞掉
+### DAEMON-008：compaction ingest 失败被静默吞掉（#7458 当前 open diff 修复）
+
+> 修复状态：#7458 当前 open diff 在 compaction ingest failure 后 latch degraded snapshot，并通过恢复面暴露该状态，consumer 可以 fail closed 或回退 persisted transcript，而不是把不完整 snapshot 当作权威源。
 
 | 字段 | 内容 |
 |---|---|
@@ -747,11 +755,11 @@ flowchart LR
 
 ### Phase 1：闭合 daemon contract
 
-1. 引入 `(epoch,eventId)` cursor 和条件能力标签。
+1. #7458 当前 open diff 引入 `(eventEpoch,eventId)` cursor；目前走 REST/SSE additive metadata 和 `state_resync_required{detail:'epoch_mismatch'}`，未新增条件能力标签。
 2. ✅ #7400 已建立 accepted prompt terminal state machine，保证 exactly-one terminal。
 3. ✅ #7400 已让 absolute deadline 真正参与 bridge race，并统一 completed/error/cancelled/deadline terminal。
 4. 部分闭合：#7400 已让 queued prompt remove 发布 cancelled terminal；完整 active/queued targeted cancel API 语义仍需独立跟进。
-5. 提供 side-effect-free session snapshot/resync API，保留全部 correlation fields。
+5. #7458 当前 open diff 补 compaction replay attribution 与 degraded snapshot；side-effect-free session snapshot/resync API 仍需按最终合入形态继续审计。
 6. ✅ #7386 已修复 detach 幂等性；#7400 已修复 draining 与 queued prompt terminal 生命周期。
 
 ### Phase 2：修复 TypeScript reference client 与 transports
@@ -771,11 +779,11 @@ flowchart LR
 
 ### Phase 4：实现 Java `DaemonSessionClient`
 
-建议独立于两个现有 stdio SDK，提供：
+#7463 当前 open diff 已按独立 daemon transport alpha 落地在 `packages/sdk-java/qwencode`，没有复用两个现有 stdio SDK 的 reader/线程池实现。当前方案提供：
 
 - `DaemonClient`：capabilities、session create/load/attach、结构化 HTTP error。
 - `DaemonSessionClient`：单 event pump、epoch cursor、snapshot/resync、terminal cache。
-- `PromptHandle`：`promptId`、completion future、targeted `cancel()`。
+- `PromptHandle` / prompt result surface：`promptId`、completion future、targeted `cancel()` 语义。
 - typed/raw 双事件入口；未知 additive event 不丢失。
 - Java 11+ HTTP client，SSE 固定 UTF-8/identity；明确 executor ownership 和 close 语义。
 

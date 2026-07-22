@@ -1,7 +1,7 @@
 # 客户端适配器与 SDK（深入）
 
 > daemon/serve（Mode B）技术方案子文档；总览见 [`README.md`](README.md)。
-> 关键文件：`packages/sdk-typescript/src/daemon/DaemonSessionClient.ts`（530 行）、`DaemonClient.ts`（~2800 行）、`events.ts`（~2500 行）、`packages/cli/src/ui/daemon/DaemonTuiAdapter.ts`（905 行）、`packages/channels/base/src/DaemonChannelBridge.ts`（705 行）、`packages/vscode-ide-companion/src/services/daemonIdeConnection.ts`（631 行）。
+> 关键文件：`packages/sdk-typescript/src/daemon/DaemonSessionClient.ts`（530 行）、`DaemonClient.ts`（~2800 行）、`events.ts`（~2500 行）、`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon/*`（#7463 当前 open）、`packages/cli/src/ui/daemon/DaemonTuiAdapter.ts`（905 行）、`packages/channels/base/src/DaemonChannelBridge.ts`（705 行）、`packages/vscode-ide-companion/src/services/daemonIdeConnection.ts`（631 行）。
 
 ---
 
@@ -47,6 +47,11 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | PR | 作者 | 状态 | 子主题 |
 | --- | --- | --- | --- |
 | #4490 | @doudouOUC | merged | `daemon_mode_b_main` 集成进入 main 后，保留客户端适配器与 SDK 的最终架构说明；本文不再登记其他作者的独立 PR。 |
+| #7269 | @doudouOUC | merged | REST SSE transport cleanup：iterator early return、throw、stream error、connect error 与 dispose 都 abort 底层 fetch/body，避免 daemon subscriber 和 pending read 泄漏。 |
+| #7400 | @doudouOUC | merged | prompt terminal exactly-once：TS `DaemonSessionClient` 的 pending prompt 可以依赖 daemon 按 `promptId` 发布正式 terminal。 |
+| #7453 | @doudouOUC | merged | prompt-terminal follow-up：queued deadline typed error、running prompt hidden-but-retained、queued terminal 不污染 session turn state。 |
+| #7458 | @doudouOUC | open | epoch-aware cursor：TS SDK 学习并回传 `eventEpoch`，daemon mismatch 时触发 `state_resync_required{detail:'epoch_mismatch'}`。 |
+| #7463 | @doudouOUC | open | Java daemon transport alpha：新增 JVM HTTP/SSE daemon client/session/event/SSE/exception surface。 |
 
 ---
 
@@ -122,6 +127,8 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 
 #7269 进一步修复 REST SSE transport 的底层 request 生命周期：每次 `RestSseTransport.subscribeEvents()` 都创建 request-local `AbortController` 并登记到 active set，连接超时、caller `AbortSignal` 与 request controller 组合成 fetch signal。无论 consumer 正常 early return、抛错、stream error、connect error 还是 transport `dispose()`，generator `finally` 都会 abort 底层 fetch/TCP 并从 active set 移除；`dispose()` 幂等 abort 所有 active SSE 请求。`parseSseStream` 的 cleanup 改为 cancel body stream，防止 daemon EventBus subscriber 或 pending read 因 iterator 不再消费而悬挂。
 
+#7458 当前 open diff 让 TS SDK 把 SSE cursor 从单个数字扩展成 `(eventEpoch,lastSeenEventId)`。`DaemonSessionClient` 从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch；后续 reconnect 回传该 epoch，daemon 若发现 mismatch 会用 `state_resync_required{detail:'epoch_mismatch'}` 要求快照恢复。旧 daemon 不返回 epoch 时，SDK 保持原有 `Last-Event-ID` 数字续传行为。
+
 实际迭代发生在 `iterateEvents()`（L462-488）：
 
 ```typescript
@@ -150,7 +157,20 @@ private async *iterateEvents(opts, release) {
 | **blocking fallback** | `subscriptionActive === false` | 调 `DaemonClient.prompt()` — 内部开临时 SSE 等结果 |
 | **non-blocking + dispatch** | `subscriptionActive === true` | 调 `promptNonBlocking()` → 202；注册 `_pendingPrompts.set(promptId, {resolve, reject})`；SSE 流中 `_dispatchTurnEvent()` 匹配 → resolve/reject |
 
-`_pendingPrompts`（L84-90）是 `Map<promptId, {resolve, reject}>`——镜像 ACP transport 的 pending-request dispatch table。SSE 流结束时 `_rejectAllPending()`（L507-511）清理所有 pending Promise。#7400 后 daemon bridge 对每个 202 accepted prompt 提供 exactly-once terminal：queued removal、deadline、close/kill/crash/shutdown 都会按 `promptId` 发布 `turn_complete` 或 `turn_error`，所以这里的 pending Promise 不需要额外猜测 daemon 内部失败路径。
+`_pendingPrompts`（L84-90）是 `Map<promptId, {resolve, reject}>`——镜像 ACP transport 的 pending-request dispatch table。SSE 流结束时 `_rejectAllPending()`（L507-511）清理所有 pending Promise。#7400 后 daemon bridge 对每个 202 accepted prompt 提供 exactly-once terminal：queued removal、deadline、close/kill/crash/shutdown 都会按 `promptId` 发布 `turn_complete` 或 `turn_error`，所以这里的 pending Promise 不需要额外猜测 daemon 内部失败路径。#7453 进一步保证 running prompt 被 remove 后仍 hidden-but-retained 到 settle/teardown，queued terminal 不污染 session-level `turnError`/retry，queued deadline 以 `PromptDeadlineExceededError` 传播而非降级成普通 abort。
+
+### Java daemon transport alpha（#7463 当前 open）
+
+#7463 在 `packages/sdk-java/qwencode` artifact 下新增 daemon package，面向 Java 11+ 应用提供与 TS `DaemonClient` 同类的 HTTP/SSE 接入，但用 JVM 友好的 typed event 和 exception taxonomy 表达失败边界。
+
+核心 surface：
+
+- `DaemonClient`：capabilities、session create/load/resume、prompt admission、permission response、cancel、heartbeat、close/detach。
+- `DaemonSessionClient`：绑定 session/clientId，维护 SSE event pump、cursor、pending prompt map 和 lifecycle cleanup。
+- `SseReader`：strict UTF-8/SSE/JSON parser，拒绝 compressed stream、malformed frame 和 event id gap。
+- `DaemonHttpException`、`PromptAdmissionUnknownException`、`PromptOutcomeIndeterminateException`、`MutationOutcomeUnknownException`、`DetachOutcomeUnknownException`：对无法证明成功的 admission/mutation/detach fail closed。
+
+传输策略与 daemon reliability contract 对齐：POST admission 不盲目重试；成功拿到 prompt watermark 后用 `Accept-Encoding: identity` + `Last-Event-ID` 建 SSE；只有 observer 成功接收事件后推进 cursor；terminal 缺失、gap、observer failure 或 mutation response 丢失时不返回部分成功。该 client 依赖 #7386/#7400/#7453/#7458 提供的 detach 幂等、prompt terminal、typed deadline 和 event epoch 语义。
 
 ---
 
@@ -341,8 +361,8 @@ sequenceDiagram
 
 ## 已知限制
 
-2. **adapter spike 均未接入默认路径**：TUI / channel / IDE spike 全部 default-off，各自声明了显式 "not covered" gap（无 live daemon E2E、无 flag 解析、无 production wiring）。
-4. **orphan prompt**：客户端断连后 prompt 仍跑到完成（结果 publish 到 SSE bus 无人消费）——这是设计选择，非 bug。
-7. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
+1. **adapter spike 均未接入默认路径**：TUI / channel / IDE spike 全部 default-off，各自声明了显式 "not covered" gap（无 live daemon E2E、无 flag 解析、无 production wiring）。
+2. **orphan prompt**：客户端断连后 prompt 仍跑到完成（结果 publish 到 SSE bus 无人消费）——这是设计选择，非 bug。
+3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
 
-_生成于 2026-06-05_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-22_

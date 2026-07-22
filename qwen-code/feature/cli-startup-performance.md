@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 当前 open diff 则把 `@google/genai` 从 session create 之前的静态闭包里移走。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -179,6 +179,22 @@ normalizedInput === normalizedDefault
 最终实现把 `packages/core/src/telemetry/sdk.ts` 拆成轻量 facade 和 heavy `sdk-impl.ts`：disabled path 只做快速短路，不 import heavy implementation；enabled path 通过 async single-flight dynamic import 初始化。HTTP exporter、gRPC exporter、OTLP URL helper 与 file exporter 分离，`outfile` 模式不加载 OTLP，HTTP 模式不加载 gRPC，gRPC 模式不加载 HTTP exporter chain。
 
 装配层也分两类：daemon runtime 在初始化 daemon metrics 前显式 await telemetry init，保证 metrics provider 准备好；Config/startup 这类普通路径使用 fire-and-forget prefetch，避免用户首次 prompt 等待 telemetry import。`scripts/check-serve-fast-path-bundle.js` 扩展 bundle guard，禁止 `@opentelemetry/sdk-node`、grpc/protobuf/exporter 等 telemetry heavy 模块回到 ACP static closure；esbuild 对 NodeSDK 内部 env-var auto exporter require 做 stub，避免 bundler 静态追踪把两条 protocol chain 都拉进来。
+
+### 3.7 undici lazy loading（#7455）
+
+#7455 解决 telemetry 懒加载后剩余的最大第三方启动成本：`undici` 同时被 CLI/core 多个路径静态导入，代理 dispatcher、API preconnect、IDE client、GitHub setup、自更新和 web-search 即使还没有网络请求也会把 undici 解析/编译进 ACP child。
+
+最终实现是在 `packages/cli/src/utils/load-undici.ts` 与 core 侧 runtime fetch helpers 中各自保留 package-local single-flight loader。helper 动态 import undici 后做 CommonJS default-only chunk 归一化，避免 esbuild 打包后 `const { Agent } = await import('undici')` 解构出 `undefined`。两个包不共享 helper，是因为 CLI/core 各自解析自己的 undici 副本，测试 mock 也需要按包命中。
+
+所有原静态导入点改为运行时加载，但顺序不变：`--proxy` / settings proxy 的 dispatcher 安装在 config initialize 中被 await，channel proxy 在 channel start 继续前 await，保证首个网络请求不会跑在 dispatcher 之前。`scripts/check-serve-fast-path-bundle.js` 增加 undici static closure blacklist，防止后续改动把 undici 重新拉进 ACP eager closure。
+
+### 3.8 Google GenAI SDK lazy loading（#7512，当前 open）
+
+#7512 是 #7264 lazy-loading candidate 3 的当前 open diff。问题是 `@google/genai` 仍在 ACP bootstrap static closure 中；仅把 provider import 改成 dynamic 还不够，因为 ACP session create 会急切构造 content generator，SDK 成本会从 initialize 阶段挪到 `POST /session` 阶段。
+
+当前方案为 core orchestration 提供 package-local、与 SDK 行为对齐的同步 surface：请求/content normalization、compat response class 和少量同步 helper 不再依赖官方 SDK 模块。真正的 provider construction 和 logging decorator 通过 single-flight lazy content generator 在首次 async model operation 时加载；两个首次操作并发时共享同一 import/construct。配置校验、runtime fetch preparation 和 Qwen OAuth cached credential acquisition 仍保持 eager，以免 session accepted 后才发现 auth 不可用。
+
+MCP tool adaptation 仍在 discovery/direct invocation 时加载官方 SDK，因为它需要 SDK adapter 能力。bundle guard 对 ACP static closure 加 `@google/genai` blacklist，要求 static closure 中 SDK input 为 0，同时允许 dynamic provider/MCP chunks 保留 SDK。
 
 ---
 

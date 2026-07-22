@@ -21,6 +21,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先（#6945）。
 - **permission prompt cancellation preservation**：ACP permission prompt、Plan unknown shell approval、Stop hook permission 与 background notification 等等待点若被父级 abort，session 终态保持 `cancelled`，并保留已 recovered 的 mid-turn message（#7295）。
 - **prompt terminal exactly-once**：每个已返回 202 的 prompt 在 agent settle、queued removal、deadline、close/kill/crash/shutdown 等路径上恰好收到一个 `turn_complete` 或 `turn_error`；deadline 由 bridge admission/dispatch race 拥有（#7400）。
+- **prompt terminal follow-up hardening**：running prompt 从 UI-visible list 移除时不立刻丢 pending entry，queued terminal 不污染 session-level turn error/retry 状态，queued deadline 保留 typed `PromptDeadlineExceededError`（#7453）。
+- **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458 当前 open）。
 
 核心工厂闭包 `createHttpAcpBridge`（`packages/acp-bridge/src/bridge.ts`），HTTP 路由层在 `packages/cli/src/serve/routes/session.ts` 与 `server.ts`。会话的并发安全建立在一个反复出现的不变式上：**所有改写 `byId` / `attachCount` / `attachRefs` / `defaultEntry` 的关键步骤都在 async 函数 `await` 之前的同步前缀里完成**，使得跨微任务边界的竞争（reaper vs attach、close vs spawn）天然原子；prompt 终态则通过 per-prompt latch 把多条异步竞争路径收敛到一个发布点。
 
@@ -65,6 +67,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#7295](https://github.com/QwenLM/qwen-code/pull/7295) | merged | permission cancel stopReason | 权限等待/Stop hook/background notification 被 parent abort 时报告 `cancelled`，并用 `preserveFallbackOnAbort` 保留 recovered mid-turn message |
 | [#7386](https://github.com/QwenLM/qwen-code/pull/7386) | merged | detach attach-ref ledger | `attachRefs` 记录 per-client attach 引用，`detachClient` 只有释放真实 ref 才扣 `attachCount`，重复/未知/匿名/owner detach 幂等 |
 | [#7400](https://github.com/QwenLM/qwen-code/pull/7400) | merged | prompt terminal exactly-once | 每个 202 accepted prompt 经 per-prompt latch 恰好发布一个 terminal；deadline 进 bridge race，teardown 关 bus 前 flush active+queued prompt terminal |
+| [#7453](https://github.com/QwenLM/qwen-code/pull/7453) | merged | prompt-terminal follow-up hardening | running prompt hidden-but-retained until settle/teardown；queued terminal 只发事件、不改 session turn state；queued deadline 传播 typed deadline error |
+| [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | open | event epoch / degraded replay | load/resume/SSE 下发 `eventEpoch`，compaction replay 保留 prompt/originator attribution 并暴露 degraded snapshot |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
@@ -674,6 +678,20 @@ sequenceDiagram
 - `bridge.ts:removePendingPrompt`：queued prompt remove 同时发 `pending_prompt_completed{removed}` 与 `turn_complete{stopReason:'cancelled'}`。
 - `routes/session.ts` / `server/prompt-deadline.ts`：route 只解析并透传 effective deadline，`PromptDeadlineExceededError` 从 acp-bridge re-export 保持兼容。
 - `bridge.test.ts` / `server.test.ts`：exactly-once terminal suite 与 route deadline 透传/不 abort 测试。
+
+### #7453 — prompt-terminal follow-up hardening
+
+- `bridge.ts:removePendingPrompt`：running prompt remove 改为从 visible list 隐藏，但保留 pending entry 到 settle/teardown，再由统一 terminal latch 清理，避免 teardown flush 看不到已接受但未终结的 prompt。
+- `bridge.ts` queued terminal path：queued prompt 的 `turn_complete` / `turn_error` 只发布事件，不再写 session-level `turnError` 或 retry state，防止一个队列项失败污染后续 turn。
+- `server/prompt-deadline.ts` 与 acp-bridge exports：pre-dispatch deadline 继续传播 `PromptDeadlineExceededError`，helper 回到纯叶子模块，避免 route/bridge 互相传递性拉入。
+- `bridge.test.ts` / `server.test.ts`：覆盖 hidden running prompt teardown、queued failure 不污染 session state、queued deadline typed error 和 deadline helper import 边界。
+
+### #7458 — event epoch / degraded replay（当前 open）
+
+- `eventBus.ts`：EventBus 构造时生成 `eventEpoch`，load/resume/create 与 SSE response header 暴露该 token。
+- `routes/session.ts` / `server.ts`：客户端重连在 `Last-Event-ID` 旁回传 epoch；epoch mismatch 时在 replay 前发布 `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}`。
+- `compactionEngine.ts`：compacted slot 保留最近 `sessionId`、`promptId`、`originatorClientId`，跨 prompt/originator 不合并 attribution。
+- `bridge.ts` replay snapshot：compaction ingest failure 后标记 degraded snapshot，load/resync consumer 可以明确知道 snapshot 不再是完整权威源。
 
 ### #4694 — compacted replay
 

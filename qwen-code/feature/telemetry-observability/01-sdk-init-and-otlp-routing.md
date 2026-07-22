@@ -46,6 +46,7 @@
 | [#4390](https://github.com/QwenLM/qwen-code/pull/4390) | MERGED | client-side HTTP span + opt-in W3C traceparent | `NOOP_PROPAGATOR`（`sdk.ts:110-118`）+ instrumentation 反馈环守卫（`sdk.ts:368-540`） |
 | [#4482](https://github.com/QwenLM/qwen-code/pull/4482) | MERGED | improve LogToSpan bridge error info and TUI handling | 桥接的 `diagnosticsSink` 注入（`sdk.ts:309-311`） |
 | [#7276](https://github.com/QwenLM/qwen-code/pull/7276) | MERGED `2026-07-21` | perf(telemetry): lazy-load the SDK and split OTLP exporter chains by protocol | `sdk.ts` 变轻量 async facade；heavy NodeSDK/instrumentation 装配在 `sdk-impl.ts`；HTTP/gRPC exporter chain 分别在 `sdk-exporters-http.ts` / `sdk-exporters-grpc.ts` 中按需动态加载；`outfile` 不加载 OTLP chain。 |
+| [#7456](https://github.com/QwenLM/qwen-code/pull/7456) | MERGED `2026-07-22` | test(telemetry): Cover daemon metrics init ordering and document metricReader asymmetry | `run-qwen-serve.test.ts` 锁定 daemon telemetry init settle 先于 daemon metrics init；`sdk-impl.ts` 注释 `metricReader` 单数契约，避免误改成 unsupported `metricReaders: []`。 |
 
 > 注：`#4390`/`#4482` 不属于「SDK init/路由」核心，但其代码与本文件强耦合（instrumentation、propagator、桥接诊断都在 `initializeTelemetry` 内构造），故一并标注。propagator 与 instrumentation 的完整展开见兄弟子文档「出站 HTTP span 与 traceparent 传播」，本文只覆盖它们在 init 序列中的装配位置。
 
@@ -175,6 +176,7 @@ function/line 级要点：
 - **`spanProcessors`**：只有 `spanExporter` 存在才挂 `SessionIdSpanProcessor` + `BatchSpanProcessor`，否则空数组（该 signal 静默跳过）。
 - **`logRecordProcessors`**：优先 `BatchLogRecordProcessor(logExporter)`；否则若有 `logToSpanProcessor` 用桥接器；都没有则空数组。**注意 `logExporter` 与 `logToSpanProcessor` 互斥**——下一节会证明 `LogToSpanProcessor` 默认不可达。
 - **条件展开 `...(x && {x})`**：`textMapPropagator`/`metricReader` 为 `undefined` 时根本不出现在 options 里（而非传 `undefined`），交给 NodeSDK 用各自默认值。
+- **`metricReader` 单数契约（#7456）**：`@opentelemetry/sdk-node@0.203.0` 的 NodeSDK options 只接受 singular `metricReader`，没有 `metricReaders: []` 这种 metrics 空数组 opt-out。traces/logs 可以传 processor arrays，metrics 要靠“显式传一个 reader”压制 env-based reader auto config；这个不对称是刻意设计，不能被重构成看似统一的数组形式。
 
 ### 步骤 8：facade `sdk.start()` 与 session 根 context
 
@@ -201,6 +203,7 @@ try {
 - `setSessionContext(createSessionRootContext(sessionId), sessionId)`：`createSessionRootContext` 用 `deriveTraceId(sessionId) = SHA-256(sessionId)[:32]` 造一个 **合成根 context**（非真实 span），写入 `session-context.ts` 的模块级 `sessionRootContext`/`currentSessionId`。这保证同 session 内所有真实 span、log 桥接 span、debug 日志行共享同一 traceId。
 - `setShellTracePropagation(...)` 跟随 outbound correlation 配置；shutdown 时复位为 false。
 - 整段包在 `try/catch`：初始化失败只记 debug，不抛——遵循「遥测绝不影响主流程」。
+- #7456 为 daemon serve 增加 ordering test，断言 telemetry init 已 resolved 后才调用 daemon metrics init；这是因为 metrics 在 global MeterProvider 注册前创建会永久绑定 noop provider。
 
 ---
 

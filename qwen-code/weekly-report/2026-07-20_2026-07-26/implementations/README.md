@@ -12,5 +12,19 @@
 | [#7323](https://github.com/QwenLM/qwen-code/pull/7323) | ✅ merged | fix(core): Enforce final tool response budgets | [pr-7323.md](pr-7323.md) |
 | [#7386](https://github.com/QwenLM/qwen-code/pull/7386) | ✅ merged | fix(acp-bridge): make detachClient idempotent via per-clientId attach-ref ledger | [pr-7386.md](pr-7386.md) |
 | [#7400](https://github.com/QwenLM/qwen-code/pull/7400) | ✅ merged | fix(acp-bridge): guarantee exactly-once prompt terminal events in daemon serve mode | [pr-7400.md](pr-7400.md) |
+| [#7447](https://github.com/QwenLM/qwen-code/pull/7447) | ❌ closed | perf(telemetry): Lazy-load the SDK and split OTLP exporter chains by protocol | [pr-7447.md](pr-7447.md) |
+| [#7453](https://github.com/QwenLM/qwen-code/pull/7453) | ✅ merged | fix(acp-bridge): close prompt-terminal follow-ups from the PR #7400 self-review | [pr-7453.md](pr-7453.md) |
+| [#7455](https://github.com/QwenLM/qwen-code/pull/7455) | ✅ merged | perf(startup): Load undici lazily behind package-local dynamic imports | [pr-7455.md](pr-7455.md) |
+| [#7456](https://github.com/QwenLM/qwen-code/pull/7456) | ✅ merged | test(telemetry): Cover daemon metrics init ordering and document metricReader asymmetry | [pr-7456.md](pr-7456.md) |
+| [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | 🟡 open | fix(serve): detect stale SSE cursors across daemon restarts via epoch token; preserve turn attribution and surface compaction failures in replay | [pr-7458.md](pr-7458.md) |
+| [#7463](https://github.com/QwenLM/qwen-code/pull/7463) | 🟡 open | feat(sdk-java): Add daemon transport | [pr-7463.md](pr-7463.md) |
+| [#7470](https://github.com/QwenLM/qwen-code/pull/7470) | ✅ merged | test(core): Cover Shell truncation without an artifact | [pr-7470.md](pr-7470.md) |
+| [#7502](https://github.com/QwenLM/qwen-code/pull/7502) | ❌ closed | feat(integrations): Add enterprise multi-tenant memory gateway | [pr-7502.md](pr-7502.md) |
+| [#7505](https://github.com/QwenLM/qwen-code/pull/7505) | 🟡 open | feat(integrations): Add canonical memory persistence | [pr-7505.md](pr-7505.md) |
+| [#7506](https://github.com/QwenLM/qwen-code/pull/7506) | 🟡 open | feat(integrations): Add Qwen enterprise memory agent | [pr-7506.md](pr-7506.md) |
+| [#7507](https://github.com/QwenLM/qwen-code/pull/7507) | 🟡 open | feat(integrations): Add governed memory lifecycle | [pr-7507.md](pr-7507.md) |
+| [#7508](https://github.com/QwenLM/qwen-code/pull/7508) | 🟡 open | feat(integrations): Add enterprise memory APIs | [pr-7508.md](pr-7508.md) |
+| [#7509](https://github.com/QwenLM/qwen-code/pull/7509) | 🟡 open | feat(integrations): Add enterprise memory foundations | [pr-7509.md](pr-7509.md) |
+| [#7512](https://github.com/QwenLM/qwen-code/pull/7512) | 🟡 open | perf(startup): lazy-load Google GenAI SDK on first use | [pr-7512.md](pr-7512.md) |
 
-_按个人 PR 口径更新于 2026-07-21_
+_按个人 PR 口径更新于 2026-07-22_
