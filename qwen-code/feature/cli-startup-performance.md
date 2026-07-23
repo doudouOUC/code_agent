@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 当前 open diff 则把 `@google/genai` 从 session create 之前的静态闭包里移走。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 当前 open diff 让 ACP child 继承父进程启用的 Node compile cache。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -188,13 +188,25 @@ normalizedInput === normalizedDefault
 
 所有原静态导入点改为运行时加载，但顺序不变：`--proxy` / settings proxy 的 dispatcher 安装在 config initialize 中被 await，channel proxy 在 channel start 继续前 await，保证首个网络请求不会跑在 dispatcher 之前。`scripts/check-serve-fast-path-bundle.js` 增加 undici static closure blacklist，防止后续改动把 undici 重新拉进 ACP eager closure。
 
-### 3.8 Google GenAI SDK lazy loading（#7512，当前 open）
+### 3.8 Google GenAI SDK lazy loading（#7512）
 
-#7512 是 #7264 lazy-loading candidate 3 的当前 open diff。问题是 `@google/genai` 仍在 ACP bootstrap static closure 中；仅把 provider import 改成 dynamic 还不够，因为 ACP session create 会急切构造 content generator，SDK 成本会从 initialize 阶段挪到 `POST /session` 阶段。
+#7512 是 #7264 lazy-loading candidate 3 的最终落地。问题是 `@google/genai` 仍在 ACP bootstrap static closure 中；仅把 provider import 改成 dynamic 还不够，因为 ACP session create 会急切构造 content generator，SDK 成本会从 initialize 阶段挪到 `POST /session` 阶段。
 
 当前方案为 core orchestration 提供 package-local、与 SDK 行为对齐的同步 surface：请求/content normalization、compat response class 和少量同步 helper 不再依赖官方 SDK 模块。真正的 provider construction 和 logging decorator 通过 single-flight lazy content generator 在首次 async model operation 时加载；两个首次操作并发时共享同一 import/construct。配置校验、runtime fetch preparation 和 Qwen OAuth cached credential acquisition 仍保持 eager，以免 session accepted 后才发现 auth 不可用。
 
 MCP tool adaptation 仍在 discovery/direct invocation 时加载官方 SDK，因为它需要 SDK adapter 能力。bundle guard 对 ACP static closure 加 `@google/genai` blacklist，要求 static closure 中 SDK input 为 0，同时允许 dynamic provider/MCP chunks 保留 SDK。
+
+### 3.9 ACP telemetry initialization defer（#7558）
+
+#7558 在 #7276 lazy telemetry facade 基础上进一步缩短 ACP child protocol initialize path。旧路径在写出 initialize result 前就可能启动 telemetry init；即使 telemetry 已经 lazy，dynamic import / SDK startup 仍会落在 daemon channel readiness 的关键路径。
+
+最终实现让 `runAcpAgent` 观察 NDJSON transport 的 incoming `initialize` request id，并在成功写出同一 request id 的 initialize result 后才触发 telemetry init。普通 interactive TUI、prompt-interactive、headless 和 daemon parent 保持原有 telemetry 时序；失败 initialize 或非 matching response 不会启动 telemetry。这样 host 先拿到 protocol readiness，再让 ACP child 在后台完成 telemetry facade 的 single-flight init。
+
+### 3.10 ACP child compile cache propagation（#7594，当前 open）
+
+#7594 处理 Node compile cache 只在父进程生效的问题。production `serve` entry 已启用 module compile cache，但 spawned ACP child 没有同一 cache directory，因此仍要重新编译常用模块。
+
+当前 open diff 在 `scripts/cli-entry.js` 中，当 Node 报告本进程新启用 compile cache 时，把 resolved cache directory 写入环境，让后续 ACP child 继承。它不会覆盖用户已有配置，也不会在 disabled、failed 或 unsupported 情况下发布目录。`packages/cli/src/cli.test.ts` 覆盖成功传播、用户配置不覆盖和失败/禁用边界。
 
 ---
 

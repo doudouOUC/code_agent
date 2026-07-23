@@ -32,6 +32,7 @@
 | #4482 | MERGED | 桥接错误信息 + TUI | 与本文弱相关：`logApiRetry` 走 OTel log → `LogToSpanProcessor` 桥接路径时，复用 #4482 的 `formatExportError` / `diagnosticsSink`。 |
 | #3893 | MERGED | 敏感属性 opt-in | 弱相关：`logApiResponse` 的 `response_text` 与本文 token 计量同函数；详见 04 子文档。 |
 | #4212 / #4302 | MERGED | stream idle 超时 / 一致性 | 相关：`STREAM_IDLE_TIMEOUT_MS` 与 `spanEndedByTimeout` 闸门是 TTFT 闭包所在的 `loggingStreamWrapper` 的防泄漏骨架；#4432 的 `retrySnapshot` 必须穿透这条超时路径。 |
+| #7536 | MERGED（2026-07-23） | GenAI / ARMS 字段对齐 | 新增 provider/operation/output type resolver、usage provenance，并让 LLM/tool/subagent span 写入与 OTel GenAI semconv 和 ARMS LLM Trace 对齐的字段。 |
 
 ---
 
@@ -173,7 +174,25 @@ recordTokenUsageMetrics(config, event.thoughts_token_count, { model, type: 'thou
 
 **取舍**：span attribute 不能像 metric 那样被后端预聚合成低基数时序，但避免了计量错误；且 per-request 维度已足够支撑「这次请求用了多少 token」的分析。
 
-### 3. 派生指标：`sampling_ms` 公式 + 除零守卫
+### 3. GenAI / ARMS field alignment（#7536）
+
+#7536 在既有 dual-emit 基础上进一步收敛字段口径：目标不是替换 `qwen-code.*` 私有字段，而是在字段名、类型和含义能一致时，同时写出 OpenTelemetry GenAI semantic conventions 与阿里云 ARMS LLM Trace 可识别的属性。
+
+核心新增模块：
+
+- `telemetry/gen-ai-provider.ts`: 集中解析 provider name、auth type、operation name 和 output type。provider 解析优先 Qwen OAuth / known host，并用 exact host 或 subdomain matching，拒绝伪造 hostname suffix。
+- `telemetry/gen-ai-usage.ts`: 用 WeakMap 给 usage metadata 附加 cache read/write provenance，不改变公共 usage shape。
+
+调用链同步补齐：
+
+- OpenAI / Anthropic / Gemini/Qwen converter 在响应转换时保留 provider response model、response id、finish reason、cache usage 和 provider tool-call id。
+- `loggingContentGenerator` 在流式/非流式路径按 candidate index 稳定排序 finish reasons；aborted partial stream 也保留已知 response metadata，避免错误路径丢字段。
+- `session-tracing` 在 LLM span 上写入 request/response model、finish reason、cache tokens、output type、conversation/session 关联等字段；tool span 使用 provider tool-call id 填充 GenAI 字段，但保留内部 `tool.call_id` 作为权威执行 id。
+- subagent span 写入 agent description，便于 ARMS 把 agent 子树和 LLM/tool span 聚合展示。
+
+边界：敏感内容仍受 detailed sensitive attributes gate 控制；#7536 只对齐 metadata 字段，不扩大 prompt、tool input/result 或 model output 的默认暴露面。
+
+### 4. 派生指标：`sampling_ms` 公式 + 除零守卫
 
 `endLLMRequestSpan` 在 token/ttft 之外派生两个属性（`session-tracing.ts` L440–457，**main / Phase 4a 版本**）：
 

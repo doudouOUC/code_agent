@@ -2,9 +2,9 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文最终实现文档放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-**时间范围**: 2026-04-06 ~ 2026-07-22（持续更新）
-**总计**: 316 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30 见对应周目录（W30 当前个人增量 +54,440 / -3,865，477 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-07-23（持续更新）
+**总计**: 321 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30 见对应周目录（W30 当前个人增量 +61,245 / -4,180，567 个文件变更）
 
 ## 按周
 
@@ -24,11 +24,11 @@
 | [2026-06-29 ~ 2026-07-05](2026-06-29_2026-07-05/) (W27 周报) | 31 | 29/0/2 | +39,985/-3,521 | serve fast-path guard、daemon channel worker/session archive、skills ACP 输出、plan-required teammate approval、worker stderr redaction、ChannelAgentBridge session listing、daemon dashboard/status/perf、session export/organization、prompt queue status、large pipe frame measurement |
 | [2026-07-06 ~ 2026-07-12](2026-07-06_2026-07-12/) (W28 周内累计) | 30 | 29/0/1 | +70,513/-6,343 | session start profiler、ACP `/tmp` fallback、大文本/PDF 读取、Phase 2a/2b/3/4 multi-workspace sessions + REST/ACP、bounded/paged/workspace-qualified transcript、workspace management sidebar、non-primary archived/organized/untrusted session catalog、channel worker reload/grouping/runtime control、extension management v2、persistent registration、runtime removal、recording failure visibility |
 | [2026-07-13 ~ 2026-07-19](2026-07-13_2026-07-19/) (W29 最终版) | 29 | 27/1/1 | +74,269/-11,430 | multi-workspace owner-routed session mutations、Extension Management V2、workspace-qualified Voice/session export、PDF vision bridge fallback、shell timeout/heartbeat、cold first-session tracing、archived export、Todo stop guard、channel startup diagnostics、deep health、Plan exit approval、bounded daemon logs、legacy telemetry、ownership guard hardening、hardening closeout、shell safety tri-state classification、ACP initialize profiling、single-writer sessions、Plan shell routing、ACP startup closure slimming、conversation branch inspection、ACP preheat readiness、ACP writer fencing |
-| [2026-07-20 ~ 2026-07-26](2026-07-20_2026-07-26/) (W30 周内累计) | 22 | 11/9/2 | +54,440/-3,865 | Plan mode entry boundary、workspace trust hot reload、SDK SSE request cleanup、lazy telemetry SDK / OTLP protocol split、ACP permission cancellation preservation、final tool response budget、daemon detach attach-ref ledger、exactly-once prompt terminal events、prompt-terminal follow-up hardening、lazy undici、daemon replay epoch/compaction hardening、Java daemon SDK alpha、Shell truncation regression、enterprise memory gateway stack、lazy Google GenAI SDK |
+| [2026-07-20 ~ 2026-07-26](2026-07-20_2026-07-26/) (W30 周内累计) | 27 | 16/9/2 | +61,245/-4,180 | Plan mode entry boundary、workspace trust hot reload、SDK SSE request cleanup、lazy telemetry SDK / OTLP protocol split、ACP permission cancellation preservation、final tool response budget、daemon detach attach-ref ledger、exactly-once prompt terminal events、prompt-terminal follow-up hardening、lazy undici、daemon replay epoch/compaction hardening、Java daemon SDK alpha、Shell truncation regression、enterprise memory gateway stack、lazy Google GenAI SDK、GenAI telemetry ARMS alignment、deferred ACP telemetry init、direct external context provider、ACP compile cache propagation、Java daemon transport reliability hardening |
 
 ## 类型分布
 
-feat ×163, fix ×104, refactor ×13, other ×8, docs ×9, chore ×6, perf ×8, test ×4, merge ×1
+feat ×165, fix ×105, refactor ×13, other ×8, docs ×9, chore ×6, perf ×10, test ×4, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

@@ -22,7 +22,7 @@
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor 与 Java daemon transport alpha |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state |
-| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、#7458/#7463 当前修复状态、修复顺序和验收矩阵 |
+| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、#7458/#7463 已合入状态、#7603 follow-up、修复顺序和验收矩阵 |
 
 ---
 
@@ -165,7 +165,7 @@ flowchart TB
 
 SDK reducer 看到该帧后置 `awaitingResync`，先调 `loadSession` 拉全量再恢复应用增量。SSE 路由侧（`server.ts` SSE handler）还会把 resync 写一行 stderr 便于排障（"ring eviction detected … gap=N events"）。
 
-#7458 当前 open diff 把这个数值启发式升级为显式 `eventEpoch`：每个 EventBus 在构造时 mint 一个不可复用 epoch token，并通过 create/load/resume response、non-blocking prompt 202 envelope 与 `X-Qwen-Event-Epoch` SSE header 下发。客户端重连时在 `Last-Event-ID` 旁回传该 token；daemon 发现 epoch 不一致时强制 `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}`，避免 daemon 重启后新一代低 event id 被旧 cursor 静默跳过。同一 diff 还让 compacted replay 保留最近 prompt/originator attribution，并在 compaction ingest failure 后暴露 degraded snapshot，而不是把不完整 snapshot 伪装成权威恢复源。
+#7458 把这个数值启发式升级为显式 `eventEpoch`：每个 EventBus 在构造时 mint 一个不可复用 epoch token，并通过 create/load/resume response、non-blocking prompt 202 envelope 与 `X-Qwen-Event-Epoch` SSE header 下发。客户端重连时在 `Last-Event-ID` 旁回传该 token；daemon 发现 epoch 不一致时强制 `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}`，避免 daemon 重启后新一代低 event id 被旧 cursor 静默跳过。同一 diff 还让 compacted replay 保留最近 prompt/originator attribution，并在 compaction ingest failure 后暴露 degraded snapshot，而不是把不完整 snapshot 伪装成权威恢复源。
 
 ```mermaid
 stateDiagram-v2
@@ -632,6 +632,7 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #4507 | SSE | server-pushed followup_suggestion 事件（webui）。 |
 | #7458 | SSE / replay reliability | 显式 `eventEpoch` 检测 stale cursor，compaction 保留 attribution 并暴露 degraded snapshot。 |
 | #7463 | Java daemon SDK | 新增 Java daemon transport alpha，并把 admission watermark、resumable SSE、terminal correlation 和 fail-closed exception taxonomy 写入 client contract。 |
+| #7603 | Java daemon SDK reliability | Java client 消费 event epoch，收紧 SSE/JSON malformed path、terminal-before-202 和 teardown ordering。 |
 
 ### 鉴权 / 变更门控
 

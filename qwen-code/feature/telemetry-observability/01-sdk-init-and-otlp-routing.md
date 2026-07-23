@@ -47,6 +47,7 @@
 | [#4482](https://github.com/QwenLM/qwen-code/pull/4482) | MERGED | improve LogToSpan bridge error info and TUI handling | 桥接的 `diagnosticsSink` 注入（`sdk.ts:309-311`） |
 | [#7276](https://github.com/QwenLM/qwen-code/pull/7276) | MERGED `2026-07-21` | perf(telemetry): lazy-load the SDK and split OTLP exporter chains by protocol | `sdk.ts` 变轻量 async facade；heavy NodeSDK/instrumentation 装配在 `sdk-impl.ts`；HTTP/gRPC exporter chain 分别在 `sdk-exporters-http.ts` / `sdk-exporters-grpc.ts` 中按需动态加载；`outfile` 不加载 OTLP chain。 |
 | [#7456](https://github.com/QwenLM/qwen-code/pull/7456) | MERGED `2026-07-22` | test(telemetry): Cover daemon metrics init ordering and document metricReader asymmetry | `run-qwen-serve.test.ts` 锁定 daemon telemetry init settle 先于 daemon metrics init；`sdk-impl.ts` 注释 `metricReader` 单数契约，避免误改成 unsupported `metricReaders: []`。 |
+| [#7558](https://github.com/QwenLM/qwen-code/pull/7558) | MERGED `2026-07-23` | perf(cli): Defer ACP telemetry initialization | ACP child 不再在 protocol initialize response 前启动 telemetry；NDJSON transport 观察 matching initialize request/result，成功写出 response 后再触发 single-flight telemetry facade。 |
 
 > 注：`#4390`/`#4482` 不属于「SDK init/路由」核心，但其代码与本文件强耦合（instrumentation、propagator、桥接诊断都在 `initializeTelemetry` 内构造），故一并标注。propagator 与 instrumentation 的完整展开见兄弟子文档「出站 HTTP span 与 traceparent 传播」，本文只覆盖它们在 init 序列中的装配位置。
 
@@ -204,6 +205,12 @@ try {
 - `setShellTracePropagation(...)` 跟随 outbound correlation 配置；shutdown 时复位为 false。
 - 整段包在 `try/catch`：初始化失败只记 debug，不抛——遵循「遥测绝不影响主流程」。
 - #7456 为 daemon serve 增加 ordering test，断言 telemetry init 已 resolved 后才调用 daemon metrics init；这是因为 metrics 在 global MeterProvider 注册前创建会永久绑定 noop provider。
+
+### ACP initialize response 后 telemetry init（#7558）
+
+#7558 只改变 ACP child startup path。`runAcpAgent` 在 NDJSON transport 边界记录 incoming `initialize` request id，并在成功写出同一 request id 的 initialize result 后才触发 telemetry init。这样 host 可以先收到 protocol initialize response，OpenTelemetry dynamic import / SDK startup 不再位于 channel readiness 的关键路径上。
+
+其它模式保持原状：ordinary interactive TUI 仍按 first paint 后的策略处理 telemetry，prompt-interactive 与 headless 仍 eager，daemon parent 的 deferred runtime / daemon metrics ordering 仍由 #7276/#7456 的路径约束。失败 initialize、非 matching response、transport write failure 都不会启动 ACP child telemetry，避免把失败握手误计为已初始化 channel。
 
 ---
 

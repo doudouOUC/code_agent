@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程），以及 #7463 当前 open diff 中新增的 Java daemon transport alpha（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程），以及 #7463 已合入的 Java daemon transport alpha（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）和 #7603 当前 open follow-up。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -16,7 +16,7 @@ qwen-code 的主入口是交互式 CLI（TUI）与一次性非交互模式。但
 
 2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。适合「agent 即服务」的远程、多端、协作场景。
 
-3. **Java daemon transport alpha（#7463，当前 open）**：在既有 `com.alibaba:qwencode-sdk` artifact 中新增 Java 11 HTTP/SSE daemon transport，面向 JVM 应用提供 admission watermark、resumable SSE、typed/raw events、permission response、prompt terminal correlation、bounded promptText、resource cleanup 和 fail-closed exception taxonomy。
+3. **Java daemon transport alpha（#7463）**：在既有 `com.alibaba:qwencode-sdk` artifact 中新增 Java 11 HTTP/SSE daemon transport，面向 JVM 应用提供 admission watermark、resumable SSE、typed/raw events、permission response、prompt terminal correlation、bounded promptText、resource cleanup 和 fail-closed exception taxonomy。#7603 当前 open diff 继续补齐 Java 对 #7458 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering 的消费边界。
 
 这些线**协议不同、不可互换**：Python SDK 说的是 stream-json（stdio）；TS/Java daemon SDK 说的是 HTTP admission + SSE event stream。`DaemonClient` 在文档里被明确定位为 `ProcessTransport` 的「兄弟」而非替代（见 `DaemonClient.ts` 头部注释）。本方案分别详解它们，并在第 6 节描述支撑 Python SDK 上架 PyPI 的发布工具链。
 
@@ -208,12 +208,12 @@ CanUseTool = Callable[[str, dict, CanUseToolContext], Awaitable[PermissionResult
 
 - **三种入口**：`createOrAttach`/`load`/`resume`（静态工厂，`DaemonSessionClient.ts:90/130/166`）。它们会按窗口需要把首个订阅的 `lastEventId` 播种为 `0`（从 daemon replay ring 头部回放），以免会话创建/恢复期间产生的事件（如 MCP 预热的 `mcp_budget_warning`、`available_commands_update`）落在 ring 里却早于首次 `events()` 而丢失。
 - **SSE 续传状态**：内部维护 `lastSeenEventId`，每收到带 `id` 的事件就 `Math.max` 更新（`iterateEvents`，`DaemonSessionClient.ts`）。`events()`（`DaemonSessionClient.ts`）默认 `resume:true`，自动用上次游标续传；`setLastEventId`/`lastEventId` 暴露给需要持久化游标的适配器。`subscribeEvents` 是 `events` 的 `@deprecated` 别名。
-- **event epoch（#7458 当前 open）**：在 daemon 提供 `eventEpoch` 后，TS SDK 会从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch，把它与 `lastSeenEventId` 一起保存；后续 reconnect 在 `Last-Event-ID` 旁回传 epoch，daemon 若发现 epoch mismatch 会强制 `state_resync_required{detail:'epoch_mismatch'}`。旧 daemon 不下发 epoch 时，SDK 自动回落到既有 numeric heuristic。
+- **event epoch（#7458）**：daemon 提供 `eventEpoch` 后，TS SDK 会从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch，把它与 `lastSeenEventId` 一起保存；后续 reconnect 在 `Last-Event-ID` 旁回传 epoch，daemon 若发现 epoch mismatch 会强制 `state_resync_required{detail:'epoch_mismatch'}`。旧 daemon 不下发 epoch 时，SDK 自动回落到既有 numeric heuristic。
 - **单订阅保护**：`openEventSubscription` 用 `acquire`/`release` 闸保证同一会话同时只有一条活跃订阅（否则抛错提示复用现有 generator）。
 - **prompt 关联**：当已有活跃订阅时，`prompt()` 走 `promptNonBlocking` 并把 `promptId` 登记到 `_pendingPrompts`，由订阅循环里的 `_dispatchTurnEvent` 用 `matchTurnEvent` 完成 resolve/reject（复用 `DaemonClient` 的同一匹配逻辑），从而**不额外开 SSE 连接**。`AbortSignal` 触发时会 `cancel()` 会话并 reject；daemon-side terminal latch 会把并发 cancel/remove/deadline/teardown 竞态折叠成一个 terminal。
 - 其余方法（`setModel`/`recap`/`shellCommand`/`context`/`contextUsage`/`supportedCommands`/`tasks`/`respondToPermission`/`heartbeat`/`updateMetadata`/`close`）都是绑定 `sessionId`+`clientId` 的转发。
 
-### 4.3 Java daemon transport alpha（#7463 当前 open）
+### 4.3 Java daemon transport alpha（#7463 / #7603）
 
 #7463 在 `packages/sdk-java/qwencode` 现有 Maven artifact 中新增 Java 11 daemon transport，而不是新建第二个 artifact。它的目标是把 HTTP admission、SSE reconnect、event cursor、terminal correlation、permission/cancel、lifecycle cleanup 和 failure taxonomy 做成可复用客户端，而不是让每个 JVM 应用手写 daemon protocol。
 
@@ -229,13 +229,15 @@ CanUseTool = Callable[[str, dict, CanUseToolContext], Awaitable[PermissionResult
 
 该 PR 还补 daemon/ACP contract，使 Java client 可以依赖“每个 admitted prompt 有一个 correlated terminal、deadline 覆盖 queue+execution、queued/running cancel 可区分、teardown terminal 先于 session failure、close/detach/destroy 资源有界”。这些能力与 #7386/#7400/#7453 的 daemon 可靠性工作直接相关。
 
+#7603 当前 open diff 在此基础上消费 #7458 的 restart-safe cursor。`PromptAcceptance` 保存 optional `eventEpoch`，Java client 在初始 SSE request 和 reconnect 上发送 `X-Qwen-Event-Epoch`，并从 validated SSE response 学习 epoch；response epoch mismatch 会在消费事件前 fail closed。该 follow-up 还收紧 truncated JSON、null data、SSE gap、terminal-before-202 buffering 和 teardown ordering，并通过 `scripts/run-java-daemon-sdk-e2e.ts` 扩展 real daemon E2E。
+
 ### 4.4 协议补全的 SDK 消费（#4360：serverTimestamp / provenance / errorKind / state_resync_required）
 
 
 - **`serverTimestamp`**（daemon 权威时间戳）：daemon 在 `formatSseFrame` 写帧边界 stamp 到 `_meta.serverTimestamp`（保留既有 `_meta` 键）。SDK 的 `ui/normalizer.ts:extractServerTimestamp`（`normalizer.ts:350`）按**三处候选顺序**读取并容忍缺失：① 顶层 `event.serverTimestamp` ② `event._meta.serverTimestamp`（Anthropic 约定）③ `event.data._meta.serverTimestamp`（sessionUpdate 嵌套位置），均非有限数则 `undefined`。这种「读 daemon 最终落在哪就读哪」的设计使 SDK 无需与 daemon 协调发版即可消费。
 - **`provenance`**（工具来源）：daemon 的 `ToolCallEmitter.resolveToolProvenance` 在 emitStart/Result/Error 都 stamp `{provenance:'builtin'|'mcp'|'subagent', serverId?}`（让重连客户端能从任一 update 重建来源）。SDK 在 `normalizer.ts:extractToolProvenance`（`normalizer.ts:597`）消费：优先显式 `provenance` 字段，否则用 `mcp__<server>__<tool>` 命名启发式回退，真未知时 UI 默认 `'unknown'`。
 - **`errorKind`**（结构化错误分类）：`stream_error` 帧通过 daemon 的 `mapDomainErrorToErrorKind` stamp。SDK 侧 `DaemonStreamErrorData.errorKind`（`events.ts:268`）类型为 `DaemonErrorKind | (string & {})`——`DaemonErrorKind` 是闭集 taxonomy（`types.ts:DAEMON_ERROR_KINDS`，含 `missing_binary`/`blocked_egress`/`auth_env_error`/`init_timeout`/`protocol_error`/`missing_file`/`parse_error`/`budget_exhausted`，并由 #4514 追加 `prompt_deadline_exceeded`/`writer_idle_timeout` 等），`(string & {})` 加宽保留对未来新种类的前向兼容与 IDE 自动补全。UI 据此做类型化重试/补救（`init_timeout` 重试 vs `missing_binary` 提示安装）而非正则匹配错误字符串。
-- **`state_resync_required`**（SSE 续传 gap 检测）：daemon 的 `eventBus.subscribe()` 回放路径发现 `earliest > lastEventId + 1`（ring 已驱逐了客户端缺失的区间）时，force-push 一个**无 `id` 的合成 resync 帧** `{type:'state_resync_required', data:{reason:'ring_evicted', lastDeliveredId, earliestAvailableId}}`。#7458 当前 open diff 还会在 `eventEpoch` mismatch 时使用 `detail:'epoch_mismatch'` 表达 daemon restart stale cursor。SDK reducer 收到后置 `awaitingResync = true`（`events.ts` 的 `state_resync_required` case），随后**自动跳过所有非终止 delta 事件**（仍推进 `lastEventId`），仅放行 `RESYNC_PASSTHROUGH_TYPES`（`events.ts:1117`：`state_resync_required` 自身 + `session_died`/`session_closed`/`client_evicted`/`stream_error` 终止帧）。消费方恢复契约：检测到 `awaitingResync` 后调用 `loadSession` 取 daemon 权威快照，再用 `createDaemonSessionViewState({...})` 重建视图态（新实例隐式清零该标志）。daemon 在合成帧后**继续回放**而非断流（网络友好，SDK 可后续算 diff）。
+- **`state_resync_required`**（SSE 续传 gap 检测）：daemon 的 `eventBus.subscribe()` 回放路径发现 `earliest > lastEventId + 1`（ring 已驱逐了客户端缺失的区间）时，force-push 一个**无 `id` 的合成 resync 帧** `{type:'state_resync_required', data:{reason:'ring_evicted', lastDeliveredId, earliestAvailableId}}`。#7458 已在 `eventEpoch` mismatch 时使用 `detail:'epoch_mismatch'` 表达 daemon restart stale cursor。SDK reducer 收到后置 `awaitingResync = true`（`events.ts` 的 `state_resync_required` case），随后**自动跳过所有非终止 delta 事件**（仍推进 `lastEventId`），仅放行 `RESYNC_PASSTHROUGH_TYPES`（`events.ts:1117`：`state_resync_required` 自身 + `session_died`/`session_closed`/`client_evicted`/`stream_error` 终止帧）。消费方恢复契约：检测到 `awaitingResync` 后调用 `loadSession` 取 daemon 权威快照，再用 `createDaemonSessionViewState({...})` 重建视图态（新实例隐式清零该标志）。daemon 在合成帧后**继续回放**而非断流（网络友好，SDK 可后续算 diff）。
 
 ---
 

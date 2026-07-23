@@ -16,8 +16,8 @@
 | [#7453](https://github.com/QwenLM/qwen-code/pull/7453) | ✅ merged | fix(acp-bridge): close prompt-terminal follow-ups from the PR #7400 self-review | [pr-7453.md](pr-7453.md) |
 | [#7455](https://github.com/QwenLM/qwen-code/pull/7455) | ✅ merged | perf(startup): Load undici lazily behind package-local dynamic imports | [pr-7455.md](pr-7455.md) |
 | [#7456](https://github.com/QwenLM/qwen-code/pull/7456) | ✅ merged | test(telemetry): Cover daemon metrics init ordering and document metricReader asymmetry | [pr-7456.md](pr-7456.md) |
-| [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | 🟡 open | fix(serve): detect stale SSE cursors across daemon restarts via epoch token; preserve turn attribution and surface compaction failures in replay | [pr-7458.md](pr-7458.md) |
-| [#7463](https://github.com/QwenLM/qwen-code/pull/7463) | 🟡 open | feat(sdk-java): Add daemon transport | [pr-7463.md](pr-7463.md) |
+| [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | ✅ merged | fix(serve): detect stale SSE cursors across daemon restarts via epoch token; preserve turn attribution and surface compaction failures in replay | [pr-7458.md](pr-7458.md) |
+| [#7463](https://github.com/QwenLM/qwen-code/pull/7463) | ✅ merged | feat(sdk-java): Add daemon transport | [pr-7463.md](pr-7463.md) |
 | [#7470](https://github.com/QwenLM/qwen-code/pull/7470) | ✅ merged | test(core): Cover Shell truncation without an artifact | [pr-7470.md](pr-7470.md) |
 | [#7502](https://github.com/QwenLM/qwen-code/pull/7502) | ❌ closed | feat(integrations): Add enterprise multi-tenant memory gateway | [pr-7502.md](pr-7502.md) |
 | [#7505](https://github.com/QwenLM/qwen-code/pull/7505) | 🟡 open | feat(integrations): Add canonical memory persistence | [pr-7505.md](pr-7505.md) |
@@ -25,6 +25,11 @@
 | [#7507](https://github.com/QwenLM/qwen-code/pull/7507) | 🟡 open | feat(integrations): Add governed memory lifecycle | [pr-7507.md](pr-7507.md) |
 | [#7508](https://github.com/QwenLM/qwen-code/pull/7508) | 🟡 open | feat(integrations): Add enterprise memory APIs | [pr-7508.md](pr-7508.md) |
 | [#7509](https://github.com/QwenLM/qwen-code/pull/7509) | 🟡 open | feat(integrations): Add enterprise memory foundations | [pr-7509.md](pr-7509.md) |
-| [#7512](https://github.com/QwenLM/qwen-code/pull/7512) | 🟡 open | perf(startup): lazy-load Google GenAI SDK on first use | [pr-7512.md](pr-7512.md) |
+| [#7512](https://github.com/QwenLM/qwen-code/pull/7512) | ✅ merged | perf(startup): lazy-load Google GenAI SDK on first use | [pr-7512.md](pr-7512.md) |
+| [#7536](https://github.com/QwenLM/qwen-code/pull/7536) | ✅ merged | feat(core): Align GenAI telemetry with ARMS | [pr-7536.md](pr-7536.md) |
+| [#7558](https://github.com/QwenLM/qwen-code/pull/7558) | ✅ merged | perf(cli): Defer ACP telemetry initialization | [pr-7558.md](pr-7558.md) |
+| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | 🟡 open | feat(integrations): add direct external context provider | [pr-7586.md](pr-7586.md) |
+| [#7594](https://github.com/QwenLM/qwen-code/pull/7594) | 🟡 open | perf(cli): Propagate compile cache to ACP children | [pr-7594.md](pr-7594.md) |
+| [#7603](https://github.com/QwenLM/qwen-code/pull/7603) | 🟡 open | fix(sdk-java): Harden daemon transport reliability | [pr-7603.md](pr-7603.md) |
 
-_按个人 PR 口径更新于 2026-07-22_
+_按个人 PR 口径更新于 2026-07-23_

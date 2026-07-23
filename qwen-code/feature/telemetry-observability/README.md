@@ -12,12 +12,12 @@
 
 | # | 子文档 | 覆盖 |
 |---|---|---|
-| 01 | [SDK 初始化与 OTLP 信号路由](01-sdk-init-and-otlp-routing.md) | init/shutdown、grpc/http/file 路由、NOOP propagator、桥接死代码(#3779)，以及 #7276 的 lazy SDK facade / protocol exporter split |
+| 01 | [SDK 初始化与 OTLP 信号路由](01-sdk-init-and-otlp-routing.md) | init/shutdown、grpc/http/file 路由、NOOP propagator、桥接死代码(#3779)，#7276 的 lazy SDK facade / protocol exporter split，以及 #7558 的 ACP initialize response 后 telemetry init |
 | 02 | [层级 span 树与统一创建](02-span-tree-and-creation.md) | session→interaction→llm_request/tool→tool.execution/hook/blocked、防泄漏 |
 | 03 | [上下文传播与并发隔离](03-context-propagation-and-concurrency.md) | ALS、resolveParentContext、subagent 并发隔离(#4410) |
 | 04 | [敏感属性 opt-in 与 PII](04-sensitive-attributes-and-pii.md) | 门控链、截断 / SHA-256 去重、response_text 未门控泄露面 |
 | 05 | [trace↔日志关联与 daemon 端遥测](05-correlation-and-daemon-telemetry.md) | getTraceContext、daemon route span、W3C 跨进程传播 |
-| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数 |
+| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS 字段对齐 |
 | 07 | [出站关联与 traceparent 传播](07-outbound-correlation.md) | 默认安全、OTLP 反馈环防护、opt-in 广播安全面 |
 
 ---
@@ -44,7 +44,8 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup profile helper。
-- **telemetry SDK lazy loading（#7276/#7456）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。
+- **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
+- **GenAI / ARMS 字段对齐（#7536）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id，并在 LLM/tool/subagent span 上写入与 OTel GenAI semantic conventions 和 ARMS LLM Trace 对齐的字段。
 
 ---
 
