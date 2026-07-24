@@ -28,8 +28,13 @@
 | [#7512](https://github.com/QwenLM/qwen-code/pull/7512) | ✅ merged | perf(startup): lazy-load Google GenAI SDK on first use | [pr-7512.md](pr-7512.md) |
 | [#7536](https://github.com/QwenLM/qwen-code/pull/7536) | ✅ merged | feat(core): Align GenAI telemetry with ARMS | [pr-7536.md](pr-7536.md) |
 | [#7558](https://github.com/QwenLM/qwen-code/pull/7558) | ✅ merged | perf(cli): Defer ACP telemetry initialization | [pr-7558.md](pr-7558.md) |
-| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | 🟡 open | feat(integrations): add direct external context provider | [pr-7586.md](pr-7586.md) |
-| [#7594](https://github.com/QwenLM/qwen-code/pull/7594) | 🟡 open | perf(cli): Propagate compile cache to ACP children | [pr-7594.md](pr-7594.md) |
-| [#7603](https://github.com/QwenLM/qwen-code/pull/7603) | 🟡 open | fix(sdk-java): Harden daemon transport reliability | [pr-7603.md](pr-7603.md) |
+| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | 🟡 open | feat(integrations): add retrieval-only external context search | [pr-7586.md](pr-7586.md) |
+| [#7594](https://github.com/QwenLM/qwen-code/pull/7594) | ✅ merged | perf(cli): Propagate compile cache to ACP children | [pr-7594.md](pr-7594.md) |
+| [#7603](https://github.com/QwenLM/qwen-code/pull/7603) | ✅ merged | fix(sdk-java): Harden daemon transport reliability | [pr-7603.md](pr-7603.md) |
+| [#7619](https://github.com/QwenLM/qwen-code/pull/7619) | ✅ merged | fix(daemon): address epoch cursor review follow-ups | [pr-7619.md](pr-7619.md) |
+| [#7622](https://github.com/QwenLM/qwen-code/pull/7622) | ✅ merged | fix(acp-bridge): resource hardening for the session event pipeline (DAEMON-009/010/011) | [pr-7622.md](pr-7622.md) |
+| [#7635](https://github.com/QwenLM/qwen-code/pull/7635) | ✅ merged | feat(core): Align GenAI request telemetry with ARMS | [pr-7635.md](pr-7635.md) |
+| [#7650](https://github.com/QwenLM/qwen-code/pull/7650) | ✅ merged | fix(core): Preserve usage after empty OpenAI stream frames | [pr-7650.md](pr-7650.md) |
+| [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | 🟡 open | feat(core): Align GenAI content telemetry fields | [pr-7667.md](pr-7667.md) |
 
-_按个人 PR 口径更新于 2026-07-23_
+_按个人 PR 口径更新于 2026-07-24_

@@ -33,6 +33,9 @@
 | #3893 | MERGED | 敏感属性 opt-in | 弱相关：`logApiResponse` 的 `response_text` 与本文 token 计量同函数；详见 04 子文档。 |
 | #4212 / #4302 | MERGED | stream idle 超时 / 一致性 | 相关：`STREAM_IDLE_TIMEOUT_MS` 与 `spanEndedByTimeout` 闸门是 TTFT 闭包所在的 `loggingStreamWrapper` 的防泄漏骨架；#4432 的 `retrySnapshot` 必须穿透这条超时路径。 |
 | #7536 | MERGED（2026-07-23） | GenAI / ARMS 字段对齐 | 新增 provider/operation/output type resolver、usage provenance，并让 LLM/tool/subagent span 写入与 OTel GenAI semconv 和 ARMS LLM Trace 对齐的字段。 |
+| #7635 | MERGED（2026-07-24） | GenAI request 参数字段 | 从 provider-final SDK request 捕获 choice count、max tokens、temperature、top_p、frequency/presence penalty 和 stop sequences，写入 ARMS/OTel 对齐字段。 |
+| #7650 | MERGED（2026-07-24） | OpenAI empty frame usage preservation | 修正 OpenAI-compatible stream 中 no-candidate empty frame 提前 flush finish 的问题，保留后续 usage-only frame。 |
+| #7667 | OPEN（2026-07-24） | GenAI content telemetry fields | 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，并移除等价私有字段。 |
 
 ---
 
@@ -192,7 +195,38 @@ recordTokenUsageMetrics(config, event.thoughts_token_count, { model, type: 'thou
 
 边界：敏感内容仍受 detailed sensitive attributes gate 控制；#7536 只对齐 metadata 字段，不扩大 prompt、tool input/result 或 model output 的默认暴露面。
 
-### 4. 派生指标：`sampling_ms` 公式 + 除零守卫
+### 4. GenAI request 参数字段（#7635）
+
+#7635 补齐的是 request 参数侧字段，而不是 prompt/content。新增 `telemetry/gen-ai-request.ts` observer，通过 OpenTelemetry Context 挂到当前 LLM span。OpenAI、Anthropic、Gemini/Qwen 的 provider-final request 在真正发送前调用 report helper，抓取第一份最终 SDK request snapshot。
+
+字段口径：
+
+- 写入 `gen_ai.request.choice.count`、`gen_ai.request.max_tokens`、`gen_ai.request.temperature`、`gen_ai.request.top_p`、`gen_ai.request.frequency_penalty`、`gen_ai.request.presence_penalty`、`gen_ai.request.stop_sequences`。
+- 只记录最终 request 中明确存在且有效的值；不推断 SDK/server default。
+- choice count 为 1 时省略；0、空数组等有意义的安全值保留。
+- first snapshot wins；retry/fallback 后续 attempt 不覆盖首次 provider-final request。
+- telemetry failure best-effort，不阻断模型请求。
+
+这个设计避免从用户输入层读参数，因为 adapter 可能补默认、移除 provider 不支持字段或按 output window clamp `max_tokens`；只有 provider-final request 才是 ARMS 应展示的真实请求面。
+
+### 5. OpenAI empty stream usage preservation（#7650）
+
+#7650 修复 OpenAI-compatible provider 的流式边界：provider 可以发出“content → finish(no usage) → empty choices/no candidates → usage-only → EOF”。旧逻辑没有把 no-candidate frame 视为空，导致 pending finish 在 usage-only frame 到来前被 flush，最终 transcript/span 里缺 usage。
+
+最终实现把没有 candidate parts 的 frame 统一视为 empty，不论 candidates/choices 是空数组还是缺失。empty frame 不触发 pending finish flush；finish-only、usage-only、tool-call preparation frame 仍按有效 frame 处理。回归测试用 mutation guard 确认 finish 不是提前 yield 后又被后续对象修改出来的假阳性。
+
+### 6. GenAI content telemetry fields（#7667 当前 open）
+
+#7667 当前 open diff 把敏感内容字段对齐到 OTel GenAI / ARMS 可识别的 standard attributes：
+
+- `gen_ai.input.messages`、`gen_ai.output.messages`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`。
+- tool spans 上的 `gen_ai.tool.description`、`gen_ai.tool.call.arguments`、`gen_ai.tool.call.result`。
+
+LLM input/system/tool definitions 从第一份 provider-final SDK request 捕获，output messages 从最终物理 request attempt 捕获。OpenAI、Anthropic、Gemini、Vertex payload 转成 pinned JSON schema，支持 multi-candidate 与 streaming，但不保留 raw chunks。tool description 使用 registry 中的静态描述并做非敏感长度上限；tool arguments/result 仍受 sensitive attribute gate 控制，soft error 不写 result。
+
+敏感字段继续由 `telemetry.includeSensitiveSpanAttributes` 与 `sensitiveSpanAttributeMaxLength` 控制。invalid、cyclic、不完整或超过限制时整项省略；tool definitions 需要 type/name，optional parameters 只有能归一到 Draft-07 时才写入。旧私有等价字段和 `tool_schema` event 被移除或降级成 standard-field adapter，降低后端字段重复。
+
+### 7. 派生指标：`sampling_ms` 公式 + 除零守卫
 
 `endLLMRequestSpan` 在 token/ttft 之外派生两个属性（`session-tracing.ts` L440–457，**main / Phase 4a 版本**）：
 

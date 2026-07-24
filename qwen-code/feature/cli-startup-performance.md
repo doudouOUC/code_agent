@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 当前 open diff 让 ACP child 继承父进程启用的 Node compile cache。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -202,11 +202,11 @@ MCP tool adaptation 仍在 discovery/direct invocation 时加载官方 SDK，因
 
 最终实现让 `runAcpAgent` 观察 NDJSON transport 的 incoming `initialize` request id，并在成功写出同一 request id 的 initialize result 后才触发 telemetry init。普通 interactive TUI、prompt-interactive、headless 和 daemon parent 保持原有 telemetry 时序；失败 initialize 或非 matching response 不会启动 telemetry。这样 host 先拿到 protocol readiness，再让 ACP child 在后台完成 telemetry facade 的 single-flight init。
 
-### 3.10 ACP child compile cache propagation（#7594，当前 open）
+### 3.10 ACP child compile cache propagation（#7594）
 
 #7594 处理 Node compile cache 只在父进程生效的问题。production `serve` entry 已启用 module compile cache，但 spawned ACP child 没有同一 cache directory，因此仍要重新编译常用模块。
 
-当前 open diff 在 `scripts/cli-entry.js` 中，当 Node 报告本进程新启用 compile cache 时，把 resolved cache directory 写入环境，让后续 ACP child 继承。它不会覆盖用户已有配置，也不会在 disabled、failed 或 unsupported 情况下发布目录。`packages/cli/src/cli.test.ts` 覆盖成功传播、用户配置不覆盖和失败/禁用边界。
+最终实现把 compile cache 启用与传播封装到 `packages/cli/src/config/compile-cache.ts`。`scripts/cli-entry.js` 在进程早期启用 Node compile cache 后，通过 helper 决定是否把 resolved directory 发布到 child environment；用户显式配置、禁用、失败或 unsupported 情况下不会覆盖现状。`packages/cli/src/config/environment.ts` 和 `packages/cli/src/serve/fast-path-settings.ts` 确保 ACP child 在 normal serve 与 fast path 下都继承该目录，CLI/environment/fast-path tests 覆盖成功传播、用户配置不覆盖和失败/禁用边界。
 
 ---
 

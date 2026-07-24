@@ -1,7 +1,7 @@
 # 客户端适配器与 SDK（深入）
 
 > daemon/serve（Mode B）技术方案子文档；总览见 [`README.md`](README.md)。
-> 关键文件：`packages/sdk-typescript/src/daemon/DaemonSessionClient.ts`（530 行）、`DaemonClient.ts`（~2800 行）、`events.ts`（~2500 行）、`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon/*`（#7463 已合入，#7603 当前 open follow-up）、`packages/cli/src/ui/daemon/DaemonTuiAdapter.ts`（905 行）、`packages/channels/base/src/DaemonChannelBridge.ts`（705 行）、`packages/vscode-ide-companion/src/services/daemonIdeConnection.ts`（631 行）。
+> 关键文件：`packages/sdk-typescript/src/daemon/DaemonSessionClient.ts`（530 行）、`DaemonClient.ts`（~2800 行）、`events.ts`（~2500 行）、`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon/*`（#7463/#7603 已合入）、`packages/cli/src/ui/daemon/DaemonTuiAdapter.ts`（905 行）、`packages/channels/base/src/DaemonChannelBridge.ts`（705 行）、`packages/vscode-ide-companion/src/services/daemonIdeConnection.ts`（631 行）。
 
 ---
 
@@ -52,7 +52,8 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #7453 | @doudouOUC | merged | prompt-terminal follow-up：queued deadline typed error、running prompt hidden-but-retained、queued terminal 不污染 session turn state。 |
 | #7458 | @doudouOUC | merged | epoch-aware cursor：TS SDK 学习并回传 `eventEpoch`，daemon mismatch 时触发 `state_resync_required{detail:'epoch_mismatch'}`。 |
 | #7463 | @doudouOUC | merged | Java daemon transport alpha：新增 JVM HTTP/SSE daemon client/session/event/SSE/exception surface。 |
-| #7603 | @doudouOUC | open | Java daemon transport reliability hardening：消费 event epoch，收紧 SSE/JSON malformed path、terminal-before-202 和 teardown ordering。 |
+| #7603 | @doudouOUC | merged | Java daemon transport reliability hardening：消费 event epoch，收紧 SSE/JSON malformed path、terminal-before-202 和 teardown ordering。 |
+| #7619 | @doudouOUC | merged | epoch cursor review follow-up：固定 `eventEpoch` / `replayDegraded` response propagation，并修正 SDK `detail` 注释。 |
 
 ---
 
@@ -128,7 +129,7 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 
 #7269 进一步修复 REST SSE transport 的底层 request 生命周期：每次 `RestSseTransport.subscribeEvents()` 都创建 request-local `AbortController` 并登记到 active set，连接超时、caller `AbortSignal` 与 request controller 组合成 fetch signal。无论 consumer 正常 early return、抛错、stream error、connect error 还是 transport `dispose()`，generator `finally` 都会 abort 底层 fetch/TCP 并从 active set 移除；`dispose()` 幂等 abort 所有 active SSE 请求。`parseSseStream` 的 cleanup 改为 cancel body stream，防止 daemon EventBus subscriber 或 pending read 因 iterator 不再消费而悬挂。
 
-#7458 让 TS SDK 把 SSE cursor 从单个数字扩展成 `(eventEpoch,lastSeenEventId)`。`DaemonSessionClient` 从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch；后续 reconnect 回传该 epoch，daemon 若发现 mismatch 会用 `state_resync_required{detail:'epoch_mismatch'}` 要求快照恢复。旧 daemon 不返回 epoch 时，SDK 保持原有 `Last-Event-ID` 数字续传行为。
+#7458 让 TS SDK 把 SSE cursor 从单个数字扩展成 `(eventEpoch,lastSeenEventId)`。`DaemonSessionClient` 从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch；后续 reconnect 回传该 epoch，daemon 若发现 mismatch 会用 `state_resync_required{detail:'epoch_mismatch'}` 要求快照恢复。旧 daemon 不返回 epoch 时，SDK 保持原有 `Last-Event-ID` 数字续传行为。#7619 将 `state_resync_required.detail` 文档化为显式可选字段，并补 route 回归，避免 load response 过滤掉 `eventEpoch` / `replayDegraded`。
 
 实际迭代发生在 `iterateEvents()`（L462-488）：
 
@@ -173,7 +174,7 @@ private async *iterateEvents(opts, release) {
 
 传输策略与 daemon reliability contract 对齐：POST admission 不盲目重试；成功拿到 prompt watermark 后用 `Accept-Encoding: identity` + `Last-Event-ID` 建 SSE；只有 observer 成功接收事件后推进 cursor；terminal 缺失、gap、observer failure 或 mutation response 丢失时不返回部分成功。该 client 依赖 #7386/#7400/#7453/#7458 提供的 detach 幂等、prompt terminal、typed deadline 和 event epoch 语义。
 
-#7603 当前 open diff 让 Java client 也完整消费 #7458 的 `(eventEpoch,lastEventId)` cursor。`PromptAcceptance` 保存 epoch，initial SSE request 和 reconnect 都发送 `X-Qwen-Event-Epoch`；response epoch mismatch 在消费事件前 fail closed。该 follow-up 还补 truncated JSON、null data、terminal-before-202 buffering、teardown ordering 和 real daemon E2E harness。
+#7603 让 Java client 也完整消费 #7458 的 `(eventEpoch,lastEventId)` cursor。`PromptAcceptance` 保存 epoch，initial SSE request 和 reconnect 都发送 `X-Qwen-Event-Epoch`；response epoch mismatch 在消费事件前 fail closed。该 follow-up 还补 truncated JSON、null data、terminal-before-202 buffering、teardown ordering 和 real daemon E2E harness。
 
 ---
 

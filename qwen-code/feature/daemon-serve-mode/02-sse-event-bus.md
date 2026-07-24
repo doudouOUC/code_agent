@@ -41,6 +41,8 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 | [#4820](https://github.com/QwenLM/qwen-code/pull/4820) | — | 新增 `session_rewound` SSE 事件——rewind 成功后 `entry.events.publish({type:'session_rewound', data:{sessionId, promptId, targetTurnIndex, filesChanged, filesFailed}})` 走 per-session EventBus 推送，使其他已附着客户端实时感知回退操作。 |
 | [#6314](https://github.com/QwenLM/qwen-code/pull/6314) | W27 follow-up | 每 subscriber 增加 live serialized-byte backlog cap，`slow_client_warning` 带 byte telemetry，累计 live bytes 超 daemon-owned 预算时只驱逐该 subscriber 并返回 `client_evicted{reason:'queue_bytes_overflow'}`。已合入 main。 |
 | [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | W30 merged | 为每个 EventBus mint 显式 `eventEpoch`，通过 REST/SSE headers 与客户端重连回传检测 daemon restart 后的 stale cursor；compaction replay 保留 attribution，并在 ingest failure 后暴露 degraded snapshot。 |
+| [#7619](https://github.com/QwenLM/qwen-code/pull/7619) | W30 merged | 补 session load route 对 `eventEpoch` / `replayDegraded` response 字段的回归覆盖，并修正 degraded breadcrumb 与 SDK `detail` 注释。 |
+| [#7622](https://github.com/QwenLM/qwen-code/pull/7622) | W30 merged | EventBus publish 前 eager 序列化并拒绝不可 JSON 事件；replay 增加 byte budget 与 `replay_budget_exceeded` resync；close 统一 dispose subscriber；compaction live journal 增加 event/byte cap。 |
 
 
 ---
@@ -74,6 +76,7 @@ per-session 一个实例。私有状态：
 | `eventEpoch` | #7458 | EventBus 构造时生成的不可复用 stream epoch token；不进入每个 `BridgeEvent` payload，而是经 REST response 与 SSE header 下发，供客户端把 cursor 解释为 `(epoch,lastEventId)` |
 | `ringSize` | 167 构造参 | 默认 `DEFAULT_RING_SIZE = 8000`（`eventBus.ts:76`） |
 | `maxSubscribers` | 168 构造参 | 默认 `DEFAULT_MAX_SUBSCRIBERS = 64`（`eventBus.ts:97`） |
+| `replayBudgetBytes` | #7622 | 重连 replay burst 的总字节预算，默认 live subscriber byte cap 的 4 倍；超限推 `state_resync_required{reason:'replay_budget_exceeded'}`，订阅继续 live。 |
 
 常量（含设计依据 doc）：`DEFAULT_MAX_QUEUED = 256`（L63，每订阅者 live backlog cap）、`WARN_THRESHOLD_RATIO = 0.75`（L85）、`WARN_RESET_RATIO = 0.375`（L87）、`DEFAULT_RING_SIZE = 8000`（L76，按 #3803 §02 为一个 chatty turn × 5s 重连窗口定容，约比典型繁忙 turn 多 30–60× 余量，代价每 session 几百 KB RAM）。
 
@@ -112,6 +115,8 @@ interface BoundedQueueEntry<T> { value: T; forced: boolean; }
 `liveCount` 是 #4237 的关键修复：**cap 只算 live 帧，`forcePush`（replay / 告警 / 终止帧）一律不计**。否则一次大 backlog 重连会 `forcePush ~ringSize` 条进 `buf`，下一条 live `publish` 立刻把刚 resume 的订阅者挤爆 — 违背 resume 契约。旧实现用 positional `forcedInBuf` 计数，仅当 forced 帧连续待在 buf **头部**时正确（subscribe-time replay）；`slow_client_warning` 改为 mid-stream `forcePush` 到 buf **尾部**后，count-based 方法会漂移（live `shift` 误减 `forcedInBuf` → 后续 cap 检查低估 live backlog → 过早 warn/evict）。per-entry `forced` 标记 + `liveCount` 是位置无关的正解（`eventBus.ts:566-608` doc）。
 
 PR #6314 在同一队列层补上 **live serialized-byte cap**：除 `liveCount` 外再维护 live bytes，默认每 subscriber 2 MiB。`forcePush` 的 replay / warning / eviction 仍不计入 live bytes，保护 `Last-Event-ID` replay 契约；单个 oversized event 在空队列上允许通过，防止健康消费者因单帧过大被误杀。byte 阈值上穿会复用 `slow_client_warning`，并在 payload 中带 queued/max byte telemetry；累计 live bytes 超预算时返回 `client_evicted{reason:'queue_bytes_overflow'}`，只关闭受影响 subscriber，不影响 session 或其它订阅者。
+
+PR #7622 在 publish 前 eager 计算并 memoize serialized byte length。不可 JSON 序列化的事件（例如 circular / BigInt payload）会被拒绝发布，记录诊断且不消耗 event id，不写入 ring、subscriber queue 或 compaction journal；同一个 byte length 复用于 live byte cap 与 compaction sizing，避免各层估算漂移。
 
 ### 帧序列化 `formatSseFrame`（`server.ts:3629`）
 
@@ -282,7 +287,16 @@ gap 帧 payload 三字段：`reason` / `lastDeliveredId` / `earliestAvailableId`
 
 TS SDK 保存 `eventEpoch` 与 `lastSeenEventId`，重连时随 `Last-Event-ID` 一起回传。daemon 收到不同 epoch 时不再依赖数值大小，直接在 replay 前 force-push `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}`，再按新 epoch 从当前 ring 全量 replay。旧 daemon 不提供 epoch 时，客户端继续走既有 numeric heuristic，保持向后兼容。
 
+#7619 补了一层 HTTP route regression：`session/load` response 必须把 `eventEpoch` 和 `replayDegraded` 从 bridge/event-bus 层带到 REST response，避免 DTO/whitelist 把恢复所需元数据吞掉。它还把 degraded breadcrumb 中的 session id 改为 JSON-stringified 文本，避免特殊字符破坏诊断输出。
+
 同一 PR 还把 compaction replay 的可靠性补齐：compaction slot 保留最近的 `sessionId`、`promptId`、`originatorClientId` 等 attribution，避免 load/resync 后丢失 turn 归属；如果 compaction ingest 失败，EventBus latch degraded snapshot 并在恢复面暴露该状态，消费者可以 fail closed 或回退持久 transcript，而不是把不完整 snapshot 当作权威状态。
+
+### Replay byte budget 与 live journal cap（#7622）
+
+#7622 解决两个 replay/compaction 的资源边界问题：
+
+1. **replay byte budget**：订阅者用 `Last-Event-ID` 重连时，EventBus 会按 memoized serialized byte length 累计 replay burst。超过预算后推 `state_resync_required{reason:'replay_budget_exceeded'}`，并保持订阅 live，让客户端拉 snapshot/resync，而不是让大量 retained frames 通过 `forcePush` 制造瞬时内存峰值。
+2. **compaction live journal cap**：compaction engine 的 in-flight journal 增加 `maxJournalEvents` 与 `maxJournalBytes`，超限时丢弃最老 live entries，并插入 `history_truncated{reason:'replay_window_exceeded', scope:'live_journal'}` marker。turn boundary compaction 仍折叠 merged working set，不因 live journal 截断而失去完整 turn compact 能力。
 
 ### SSE 写侧观测（`server.ts:2972-2990`）
 

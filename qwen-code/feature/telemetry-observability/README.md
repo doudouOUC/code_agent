@@ -17,7 +17,7 @@
 | 03 | [上下文传播与并发隔离](03-context-propagation-and-concurrency.md) | ALS、resolveParentContext、subagent 并发隔离(#4410) |
 | 04 | [敏感属性 opt-in 与 PII](04-sensitive-attributes-and-pii.md) | 门控链、截断 / SHA-256 去重、response_text 未门控泄露面 |
 | 05 | [trace↔日志关联与 daemon 端遥测](05-correlation-and-daemon-telemetry.md) | getTraceContext、daemon route span、W3C 跨进程传播 |
-| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS 字段对齐 |
+| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields |
 | 07 | [出站关联与 traceparent 传播](07-outbound-correlation.md) | 默认安全、OTLP 反馈环防护、opt-in 广播安全面 |
 
 ---
@@ -45,7 +45,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup profile helper。
 - **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
-- **GenAI / ARMS 字段对齐（#7536）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id，并在 LLM/tool/subagent span 上写入与 OTel GenAI semantic conventions 和 ARMS LLM Trace 对齐的字段。
+- **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes。
 
 ---
 

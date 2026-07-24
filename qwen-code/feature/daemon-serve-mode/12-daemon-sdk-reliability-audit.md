@@ -1,6 +1,6 @@
 # daemon / SDK 可靠性审计：流式完整性、终态与 Java 客户端
 
-> 审计日期：2026-07-20 至 2026-07-23
+> 审计日期：2026-07-20 至 2026-07-24
 >
 > qwen-code 基线：[`24a1c20dc85d9676e3275f4d304f8dd886b735b9`](https://github.com/QwenLM/qwen-code/commit/24a1c20dc85d9676e3275f4d304f8dd886b735b9)
 >
@@ -18,7 +18,9 @@
 >
 > 后续修复状态（2026-07-22）：[#7453](https://github.com/QwenLM/qwen-code/pull/7453) 已合入并补齐 #7400 follow-up（running prompt hidden-but-retained、queued terminal 不污染 session state、queued deadline typed error）。
 >
-> 后续修复状态（2026-07-23）：[#7458](https://github.com/QwenLM/qwen-code/pull/7458) 已合入并闭合 DAEMON-001/007/008（event epoch、compaction attribution、degraded snapshot）；[#7463](https://github.com/QwenLM/qwen-code/pull/7463) 已合入并实现 Java daemon transport alpha；[#7603](https://github.com/QwenLM/qwen-code/pull/7603) 当前 open diff 正在补齐 Java 侧 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering follow-up。
+> 后续修复状态（2026-07-23）：[#7458](https://github.com/QwenLM/qwen-code/pull/7458) 已合入并闭合 DAEMON-001/007/008（event epoch、compaction attribution、degraded snapshot）；[#7463](https://github.com/QwenLM/qwen-code/pull/7463) 已合入并实现 Java daemon transport alpha。
+>
+> 后续修复状态（2026-07-24）：[#7603](https://github.com/QwenLM/qwen-code/pull/7603) 已合入并补齐 Java 侧 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering follow-up；[#7619](https://github.com/QwenLM/qwen-code/pull/7619) 已合入并补 load response `eventEpoch` / `replayDegraded` 回归；[#7622](https://github.com/QwenLM/qwen-code/pull/7622) 已合入并闭合 DAEMON-009/010/011（live journal cap、subscriber close dispose、publish serialization 与 replay byte budget）。
 
 这批问题中存在多条能够独立造成“流式输出只剩前半段、卡片提前结束或调用永久等待”的路径：
 
@@ -165,7 +167,9 @@ flowchart LR
 | 责任侧 | EventBus/compaction。 |
 | 最小修复 | 标记 snapshot degraded 并暴露诊断；恢复时拒绝使用已知不完整 snapshot 或退回持久 transcript。 |
 
-### DAEMON-009：长时间未结束的 turn 可造成 live journal 无界增长
+### DAEMON-009：长时间未结束的 turn 可造成 live journal 无界增长（已由 #7622 修复）
+
+> 修复状态：#7622 为 compaction live journal 增加 `maxJournalEvents` 与 `maxJournalBytes`，超限时丢弃最老 live entries，并插入 `history_truncated{reason:'replay_window_exceeded', scope:'live_journal'}` marker；turn boundary compaction 仍折叠 merged working set，不依赖被截断的 live journal。
 
 | 字段 | 内容 |
 |---|---|
@@ -176,7 +180,9 @@ flowchart LR
 | 责任侧 | compaction。 |
 | 最小修复 | 对 in-flight journal 实施字节和事件上限；超过上限生成明确 truncation/degraded marker。 |
 
-### DAEMON-010：关闭未启动订阅者时可能保留 listener/queue
+### DAEMON-010：关闭未启动订阅者时可能保留 listener/queue（已由 #7622 修复）
+
+> 修复状态：#7622 让 EventBus `close()` 对每个 subscriber 调统一 `dispose()`，而不是只 close queue/clear set；从未开始迭代的 subscriber 也会摘除 AbortSignal listener 并释放 queue/bus closure 引用。
 
 | 字段 | 内容 |
 |---|---|
@@ -187,7 +193,9 @@ flowchart LR
 | 责任侧 | EventBus lifecycle。 |
 | 最小修复 | `close()` 对每个 subscriber 调统一 dispose，而不是只 close queue/clear set。 |
 
-### DAEMON-011：异常序列化与 replay 可绕过事件字节预算
+### DAEMON-011：异常序列化与 replay 可绕过事件字节预算（已由 #7622 修复）
+
+> 修复状态：#7622 在 publish 前 eager `JSON.stringify` 并 memoize serialized byte length。不可序列化事件直接拒绝发布，不烧 event id、不写 ring/subscriber/compaction；replay 增加独立 byte budget，超限推 `state_resync_required{reason:'replay_budget_exceeded'}` 并保持订阅 live。
 
 | 字段 | 内容 |
 |---|---|
@@ -789,7 +797,7 @@ flowchart LR
 - typed/raw 双事件入口；未知 additive event 不丢失。
 - Java 11+ HTTP client，SSE 固定 UTF-8/identity；明确 executor ownership 和 close 语义。
 
-#7603 当前 open diff 继续补 Java follow-up：`PromptAcceptance` 保存 `eventEpoch`，SSE request/reconnect 携带 `X-Qwen-Event-Epoch`，response epoch mismatch fail closed；同时补 truncated JSON、null data、terminal-before-202 buffering、teardown ordering 和 real daemon E2E harness。
+#7603 已合入并补 Java follow-up：`PromptAcceptance` 保存 `eventEpoch`，SSE request/reconnect 携带 `X-Qwen-Event-Epoch`，response epoch mismatch fail closed；同时补 truncated JSON、null data、terminal-before-202 buffering、teardown ordering 和 real daemon E2E harness。#7619 另补 REST load response 的 `eventEpoch` / `replayDegraded` 传播回归；#7622 补 EventBus / compaction resource hardening，关闭 DAEMON-009/010/011。
 
 ### Phase 5：独立修复旧 Java SDK
 

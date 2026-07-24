@@ -12,7 +12,7 @@
 | # | 子文档 | 覆盖 |
 |---|---|---|
 | 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、prompt route 202 + bridge-owned deadline / 权限响应超时 / access log |
-| 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、state_resync、event epoch、compaction degraded replay、协议帧 serverTimestamp/provenance/errorKind |
+| 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、replay byte budget、state_resync、event epoch、compaction degraded/truncated replay、协议帧 serverTimestamp/provenance/errorKind |
 | 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268 open） |
 | 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写 |
@@ -20,9 +20,9 @@
 | 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量 |
 | 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、绕过 prompt FIFO、shell `this`-binding 隐患 |
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
-| 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor 与 Java daemon transport alpha |
+| 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor、Java daemon transport alpha 与 #7603 reliability follow-up |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state |
-| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、#7458/#7463 已合入状态、#7603 follow-up、修复顺序和验收矩阵 |
+| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、#7458/#7463/#7603/#7622 已合入状态、修复顺序和验收矩阵 |
 
 ---
 
@@ -158,14 +158,15 @@ flowchart TB
 
 **订阅者上限**：`DEFAULT_MAX_SUBSCRIBERS = 64`/session。超限 `subscribe()` 抛 `SubscriberLimitExceededError`，SSE 路由捕获后返回 **`429 + Retry-After`**（不是 `200 + stream_error`，因为后者会触发 `EventSource` 自动重连放大攻击面）。
 
-**state_resync_required（resync 语义）**：当客户端带 `Last-Event-ID` 重连但游标已被 ring 淘汰或跨越 epoch（daemon 重启使 `nextId` 归 1），EventBus 在 replay **之前**先 force-push 一个 `state_resync_required` 帧，**但流保持 OPEN**（与 `client_evicted` 不同）。两种原因：
+**state_resync_required（resync 语义）**：当客户端带 `Last-Event-ID` 重连但游标已被 ring 淘汰、跨越 epoch（daemon 重启使 `nextId` 归 1）或 replay byte budget 超限，EventBus 在 replay **之前或过程中** force-push 一个 `state_resync_required` 帧，**但流保持 OPEN**（与 `client_evicted` 不同）。三种原因：
 
 - `ring_evicted`：`earliestInRing > lastEventId + 1`，中间帧已被淘汰。
 - `epoch_reset`：`lastEventId >= this.nextId`，游标属于已死 epoch（daemon 重启）。此时 replay 全量重放当前 ring（`replayFrom = 0`）。
+- `replay_budget_exceeded`：#7622 的 replay byte budget 防止 retained frames 通过 force-push 绕过 live byte cap；超限后客户端按 snapshot/resync 契约恢复。
 
 SDK reducer 看到该帧后置 `awaitingResync`，先调 `loadSession` 拉全量再恢复应用增量。SSE 路由侧（`server.ts` SSE handler）还会把 resync 写一行 stderr 便于排障（"ring eviction detected … gap=N events"）。
 
-#7458 把这个数值启发式升级为显式 `eventEpoch`：每个 EventBus 在构造时 mint 一个不可复用 epoch token，并通过 create/load/resume response、non-blocking prompt 202 envelope 与 `X-Qwen-Event-Epoch` SSE header 下发。客户端重连时在 `Last-Event-ID` 旁回传该 token；daemon 发现 epoch 不一致时强制 `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}`，避免 daemon 重启后新一代低 event id 被旧 cursor 静默跳过。同一 diff 还让 compacted replay 保留最近 prompt/originator attribution，并在 compaction ingest failure 后暴露 degraded snapshot，而不是把不完整 snapshot 伪装成权威恢复源。
+#7458 把这个数值启发式升级为显式 `eventEpoch`：每个 EventBus 在构造时 mint 一个不可复用 epoch token，并通过 create/load/resume response、non-blocking prompt 202 envelope 与 `X-Qwen-Event-Epoch` SSE header 下发。客户端重连时在 `Last-Event-ID` 旁回传该 token；daemon 发现 epoch 不一致时强制 `state_resync_required{reason:'epoch_reset', detail:'epoch_mismatch'}`，避免 daemon 重启后新一代低 event id 被旧 cursor 静默跳过。同一 diff 还让 compacted replay 保留最近 prompt/originator attribution，并在 compaction ingest failure 后暴露 degraded snapshot，而不是把不完整 snapshot 伪装成权威恢复源。#7619 再补 load route response 对 `eventEpoch`/`replayDegraded` 的回归覆盖；#7622 增加 publish 序列化拒绝、replay byte budget 和 compaction live journal cap。
 
 ```mermaid
 stateDiagram-v2
@@ -633,6 +634,8 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #7458 | SSE / replay reliability | 显式 `eventEpoch` 检测 stale cursor，compaction 保留 attribution 并暴露 degraded snapshot。 |
 | #7463 | Java daemon SDK | 新增 Java daemon transport alpha，并把 admission watermark、resumable SSE、terminal correlation 和 fail-closed exception taxonomy 写入 client contract。 |
 | #7603 | Java daemon SDK reliability | Java client 消费 event epoch，收紧 SSE/JSON malformed path、terminal-before-202 和 teardown ordering。 |
+| #7619 | epoch cursor follow-up | 补 load route `eventEpoch`/`replayDegraded` response 回归、degraded breadcrumb 转义和 SDK `detail` 注释。 |
+| #7622 | EventBus / compaction resource hardening | 拒绝不可序列化事件、增加 replay byte budget、subscriber close dispose 和 live journal event/byte cap。 |
 
 ### 鉴权 / 变更门控
 
