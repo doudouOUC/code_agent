@@ -36,5 +36,6 @@
 | [#7635](https://github.com/QwenLM/qwen-code/pull/7635) | ✅ merged | feat(core): Align GenAI request telemetry with ARMS | [pr-7635.md](pr-7635.md) |
 | [#7650](https://github.com/QwenLM/qwen-code/pull/7650) | ✅ merged | fix(core): Preserve usage after empty OpenAI stream frames | [pr-7650.md](pr-7650.md) |
 | [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | 🟡 open | feat(core): Align GenAI content telemetry fields | [pr-7667.md](pr-7667.md) |
+| [#7686](https://github.com/QwenLM/qwen-code/pull/7686) | 🟡 open | perf(core): Lazy-load first-use dependencies | [pr-7686.md](pr-7686.md) |
 
-_按个人 PR 口径更新于 2026-07-24_
+_按个人 PR 口径更新于 2026-07-25_

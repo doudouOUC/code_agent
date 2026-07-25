@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-07-20 ~ 2026-07-26 (W30 周内累计)
 
-> 本文件已整理 2026-07-20 ~ 2026-07-24（Asia/Shanghai）的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。
+> 本文件已整理 2026-07-20 ~ 2026-07-25（Asia/Shanghai）的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。
 
-**主题**: Plan mode entry boundary、workspace trust hot reload、SDK SSE request cleanup、lazy telemetry SDK / OTLP protocol split、ACP permission cancellation preservation、final tool response budget、daemon detach attach-ref ledger、exactly-once prompt terminal events、prompt-terminal follow-up hardening、lazy undici、daemon replay epoch/compaction hardening、Java daemon SDK alpha、Shell truncation regression、enterprise memory gateway stack、lazy Google GenAI SDK、GenAI telemetry ARMS alignment、deferred ACP telemetry init、retrieval-only external context search、ACP compile cache propagation、Java daemon transport reliability hardening、epoch cursor review follow-up、daemon event pipeline resource hardening、GenAI request telemetry ARMS alignment、OpenAI empty-frame usage preservation、GenAI content telemetry fields
+**主题**: Plan mode entry boundary、workspace trust hot reload、SDK SSE request cleanup、lazy telemetry SDK / OTLP protocol split、ACP permission cancellation preservation、final tool response budget、daemon detach attach-ref ledger、exactly-once prompt terminal events、prompt-terminal follow-up hardening、lazy undici、daemon replay epoch/compaction hardening、Java daemon SDK alpha、Shell truncation regression、enterprise memory gateway stack、lazy Google GenAI SDK、GenAI telemetry ARMS alignment、deferred ACP telemetry init、retrieval-only external context search、ACP compile cache propagation、Java daemon transport reliability hardening、epoch cursor review follow-up、daemon event pipeline resource hardening、GenAI request telemetry ARMS alignment、OpenAI empty-frame usage preservation、GenAI content telemetry fields、first-use dependency lazy loading
 
-**PR 统计**: 32 PRs - 22 merged / 8 open / 2 closed
+**PR 统计**: 33 PRs - 22 merged / 9 open / 2 closed
 **当前已合并 PR 代码量**: +22,866 / -2,520，309 个文件变更
-**全量代码量**: +68,099 / -5,654，625 个文件变更
-**类型分布**: feat ×12, fix ×12, perf ×6, test ×2
-**范围 (scope)**: core ×7, integrations ×7, acp-bridge ×4, cli ×3, telemetry ×3, sdk-java ×2, serve ×2, startup ×2, daemon ×1, sdk ×1
+**全量代码量**: +69,056 / -5,794，660 个文件变更
+**类型分布**: feat ×12, fix ×12, perf ×7, test ×2
+**范围 (scope)**: core ×8, integrations ×7, acp-bridge ×4, cli ×3, telemetry ×3, sdk-java ×2, serve ×2, startup ×2, daemon ×1, sdk ×1
 
 ---
 
@@ -48,6 +48,7 @@
 | [#7635](https://github.com/QwenLM/qwen-code/pull/7635) | ✅ merged | @doudouOUC | feat(core): Align GenAI request telemetry with ARMS | +759/-16 | 12 | 07-24 02:14 | 07-24 04:34 |
 | [#7650](https://github.com/QwenLM/qwen-code/pull/7650) | ✅ merged | @doudouOUC | fix(core): Preserve usage after empty OpenAI stream frames | +65/-38 | 2 | 07-24 04:51 | 07-24 07:09 |
 | [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | 🟡 open | @doudouOUC | feat(core): Align GenAI content telemetry fields | +5620/-1368 | 34 | 07-24 11:43 | — |
+| [#7686](https://github.com/QwenLM/qwen-code/pull/7686) | 🟡 open | @doudouOUC | perf(core): Lazy-load first-use dependencies | +957/-140 | 35 | 07-24 16:14 | — |
 
 ---
 
@@ -87,6 +88,7 @@
 | [#7635](https://github.com/QwenLM/qwen-code/pull/7635) | #7536 已对齐 provider/response/usage metadata，但 ARMS 还需要请求侧参数：choice count、max tokens、temperature、top_p、frequency/presence penalty 和 stop sequences；这些字段必须以 provider-final request 为准，不能用用户输入或 SDK 默认猜测。 | 最终实现新增 `telemetry/gen-ai-request.ts` observer，通过 OpenTelemetry Context 在 OpenAI、Anthropic、Gemini/Qwen request 发送边界抓取第一份 provider-final request snapshot；只记录有效、明确存在的值，choice count 为 1 时省略，重试/回退不能覆盖 first snapshot，telemetry failure best-effort。集成测试覆盖 fake OpenAI 和 CLI telemetry。 | 已更新 [telemetry-observability](../../feature/telemetry-observability/)。完整实现见 [implementations/pr-7635.md](implementations/pr-7635.md)。 |
 | [#7650](https://github.com/QwenLM/qwen-code/pull/7650) | OpenAI-compatible streaming provider 可能按“内容 → finish（无 usage）→ 空 choices/no candidates → usage-only → EOF”输出；旧 empty-frame 判断没有识别 no-candidate 空帧，导致 pending finish 在 usage 到达前被 flush，transcript/telemetry 丢 usage。 | 最终实现把没有 candidate parts 的 stream frame 统一视为 empty，不论 candidates/choices 是空数组还是缺失；finish-only、usage-only、tool-call preparation frame 仍保持有效。pending finish 会等 usage 或 EOF 再释放，回归测试用 mutation guard 确认早 flush 不会被后续对象修改掩盖。 | 已更新 telemetry observability 文档。完整实现见 [implementations/pr-7650.md](implementations/pr-7650.md)。 |
 | [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | GenAI span 的敏感内容字段仍与 OTel/ARMS 不完全对齐，LLM input/output messages、system instructions、tool definitions、tool call arguments/result 分散在私有字段或事件里，后端难以按统一 schema 展示。 | 当前 open diff 新增 GenAI content/exchange observer：从第一份 provider-final SDK request 捕获 input/system/tool definitions，从最终物理 request attempt 捕获 output messages，并把 OpenAI/Anthropic/Gemini/Vertex payload 转成 pinned GenAI JSON schema；tool spans 记录 registry description、最终 invocation params 和成功结果。敏感字段继续受 `telemetry.includeSensitiveSpanAttributes` 和大小限制门控，invalid/cyclic/oversized 内容整项省略；旧私有等价字段和 `tool_schema` event 被移除或降级为标准字段 adapter。 | 已更新 [telemetry-observability](../../feature/telemetry-observability/)。完整实现见 [implementations/pr-7667.md](implementations/pr-7667.md)。 |
+| [#7686](https://github.com/QwenLM/qwen-code/pull/7686) | ACP child 启动期 static closure 仍急切带上 `iconv-lite`、`@xterm/headless` 和 `simple-git`，但多数 session 不会在 bootstrap 阶段使用非 UTF-8 codec、PTY terminal replay 或 Git worktree 操作。 | 当前 open diff 新增 `iconv-lite` / `@xterm/headless` / `simple-git` first-use single-flight loader，并校验动态模块 shape；文件服务内部读写改走 async codec loader，同时保留 package-root 同步 encoding 兼容入口并用 esbuild 定向插件从 ACP 闭包里 tree-shake 掉；PTY 只在选中 PTY 路径后加载 xterm，且首次加载期间 abort 不 spawn；Git service 构造无副作用，第一次真实 Git 操作才加载依赖；CLI deferred Core runtime 改为窄入口，bundle guard 禁止三包静态回到 ACP closure。 | 已更新 [cli-startup-performance.md](../../feature/cli-startup-performance.md)。完整实现见 [implementations/pr-7686.md](implementations/pr-7686.md)。 |
 
 ## PR 对应 feature 覆盖
 
@@ -96,10 +98,10 @@
 | [daemon-serve-mode/](../../feature/daemon-serve-mode/) | #7268 / #7295 / #7386 / #7400 / #7453 / #7458 / #7463 / #7603 / #7619 / #7622 | 补 workspace trust hot reload、ACP permission cancellation、attach-ref ledger detach 幂等、prompt terminal exactly-once、#7400 follow-up、event epoch stale cursor detection、compaction attribution/degraded replay、Java daemon SDK alpha、#7603 Java reliability hardening、#7619 epoch cursor review follow-up，以及 #7622 EventBus/compaction resource hardening。 |
 | [sdk.md](../../feature/sdk.md) | #7269 / #7268 / #7400 / #7458 / #7463 / #7603 / #7619 | 补 REST SSE cleanup、trust v2、prompt terminal exactly-once、epoch-aware TS daemon cursor/reconnect、Java daemon transport alpha、Java 对 event epoch / SSE / JSON 边界的 follow-up hardening，以及 `state_resync_required.detail` SDK 注释修正。 |
 | [telemetry-observability/](../../feature/telemetry-observability/) | #7276 / #7447(closed) / #7456 / #7536 / #7558 / #7635 / #7650 / #7667(open) | 补 telemetry facade/implementation 懒加载、async init、OTLP protocol chain split、bundle guard、daemon metrics init ordering test、`metricReader` asymmetry、GenAI/ARMS metadata 字段对齐、request 参数字段对齐、OpenAI empty frame usage preservation，以及 GenAI content/tool sensitive span fields。 |
-| [cli-startup-performance.md](../../feature/cli-startup-performance.md) | #7276 / #7455 / #7512 / #7558 / #7594 / #7447(closed) | 补 ACP child static closure 中 telemetry、undici、Google GenAI SDK 的懒加载与 bundle guard；补 ACP telemetry init 后移和已合入的 compile cache 目录传播。 |
+| [cli-startup-performance.md](../../feature/cli-startup-performance.md) | #7276 / #7455 / #7512 / #7558 / #7594 / #7447(closed) / #7686(open) | 补 ACP child static closure 中 telemetry、undici、Google GenAI SDK 的懒加载与 bundle guard；补 ACP telemetry init 后移、#7594 compile cache 目录传播，以及 #7686 当前 open diff 对 `iconv-lite`、`@xterm/headless`、`simple-git` 的首次使用动态加载与 static closure guard。 |
 | [tool-response-budget.md](../../feature/tool-response-budget.md) | #7323 / #7470 | 新增最终工具响应预算专题，覆盖 structured persisted-output metadata、共享 finalizer、runtime aggregation boundaries、record/send 一致性、Plan mode reminder exception，以及 Shell 无 artifact 回归测试。 |
 | [context-compression.md](../../feature/context-compression.md) | #7323 | 补“active tool result history 预算”之外的最终 tool response batch budget，明确它约束当前批次发给模型与录制的 finalized parts。 |
 | [enterprise-memory-gateway.md](../../feature/enterprise-memory-gateway.md) | #7502(closed) / #7509 / #7505 / #7507 / #7508 / #7506 | 新增 enterprise memory gateway 技术方案，记录单体 PR 关闭与拆分 stack：foundations、canonical persistence、governed lifecycle、runtime/management APIs、Qwen Agent integration。 |
 | [external-context-provider.md](../../feature/external-context-provider.md) | #7586 | 将 direct external context provider 口径调整为当前 open diff 的 retrieval-only external context search：只读 `context_search`、管理员固定 provider/corpus、Mem0/Generic HTTP adapter、managed profile 与 direct profile trust boundary；删除自动 recall / remember writer 作为当前实现能力的表述。 |
 
-_周内累计按个人 PR 口径更新于 2026-07-24_
+_周内累计按个人 PR 口径更新于 2026-07-25_
