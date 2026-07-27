@@ -21,6 +21,8 @@
 > 后续修复状态（2026-07-23）：[#7458](https://github.com/QwenLM/qwen-code/pull/7458) 已合入并闭合 DAEMON-001/007/008（event epoch、compaction attribution、degraded snapshot）；[#7463](https://github.com/QwenLM/qwen-code/pull/7463) 已合入并实现 Java daemon transport alpha。
 >
 > 后续修复状态（2026-07-24）：[#7603](https://github.com/QwenLM/qwen-code/pull/7603) 已合入并补齐 Java 侧 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering follow-up；[#7619](https://github.com/QwenLM/qwen-code/pull/7619) 已合入并补 load response `eventEpoch` / `replayDegraded` 回归；[#7622](https://github.com/QwenLM/qwen-code/pull/7622) 已合入并闭合 DAEMON-009/010/011（live journal cap、subscriber close dispose、publish serialization 与 replay byte budget）。
+>
+> 后续修复状态（2026-07-27）：[#7812](https://github.com/QwenLM/qwen-code/pull/7812) 当前 open diff 补 managed daemon shutdown 下 exact-owned writer locks cooperative release；[#7821](https://github.com/QwenLM/qwen-code/pull/7821) 当前 open diff 补 Todo Stop Guard continuation ordering/ownership hardening。两者尚未合入，本文只记录当前实现观察。
 
 这批问题中存在多条能够独立造成“流式输出只剩前半段、卡片提前结束或调用永久等待”的路径：
 
@@ -205,6 +207,32 @@ flowchart LR
 | 代码证据 | `packages/acp-bridge/src/eventBus.ts:141-149,637-655`。 |
 | 责任侧 | EventBus sizing/replay。 |
 | 最小修复 | 序列化失败必须拒绝 publish 并记录诊断；replay 需要独立的总字节预算和明确 truncation/resync 语义。 |
+
+### DAEMON-012：managed daemon shutdown 后 writer lock 可能残留（#7812 open）
+
+> 当前修复状态：#7812 当前 open diff 在 shutdown 首个 signal 后同步关闭 session/turn admission，drain accepted transcript work，再原子 retire exact-owned writer locks；managed acquisition 不再凭 hostname、age、container-visible PID 抢 existing owner。
+
+| 字段 | 内容 |
+|---|---|
+| 严重级别 | P1 |
+| 触发条件 | daemon-managed ACP child 在 shutdown/replacement 时持有 persisted session writer lock，随后新 daemon 在不同 hostname 或容器边界内尝试恢复同一 session。 |
+| 用户影响 | 旧 lock 不释放会造成持久 writer conflict；新 daemon 若错误抢锁则可能产生 split-brain transcript 双写。 |
+| 代码证据 | #7812 当前 diff 触达 `packages/core/src/services/session-writer-lease.ts`、`chatRecordingService.ts`、`packages/acp-bridge/src/process-registry.ts`、`spawnChannel.ts`、`bridge.ts` 与 `packages/cli/src/serve/run-qwen-serve.ts`。 |
+| 责任侧 | daemon shutdown / writer lease lifecycle。 |
+| 最小修复 | managed shutdown 必须先关闭 admission、drain accepted transcript work、释放 exact-owned locks，并用明确 child process signal/reap timeline 收束 teardown。 |
+
+### DAEMON-013：Todo Stop Guard continuation ownership/order 可交错（#7821 open）
+
+> 当前修复状态：#7821 当前 open diff 用 trusted bridge invocation prompt id 建立 owner-scoped claim/release 协议，让 Guard continuation 在 queued input/model selection 之后、compression/provider submission 之前占位；失败恢复只移除 synthetic Guard prompt。
+
+| 字段 | 内容 |
+|---|---|
+| 严重级别 | P1 |
+| 触发条件 | Todo Stop Guard continuation 与用户输入、model selection、workspace relocation、session disposal、overlapping prompt 或外部 Stop hooks 并发。 |
+| 用户影响 | continuation 可能拿错 owner、误删用户内容、丢弃成功 function response、旧 prompt 修改新 owner，或让外部 Stop hooks 基于旧 response 继续支配新 response。 |
+| 代码证据 | #7821 当前 diff 触达 `packages/cli/src/acp-integration/session/Session.ts`、`daemon-todo-stop-guard.test.ts`、`packages/acp-bridge/src/bridge.ts`、`bridgeClient.ts`、`bridgeTypes.ts`、`packages/channels/base/src/AcpBridge.ts` 与 desktop shared agent。 |
+| 责任侧 | daemon session lifecycle / Guard continuation protocol。 |
+| 最小修复 | continuation ordering 必须 owner-scoped claim/release；恢复路径保留真实 user/function content，只移除 synthetic Guard prompt；workspace relocation/disposal/older prompt 不能跨 owner 修改新状态。 |
 
 ---
 
@@ -799,6 +827,8 @@ flowchart LR
 
 #7603 已合入并补 Java follow-up：`PromptAcceptance` 保存 `eventEpoch`，SSE request/reconnect 携带 `X-Qwen-Event-Epoch`，response epoch mismatch fail closed；同时补 truncated JSON、null data、terminal-before-202 buffering、teardown ordering 和 real daemon E2E harness。#7619 另补 REST load response 的 `eventEpoch` / `replayDegraded` 传播回归；#7622 补 EventBus / compaction resource hardening，关闭 DAEMON-009/010/011。
 
+#7812/#7821 当前仍为 open diff，分别追踪 DAEMON-012/013。它们的目标是把 shutdown/writer ownership 与 Guard continuation ordering 收敛到可证明的 state machine；未合入前不能把对应能力写成 `main` 已落地。
+
 ### Phase 5：独立修复旧 Java SDK
 
 旧 `qwencode` 的 stdout/concurrency/result 问题和 ACP Java client 的 schema/API 问题应作为兼容修复线处理，避免把不安全的单 reader/线程池工具复用到新 daemon SDK。
@@ -818,6 +848,8 @@ flowchart LR
 | active targeted cancel | 取消当前 prompt | 收到 cancel-requested advisory 后最终收到一次 cancelled/error terminal。 |
 | non-cooperative deadline | agent 忽略 cancel | deadline 到点即完成 prompt terminal 并释放 FIFO；agent 回收在后台完成。#7400 已覆盖该路径。 |
 | 最后客户端 detach | A active、B queued 后 detach | 重复 detach 幂等；已接受工作按声明策略 drain 或带 terminal 取消，不得静默丢失。#7386/#7400 已分别覆盖 detach 幂等与 pending prompt draining。 |
+| managed daemon shutdown | shutdown 时仍有 accepted transcript work 与 exact-owned writer lock | 先关闭 admission，drain accepted transcript work，retire exact-owned writer locks；新 daemon 不凭不可证明 owner evidence 抢 managed lock。#7812 当前 open diff 覆盖。 |
+| Todo Stop Guard continuation | Guard continuation 与用户输入、relocation 或 overlapping prompt 并发 | continuation owner claim/release 原子化；失败恢复保留用户内容和成功 function responses；旧 owner 不能修改新 owner。#7821 当前 open diff 覆盖。 |
 | 慢消费者 | 暂停消费并注入 256+ events | transport 反压或明确 overflow/resync；禁止 silent drop-oldest。 |
 | gzip/buffering proxy | 代理默认开启压缩和缓冲 | identity header 生效；无数据超过 inactivity budget 时抛结构化 timeout。 |
 | malformed SSE frame | 插入带 cursor 的非法 JSON/schema | 流失败并 resync；不得越过该 cursor 后继续提交状态。 |
@@ -840,7 +872,7 @@ flowchart LR
 - 两个 Java 模块在跳过现有集成式测试后均能完成 Maven package。
 - 审计前后 qwen-code 工作树保持干净。
 
-绿色测试不推翻本文结论。#7386/#7400 已补强 daemon 侧 duplicate detach、queued removal terminal、deadline FIFO release、teardown terminal flush 和 last-detach draining 覆盖；当前测试仍没有系统覆盖 terminal-before-202、epoch 数值碰撞、HTTP/WS dispose race、WS slow-consumer overflow、Java timeout 后 orphan reader 等路径。Java 现有部分测试还会调用真实 qwen/model，且只断言结果非 null，空结果或截短结果也可能通过。
+绿色测试不推翻本文结论。#7386/#7400 已补强 daemon 侧 duplicate detach、queued removal terminal、deadline FIFO release、teardown terminal flush 和 last-detach draining 覆盖；#7812/#7821 当前 open diff 继续补 managed shutdown writer release 与 Guard continuation ordering 测试。当前测试仍没有系统覆盖 terminal-before-202、epoch 数值碰撞、HTTP/WS dispose race、WS slow-consumer overflow、Java timeout 后 orphan reader 等路径。Java 现有部分测试还会调用真实 qwen/model，且只断言结果非 null，空结果或截短结果也可能通过。
 
 ---
 

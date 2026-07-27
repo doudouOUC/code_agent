@@ -1,6 +1,6 @@
 # CLI 启动性能技术方案
 
-> 适用范围：`QwenLM/qwen-code` epic #3011（[P1] Startup Optimization / 启动优化）下已落地的四个启动性能子系统。
+> 适用范围：`QwenLM/qwen-code` epic #3011（[P1] Startup Optimization / 启动优化）及后续 daemon/ACP cold-start、first-output latency 相关性能工作。
 > 代码基准：本地 `main` 检出，主要文件 `packages/cli/src/utils/apiPreconnect.ts`、`packages/cli/src/utils/earlyInputCapture.ts`、`packages/cli/src/utils/startupProfiler.ts`、`packages/core/src/tools/tool-registry.ts`，装配点 `packages/cli/index.ts` 与 `packages/cli/src/gemini.tsx`。
 > 说明：文中所有结论以仓库当前代码为准；当 PR 描述与现网代码存在演进差异时，以代码为准并在「已知限制」中标注。
 
@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。2026-07-25 的 #7686 当前 open diff 继续把 `iconv-lite`、`@xterm/headless` 和 `simple-git` 改为首次真实使用时动态加载，并用 bundle guard 固定 ACP static closure 边界。2026-07-26 的 #7747 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，在保留 JSONC 格式语义的同时移除旧 parser cluster。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。2026-07-25 的 #7686 当前 open diff 继续把 `iconv-lite`、`@xterm/headless` 和 `simple-git` 改为首次真实使用时动态加载，并用 bundle guard 固定 ACP static closure 边界。2026-07-26 的 #7747 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，在保留 JSONC 格式语义的同时移除旧 parser cluster。2026-07-27 的 #7761 新增 daemon/ACP first-output latency benchmark；#7825 已修 artifact schema 与 helper 简化，#7820 当前 open diff 继续修正 measurement validity/schema；#7767 当前 open diff 则基于该 benchmark 在 ACP session creation 后预加载 lazy Provider，以减少首 prompt 的 provider 构造成本。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -230,6 +230,20 @@ settings writer 保留原同步 API：新文件仍写 pretty JSON，已有文件
 
 构建侧删除 `packages/cli/src/utils/commentJson.ts`，移除 `comment-json`，把 `jsonc-parser` 加到 CLI prod dependency。`esbuild.config.js` 在 bundle 中把 public import 定向到 `jsonc-parser/lib/esm/main.js`，避免 UMD build；未 bundle 输出仍使用 public Node-compatible package entry。`scripts/check-serve-fast-path-bundle.js` 新增 guard，禁止 `comment-json`、`esprima` 与 `jsonc-parser/lib/umd` 进入 ACP static closure。PR 的 Linux 30 组 cold-start 数据显示 exact ACP closure 从 12,449,869 bytes 降到 12,145,099 bytes，`channel.initialize` P50 改善 35.39ms；预热场景统计上持平。
 
+### 3.13 daemon first-output latency benchmark（#7761 / #7820 当前 open / #7825）
+
+#7761 把性能度量从 daemon startup/profile 扩展到“第一条 prompt 何时产生模型内容”。benchmark 是 opt-in integration harness，不改变生产路径，也不重新定义 `ttft_ms`。它从 fresh process spawn 开始记录 process-to-session-ready、prompt-to-provider-request-arrival、prompt-to-first-model-output、prompt-to-first-answer-text、provider-ready-to-first-output 与 prompt-to-terminal，避免只看 session readiness 而漏掉 lazy provider 或 SSE readiness 成本。
+
+runner 支持单 bundle cold/warm baseline 与双 bundle AB/BA paired comparison。每个 arm 都隔离 process、workspace、home、Qwen home、port 与 compile cache；event correlation 锁定 accepted top-level prompt id，并把 message/thought/initial tool-call 与 replay/status/usage/role-only/user echo/compression diagnostics/tool updates 分开。artifact 使用 versioned JSON+Markdown，记录所有 sample、failure code、relative timestamp、request count、cleanup evidence、percentile summary、seeded paired median bootstrap CI、order sensitivity 和 provider preload gate。
+
+#7825 已合入 schema follow-up：删除错误的 bundle-level git commit，重命名 prompt shape 说明字段，提升 schema version，移除不可达 ordering balance check，并合并 success predicate。#7820 当前 open diff 继续修正 measurement validity：dwell anchor 从 session readiness 改到 SSE readiness，benchmark runner 从共享 integration config 拆到 serial 专用 config，Phase 1 gate 从裸 percentile diff 改成 paired bootstrap CI lower bound，并修正 duration normalization、comparison-only dwell parsing 与设计文档口径。
+
+### 3.14 ACP provider preload after session creation（#7767 当前 open）
+
+#7767 的目标不是再压缩 initialize，而是利用 #7761 benchmark 指出的 session accepted 之后、首 prompt 之前的空窗，把内部 lazy Provider 预先构造好。当前 open diff 在 ACP `session/new` response 写回 child transport 后调度 best-effort preparation；第一条 prompt 会复用同一个 in-flight/completed promise，preload 和 immediate prompt 竞争时只构造一次 Provider。
+
+非 lazy generator 是 no-op。background failure 被捕获以避免 unhandled rejection，但 rejected promise 仍会 memoized 给首次真实调用观察。Qwen OAuth hot model switch 或 ACP worktree relocation 会丢弃尚未使用的 preload；已经用于请求的 generator 不会被替换，防止 mid-request 状态漂移。PR 当前仍 open，feature 文档只登记当前 diff 与 benchmark 证据，不把它描述成 `main` 已落地能力。
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -343,6 +357,10 @@ sequenceDiagram
 | #7594 | MERGED | ACP compile cache propagation | 父进程启用 Node compile cache 后，把 resolved cache directory 安全传播给 ACP child |
 | #7686 | OPEN | first-use dependency lazy loading | 当前 diff 将 `iconv-lite`、`@xterm/headless`、`simple-git` 移出 ACP static closure，分别在非 UTF-8、PTY、Git 首次真实使用时动态加载 |
 | #7747 | MERGED | lightweight JSONC settings editor | 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，保留 JSONC 格式语义并移除旧 parser cluster |
+| #7761 | MERGED | first-output latency benchmark | 新增 opt-in daemon/ACP benchmark，按 prompt/session/provider 事件关联度量 fresh process 到首个模型输出、首段 answer text 和 terminal 的阶段 |
+| #7767 | OPEN | ACP provider preload | 当前 diff 在 ACP session creation response 写回后 best-effort 预加载 lazy Provider，首 prompt 复用同一 in-flight preparation |
+| #7820 | OPEN | first-output benchmark validity/schema | 当前 diff 把 dwell anchor 改到 SSE readiness，拆 serial benchmark config，并用 paired bootstrap CI lower bound 做 Phase 1 gate |
+| #7825 | MERGED | first-output artifact schema simplification | 删除 bundle-level git commit、重命名 prompt shape 说明字段、提升 schema version，并合并 success predicate |
 
 epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 
@@ -401,6 +419,26 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **构建守卫**：删除 `commentJson.ts`，移除 `comment-json` 依赖，新增 CLI prod dependency `jsonc-parser`；bundle 内 public import 定向到 ESM build，fast-path guard 禁止 `comment-json`、`esprima`、`jsonc-parser/lib/umd` 回到 ACP static closure。
 - **验证**：focused CLI tests 覆盖 malformed/non-object、leading/nested/inline/trailing comments、duplicate keys、CRLF、tabs、final newline、BOM、prototype-named keys、field deletion 与 write failure；typecheck、lint、clean build、bundle、unbundled runtime smoke 和 bundle guard 通过。Linux 30 组 cold-start 显示 exact ACP closure 减少 304,770 bytes，`channel.initialize` P50 改善 35.39ms。
 
+### #7761 first-output latency benchmark（MERGED）
+
+- **问题**：daemon startup/profile 只能解释 initialize 或 session readiness，不能回答 fresh process 到首个模型输出、首段 answer text 和 terminal 的完整延迟，也不能给 provider preload 优化提供 paired comparison 证据。
+- **实现模式**：新增 gated integration benchmark，隔离 process/workspace/home/Qwen home/port/compile cache；支持 single-bundle cold/warm baseline 与 dual-bundle AB/BA comparison。
+- **关键代码**：`_first-output-benchmark.ts` 锁定 accepted top-level prompt id，区分 provider request arrival、first model-derived output、first answer text 与 terminal；artifact 保留 sample/failure/timestamp/request/cleanup/percentile/bootstrap/order sensitivity/provider preload gate。
+- **验证**：helper/fake-server tests、build/typecheck、50-sample macOS exploratory 与 50/50 Linux formal run；生产行为不变。
+
+### #7767 ACP provider preload（OPEN）
+
+- **问题**：lazy Provider 构造仍落在首 prompt 关键路径，session accepted 后到用户输入前的空窗没有被利用。
+- **实现模式**：ACP `session/new` response 写回后 best-effort 调度 lazy Provider preparation；首 prompt 复用同一 promise，preload 与 immediate prompt 只构造一次。
+- **边界**：非 lazy generator no-op；background failure memoized 给首次真实调用；Qwen OAuth model switch / ACP worktree relocation 只丢弃未使用 preload。
+- **验证**：fake provider 100ms dwell 场景 paired median 改善约 49ms；PR 仍 open，需以后续合入 diff 为准。
+
+### #7820 / #7825 first-output benchmark follow-up（OPEN / MERGED）
+
+- **问题**：#7761 artifact schema 与 validity review 发现 bundle-level commit provenance、dwell anchor、runner 并发、gate 统计和 success predicate 存在解释风险。
+- **实现模式**：#7825 已删除 bundle-level git commit、重命名 prompt shape 说明字段、提升 schema version、合并 success predicate；#7820 当前 open diff 把 dwell anchor 改为 SSE readiness，拆 serial benchmark config，并把 Phase 1 gate 改为 paired bootstrap CI lower bound。
+- **验证**：helper/fake-server suites、artifact fixtures、dwell error、target lint/format 与 patched tsconfig 类型检查；#7820 未重新跑 reference-host benchmark。
+
 ### #3085（CLOSED，已拆分）
 - 为 #3318 + #3319 的合并版 PR，已关闭。原始 `isDefaultBaseUrl` 使用裸 `startsWith` 存在子域伪造缺陷（`dashscope.aliyuncs.com.evil.com` 误命中），在 #3318 修正为 `=== || startsWith(default + '/')`。
 
@@ -415,3 +453,4 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **预连接当前对无代理用户实为 no-op**：`!options.proxy → return` 意味着绝大多数未配置代理的用户走不到真正的 `HEAD` 预热分支（这是相对 #3318 原始描述「默认域 HEAD 预热」的演进）。若要为无代理用户也兑现首调用提速，需要一条不依赖共享 dispatcher、直接预热运行时内建 fetch 连接池的路径。
 - **import-order 依赖打包顺序**：`index.ts` 中 `initStartupProfiler()` 先于 `import './src/gemini.js'` 的 T0 早捕获，依赖 esbuild 打包保留语句顺序；若改为纯 ESM 运行（import 提升）或调整打包策略，T0 的「早于模块求值」语义需重新验证。
 - **后续方向（epic #3011 未尽项）**：分层零加载入口（`--version`/`--help` 零导入）、core barrel 拆分按需导入、重型依赖（OpenTelemetry/highlight.js/React-Ink）动态加载、esbuild code splitting（#3226，懒注册收益的真正前置），均尚未在本批 PR 覆盖。
+- **#7767/#7820 仍为 open diff**：provider preload 与 benchmark validity follow-up 只记录当前实现观察，不能视为 `main` 已落地能力；其中 #7820 明确没有重新跑 reference-host benchmark，当前价值主要是修正 measurement harness 自身。

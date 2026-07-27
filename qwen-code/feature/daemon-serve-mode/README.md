@@ -13,7 +13,7 @@
 |---|---|---|
 | 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、prompt route 202 + bridge-owned deadline / 权限响应超时 / access log |
 | 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、replay byte budget、state_resync、event epoch、compaction degraded/truncated replay、协议帧 serverTimestamp/provenance/errorKind |
-| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening |
+| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening、managed writer shutdown（#7812 open）、Todo Stop Guard continuation hardening（#7821 open） |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268 open） |
 | 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写 |
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
@@ -22,7 +22,7 @@
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor、Java daemon transport alpha 与 #7603 reliability follow-up |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754 open） |
-| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、#7458/#7463/#7603/#7622 已合入状态、修复顺序和验收矩阵 |
+| 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单、#7458/#7463/#7603/#7622 已合入状态，以及 #7812/#7821 open diff 的 shutdown/writer 与 Guard ordering 风险 |
 
 ---
 
@@ -38,6 +38,8 @@ qwen-code 的原始形态是一次性 CLI 进程：用户在终端启动 `qwen`�
 - **1 daemon 可以管理多个 isolated workspace runtime**：第一项 workspace 仍是 primary / legacy default，用于兼容未 workspace-qualified 的旧入口；新增 workspace 通过 runtime registry 隔离 cwd、settings、env、ACP/channel/session ownership，并让客户端继续 gate on `/capabilities.features`。进程级 token、rate limit、fault radius 和部分 legacy/global route 仍是 daemon-wide 资源。
 - **workspace trust 可以热重载（#7268 open）**：当前 open diff 将 trust policy loader、monitor、reconciler 与 runtime generation guard 串起来，trust grant/revoke 后关闭旧 generation、drain 并重建 runtime；过渡、失败或 blocked 状态通过 v2 trust status 暴露，route commit 边界 fail-closed。
 - **Web Shell Voice 必须跟随 composer workspace（#7754 open）**：当前 open diff 让 primary/locked/split-view composer 解析唯一 Voice owner；trusted secondary 走 workspace-qualified Voice status/settings/model/stream routes，未知、歧义、不可信、draining/removed 状态 fail closed，不 fallback primary。
+- **shutdown 必须释放 exact-owned writer locks（#7812 open）**：当前 open diff 在 daemon shutdown 时先关闭 session/turn admission，drain 已接受 transcript work，再原子 retire exact-owned writer locks；managed runtime 不再凭 hostname/age/PID 抢 existing owner。
+- **Todo Stop Guard continuation 必须 owner-scoped（#7821 open）**：当前 open diff 用 bridge invocation prompt id claim/release continuation ordering，防止 Guard prompt 与用户输入、workspace relocation、session disposal 或 overlapping prompt 交错。
 - **多客户端协作**：同一 session 可被多个客户端 attach，事件通过 SSE 扇出，权限通过仲裁器协调。
 - **协议向后兼容**：能力通过 `/capabilities` 的 `features[]` 标签协商，客户端 **gate on features 而非 mode**；老 daemon 缺失新标签即静默降级。
 
@@ -430,6 +432,8 @@ sequenceDiagram
 | #5825 | startup benchmark | 新增 gated integration benchmark，测 built CLI `qwen serve` 从 spawn 到 stdout listening line，并校验 `/daemon/status` startup timing 与 preheat state。 |
 | #5874 | skip wrapper spawnSync | `qwen serve` 在 CLI entry wrapper 中直接 in-process import `cli.js`，跳过为 `--expose-gc` 额外 `spawnSync` 的 Node 进程，减少冷启动成本；ACP child 仍独立带 `--expose-gc`。 |
 | #5938 | compile cache + deferred version | serve fast path 在 import `cli.js` 前启用 Node compile cache，warm restart 可复用 bytecode；`getCliVersion()` 改成 promise 并与 runtime module load 并行，`/capabilities` 和 `/daemon/status` 仍在 route bootstrap 前拿到 `qwenCodeVersion`。 |
+| #7761 | first-output benchmark | 新增 gated daemon/ACP first-output benchmark，测 fresh process 到 provider request、first model-derived output、first answer text 和 terminal 的阶段，并输出 JSON/Markdown artifacts。 |
+| #7767(open) | provider preload after session creation | 当前 open diff 在 ACP `session/new` response 写回后 best-effort 预加载 lazy Provider，首 prompt 复用同一 preparation promise。 |
 
 ### 3.13 2026-06-28 daemon / serve follow-up
 
@@ -512,6 +516,7 @@ sequenceDiagram
 | #6911 | archived session export | `GET /workspaces/:workspace/session/:id/archive/export` 只读 selected trusted workspace archive JSONL，不查 active、不 fallback primary。 |
 | #6912 | Web Shell archive hardening | Web Shell active/archived rows 统一用 `(workspaceCwd, sessionId)` 做 identity，non-primary archive/unarchive/export 状态与 reconcile 不再串 workspace。 |
 | #6945 | Todo stop guard | opt-in `experimental.todoStopGuard` 在自然 stop 后基于成功 top-level TodoWrite 结果最多追加两次 primary-model continuation。 |
+| #7821(open) | Todo Stop Guard continuation hardening | 当前 open diff 用 owner-scoped claim/release 协议固定 Guard continuation ordering，失败恢复保留用户内容和成功 function responses，并防旧 prompt 修改新 owner。 |
 | #6950 | channel startup diagnostics | worker startup IPC 传回 bounded/redacted adapter `connect()` failures，partial success 入 snapshot，dynamic all-fail 返回 `channel_worker_start_failed`。 |
 | #6961 | daemon-global deep health | `GET /health?deep=1` 聚合所有 managed runtimes（含 draining）的 sessions、pending permissions、active prompts、latest activity、任一 channel live 和 `workspaceCount`。 |
 | #6969 | bounded daemon log rotation | daemon log 改为 stable active file + bounded archives/fallback family，并在 status/access log 中暴露 ownership、health、drop counters 和 suppression summary。 |
@@ -625,6 +630,7 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #4516 | 会话 | `POST /session/:id/compress` + `_meta`（T1.3/T1.4）。**已关闭未合入 daemon_mode_b_main**。 |
 | #4515/#6297/#6844 | 会话 | 原 `stats/export` PR 已关闭未合入；`GET /session/:id/stats` 后续已在 daemon_mode_b_main 落地，primary export 由 #6297 落地，workspace-qualified export 由 #6844 落地。 |
 | #4812 | 会话 | `POST /session/:id/branch` session forking（fork transcript → restore → rename）。 |
+| #7812(open) | managed writer shutdown | 当前 open diff 在 daemon shutdown 时同步关闭 admission、drain accepted transcript work、retire exact-owned writer locks，并统一 ACP child SIGTERM/SIGKILL/reap timeline。 |
 
 ### SSE / SDK 协议
 
@@ -771,3 +777,5 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 6. **EventBus 仍私有于 SSE 路由**（`eventBus.ts` 的 `FIXME(stage-1.5)`）。Stage 1.5 计划把它抬成顶层 building block（`packages/event-bus`），让 channels/dualOutput/remoteInput/未来 WebSocket transport 共享同一总线，而非各跑并行事件流。
 
 7. **`/health` deep 探针非真实 liveness**。`?deep=1` 只读 Map-size getter（`sessionCount`/`pendingPermissionCount`），不 ping 各子进程，检测不出"wedged 但仍计数"的会话；真实 liveness 仍应靠 TCP 连接是否被接受。
+
+8. **#7812/#7821 仍为 open diff**。managed writer shutdown 与 Todo Stop Guard continuation hardening 是当前观察到的方案记录，不能描述为 `main` 已落地能力；后续需要按最终合入 diff 再更新本目录子文档。
