@@ -1,7 +1,7 @@
 # 权限系统技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的工具调用权限子系统。
-> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）、plan-required teammate leader approval（#6138）、main-session `exit_plan_mode` 显式用户批准（#6967）、shell safety 三态事实层（#7053）、Plan-mode shell safety routing（#7172）、`enter_plan_mode` 执行边界（#7248）与 ACP permission cancel stopReason 保留（#7295）已在 `main`。
+> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）、plan-required teammate leader approval（#6138）、main-session `exit_plan_mode` 显式用户批准（#6967）、shell safety 三态事实层（#7053）、Plan-mode shell safety routing（#7172）、`enter_plan_mode` 执行边界（#7248）、ACP permission cancel stopReason 保留（#7295）与手动退出 Plan 后的 per-conversation notice delivery（#7744）已在 `main`。
 
 ---
 
@@ -14,7 +14,7 @@ qwen-code 在执行任何工具（读文件、写文件、跑 shell、抓网页�
 - `ask` —— 弹确认框，交给用户裁决；
 - （内部还有第四态 `default` —— "没有任何规则命中"，会进入默认裁决兜底，最终一定收敛成上面三者之一）。
 
-围绕这套三态决策，演进出十一个相互独立又彼此咬合的子问题，正是本方案要解决的：
+围绕这套三态决策，演进出十二个相互独立又彼此咬合的子问题，正是本方案要解决的：
 
 1. **规则模型与匹配**：用户/SDK/设置文件用 `Tool(specifier)` 这种 DSL 配置 allow/ask/deny 三张规则表（`permissions.allow` / `permissions.ask` / `permissions.deny`）。需要一套解析 + 匹配引擎，支持 shell 命令 glob、gitignore 风格路径、域名、MCP 通配等多种 specifier 语义。
 
@@ -38,7 +38,9 @@ qwen-code 在执行任何工具（读文件、写文件、跑 shell、抓网页�
 
 11. **权限等待期间父级取消要保持 `cancelled` 终态（#7295）**：ACP permission prompt、Plan unknown shell approval、Stop hook permission 与 background notification 等等待点被 parent abort 时，不能把终态误报成 `end_turn`，也不能丢掉已经 recovered 的 mid-turn message。
 
-前三点、第八点到第十点是**单进程内**的规则/事实/Plan lifecycle 策略（`packages/core`），第四点是**跨进程多客户端**的协调层（`packages/acp-bridge`，早期落在 `daemon_mode_b_main`，现随 #4490 进入 `main`），第五点和第十一点把取消/超时结果接回 ACP turn loop，确保权限层的"取消"不会被后续工具继续执行或错误终态稀释，第六点限制 subagent/team agent 对主会话 plan lifecycle 的控制权，第七点把 main-session Plan mode 退出从自动权限放行面里拆出来。本方案逐层展开。
+12. **手动退出 Plan 后要可靠通知下一次 live model request（#7744）**：Shift+Tab 或 ACP `session/set_mode` 这类手动 Plan -> non-Plan 切换不是 `exit_plan_mode` tool approval，模型下一轮必须收到一次明确提醒；提醒不能被其它 conversation 抢走，也不能在 retry、fallback、compression 或 tool-result continuation 中漏投/重投。
+
+前三点、第八点到第十点是**单进程内**的规则/事实/Plan lifecycle 策略（`packages/core`），第四点是**跨进程多客户端**的协调层（`packages/acp-bridge`，早期落在 `daemon_mode_b_main`，现随 #4490 进入 `main`），第五点和第十一点把取消/超时结果接回 ACP turn loop，确保权限层的"取消"不会被后续工具继续执行或错误终态稀释，第六点限制 subagent/team agent 对主会话 plan lifecycle 的控制权，第七点把 main-session Plan mode 退出从自动权限放行面里拆出来，第十二点则把手动退出 Plan 的状态变化投递到后续 live conversation 的 model-bound history 边界。本方案逐层展开。
 
 ---
 
@@ -264,6 +266,19 @@ unknown 被用户允许后，host 在执行前重新校验 Plan revision、cwd�
 实现上新增 `getAbortAwareEndTurnStopReason()`：任何准备返回 `end_turn` 的权限/Stop-hook/background notification 终态都先检查 parent abort；abort 已触发时改报 `cancelled`，pending send 主循环也在 abort 后立即返回 cancelled。`#preserveStoppedToolRun()` 增加 `preserveFallbackOnAbort`，在 abort 场景下保留 recovered mid-turn message，避免取消导致上下文丢失。
 
 这条能力不改变“权限取消后跳过同一 assistant step 后续工具”的既有 fail-closed 语义；它补齐的是父级取消与等待点并发时的 stopReason 和 transcript preservation 一致性。
+
+### 3.3.4 manual Plan-exit notice delivery（#7744）
+
+#7744 解决的是手动退出 Plan mode 后的模型感知问题。通过 `exit_plan_mode` tool 离开 Plan 时，工具本身已经有显式用户批准和 tool response；但用户按 Shift+Tab 或 ACP 直接 `session/set_mode` 从 Plan 切到 Default/Auto/Yolo 时，下一轮模型请求需要额外收到一次“用户已手动离开 Plan，当前 mode 是 X”的提醒。早期实现只在 UserQuery/Cron reminder path 消费一个全局 pending boolean，ACP direct send、tool-result continuation、steering/hook continuation 与 interactive agent chat 都可能漏掉；共享 boolean 还会让一个 conversation 抢走另一个 conversation 的提醒。
+
+最终实现把状态拆成两层：
+
+- `Config.manualPlanExitNoticeEventState` 记录最新 approval-mode event version 和事件类型。Plan -> non-Plan 的手动切换生成 `manual-exit`，approved `exit_plan_mode` 生成 `clear`，非 Plan 之间切换不生成新提醒。
+- `Config.manualPlanExitNoticeCursorState` 是每个 conversation 的 delivery cursor。每个 live conversation 独立 claim 自己尚未看过的 manual-exit event，因此主会话和 interactive agent 可以各自收到一次，同一 conversation 的 replacement chat 不会重投。
+
+投递点在 `GeminiChat` 的 live chat history commit boundary：proactive compression 和 hard-rescue 检查完成后，`GeminiChat` 在即将提交 user content 时 claim notice，并把它作为最后一个 text part 追加到当前 user content。这个位置覆盖普通 prompt、ACP/daemon direct send、tool-result continuation、steering continuation 和 hook continuation；function response / tool result part 保持在提醒之前。
+
+rollback 与 retry 边界也在 `GeminiChat` 内统一处理：claim 后同步 setup 失败会 restore 该 version；provider retry/fallback 复用已提交的 history entry，不重新 claim；reactive context-overflow compression 重建 retry history 时保留已经提交的精确 notice。只有主 chat 和 interactive agent chat 调用 `enableManualPlanExitNotices()`，fork/speculation、headless agent、workflow、memory helper 和 compaction side query 不启用，避免后台或派生会话消费 live 用户可见提醒。
 
 ---
 
@@ -494,6 +509,7 @@ stateDiagram-v2
 | **#7172** | Plan-mode shell routing | Plan mode 中模型发起的 shell/monitor 按 read-only/write/unknown 分流；read-only 走既有权限，write 直接拒绝，unknown 走一次性精确审批并在执行前校验 Plan revision/cwd/policy/raw invocation。 |
 | **#7248** | Plan mode entry boundary | `enter_plan_mode` 成为同批 executable tool 的执行边界；第一个 entry tool 执行，其它 executable sibling fail-closed，并返回完整 Plan mode reminder 作为 lifecycle policy。 |
 | **#7295** | permission prompt cancellation preservation | 权限等待、Plan unknown shell approval、Stop hook permission 与 background notification 在 parent abort 后报告 `cancelled`，并保留 recovered mid-turn message。 |
+| **#7744** | manual Plan-exit notice delivery | 手动 Plan -> non-Plan 切换生成 approval-mode event，每个 live conversation 用独立 cursor 在 `GeminiChat` history commit 边界投递一次提醒；approved `exit_plan_mode` 退出不发提醒，retry/fallback/compression 保持 exactly-once。 |
 
 ---
 
@@ -514,6 +530,8 @@ stateDiagram-v2
 7. **#7248 只阻断同批 executable sibling，不替代 Plan shell routing。** 它处理“进入 Plan mode 的 batch 边界”；进入之后的 shell/monitor read-only/write/unknown 分流仍由 #7172 负责。
 
 8. **#7295 修 stopReason 和 preservation，不放宽权限。** parent abort 优先只会把终态从 `end_turn` 改成 `cancelled` 并保留已恢复上下文，不会把被拒或取消的工具重新执行。
+
+9. **#7744 不做跨进程持久化。** manual Plan-exit notice event/cursor 是当前进程内 live conversation delivery state；进程重启后不会尝试补发历史手动退出提醒。这个限制与 PR 范围一致，避免把一次性 conversation 边界信号升级成持久 session migration 语义。
 
 
 ---
@@ -641,3 +659,11 @@ stateDiagram-v2
 - Stop hook / background notification 终态路径：返回前统一检查 parent abort，保证取消语义在 nested waiting point 中不会被覆盖。
 - `#preserveStoppedToolRun()`：新增 `preserveFallbackOnAbort`，abort 场景仍保留 recovered mid-turn message，避免取消响应丢上下文。
 - tests：覆盖 Plan shell approval、Stop hook permission、Stop-hook iteration 间 abort、background notification permission wait 和 recovered message preservation。
+
+### #7744 — manual Plan-exit notice reliable delivery
+
+- `config.ts`：新增 `manualPlanExitNoticeEventState` 与 `manualPlanExitNoticeCursorState`，用 event version 和 per-conversation cursor 分离 mode change ownership；Plan -> non-Plan 手动切换产生 manual-exit，approved `exit_plan_mode` 产生 clear。
+- `geminiChat.ts`：新增 opt-in `enableManualPlanExitNotices()`；在 live chat history commit boundary claim notice 并追加为 user content 最后一个 text part，setup 失败 restore claim，retry/fallback 复用 committed history。
+- reactive context-overflow compression：重建 retry history 时保留已提交 notice，避免 compression 后请求丢失手动退出信号。
+- `client.ts` / `agent-core.ts` / `agent.ts`：主 chat 与 interactive agent chat opt-in；fork/speculation、headless agent、workflow、memory helper 和 compaction side query 排除；agent approval-mode override 继承当前 event snapshot。
+- tests：覆盖 config transition/cursor、main chat/interactive agent ownership、fork 排除、part ordering、rollback、retry/fallback、compression、chat rebuild 与 prompt 文案。

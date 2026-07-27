@@ -37,5 +37,8 @@
 | [#7650](https://github.com/QwenLM/qwen-code/pull/7650) | ✅ merged | fix(core): Preserve usage after empty OpenAI stream frames | [pr-7650.md](pr-7650.md) |
 | [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | 🟡 open | feat(core): Align GenAI content telemetry fields | [pr-7667.md](pr-7667.md) |
 | [#7686](https://github.com/QwenLM/qwen-code/pull/7686) | 🟡 open | perf(core): Lazy-load first-use dependencies | [pr-7686.md](pr-7686.md) |
+| [#7744](https://github.com/QwenLM/qwen-code/pull/7744) | ✅ merged | fix(core): reliably deliver manual plan-exit notices | [pr-7744.md](pr-7744.md) |
+| [#7747](https://github.com/QwenLM/qwen-code/pull/7747) | ✅ merged | perf(cli): replace comment-json settings parser | [pr-7747.md](pr-7747.md) |
+| [#7754](https://github.com/QwenLM/qwen-code/pull/7754) | 🟡 open | feat(web-shell): Scope voice to composer workspace | [pr-7754.md](pr-7754.md) |
 
-_按个人 PR 口径更新于 2026-07-25_
+_按个人 PR 口径更新于 2026-07-26_

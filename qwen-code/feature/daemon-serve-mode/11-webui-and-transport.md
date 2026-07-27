@@ -29,6 +29,7 @@
 | #6745 | @doudouOUC | merged | removable secondary workspace 的 runtime removal、busy snapshot 与 force confirmation flow。 |
 | #6825 | @doudouOUC | merged | Extension Management V2 的 catalog/projection/action/warning surface 接入 TUI/Web Shell/SDK。 |
 | #6839 | @doudouOUC | merged | workspace-qualified Voice 的 selected runtime settings/transcribe/stream 与 workspace removal activity。 |
+| #7754 | @doudouOUC | open | Web Shell Voice 按 composer owning workspace 解析 fail-closed target；trusted secondary 使用 workspace-qualified Voice routes，owner 变化清理 capture generation。 |
 | #6910 | @doudouOUC | open | Web Shell archived rows 按 capability/trust 暴露 Export，并走 owning workspace client。 |
 | #6912 | @doudouOUC | merged | Web Shell non-primary archive/unarchive action identity、busy state 与 reconcile hardening。 |
 
@@ -205,6 +206,12 @@ sequenceDiagram
 
 #6839 对 Web Shell 的直接影响不是新增 secondary workspace Voice 控件，而是让 workspace runtime lifecycle 能看见 Voice activity。workspace sidebar 的 removal/busy flow 需要展示 `activity.voiceSessions`：普通 remove 遇到 active Voice work 返回 busy，force remove 只 abort 目标 runtime 的 Voice stream/lease，不影响其它 workspace；成功后刷新 workspace/capabilities。客户端若要启用 selected workspace Voice 设置或 batch transcription，应同时 gate `workspace_qualified_voice` 和对应 legacy Voice 能力。
 
+#7754 open diff 则把 Web Shell Voice 从“selected workspace 能力”推进到“composer owner 能力”。新 `voice-workspace-target.ts` 根据 capabilities、composer intended cwd、session id/draft id 和 workspace list 解析 Voice target：primary 或旧单 workspace daemon 继续使用 legacy route；trusted secondary 必须唯一匹配 canonical cwd 或 workspace id，且拥有 `workspace_qualified_voice`，才走 `/workspaces/:workspace/voice/...` status/provider/settings/model/stream；unknown、ambiguous、untrusted、bootstrapping、draining 或 removed workspace 直接 fail closed，不 fallback primary。
+
+UI 组件需要把 owner 信息一路传到 Voice 层。`App.tsx`、`ChatPane.tsx`、`SplitView.tsx` 和 `ChatEditor.tsx` 为 main、locked、split-view composer 传递 intended cwd、session id 与 merged workspace list；`VoiceButton` 以 target workspace/owner/settings revision 作为 status key，pending/error/unsupported/mismatch 时隐藏或禁用，而不是读取 primary 状态。`use-voice-workspace-settings.ts` 区分 user-scope 与 workspace-scope revision：user-level Voice 设置仍共享，workspace providers/settings/model 只通过 resolved owning workspace client 加载和保存。
+
+capture 生命周期也绑定到 owner。`useVoiceCapture` 每次开始录音都会 snapshot target/owner/generation，WebSocket URL 来自 target 的 `streamPath`；target、owner 或 gate 变化时 abort 当前 capture，并清理 microphone、audio、timer、socket 和 callbacks。旧 generation 的 final transcript 或 error 会被忽略，防止切换、移除、untrust 或 drain owning workspace 后把旧 runtime 的转录插入当前 composer。`packages/web-shell/vite.config.ts` 同步增加 qualified Voice stream upgrade proxy，只转发 `/workspaces/<selector>/voice/stream`，legacy primary path 保持既有开发行为。
+
 #6912 修正 Web Shell session row 的 identity：merged active/archived collection、React key、current selection、busy state、unread/export state 都使用 `(workspaceCwd, sessionId)`，不能只用 session id。secondary active row 只在 trusted 且 capability 足够时显示 Archive；trusted archived row 可以 Unarchive；操作完成后同时 reconcile primary 与 selected workspace 的 active/archived catalog，并展示 daemon response 的 `errors[]`。#6910 在此基础上给 archived row 增加 Export：只有 `workspace_archived_session_export` 存在且 row workspace trusted 时才显示，点击后调用 row owning workspace 的 `WorkspaceDaemonClient.exportArchivedSession()`，避免同 id session 从 primary 或 active route 导出错内容。
 
 ---
@@ -346,4 +353,4 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-11_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-26_
