@@ -1,7 +1,7 @@
 # 文件读取 / 大文本范围 / PDF 预算技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback。
+> 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback、#7947 Serve large text bounded reads 当前 draft diff。
 
 ---
 
@@ -13,7 +13,7 @@ qwen-code 的 `read_file`、`@file` 和多文件读取路径长期用大小上�
 - 纯文本模型读取大型 PDF 时，旧 fallback 可能把整本 PDF 的 `pdftotext` 结果注入 prompt，100 页级文档会造成上下文溢出。
 - dense/scanned PDF 在 `pdftotext` 失败或超过 token guard 后，旧链路只能报错；即使配置了 vision model，也需要一个 bounded、text-first、带 disclosure 的 PDF vision bridge fallback。
 
-#6404 解决“大文本应该能按范围有界读取”；#6409 解决“大 PDF 全文 fallback 不应进入上下文，但显式页码读取仍应可用”；#6585 解决“vision-capable 主模型可消费 bounded PDF page image”；#6846 则补上“纯文本主模型 + configured vision bridge 时，PDF 读取失败/单页超预算可被安全转录”的路径。
+PR #6404 解决“大文本应该能按范围有界读取”；#6409 解决“大 PDF 全文 fallback 不应进入上下文，但显式页码读取仍应可用”；#6585 解决“vision-capable 主模型可消费 bounded PDF page image”；#6846 则补上“纯文本主模型 + configured vision bridge 时，PDF 读取失败/单页超预算可被安全转录”的路径。#7947 当前 draft diff 把 #6404 的大文本行窗口能力补到 Serve workspace filesystem，避免 HTTP/ACP `/file?line=&limit=` 在切片前被 256 KiB 文件大小门拦下。
 
 ---
 
@@ -22,7 +22,7 @@ qwen-code 的 `read_file`、`@file` 和多文件读取路径长期用大小上�
 读取链路分成三类：
 
 1. **小文本完整读取**：继续使用 encoding-aware 路径，保留 BOM、encoding、line ending 与原有 line/limit 行为。
-2. **大文本范围读取**：对超过旧 10MB guard 的文本文件走 streaming range，按 0-based `line`、`limit` 和 `maxOutputBytes` 返回有界内容，同时计算 total line count 与 truncation metadata。
+2. **大文本范围读取**：对超过旧 10MB guard 的文本文件走 streaming range，按 0-based `line`、`limit` 和 `maxOutputBytes` 返回有界内容，同时计算 total line count 与 truncation metadata；#7947 让 Serve `/file` 在 line/limit 存在时也能对超过 256 KiB 的 UTF-8 文本走同类 bounded window。
 3. **PDF text fallback 预算读取**：大型 PDF 不带 `pages` 时返回短 guidance 或 attachment reference；显式 `pages` 仍走 `pdftotext`，但输入 size 和输出 token 都有上限。
 4. **PDF page image fallback**：当 PDF text extraction 失败或超过输出预算，且有 vision 消费路径时，用 `pdftoppm` 把页面渲染成 bounded JPEG image parts。
 5. **PDF vision bridge fallback**：纯文本主模型读取 PDF 时，只有抽取失败或单页文本不可再缩小时，才把 bounded rendered pages 交给 configured vision bridge 转录，并把转录标为不可信/有损。
@@ -66,6 +66,12 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 
 `read_file` 改为接收 `AbortSignal` 并传入读取链路。`read_many_files`、`pathReader` 和 CLI `@file` 处理也接入相同的 range metadata。默认大文本输出会标明 `Showing lines X-Y of N total lines`，并在 byte limit 命中时追加 `... [truncated]`。
 
+### 3.1.1 Serve workspace large text window（#7947 当前 draft）
+
+PR #7947 解决的是 Serve workspace filesystem 与 Core 能力之间的 gap。旧 Serve `/file` 先按 256 KiB 做 full snapshot size gate，再处理 `line`/`limit`，因此大日志即使只请求前 20 行也会 `file_too_large`。当前 draft diff 让 large-window read 只在文本、UTF-8、显式 bounded window 下放行；输出仍受 256 KiB cap。
+
+实现上，large-window path 从 validation、binary probe 到 streaming read 复用 caller-owned file descriptor，并在读后重新检查 path 和 inode，防止检查后 symlink swap 或文件替换。响应会报告完整 file size 与 `truncated: true`，但不返回 full-file hash；只有读到 EOF 时才返回 original line count。full snapshot、edit、hash 和 optimistic locking 继续保留旧大小门，因此该 PR 不是“Serve 可完整读取任意大文件”，而是“Serve 可读取大文本的小窗口”。
+
 ### 3.2 PDF full-text gate（#6409）
 
 `packages/core/src/utils/pdf.ts` 定义 PDF 预算常量和 helper：
@@ -105,7 +111,7 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 
 ### 3.5 PDF vision bridge fallback（#6846）
 
-#6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用于“纯文本主模型 + configured vision bridge”的场景。它不改变普通图片读取，也不改变 vision-capable 主模型或 native-PDF 模型路径。
+PR #6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用于“纯文本主模型 + configured vision bridge”的场景。它不改变普通图片读取，也不改变 vision-capable 主模型或 native-PDF 模型路径。
 
 触发条件是 text-first 的：
 
@@ -135,6 +141,7 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 - **PDF 默认不再全文硬塞上下文**：纯文本模型遇到大型 PDF 需要 `pages`，attachment 路径只给 reference。
 - **PDF image fallback 需要 vision 消费路径**：vision-capable 主模型可以直接消费 bounded JPEG page parts；纯文本主模型只有配置 vision bridge 且满足 #6846 触发条件时才转录，失败会恢复原 PDF error/guidance。
 - **大文本仍可能扫描到 EOF**：为了给出准确 total line count，streaming path 可能继续扫描文件尾；它避免 OOM，但不保证超大日志即时完成。
+- **Serve large-window 与 full snapshot 分离**：#7947 当前 draft 只放行 UTF-8 大文本 bounded line-window read；full snapshot、edit、hash 和 optimistic locking 仍保留 256 KiB 门。
 - **ACP 远端兼容**：core-only 字段不直接发给 ACP 远端，line number 在边界处转换。
 - **PDF token guard 是估算**：它以 tokenizer 估算输出预算，不是模型服务端真实 tokenization；目标是防止明显超大结果进入 prompt。
 
@@ -155,6 +162,7 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 - `packages/cli/src/nonInteractive/io/BaseJsonOutputAdapter.test.ts`、`ui/utils/export/normalize.test.ts`: JSON/export 输出保留 structured disclosure。
 - `packages/cli/src/acp-integration/service/filesystem.test.ts`: ACP 边界 0-based/1-based line 转换和 fallback 参数保留。
 - `packages/cli/src/ui/hooks/atCommandProcessor.test.ts`: `@file` 大文本附件返回截断内容。
+- `packages/cli/src/serve/fs/workspace-file-system.test.ts`、`workspace-file-read.test.ts`、`bridge-file-system-adapter.test.ts`: #7947 当前 draft 对 Serve large UTF-8 text line-window、route metadata 和 ACP adapter 的覆盖。
 
 ---
 
@@ -166,6 +174,7 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 | [#6409](https://github.com/QwenLM/qwen-code/pull/6409) | merged | large PDF text extraction budget | 大型 PDF 不带 `pages` 时返回 guidance/reference，显式页码读取保留并加 token guard。 |
 | [#6585](https://github.com/QwenLM/qwen-code/pull/6585) | merged | PDF page image fallback | `pdftotext` 失败或超预算时，vision-capable 路径用 `pdftoppm` 生成 bounded JPEG page image parts，并提示被 page/byte cap 省略的页。 |
 | [#6846](https://github.com/QwenLM/qwen-code/pull/6846) | merged | PDF vision bridge fallback | 纯文本主模型配置 vision bridge 时，PDF 抽取失败或单页超预算可转为最多 4 页的有损、不可信视觉转录；失败恢复原 PDF error 并保留 disclosure。 |
+| [#7947](https://github.com/QwenLM/qwen-code/pull/7947) | draft | Serve large text bounded reads | 当前 draft diff 允许 Serve workspace `/file` 对超过 256 KiB 的 UTF-8 文本返回 bounded line window，并保留 full snapshot/edit/hash 的旧大小门。 |
 
 ---
 
@@ -176,3 +185,4 @@ ACP 协议边界仍使用 1-based `line`。`AcpFileSystemService` 在发远端 `
 - PDF text extraction 依赖本机 `pdftotext`，image fallback 依赖 `pdftoppm`；二者都来自 poppler-utils，缺失时 direct read 会提示安装依赖。
 - PDF 输出 token guard 只能控制提取文本进入 tool result 的上限，不改变自动压缩阈值或 native PDF-capable model 的行为。
 - #6846 已合入；后续可继续补 token-aware 大文本输出预算和 PDF bridge E2E 覆盖。
+- #7947 仍为 draft；当前只记录 macOS 验证过的 Serve large-text window 方案，Windows/Linux 文件系统差异仍需后续 CI/review 确认。

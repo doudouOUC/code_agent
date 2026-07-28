@@ -17,7 +17,7 @@
 | 03 | [上下文传播与并发隔离](03-context-propagation-and-concurrency.md) | ALS、resolveParentContext、subagent 并发隔离(#4410) |
 | 04 | [敏感属性 opt-in 与 PII](04-sensitive-attributes-and-pii.md) | 门控链、截断 / SHA-256 去重、response_text 未门控泄露面 |
 | 05 | [trace↔日志关联与 daemon 端遥测](05-correlation-and-daemon-telemetry.md) | getTraceContext、daemon route span、W3C 跨进程传播 |
-| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields |
+| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields、#7921 ARMS session user ID |
 | 07 | [出站关联与 traceparent 传播](07-outbound-correlation.md) | 默认安全、OTLP 反馈环防护、opt-in 广播安全面 |
 
 ---
@@ -45,7 +45,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup profile helper。
 - **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
-- **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes。
+- **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis。
 
 ---
 
@@ -265,7 +265,7 @@ getActiveSpanTraceContext()  // 优先取当前 active span 的 traceId/spanId
 
 **daemon 日志**：`emitDaemonLog(body, attrs)` 经 `@opentelemetry/api-logs` 发 `qwen-code.daemon.error` 事件；所有 daemon 遥测 API 都包了 `try/catch` 且 SDK 未初始化时静默——遵循「遥测绝不影响请求处理」原则。
 
-#6907 已把 cold first-session startup 拆进同一棵 daemon trace：`POST /session` 的 HTTP span 会回填 deferred runtime wait timing；bridge 侧增加 `channel.wait` span，标记 reused / joined / spawned-on-request，并为 channel 生成诊断 UUID；`session/new` 请求携带 traceparent，ACP child 在 `Session.startChat()` 周围记录 `qwen-code.daemon.session_start` 子 span 和阶段耗时。这样首个 session 的慢启动能区分 daemon runtime、channel preheat/attach、ACP child bootstrap 与 core chat 初始化，而不是只看到一个长 HTTP route duration。
+PR #6907 已把 cold first-session startup 拆进同一棵 daemon trace：`POST /session` 的 HTTP span 会回填 deferred runtime wait timing；bridge 侧增加 `channel.wait` span，标记 reused / joined / spawned-on-request，并为 channel 生成诊断 UUID；`session/new` 请求携带 traceparent，ACP child 在 `Session.startChat()` 周围记录 `qwen-code.daemon.session_start` 子 span 和阶段耗时。这样首个 session 的慢启动能区分 daemon runtime、channel preheat/attach、ACP child bootstrap 与 core chat 初始化，而不是只看到一个长 HTTP route duration。
 
 **配置解耦**：daemon 分支新增 `runtime-config.ts:TelemetryRuntimeConfig` 接口，`initializeTelemetry` 改为接收该接口而非具体 `Config`（`sdk.ts` 签名改动），便于 daemon / SDK 等非完整 `Config` 场景复用遥测初始化。
 
@@ -282,6 +282,10 @@ getActiveSpanTraceContext()  // 优先取当前 active span 的 traceId/spanId
 | `qwen-code.model`（start 时） | `gen_ai.request.model` | Stable |
 
 私有名始终权威，`gen_ai.*` 只是给「懂 spec 的后端」的兼容层。**关键设计：双发只写在 span attribute，而不再发一份 metric counter**——token 用量的 metric 已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 计过一次，再发 counter 会**双计**（详见第 5 节）。
+
+**ARMS Session User ID（#7921）**：`telemetry.userId` 与 `QWEN_TELEMETRY_USER_ID` 允许 operator 提供稳定 pseudonymous end-user id。环境变量 trim 后优先；空 env 回退 settings；非 string setting 直接配置失败，避免把 `null`、对象或数组导出为 span attribute。`Config.getTelemetryUserId()` 在 interaction span 创建时读取该值并写入 `gen_ai.user.id`，之后沿 interaction context 传播到 LLM、Tool、Agent spans，包括 tool-result continuation 与 linked-root background agents。
+
+这个字段只写 span attribute，不写 Resource、LogRecord、Metric 或 Baggage，也不别名到 `enduser.id` / `user.id`。原因是 ARMS Session Analysis 需要的是 span-level user dimension；Resource 会把 user id 变成进程级维度并自动附到 metrics，Baggage/traceparent 会把身份传播到外部请求。该方案假设一进程一用户；共享 multi-user daemon/channel 不能用进程级 settings/env 表达真实用户。
 
 **TTFT 采集**（`loggingContentGenerator.ts:loggingStreamWrapper` L468–535）：`ttftMs` 是**方法内闭包变量**（注释明确「绝不能是实例字段」，因为 `LoggingContentGenerator` 在并发 stream 间共享）。在流式迭代中，遇到**首个含用户可见内容**的 chunk（`hasUserVisibleContent`，跳过纯 role/usageMetadata chunk）时记录 `Date.now() - startTime`。语义上是「首个真实 token」的时间，与 claude-code 的 message_start 口径不同。
 
@@ -455,6 +459,7 @@ sequenceDiagram
 | #3893 | 敏感属性 opt-in | 引入 `includeSensitiveSpanAttributes` 开关 | 1 |
 | #4417 | TTFT + GenAI 双发 | 流式 TTFT 采集 + `gen_ai.*` 语义双发 | 4a |
 | #4432 | retry 可见性 | `requestSetupMs`/`attempt`/`retryTotalDelayMs`（**MERGED**） | 4b |
+| #7921 | ARMS session user ID | `telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 写入 span-level `gen_ai.user.id`，不写 Resource/log/metric/Baggage | ARMS |
 
 ### 6.4 出站关联（#4384）
 
@@ -488,7 +493,7 @@ sequenceDiagram
 |---|---|---|---|
 | #6263 | daemon NDJSON perf observability | 新增 `startEventLoopLagMonitor()`，用 `monitorEventLoopDelay` 读取 mean/p50/p99/max；注册 `qwen-code.daemon.event_loop.lag` 与 `qwen-code.acp.event_loop.lag` OTel gauge；daemon-child pipe payload size 通过 `qwen-code.daemon.pipe.message_bytes` histogram 记录 inbound/outbound。 | Daemon perf |
 
-#6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程把 event-loop snapshot 与 pipe byte 聚合同时接到 `/daemon/status.runtime.perf`，ACP child event-loop lag 不进入 status JSON，只通过 OTel gauge 和 forwarded stderr stall warning 暴露。这样 status endpoint 保持 daemon-local 诊断语义，跨进程细节仍交给 telemetry backend。
+PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程把 event-loop snapshot 与 pipe byte 聚合同时接到 `/daemon/status.runtime.perf`，ACP child event-loop lag 不进入 status JSON，只通过 OTel gauge 和 forwarded stderr stall warning 暴露。这样 status endpoint 保持 daemon-local 诊断语义，跨进程细节仍交给 telemetry backend。
 
 ---
 
@@ -515,3 +520,5 @@ sequenceDiagram
 10. **`tool_output_truncated` 事件名有兼容性变更（#5960）**：#5960 把原先 hardcoded、未加命名空间的 `tool_output_truncated` 改为 `qwen-code.tool_output_truncated`，与其它 event constants 对齐。代码侧更一致，但下游 collector/dashboard/filter 如果按旧事件名筛选，需要同时迁移 filter。
 
 11. **#6263 的 child lag 只走 telemetry/stderr**：`/daemon/status.runtime.perf` 只表示 daemon 进程；ACP child event-loop lag 不在 status JSON 内。dashboard 若只读 `/daemon/status`，不能把 child 卡顿误判为缺失数据，需要同时看 OTel gauge 或 stderr stall warning。
+
+12. **#7921 只适合一进程一用户部署**：`telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 是进程级配置。shared daemon、shared ACP channel 或任何一个进程服务多个 end user 的部署，如果直接配置该字段，会把不同用户归并成同一个 ARMS user id；这类场景需要后续增加 per-session/per-request identity surface。

@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.6、§4.3）。本文在 file/symbol/line 级别**取代**总览的 §3.6 段落，深入到 `resolveWithinWorkspace` 的逐分支防穿越/防符号链接逃逸算法、CAS+原子写链路的每一步守卫、读路由的 fail-closed 参数校验，以及 `FileSystemService` / `BridgeFileSystem` 注入 seam。
 >
-> 代码锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（读法：`git -C <repo> show daemon_mode_b_main:<path>`）。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）。
+> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads 当前 draft diff）。
 
 ---
 
@@ -40,6 +40,7 @@ Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP
 | #4279 | 文件路由 follow-up | 读/写路由的边界与审计 fold-in（与 #4269/#4280 同批）。 |
 | #4319 | acp-bridge F1（`BridgeFileSystem` seam） | 把 `BridgeFileSystem` 接口（`packages/acp-bridge/src/bridgeFileSystem.ts`）抬到 bridge 包，给 ACP 子进程侧 fs 调用留注入点。 |
 | #4334 | acp-bridge F1 follow-up（adapter wiring） | `bridgeFileSystemAdapter.ts` 把 ACP `readTextFile`/`writeTextFile` 路由到**同一** `WorkspaceFileSystemFactory`，统一审计 + 信任门 + 路径约束。 |
+| #7947 | Serve large text bounded reads（draft） | 当前 draft diff 允许 Serve `/file` 对超过 256 KiB 的 UTF-8 文本返回 bounded line window，同时保留 full snapshot/edit/hash 的旧大小门。 |
 
 ---
 
@@ -209,7 +210,7 @@ return n;
 
 ### 各路由要点
 
-- **`handleGetFile`（L200）**：`resolve(queryPath, 'read')` → `readText(resolved, {maxBytes, line, limit})`。响应 path 用 `workspaceRelative`（绝不回显绝对路径）。`readText` 底层（`workspaceFileSystem.ts:370`）在读前还有一道 `opts.line` 校验：`!Number.isSafeInteger(line) || line < 1` → `parse_error`，挡住 `Infinity`/浮点透传到 `readFileWithLineAndLimit` 导致诡异截断。
+- **`handleGetFile`（L200）**：`resolve(queryPath, 'read')` → `readText(resolved, {maxBytes, line, limit})`。响应 path 用 `workspaceRelative`（绝不回显绝对路径）。`readText` 底层（`workspaceFileSystem.ts:370`）在读前还有一道 `opts.line` 校验：`!Number.isSafeInteger(line) || line < 1` → `parse_error`，挡住 `Infinity`/浮点透传到 `readFileWithLineAndLimit` 导致诡异截断。#7947 当前 draft diff 在显式 bounded line-window 且文件为 UTF-8 文本时，允许超过 256 KiB 的文件走 streaming read；输出仍受 256 KiB cap，full snapshot/edit/hash 不放开。
 - **`handleGetFileBytes`（L270）**：`readBytesWindow`（`workspaceFileSystem.ts:425`）。这条路给二进制/大文件做字节窗口；返回 `contentBase64`。**仅当窗口覆盖整文件**（`offset===0 && buf.length===st.size`）才附 `hash`（全窗 sha256 当乐观并发 token）。读中做了 open-fd 双 stat + `assertSameFile`（dev/ino）+ "size/mtime 变了就 `hash_mismatch`"，把返回字节绑定到稳定快照。
 - **`handleGetStat`（L332）**：`resolve(queryPath, 'stat')`（容忍不存在）→ `stat`（底层 `fsp.lstat`，**不**跟随符号链接，故能如实报 `kind: 'symlink'`）。
 - **`handleGetList`（L364）**：探测用 `maxEntries: MAX_LIST_ENTRIES + 1 = 2001`，超 2000 则 slice 回 2000 且置 `truncated: true`——让 SDK 知道还有更多而不是静默假设全集。`list`（`workspaceFileSystem.ts:510`）把符号链接 dirent 标 `kind:'symlink'` 而非自动跟随（"Treating each child as implicitly-resolved here would be a brand-cast bypass"）。
@@ -438,9 +439,11 @@ sequenceDiagram
 
 3. **ACP 子进程侧 `params.path` 约束的渐进对齐**。#4334 adapter 已把 ACP fs 路由到同一 `WorkspaceFileSystem`，但 ACP `readTextFile` 的 `line`/`limit` 窗口在 adapter 里做**兼容性丢弃**（`bridgeFileSystemAdapter.ts:136-143`：null / 非正值回落 `undefined`），以贴近 pre-PR 内联 proxy 对 `limit<=0` 返回空内容的姿态，而非透传 `parse_error` 给老 agent。是渐进对齐而非一次到位。
 
-4. **`io_error` 的 503 不可区分根因**。聚合的 `io_error`（ENOSPC/EIO/EBUSY/ENAMETOOLONG/EMFILE）都映射 503，监控只能知道"环境性故障"，需读 `message`/`hint` 才能分 `df -h`（满盘）vs fd 耗尽。
+4. **#7947 仍为 draft**。Serve large text bounded reads 只记录当前 draft diff；尚不能视为 `main` 已落地能力。它只放行 UTF-8 bounded line-window，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。
 
-5. **NTFS-on-Linux 残余绕过**。`ntfs-3g` 挂载承认除冒号语法外的所有 Windows 绕过，但 8.3/ADS 检测平台门控在 win32，故 daemon 跑在 Linux 而工作区是 NTFS 挂载时有残余 gap（罕见，文档化接受）。
+5. **`io_error` 的 503 不可区分根因**。聚合的 `io_error`（ENOSPC/EIO/EBUSY/ENAMETOOLONG/EMFILE）都映射 503，监控只能知道"环境性故障"，需读 `message`/`hint` 才能分 `df -h`（满盘）vs fd 耗尽。
+
+6. **NTFS-on-Linux 残余绕过**。`ntfs-3g` 挂载承认除冒号语法外的所有 Windows 绕过，但 8.3/ADS 检测平台门控在 win32，故 daemon 跑在 Linux 而工作区是 NTFS 挂载时有残余 gap（罕见，文档化接受）。
 
 ---
 
@@ -453,6 +456,7 @@ sequenceDiagram
 | `packages/cli/src/serve/routes/workspaceFileRead.test.ts` | 31 | 读路由：`parseIntInRange` fail-closed、`applyReadHeaders`、glob symlink_escape 聚合、list/glob truncated 探测、`workspaceRelative` POSIX 归一。 |
 | `packages/cli/src/serve/routes/workspaceFileWrite.test.ts` | 10 | 写/编辑路由：`mutate({strict:true})` 401、body 校验、`invalid_client_id`、`expectedHash` 必填、201/200 created。 |
 | `packages/cli/src/serve/bridgeFileSystemAdapter.test.ts` | 18 | ACP write/read 命中工作区内磁盘（happy path）+ 信任门（`trusted:false` factory 使 ACP 写以与 HTTP `POST /file` 同姿态 reject）+ line/limit null 丢弃。 |
+| #7947 current draft focused suites | 158 | Serve workspace/ACP adapter/HTTP route 对 large UTF-8 text line-window、binary/unsupported encoding rejection、post-read identity check 和 metadata 的覆盖。 |
 
 > 合计 ~163 个用例集中在文件子系统四层 + adapter。`workspaceFileSystem.test.ts` 的 75 例是密度最高的安全回归套件，逐一覆盖 §"写/编辑路由" 列出的每道守卫。
 

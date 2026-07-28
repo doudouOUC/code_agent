@@ -3,7 +3,7 @@
 > 子文档；总览见 README.md
 > 本文 **取代并细化** 总览 `telemetry-observability.md` 的 §3.7（GenAI 语义双发 / TTFT / retry）与 §3.8（资源属性与基数控制），下沉到 function/line 级。
 > 代码均基于 `QwenLM/qwen-code@main`（除显式标注分支/PR 外）。引用格式 `file:symbol`（+行号），行号以阅读时的 `main` 为准。
-> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；其行号以 `gh pr diff 4432` 为准，合入后会漂移。
+> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667 仍为 open；其行号以对应 PR diff 为准，合入后会漂移。
 
 ---
 
@@ -15,7 +15,8 @@
 2. **GenAI 语义双发（dual-emit）**：在写私有属性（`input_tokens` / `output_tokens` / `ttft_ms` …）的同时，并行写一份 OTel GenAI 语义约定属性（`gen_ai.*`）。**关键设计：双发只写 span attribute，绝不再发一份 metric counter**——token 计量已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 承担一次，再发 counter 就会**双计**。
 3. **重试可见性【#4432 已合入】**：通过 `AsyncLocalStorage`（`retryContext`）把「第几次尝试 / 累计退避 / 累计 setup」从 `retryWithBackoff` 透传到 `LoggingContentGenerator`。核心三处精妙：(a) `iterationCount` **单调计数器**与被 clamp 的 `attempt` 循环变量**解耦**；(b) `onRetry` 三汇（QwenLogger / OTel log / metric counter）；(c) 顺带修复 Phase 4a 的 `sampling_ms` **重复扣减 setup** bug。
 4. **LLM request phase breakdown（#5904 / Phase 4c）**：把已有但未接线的 `recordApiRequestBreakdown` histogram 接到 `endLLMRequestSpan`，每个 LLM request 最多记录 REQUEST_PREPARATION、NETWORK_LATENCY、RESPONSE_PROCESSING 三段耗时，便于判断延迟花在 retry/setup、TTFT 还是输出 streaming。
-5. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
+5. **ARMS session user ID（#7921）**：operator 可通过 `telemetry.userId` 或 `QWEN_TELEMETRY_USER_ID` 提供稳定 pseudonymous user id，写入 span-level `gen_ai.user.id`，并传播到 interaction/LLM/tool/agent spans。
+6. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
 
 一句话串起来：**一次 LLM 请求 = 一个 `llm_request` span**；TTFT/token/gen_ai.\* 都是这个 span 的**属性**；retry 在这个 span 之**上**（每次重试是一个**全新**的 span），靠 ALS 把上下文灌进每个 per-attempt span；只有 token 用量和 retry 次数会另外落 **metric counter**（受基数开关约束）。
 
@@ -36,6 +37,7 @@
 | #7635 | MERGED（2026-07-24） | GenAI request 参数字段 | 从 provider-final SDK request 捕获 choice count、max tokens、temperature、top_p、frequency/presence penalty 和 stop sequences，写入 ARMS/OTel 对齐字段。 |
 | #7650 | MERGED（2026-07-24） | OpenAI empty frame usage preservation | 修正 OpenAI-compatible stream 中 no-candidate empty frame 提前 flush finish 的问题，保留后续 usage-only frame。 |
 | #7667 | OPEN（2026-07-24） | GenAI content telemetry fields | 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，并移除等价私有字段。 |
+| #7921 | MERGED（2026-07-28） | ARMS session user ID | 新增 `telemetry.userId` / `QWEN_TELEMETRY_USER_ID`，在 interaction 创建时写 `gen_ai.user.id` 并传播到 LLM、Tool、Agent spans。 |
 
 ---
 
@@ -179,7 +181,7 @@ recordTokenUsageMetrics(config, event.thoughts_token_count, { model, type: 'thou
 
 ### 3. GenAI / ARMS field alignment（#7536）
 
-#7536 在既有 dual-emit 基础上进一步收敛字段口径：目标不是替换 `qwen-code.*` 私有字段，而是在字段名、类型和含义能一致时，同时写出 OpenTelemetry GenAI semantic conventions 与阿里云 ARMS LLM Trace 可识别的属性。
+PR #7536 在既有 dual-emit 基础上进一步收敛字段口径：目标不是替换 `qwen-code.*` 私有字段，而是在字段名、类型和含义能一致时，同时写出 OpenTelemetry GenAI semantic conventions 与阿里云 ARMS LLM Trace 可识别的属性。
 
 核心新增模块：
 
@@ -197,7 +199,7 @@ recordTokenUsageMetrics(config, event.thoughts_token_count, { model, type: 'thou
 
 ### 4. GenAI request 参数字段（#7635）
 
-#7635 补齐的是 request 参数侧字段，而不是 prompt/content。新增 `telemetry/gen-ai-request.ts` observer，通过 OpenTelemetry Context 挂到当前 LLM span。OpenAI、Anthropic、Gemini/Qwen 的 provider-final request 在真正发送前调用 report helper，抓取第一份最终 SDK request snapshot。
+PR #7635 补齐的是 request 参数侧字段，而不是 prompt/content。新增 `telemetry/gen-ai-request.ts` observer，通过 OpenTelemetry Context 挂到当前 LLM span。OpenAI、Anthropic、Gemini/Qwen 的 provider-final request 在真正发送前调用 report helper，抓取第一份最终 SDK request snapshot。
 
 字段口径：
 
@@ -211,13 +213,13 @@ recordTokenUsageMetrics(config, event.thoughts_token_count, { model, type: 'thou
 
 ### 5. OpenAI empty stream usage preservation（#7650）
 
-#7650 修复 OpenAI-compatible provider 的流式边界：provider 可以发出“content → finish(no usage) → empty choices/no candidates → usage-only → EOF”。旧逻辑没有把 no-candidate frame 视为空，导致 pending finish 在 usage-only frame 到来前被 flush，最终 transcript/span 里缺 usage。
+PR #7650 修复 OpenAI-compatible provider 的流式边界：provider 可以发出“content → finish(no usage) → empty choices/no candidates → usage-only → EOF”。旧逻辑没有把 no-candidate frame 视为空，导致 pending finish 在 usage-only frame 到来前被 flush，最终 transcript/span 里缺 usage。
 
 最终实现把没有 candidate parts 的 frame 统一视为 empty，不论 candidates/choices 是空数组还是缺失。empty frame 不触发 pending finish flush；finish-only、usage-only、tool-call preparation frame 仍按有效 frame 处理。回归测试用 mutation guard 确认 finish 不是提前 yield 后又被后续对象修改出来的假阳性。
 
 ### 6. GenAI content telemetry fields（#7667 当前 open）
 
-#7667 当前 open diff 把敏感内容字段对齐到 OTel GenAI / ARMS 可识别的 standard attributes：
+PR #7667 当前 open diff 把敏感内容字段对齐到 OTel GenAI / ARMS 可识别的 standard attributes：
 
 - `gen_ai.input.messages`、`gen_ai.output.messages`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`。
 - tool spans 上的 `gen_ai.tool.description`、`gen_ai.tool.call.arguments`、`gen_ai.tool.call.result`。
@@ -226,7 +228,15 @@ LLM input/system/tool definitions 从第一份 provider-final SDK request 捕获
 
 敏感字段继续由 `telemetry.includeSensitiveSpanAttributes` 与 `sensitiveSpanAttributeMaxLength` 控制。invalid、cyclic、不完整或超过限制时整项省略；tool definitions 需要 type/name，optional parameters 只有能归一到 Draft-07 时才写入。旧私有等价字段和 `tool_schema` event 被移除或降级成 standard-field adapter，降低后端字段重复。
 
-### 7. 派生指标：`sampling_ms` 公式 + 除零守卫
+### 7. ARMS session user ID（#7921）
+
+PR #7921 增加的是 span-level end-user dimension，而不是 Resource 或 metric dimension。配置来源两层：`QWEN_TELEMETRY_USER_ID` trim 后优先；若 env 是空字符串则回退 settings；`telemetry.userId` 只接受 string，非 string setting 直接配置失败。Core 通过 `Config.getTelemetryUserId()` 暴露解析后的值。
+
+写入点在 interaction span 创建阶段。`gen_ai.user.id` 作为普通 span attribute 附在 interaction 上，并沿 interaction context 传播到 LLM、Tool、Agent spans，包括 tool-result continuation 与 linked-root background agents。这样 ARMS Session/User view 可以按 pseudonymous user id 聚合同一用户的 GenAI 调用链。
+
+该字段不写 Resource、LogRecord、Metric 或 Baggage，也不双写 `enduser.id` / `user.id`。Resource 会把用户 id 变成进程级维度并自动附到 metrics；Baggage/traceparent 会把身份传播到外部服务；两者都不符合本 PR 的低扩散目标。方案只适合一进程一用户部署，共享 multi-user daemon/channel 需要未来新增 per-session 或 per-request 身份面。
+
+### 8. 派生指标：`sampling_ms` 公式 + 除零守卫
 
 `endLLMRequestSpan` 在 token/ttft 之外派生两个属性（`session-tracing.ts` L440–457，**main / Phase 4a 版本**）：
 
@@ -259,7 +269,7 @@ if (metadata.ttftMs !== undefined) {
 
 ### 1. 为什么用 ALS（而非 in-generator accumulator）
 
-#4432 设计文档（`docs/design/telemetry-llm-request-timing-design.md` D4）记录了一段「实现中才发现的事实」：原计划照搬 claude-code「一个 LLM span 拥有整个 retry loop」的模式，但 qwen-code 的 4 个 `retryWithBackoff` 调用点都把 `apiCall = () => contentGenerator.generateContent(...)` 包在外面——**retry 层在 `LoggingContentGenerator` 之上**，每次 attempt 都是全新的 span，没有「跨 attempt 的共享 span」可供累积。
+PR #4432 设计文档（`docs/design/telemetry-llm-request-timing-design.md` D4）记录了一段「实现中才发现的事实」：原计划照搬 claude-code「一个 LLM span 拥有整个 retry loop」的模式，但 qwen-code 的 4 个 `retryWithBackoff` 调用点都把 `apiCall = () => contentGenerator.generateContent(...)` 包在外面——**retry 层在 `LoggingContentGenerator` 之上**，每次 attempt 都是全新的 span，没有「跨 attempt 的共享 span」可供累积。
 
 **解法**：用 `AsyncLocalStorage` 把 per-attempt 上下文从 `retryWithBackoff` 透传到 `LoggingContentGenerator`。这套做法对齐代码库既有模式（`promptIdContext` / `subagentNameContext` / `agent-context`），新增面最小。
 
@@ -466,7 +476,7 @@ const samplingMs = Math.max(0, duration - metadata.ttftMs);
 
 ## LLM request phase breakdown metric（#5904 / Phase 4c）
 
-#5904 把早期已存在但没有生产调用方的 `recordApiRequestBreakdown` 接到 `session-tracing.ts:endLLMRequestSpan`。它不是新增 span attribute，而是把一次 LLM request 的耗时按 phase 额外写入 `qwen-code.api.request.breakdown` histogram，便于在 metrics 后端直接看“延迟花在哪一段”。
+PR #5904 把早期已存在但没有生产调用方的 `recordApiRequestBreakdown` 接到 `session-tracing.ts:endLLMRequestSpan`。它不是新增 span attribute，而是把一次 LLM request 的耗时按 phase 额外写入 `qwen-code.api.request.breakdown` histogram，便于在 metrics 后端直接看“延迟花在哪一段”。
 
 三段 phase 的口径与前文 TTFT / retry 字段保持一致：
 

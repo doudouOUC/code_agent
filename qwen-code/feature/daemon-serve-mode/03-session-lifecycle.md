@@ -14,11 +14,11 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **metadata**：`displayName` 重命名 + `session_metadata_updated` 扇出（#4240）。
 - **load / resume**：`session/load`（回放完整历史）vs `session/resume`（不回放），`pendingRestoreEvents` 缓冲、并发 restore 的 coalesce 合并与跨动作 `RestoreInProgressError`（#4222）。
 - **archive / unarchive / archived export**：active transcript 位于 `chats/`，archived transcript 位于 `chats/archive/`；archive 是状态转换，不删除 transcript，load/resume archived session 会要求先 unarchive；archived export 可只读 selected trusted workspace 的 archive JSONL，不改变 archive 状态（#6058/#6911）。
-- **persisted transcript / recording failure / writer lease**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录；#7166 closed diff 描述完整 single-writer 方案但未合入，#7237 open diff 已抽出 ACP/daemon P0a writer fence，优先把 live owner reuse、append fencing、close drain 与 runtime root pinning 落到可独立合入的边界上；#7812 当前 open diff 继续补 managed daemon shutdown 下 exact-owned writer locks 的 cooperative release（#6525/#6740/#6743/#7166/#7237/#7812）。
+- **persisted transcript / recording failure / writer lease**：active transcript 可通过 singular 或 workspace-qualified pager 只读分页；recording durable append 失败后 recorder 会停止并广播 `recording_stopped`，防止继续写出缺 parent 的断链记录；#7166 closed diff 描述完整 single-writer 方案但未合入，#7237 open diff 已抽出 ACP/daemon P0a writer fence，#7894 把 lease 放到 restart-required opt-in 后，#7812 补 managed daemon shutdown 下 exact-owned writer locks 的 cooperative release，#7886 当前 open diff 再把 transcript timestamp drift 变成 advisory reconciliation（#6525/#6740/#6743/#7166/#7237/#7894/#7812/#7886）。
 - **multi-workspace owner-routed legacy session actions**：metadata、recap、BTW、mid-turn、task cancel、goal clear、rewind/shell、continue/language/artifact 等 singular legacy route 先解析 live owner runtime，再调用 owning bridge；URL/响应 shape 保持兼容（#6798/#6826/#6833）。branch/fork/cd 是显式例外，继续 primary-only，secondary owner fail-closed（#7005）。
 - **workspace-qualified Voice admission**：legacy 与 workspace-qualified Voice REST/WS 共用进程级 admission coordinator；runtime removal 会把 active Voice lease 计入 busy activity，force removal/shutdown 只 abort 目标 runtime 的 Voice work（#6839）。
 - **runtime removal**：removable secondary workspace 被 hot remove 时，会 drain/close 其 session、ACP、memory 和 channel resources，primary/static workspace 不可删除（#6745）。
-- **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先。#7821 当前 open diff 把 continuation ordering 收紧为 owner-scoped claim/release state machine，避免与用户输入、workspace relocation、session disposal 或 overlapping prompt 交错（#6945/#7821）。
+- **Todo stop guard**：daemon/ACP session 可 opt-in 在自然 stop 且最新可信 top-level Todo 仍未完成时做 bounded automatic continuation；safe/bare/Plan mode 强制关闭，permission/cancel/token/loop protection 仍优先。#7821 把 continuation ordering 收紧为 owner-scoped claim/release state machine，避免与用户输入、workspace relocation、session disposal 或 overlapping prompt 交错（#6945/#7821）。
 - **permission prompt cancellation preservation**：ACP permission prompt、Plan unknown shell approval、Stop hook permission 与 background notification 等等待点若被父级 abort，session 终态保持 `cancelled`，并保留已 recovered 的 mid-turn message（#7295）。
 - **prompt terminal exactly-once**：每个已返回 202 的 prompt 在 agent settle、queued removal、deadline、close/kill/crash/shutdown 等路径上恰好收到一个 `turn_complete` 或 `turn_error`；deadline 由 bridge admission/dispatch race 拥有（#7400）。
 - **prompt terminal follow-up hardening**：running prompt 从 UI-visible list 移除时不立刻丢 pending entry，queued terminal 不污染 session-level turn error/retry 状态，queued deadline 保留 typed `PromptDeadlineExceededError`（#7453）。
@@ -69,8 +69,10 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#7400](https://github.com/QwenLM/qwen-code/pull/7400) | merged | prompt terminal exactly-once | 每个 202 accepted prompt 经 per-prompt latch 恰好发布一个 terminal；deadline 进 bridge race，teardown 关 bus 前 flush active+queued prompt terminal |
 | [#7453](https://github.com/QwenLM/qwen-code/pull/7453) | merged | prompt-terminal follow-up hardening | running prompt hidden-but-retained until settle/teardown；queued terminal 只发事件、不改 session turn state；queued deadline 传播 typed deadline error |
 | [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | merged | event epoch / degraded replay | load/resume/SSE 下发 `eventEpoch`，compaction replay 保留 prompt/originator attribution 并暴露 degraded snapshot |
-| [#7812](https://github.com/QwenLM/qwen-code/pull/7812) | open | managed writer shutdown | 当前 open diff 在 daemon shutdown 时同步关闭 admission、drain accepted transcript work、retire exact-owned writer locks，并统一 ACP child SIGTERM/SIGKILL/reap timeline |
-| [#7821](https://github.com/QwenLM/qwen-code/pull/7821) | open | Todo Stop Guard continuation hardening | 当前 open diff 用 owner-scoped claim/release 协议固定 Guard continuation ordering，失败恢复保留用户内容和成功 function responses |
+| [#7812](https://github.com/QwenLM/qwen-code/pull/7812) | merged | managed writer shutdown | daemon shutdown 时同步关闭 admission、drain accepted transcript work、retire exact-owned writer locks，并统一 ACP child SIGTERM/SIGKILL/reap timeline |
+| [#7821](https://github.com/QwenLM/qwen-code/pull/7821) | merged | Todo Stop Guard continuation hardening | 用 owner-scoped claim/release 协议固定 Guard continuation ordering，失败恢复保留用户内容和成功 function responses |
+| [#7894](https://github.com/QwenLM/qwen-code/pull/7894) | merged | session writer lease opt-in | 新增 restart-required `experimental.sessionWriterLease`，ACP/daemon 且 boolean true 时才启用 lease，并由 ACP bootstrap snapshot gate |
+| [#7886](https://github.com/QwenLM/qwen-code/pull/7886) | open | transcript timestamp drift tolerance | 当前 open diff 将 transcript timestamps 降为 advisory，timestamp-only drift 走 SHA-256 full reconciliation，identity/owner/tail 等硬状态仍 fail-closed |
 | [#4334](https://github.com/QwenLM/qwen-code/pull/4334) | acp-bridge F1 | channelInfo 修复 #4325 | `closeSession` / `killSession` 改用 `channelInfoForEntry(entry)` 而非模块级 `channelInfo`，修复 channel-overlap 误杀 |
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
@@ -132,17 +134,21 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 
 ### session writer lease（#7166 closed / #7237 P0a open）
 
-#7166 closed diff 把“谁能写 active transcript”从隐含进程约定提升为显式 lease，但该完整方案未合入 main。创建、restore、resume、fork、worktree restore 与 ACP session 启动都会为 `(runtimeBase, sessionId)` 获取一个 writer owner；owner 记录包含 `ownerId`、`pid`、`hostname` 与时间戳，落在 runtime output 目录的侧车文件里。当前进程可回收本机 stale owner，但遇到外部主机仍持有 lease 时不会自动抢占，避免共享目录或远端 workspace 下出现 split-brain 写入。
+PR #7166 closed diff 把“谁能写 active transcript”从隐含进程约定提升为显式 lease，但该完整方案未合入 main。创建、restore、resume、fork、worktree restore 与 ACP session 启动都会为 `(runtimeBase, sessionId)` 获取一个 writer owner；owner 记录包含 `ownerId`、`pid`、`hostname` 与时间戳，落在 runtime output 目录的侧车文件里。当前进程可回收本机 stale owner，但遇到外部主机仍持有 lease 时不会自动抢占，避免共享目录或远端 workspace 下出现 split-brain 写入。
 
 写入路径使用 owner token 与文件长度做 fencing：append 前确认当前 owner 仍匹配、JSONL 长度没有被外部改写；一旦 owner 丢失、lease 被替换或 transcript 字节边界变化，recorder 进入 integrity failure，不再继续写入缺 parent 或乱序记录。session transition 也保持旧 recorder/lease 到 commit 点后再切换，防止 load/resume/fork 中途把旧 session 的 writer 提前释放。
 
 live admission 对已有 owner fail-closed。daemon/ACP 路由在打开 persisted session 前先解析 writer 状态；若另一个 live runtime 已持有该 session，返回结构化 `session_writer_conflict`，并通过 status/runtime API 暴露 owner 信息，供 Web Shell、SDK、scheduled task keepalive 和 IDE 端提示用户切换或关闭旧 runtime，而不是在新 runtime 里继续追加。
 
-#7237 open diff 是从 #7166 抽出的 P0a 防线，重点保护 ACP/daemon 最容易产生双写的路径。它把 writer owner 改成 atomic hard-link lease，owner 获取后重新读取 authoritative transcript tail；每次 append 同时校验 owner token、文件 identity、metadata 与预期 UTF-8 byte length。daemon 在已有 live owner 时复用 owner session，而不是新建 fresh session 抢写；prompt、cron、notification、teammate turns 都先过 ownership gate。
+PR #7237 open diff 是从 #7166 抽出的 P0a 防线，重点保护 ACP/daemon 最容易产生双写的路径。它把 writer owner 改成 atomic hard-link lease，owner 获取后重新读取 authoritative transcript tail；每次 append 同时校验 owner token、文件 identity、metadata 与预期 UTF-8 byte length。daemon 在已有 live owner 时复用 owner session，而不是新建 fresh session 抢写；prompt、cron、notification、teammate turns 都先过 ownership gate。
 
 关闭路径同样被收紧：session close 需要等待 active turn settle 并确认 close acknowledged 后才释放 lease，避免 close/teardown 与迟到 append 交叉。runtime/persistence root 在 cwd 变化时保持 pinned，ACP/HTTP writer errors 稳定、低敏且可被客户端识别为冲突或 writer-lost，而不是泛化 500。
 
-#7812 当前 open diff 进一步把该边界扩展到 daemon-managed ACP child shutdown。shutdown 首个信号到来后，session/turn admission 同步关闭，已接受 transcript work drain，exact-owned writer locks 原子 retire；SessionEnd hooks 与 resource cleanup 等 writer phase settle 后再执行。daemon-scoped process registry 跟踪 primary、secondary、dynamic runtime 的 ACP children，先 SIGTERM，5 秒后 SIGKILL，10 秒内要求 raw process reap；managed acquisition 不再凭 hostname、age 或 container-visible PID 抢 existing owner，standalone ACP 才保留 local stale-owner recovery。
+PR #7894 先把 writer lease 放到 restart-required `experimental.sessionWriterLease` opt-in 后面，默认关闭；只有 ACP/daemon path 且设置为 boolean `true` 才启用 lease。ACP 在 bootstrap config 时 snapshot effective gate，并在该 ACP 进程服务的所有 session 中复用，避免 per-session reload 把同一进程变成混合 writer。
+
+PR #7812 把该边界扩展到 daemon-managed ACP child shutdown。shutdown 首个信号到来后，session/turn admission 同步关闭，已接受 transcript work drain，exact-owned writer locks 原子 retire；SessionEnd hooks 与 resource cleanup 等 writer phase settle 后再执行。daemon-scoped process registry 跟踪 primary、secondary、dynamic runtime 的 ACP children，先 SIGTERM，5 秒后 SIGKILL，10 秒内要求 raw process reap；managed acquisition 不再凭 hostname、age 或 container-visible PID 抢 existing owner，standalone ACP 才保留 local stale-owner recovery。
+
+PR #7886 当前 open diff 将 transcript `birthtime`、`ctime`、`mtime` 降为 advisory。writer acquisition 建立 streaming SHA-256 baseline，普通 append 增量推进 digest；timestamp-only drift 触发 full-content reconciliation，带 pre/post handle/path 与 exact-owner 校验，最多重试 3 次。file identity、length、owner/group、link count、tail validity、symlink/non-regular 等硬状态仍 fail-closed。
 
 ### heartbeat 结果/状态类型（`bridgeTypes.ts`）
 
@@ -544,7 +550,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#7812/#7821 仍为 open diff**。managed writer shutdown 与 Todo Stop Guard continuation hardening 只记录当前实现观察；如果最终 review 改变 owner recovery、shutdown timeline 或 Guard claim 协议，本子文档需要再按 merged diff 对齐。
+6. **#7886 仍为 open diff**。transcript timestamp drift tolerance 只记录当前实现观察，不能视为 `main` 已落地能力；如果最终 review 改变 digest baseline、reconciliation retry 或 hard-state fail-closed 边界，本子文档需要再按 merged diff 对齐。
 
 ---
 
@@ -559,8 +565,9 @@ sequenceDiagram
 - **heartbeat**：`describe('recordHeartbeat')`（`:680`）。
 - **close/kill/detach/metadata**：`describe('closeSession')`（`:7813`）、`describe('updateSessionMetadata')`（`:8010`）、`describe('listWorkspaceSessions')`（`:4709`/ enriched `:8076`）、`publishWorkspaceEvent + knownClientIds`（`:8100`）。
 - **prompt terminal exactly-once**：`describe('prompt terminal exactly-once (DAEMON-002/003/004/005)')` 覆盖 queued removal terminal、wedged deadline、queued deadline、close/kill terminal-before-bus-close、last detach draining、cancel/remove/deadline race、channel crash exactly-once（#7400）。
-- **managed writer shutdown**：#7812 当前 open diff 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
-- **Todo Stop Guard continuation hardening**：#7821 当前 open diff 覆盖 owner claim/release、失败恢复、Stop hook 重跑、workspace relocation、session disposal、overlapping prompt 与 cron queue cap。
+- **managed writer shutdown**：#7812 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
+- **Todo Stop Guard continuation hardening**：#7821 覆盖 owner claim/release、失败恢复、Stop hook 重跑、workspace relocation、session disposal、overlapping prompt 与 cron queue cap。
+- **session writer lease opt-in / timestamp drift**：#7894 覆盖 restart-required opt-in 与 ACP bootstrap gate；#7886 当前 open diff 覆盖 timestamp-only drift reconciliation、digest baseline 和 release-aware baseline read。
 - **load/resume/restore**：`loads an existing ACP session...`（`:798`）、`buffers load replay events until the restored session is registered`（`:838`）、`resumes an existing ACP session without calling session/load`（`:899`）、`attaches to an already live session and returns the cached restore state`（`:931`）、`propagates the original ACP state to coalesced restore waiters`（`:973`）、`survives spawn-owner disconnect kill while a coalesced restore is mid-flight`（`:1011`）、`does not kill the channel when the last live session leaves while a restore is pending`（`:1057`）、`does not promote a restored session into the omitted-id attach default`（`:1100`）、`rejects load while a resume for the same session is in flight`（`:1164`）/ 镜像（`:1196`）、`does not kill a shared channel when one of multiple pending restores fails`（`:1231`）、`does not surface an unhandledRejection when the channel exits after a successful restore`（`:1282`）、`shutdown awaits in-flight restores before resolving`（`:1323`）。
 - **tombstone/early-events**：`tombstones closed sessionIds so late notifications cannot leak into a future load`（`:6781`）、`purges buffered guardrail events when restore fails so retry-success does not replay stale frames`（`:6876`）。
 
@@ -701,7 +708,7 @@ sequenceDiagram
 - `compactionEngine.ts`：compacted slot 保留最近 `sessionId`、`promptId`、`originatorClientId`，跨 prompt/originator 不合并 attribution。
 - `bridge.ts` replay snapshot：compaction ingest failure 后标记 degraded snapshot，load/resync consumer 可以明确知道 snapshot 不再是完整权威源。
 
-### #7812 — managed writer shutdown（OPEN）
+### #7812 — managed writer shutdown（MERGED）
 
 - `process-registry.ts`：daemon-scoped ACP child registry 记录 raw process，统一 SIGTERM、5s SIGKILL 与 10s reap timeout。
 - `spawnChannel.ts`：partial channel construction 与 overlapping teardown join 同一 terminal outcome，避免构建和销毁双写资源状态。
@@ -709,13 +716,27 @@ sequenceDiagram
 - `session-writer-lease.ts`：managed acquisition 不再基于 hostname、age、container-visible PID 回收 existing owner；standalone ACP 保留 local stale-owner recovery。
 - `chatRecordingService.ts`：exact-owned writer locks 在 writer phase 原子 retire，避免 daemon replacement 后留下不可证明 owner。
 
-### #7821 — Todo Stop Guard continuation hardening（OPEN）
+### #7821 — Todo Stop Guard continuation hardening（MERGED）
 
 - `daemon-todo-stop-guard.ts`：Guard continuation 用 trusted bridge invocation prompt id claim/release owner-scoped ordering position。
 - `Session.ts`：Guard preparation 位于 queued input/model selection 之后、compression/provider submission 之前；失败恢复保留已 drain user content 与成功 function responses，只移除 synthetic Guard prompt。
 - `bridge.ts` / `bridgeClient.ts` / `bridgeTypes.ts`：daemon bridge 协议同步 owner claim/release，旧或不可信 caller fail closed。
 - `AcpBridge.ts` / `qwen-agent.ts`：channel bridge 与 desktop shared agent consumer 按同一协议处理 continuation ownership。
 - session lifecycle：workspace relocation 走 close gate，disposal/older overlapping prompt 不能修改 newer owner，unrelated cron queue cap 精确执行。
+
+### #7894 — session writer lease opt-in（MERGED）
+
+- `config.ts` / settings schema：新增 restart-required `experimental.sessionWriterLease`，默认 false，只有 boolean true 才启用。
+- `acpAgent.ts`：ACP bootstrap 时 snapshot effective gate，并在同一 ACP child 的所有 session 中复用，避免 settings reload 造成 mixed writer mode。
+- `chatRecordingService.ts`：lease 只在 ACP/daemon path 且 opt-in gate 为 true 时使用；interactive/headless 保持 legacy recorder。
+- 测试覆盖 core config、CLI settings schema、ACP process-stability gate 和 writer lease gate。
+
+### #7886 — transcript timestamp drift tolerance（OPEN）
+
+- `session-writer-lease.ts`：`birthtime`、`ctime`、`mtime` 降为 advisory；file identity、length、regular type、mode、owner/group、link count 与 tail validity 仍 fail-closed。
+- writer acquisition 为已有 transcript 建立 streaming SHA-256 baseline，普通 append 增量推进 digest。
+- timestamp-only drift 触发 full-content reconciliation，带 pre/post handle/path 与 exact-owner 校验，最多重试 3 次；持续不稳定返回 `session_writer_unavailable`。
+- release-aware baseline read 每 1 MiB chunk 检查 release，避免 managed shutdown 被长 snapshot 阻塞。
 
 ### #4694 — compacted replay
 
