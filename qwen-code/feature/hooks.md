@@ -1,8 +1,8 @@
 # Hooks / submitted prompt provenance 技术方案
 
 > 适用范围：`UserPromptSubmit` hook 的 submitted prompt provenance。
-> 关键 PR：[#7762](https://github.com/QwenLM/qwen-code/pull/7762)、[#7877](https://github.com/QwenLM/qwen-code/pull/7877) 当前 open diff。
-> 说明：本文只按 @doudouOUC 个人 PR 记录已合入能力与当前 open diff consumer；字段是 optional additive surface，旧 hook consumer 不应假定它总存在。
+> 关键 PR：[#7762](https://github.com/QwenLM/qwen-code/pull/7762)、[#7877](https://github.com/QwenLM/qwen-code/pull/7877)。
+> 说明：本文只按 @doudouOUC 个人 PR 记录已合入能力；字段是 optional additive surface，旧 hook consumer 不应假定它总存在。
 
 ---
 
@@ -12,7 +12,7 @@
 
 PR #7762 的目标是在不改变模型输入、不改变 hook 顺序、不破坏现有 hook consumer 的前提下，为安全审计、日志和同进程 hook 增加一个用户提交文本的 provenance 线索。
 
-PR #7877 进一步验证了这个字段的一个具体消费者：External Context Auto Recall hook 只用 `submitted_prompt` 构造 provider query，而不把 model-bound `prompt`、`@file` expansion、reminder 或其它系统上下文发给外部 provider。
+PR #7877 进一步落地了这个字段的一个具体消费者：External Context Auto Recall hook 只用 `submitted_prompt` 构造 provider query，而不把 model-bound `prompt`、`@file` expansion、reminder 或其它系统上下文发给外部 provider。
 
 ---
 
@@ -65,7 +65,7 @@ deferred turn 与 exact in-memory restoration 通过 sidecar 传递 provenance�
 
 ### 3.5 Auto Recall consumer（#7877）
 
-External Context Auto Recall 是 `submitted_prompt` 的当前 open diff 消费者。hook entry 只处理 `hook_event_name === 'UserPromptSubmit'` 且 `submitted_prompt` 为非空字符串的 payload；legacy `prompt` only、invalid JSON、image-only、unsupported producer 或无法证明 fresh user submission 的输入都 no-op。
+External Context Auto Recall 是 `submitted_prompt` 的已合入消费者。hook entry 只处理 `hook_event_name === 'UserPromptSubmit'` 且 `submitted_prompt` 为非空字符串的 payload；legacy `prompt` only、invalid JSON、image-only、unsupported producer 或无法证明 fresh user submission 的输入都 no-op。
 
 该 hook 先做 repository root realpath containment，再对 `submitted_prompt` 做 whitespace normalization、常见 accidental secret pattern 过滤和 512 code point 上限。provider 返回的检索结果不会改变 `prompt` 字段，而是通过 `hookSpecificOutput.additionalContext` 追加到 user-layer context，并包在 `untrusted_external_context` envelope 中。它证明 `submitted_prompt` 可以作为“用户提交文本 provenance”，但不把字段升级为安全认证或权限边界。
 
@@ -99,7 +99,7 @@ PR #7877 追加 external-context auto recall E2E，验证 `@file` expansion 不�
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
 | [#7762](https://github.com/QwenLM/qwen-code/pull/7762) | MERGED | submitted prompt provenance | 给 `UserPromptSubmit` 增加 optional `submitted_prompt`，TUI fresh `UserQuery` 捕获扩展前文本投影，恢复/取消路径保留可证明 provenance，不能证明的 producer 省略字段。 |
-| [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | OPEN | external context auto recall | 当前 open diff 用 `submitted_prompt` 作为 external-context auto recall 的唯一 query 来源，返回 user-layer untrusted `additionalContext`，并保持 `prompt` / hook order / chaining 兼容。 |
+| [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | MERGED | external context auto recall | 用 `submitted_prompt` 作为 external-context auto recall 的唯一 query 来源，返回 user-layer untrusted `additionalContext`，并保持 `prompt` / hook order / chaining 兼容。 |
 
 ---
 
@@ -108,6 +108,6 @@ PR #7877 追加 external-context auto recall E2E，验证 `@file` expansion 不�
 1. **字段不保证存在**。`submitted_prompt` 是 provenance 线索，不是所有 hook payload 的必填字段；consumer 必须继续兼容缺失。
 2. **image-only 与 machine-generated turn 不提供原文投影**。这些路径没有同样明确的 fresh text submission，当前选择省略而不是猜测。
 3. **large paste 是 compact projection**。hook 看到的是占位式投影，不是完整大段粘贴内容；这是为了与现有大粘贴处理和数据最小化保持一致。
-4. **#7877 仍为 open**。Auto Recall 的 hook consumer 只记录当前 diff 方案；不能把它视为 `main` 已落地能力。
+4. **`submitted_prompt` 不是安全认证**。#7877 证明它可作为 provider query 来源，但 hook 仍必须把字段视为用户可控文本，不能把它当权限证明。
 
-_按个人 PR 口径更新于 2026-07-28_
+_按个人 PR 口径更新于 2026-07-29_

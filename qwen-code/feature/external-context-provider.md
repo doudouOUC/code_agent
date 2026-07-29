@@ -1,7 +1,7 @@
 # Direct External Context Search / Auto Recall 技术方案
 
-> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP 当前 open diff；#7877 submitted-prompt auto recall 当前 open diff）。
-> 当前记录：#7586 与 #7877 仍为 open，本文件按当前 diff、changed files、测试路径与 examples 记录方案观察；不能视为 `main` 已落地能力。
+> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP 当前 open diff；#7877 submitted-prompt auto recall）。
+> 当前记录：#7586 仍为 open；#7877 已按 merged diff、changed files、测试路径与 examples 记录最终实现。
 
 ---
 
@@ -9,7 +9,7 @@
 
 PR #7586 当前实现面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。两者都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
 
-核心风险是把 provider 直接暴露给模型或 hook：模型不应知道 credential env 名称，不应选择 provider/corpus，不应看到 provider 内部错误，也不能把 provider 输出当作可信系统指令。因此当前 diff 把能力拆成两个互斥入口：retrieval-only MCP server 只暴露 `context_search({query})`；auto recall hook 只消费 `submitted_prompt` 并返回 bounded user-layer `additionalContext`。两者都不提供写入记忆工具或管理面。
+核心风险是把 provider 直接暴露给模型或 hook：模型不应知道 credential env 名称，不应选择 provider/corpus，不应看到 provider 内部错误，也不能把 provider 输出当作可信系统指令。因此方案把能力拆成两个互斥入口：retrieval-only MCP server 只暴露 `context_search({query})`；auto recall hook 只消费 `submitted_prompt` 并返回 bounded user-layer `additionalContext`。两者都不提供写入记忆工具或管理面。
 
 ---
 
@@ -104,7 +104,7 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 
 ## 5. 已知限制 / 后续
 
-- #7586 与 #7877 仍为 open；不能视为 main 已落地。
+- #7586 仍为 open；不能视为 main 已落地。#7877 已合入，但只提供 direct auto recall profile，不改变 #7586 的 MCP profile 状态。
 - 当前实现仍是只读检索；auto recall 也只注入 untrusted context，不包含 remember writer、删除、审批、policy 或 management API。
 - provider credential 的最小权限、document ACL 和审计由外部系统保证；Qwen extension 只约束本地配置和请求边界。
 - provider 输出的相关性、排序、去重和安全过滤依赖 provider；本层只做结构校验、长度限制和非可信展示。
@@ -115,6 +115,6 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
 | [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | OPEN | retrieval-only MCP | 固定 provider/corpus/credential，只暴露 `context_search({query})`，返回 bounded untrusted result。 |
-| [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | OPEN | submitted-prompt auto recall | 新增 `UserPromptSubmit` command hook profile，基于 `submitted_prompt` 自动检索一次并通过 user-layer `additionalContext` 注入。 |
+| [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | MERGED | submitted-prompt auto recall | 新增 `UserPromptSubmit` command hook profile，基于 `submitted_prompt` 自动检索一次并通过 user-layer `additionalContext` 注入。 |
 
-_按个人 PR 口径更新于 2026-07-28_
+_按个人 PR 口径更新于 2026-07-29_

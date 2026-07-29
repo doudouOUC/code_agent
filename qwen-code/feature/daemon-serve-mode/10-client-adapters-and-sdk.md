@@ -54,6 +54,7 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #7463 | @doudouOUC | merged | Java daemon transport alpha：新增 JVM HTTP/SSE daemon client/session/event/SSE/exception surface。 |
 | #7603 | @doudouOUC | merged | Java daemon transport reliability hardening：消费 event epoch，收紧 SSE/JSON malformed path、terminal-before-202 和 teardown ordering。 |
 | #7619 | @doudouOUC | merged | epoch cursor review follow-up：固定 `eventEpoch` / `replayDegraded` response propagation，并修正 SDK `detail` 注释。 |
+| #8002 | @doudouOUC | open | workspace file read cursor paging：当前 open diff 为 TS daemon client / workspace client 暴露 `cursor` request 与 `hasMore`/`nextCursor` response 字段。 |
 
 ---
 
@@ -102,7 +103,7 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 
 #6482 后，`load()` 的 replay snapshot 是 bounded live window，不再是完整 transcript。snapshot 可能以 id-less `history_truncated` 开头；SDK/UI 把它作为 transcript status 渲染，并继续应用 retained replay。#6525 给 full active persisted transcript 增加独立 API：`DaemonClient.getSessionTranscriptPage(sessionId, { cursor, limit })` 调 `GET /session/:id/transcript`，返回 id-less replay frames，不 attach client、不 seed EventBus、不返回 `lastEventId`；cursor 由 workspace project 目录持久 HMAC key 签名并绑定文件 snapshot，不能当作跨文件替换的长期 bookmark。
 
-#6567 后，`DaemonClient.workspaceById(id)` / `workspaceByCwd(cwd)` 返回 `WorkspaceDaemonClient`，把 selector 封进 `/workspaces/:workspace/...` 路由。该 client 覆盖 workspace file/status/settings/trust/permissions/MCP/tools/memory/agents/session list/group/archive/delete/reload/init 等 core REST helper；legacy `DaemonClient` 方法仍默认指向 primary workspace。客户端应先检查 `workspace_qualified_rest_core`，该能力随 workspace settings/persist route deps 条件广告。#6625 新增 `DaemonClient.addWorkspace(cwd)`，WebUI workspace provider 成功注册后强制刷新 capabilities，以拿到新增 `workspaces[]`。#6716 把它扩展为 `addWorkspace(cwd, { persist:true })`，只有看到 `persistent_workspace_registration` capability 时客户端才应发送 persist，并读取可选 `persisted` response 字段。#6745 给 SDK/WebUI 增加 runtime removal helper：客户端先 gate `workspace_runtime_removal` 和 workspace row `removable`，普通 remove 遇到 busy snapshot 时提示 force；当前 session 属于目标 workspace 时禁用 force，成功后刷新 capabilities 并回落到 primary workspace。
+#6567 后，`DaemonClient.workspaceById(id)` / `workspaceByCwd(cwd)` 返回 `WorkspaceDaemonClient`，把 selector 封进 `/workspaces/:workspace/...` 路由。该 client 覆盖 workspace file/status/settings/trust/permissions/MCP/tools/memory/agents/session list/group/archive/delete/reload/init 等 core REST helper；legacy `DaemonClient` 方法仍默认指向 primary workspace。客户端应先检查 `workspace_qualified_rest_core`，该能力随 workspace settings/persist route deps 条件广告。#8002 当前 open diff 进一步给 workspace file read 增加 `workspace_file_read_cursor` capability：`readFile()` 请求可传 opaque `cursor`，响应可读 `hasMore`/`nextCursor`，旧 daemon 不返回这些字段时保持原 line-window 行为。#6625 新增 `DaemonClient.addWorkspace(cwd)`，WebUI workspace provider 成功注册后强制刷新 capabilities，以拿到新增 `workspaces[]`。#6716 把它扩展为 `addWorkspace(cwd, { persist:true })`，只有看到 `persistent_workspace_registration` capability 时客户端才应发送 persist，并读取可选 `persisted` response 字段。#6745 给 SDK/WebUI 增加 runtime removal helper：客户端先 gate `workspace_runtime_removal` 和 workspace row `removable`，普通 remove 遇到 busy snapshot 时提示 force；当前 session 属于目标 workspace 时禁用 force，成功后刷新 capabilities 并回落到 primary workspace。
 
 #6598 后，`DaemonClient.reloadChannelWorker()` 调 `POST /workspace/channel/reload`，用于 `qwen serve --channel` 场景下 relaunch channel worker 并重读 settings；客户端应先检查 `channel_reload` capability。#6635 扩展 status/type 面：`/daemon/status.runtime.channelWorkers[]` 与 SDK `DaemonChannelWorkerGroupSnapshot` 表达每个 workspace 的 worker，兼容 `channelWorker`/reload response 仍返回 primary 或首个 snapshot。#6741 继续增加 runtime channel control helpers：查询/设置/停止 channel selection 时先 gate `channel_control`，`reload` 仍可复用 `channel_reload`，CLI `qwen channel set/status/stop` 也走同一 daemon HTTP surface。#6950 不新增 capability，但要求 SDK/CLI 保留 channel startup failure payload：partial success 的 channel worker snapshot 可带 bounded/redacted failures，dynamic all-fail 时 HTTP 502 `channel_worker_start_failed` response 会包含 attempted failure 列表与 rollback state，客户端不要再把它压成泛化 “No channels connected”。
 
@@ -368,5 +369,6 @@ sequenceDiagram
 1. **adapter spike 均未接入默认路径**：TUI / channel / IDE spike 全部 default-off，各自声明了显式 "not covered" gap（无 live daemon E2E、无 flag 解析、无 production wiring）。
 2. **orphan prompt**：客户端断连后 prompt 仍跑到完成（结果 publish 到 SSE bus 无人消费）——这是设计选择，非 bug。
 3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
+4. **#8002 仍为 open**：workspace file read cursor paging 只记录当前 open diff 的 TS SDK surface；客户端必须 gate `workspace_file_read_cursor` 并兼容旧 daemon 缺字段。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-22_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-29_

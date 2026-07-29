@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。2026-07-25 的 #7686 当前 open diff 继续把 `iconv-lite`、`@xterm/headless` 和 `simple-git` 改为首次真实使用时动态加载，并用 bundle guard 固定 ACP static closure 边界。2026-07-26 的 #7747 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，在保留 JSONC 格式语义的同时移除旧 parser cluster。2026-07-27 的 #7761 新增 daemon/ACP first-output latency benchmark；#7825/#7820 已修 artifact schema、measurement validity 与 serial runner；#7767 已基于该 benchmark 在 ACP session creation 后预加载 lazy Provider，以减少首 prompt 的 provider 构造成本。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。2026-07-25 的 #7686 当前 open diff 继续把 `iconv-lite`、`@xterm/headless` 和 `simple-git` 改为首次真实使用时动态加载，并用 bundle guard 固定 ACP static closure 边界。2026-07-26 的 #7747 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，在保留 JSONC 格式语义的同时移除旧 parser cluster。2026-07-27 的 #7761 新增 daemon/ACP first-output latency benchmark；#7825/#7820 已修 artifact schema、measurement validity 与 serial runner；#7767 已基于该 benchmark 在 ACP session creation 后预加载 lazy Provider，以减少首 prompt 的 provider 构造成本。#7994 当前 open diff 继续把 immediate prompt dispatch 拆成 prompt accepted、user echo、queue wait 与 provider request arrival 等阶段。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -244,6 +244,12 @@ PR #7767 的目标不是再压缩 initialize，而是利用 #7761 benchmark 指�
 
 非 lazy generator 是 no-op。background failure 被捕获以避免 unhandled rejection，但 rejected promise 仍会 memoized 给首次真实调用观察。Qwen OAuth hot model switch 或 ACP worktree relocation 会丢弃尚未使用的 preload；已经用于请求的 generator 不会被替换，防止 mid-request 状态漂移。
 
+### 3.15 immediate prompt dispatch metrics（#7994 当前 open）
+
+#7994 不改变生产路径，只扩展 #7761 benchmark 的观测粒度。artifact schema 升到 v2 后，除原有 process/session/provider/first-output/terminal 指标外，还记录 `promptAcceptedAt`、`userEchoAt`、`daemonPromptQueueWaitMs`、`promptToAcceptanceMs`、`acceptanceToProviderRequestArrivalMs`、`promptToUserEchoMs` 与 `userEchoToProviderRequestArrivalMs`。
+
+`FirstOutputTracker` 用 accepted top-level prompt id 关联 relayed `user_message_chunk`，并缓存 prompt acceptance 前已到达的 echo；transcript replay 不算 user echo，user echo 也不会被计为 model output。Provider request 可能先于客户端收到 HTTP 202 或 SSE echo，所以 acceptance/echo 到 provider arrival 的 delta 允许为负；其它负时长仍作为 invalid sample 处理。queue wait 指标只在 isolated turn 后 daemon status counter 恰好推进一次且 `lastMs` 有限非负时采信。
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -361,6 +367,7 @@ sequenceDiagram
 | #7767 | MERGED | ACP provider preload | 在 ACP session creation response 写回后 best-effort 预加载 lazy Provider，首 prompt 复用同一 in-flight preparation |
 | #7820 | MERGED | first-output benchmark validity/schema | 把 dwell anchor 改到 SSE readiness，拆 serial benchmark config，并用 paired bootstrap CI lower bound 做 Phase 1 gate |
 | #7825 | MERGED | first-output artifact schema simplification | 删除 bundle-level git commit、重命名 prompt shape 说明字段、提升 schema version，并合并 success predicate |
+| #7994 | OPEN | immediate prompt dispatch metrics | 当前 open diff 将 benchmark artifact 升到 v2，记录 prompt accepted、user echo、queue wait 与 provider request arrival 的细分阶段 |
 
 epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 
@@ -439,6 +446,12 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **实现模式**：#7825 已删除 bundle-level git commit、重命名 prompt shape 说明字段、提升 schema version、合并 success predicate；#7820 把 dwell anchor 改为 SSE readiness，拆 serial benchmark config，并把 Phase 1 gate 改为 paired bootstrap CI lower bound。
 - **验证**：helper/fake-server suites、artifact fixtures、dwell error、target lint/format 与 patched tsconfig 类型检查；#7820 未重新跑 reference-host benchmark。
 
+### #7994 immediate prompt dispatch metrics（OPEN）
+
+- **问题**：first-output benchmark 缺少 prompt accepted、user echo 与 provider request arrival 之间的拆分，无法定位 immediate prompt 的延迟到底来自 queue wait、HTTP/SSE echo 还是 provider dispatch。
+- **实现模式**：artifact schema v2 增加 prompt acceptance、user echo、daemon queue wait 与 signed provider delta；tracker 只按 accepted top-level prompt id 关联 relayed user echo，排除 replay 与 model output。
+- **验证**：helper tests 与本地 opt-in benchmark run 覆盖 echo correlation、negative delta、queue-wait snapshot 和 artifact 字段；当前 open diff 尚不能视为 main 已落地能力。
+
 ### #3085（CLOSED，已拆分）
 - 为 #3318 + #3319 的合并版 PR，已关闭。原始 `isDefaultBaseUrl` 使用裸 `startsWith` 存在子域伪造缺陷（`dashscope.aliyuncs.com.evil.com` 误命中），在 #3318 修正为 `=== || startsWith(default + '/')`。
 
@@ -454,3 +467,4 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **import-order 依赖打包顺序**：`index.ts` 中 `initStartupProfiler()` 先于 `import './src/gemini.js'` 的 T0 早捕获，依赖 esbuild 打包保留语句顺序；若改为纯 ESM 运行（import 提升）或调整打包策略，T0 的「早于模块求值」语义需重新验证。
 - **后续方向（epic #3011 未尽项）**：分层零加载入口（`--version`/`--help` 零导入）、core barrel 拆分按需导入、重型依赖（OpenTelemetry/highlight.js/React-Ink）动态加载、esbuild code splitting（#3226，懒注册收益的真正前置），均尚未在本批 PR 覆盖。
 - **#7820 没有重新跑 reference-host benchmark**：该 PR 的价值主要是修正 measurement harness 自身，不能把历史 benchmark 结果简单外推为新的性能结论。
+- **#7994 仍为 open**：immediate prompt dispatch metrics 只记录当前 diff 方案，不能把 schema v2 字段视为 `main` 已落地能力。
