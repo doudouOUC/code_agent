@@ -33,7 +33,7 @@ HTTP route (server.ts)
 
 bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.test.ts:2669`「FIFO-serializes concurrent prompts on the same session」）。但这里的状态/控制端点 **不进这个队列**：tasks/stats/hooks 等 status 路径和 recap/btw/rewind 控制路径走 ACP `extMethod(...)`，shell 在 daemon 本进程执行，settings 由 host 直接持久化，二者也不经 `session/prompt` FIFO。因此即使主对话正在流式输出，客户端也能并发拉一次 tasks/stats/hooks 快照、问一句 btw、或要一句 recap，而无需等当前 turn 结束。`bridge.test.ts:526`「requests session tasks status **without waiting for the prompt queue**」就是钉死 status 路径不排队的不变式测试。
 
-代价是：这些 ext-method 在 ACP 子进程里与主 prompt 共享同一个事件循环；它们若触发 LLM 调用（recap/btw），是在子进程里另起一次**侧查询/分叉**，不复用主 turn 的 streaming，但也**不污染主对话历史**（详见各端点小节）。
+代价是：这些 ext-method 在 ACP 子进程里与主 prompt 共享同一个事件循环；它们若触发 LLM 调用（recap/btw），是在子进程里另起一次**侧查询/分叉**，不复用主 turn 的 streaming，但也**不污染主对话历史**（详见各端点小节）。#8080 后，workspace skill status 读取不再把“只读查询”升级成 extension/skill 重扫描；status 面只消费已提交 snapshot，刷新由 settings/content/extension mutation 显式触发。
 
 ### 鉴权姿态
 
@@ -102,6 +102,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #6769 | feat(serve): Bound persisted transcript pages | merged | workspace transcript source/response/cursor byte bounds 与 `transcript_page_too_large`。 |
 | #6911 | feat(cli): Add archived session export | 2026-07-15 | `GET /workspaces/:workspace/session/:id/archive/export` selected trusted workspace archived JSONL export。 |
 | #6969 | feat(cli): Add bounded daemon log rotation | merged | stable `debug/daemon/daemon.log`、有界 archive、fallback run family、logger status 与 access-log suppression。 |
+| #8080 | fix(serve): Prevent repeated workspace skill rescans | 2026-07-30 | workspace skill status 改为 side-effect-free read model：ACP child 只读 committed cache，daemon 侧用 TTL/generation/single-flight/ETag 与 explicit refresh 控制可见性。 |
 
 > 合并次序：recap（5-26）→ logger（5-27）→ shell + tasks（5-28，当天先后）→ request-log（5-29）→ btw（5-30）→ remember/forget/dream（6-06）→ rewind/hooks/directory（6-07）。logger 先于 shell/request-log 落地，所以 shell/request-log 直接挂到 `daemonLog` 上记日志。
 
@@ -383,6 +384,14 @@ manager 串行化 lifecycle mutation，复用 workspace worker group reconcile�
 
 #4832 时这条路由不执行安装/更新/启停，只给 dashboard/IDE 一个统一的「当前 daemon 真正加载了什么 extension」快照。它也解释了为什么 MCP/skills/agents/hooks 文档里会出现 `extension` level/source：extension 能把这些能力注入到同一 workspace runtime。
 
+### workspace skill status read model（#8080）
+
+#8080 修复的是“只读 status 查询反复触发 workspace skill 重扫描”的问题。最终实现把 workspace skills 状态拆成 side-effect-free read model：ACP 子进程的 status 方法只从 `SkillManager.getCachedSkills()` 读取 committed snapshot，不能为了回答 `/workspace/skills` 或 ACP status 自己触发 extension/skill discovery；真正会改变 snapshot 的路径必须带显式 refresh reason。
+
+daemon 侧 `WorkspaceService` 在 status route 前加 5 秒 TTL、workspace generation guard 与 single-flight。并发查询复用同一 refresh promise，workspace mutation、settings reload 或 extension content 变化会按 reason invalidation；未变内容可用 ETag / `If-None-Match` 直接返回 304。`ExtensionManager` 也记录 source fingerprint，只有 settings/content/all 这类 mutation reason 才刷新 extension-derived skills，避免 Web Shell、ACP child 或 IDE 轮询把“看状态”变成“重新扫盘”。
+
+边界上，#8080 不改变 skill enable/disable、extension activation policy 或 workspace trust 语义；它只把状态可见性改成“已提交快照 + 明确刷新”的模型。验证覆盖 `workspace-service` status TTL/generation/single-flight、route ETag/304、ACP child cache-only status、`SkillManager.getCachedSkills()`、ExtensionManager source fingerprint 与 mutation-triggered refresh。
+
 
 - 只允许可信 workspace client 发起，避免任意 bearer 读者伪造 active UI 操作。
 - extension 来源需要经过 allowlist/URL 校验；拒绝 credentials、private network/local link 等高风险来源。
@@ -391,7 +400,7 @@ manager 串行化 lifecycle mutation，复用 workspace worker group reconcile�
 
 ### extension management v2（#6825）
 
-#6825 新增 `extension_management_v2`，并保留旧 `workspace_extensions` 作为 primary compatibility/diagnostic surface。V2 不采用早期 workspace-qualified extensions 方案名：核心模型是 user-level artifact + workspace activation policy，而不是每个 workspace 拥有自己的安装物；#6825 取代 #6638 的早期观察版，补齐 transaction journal/recovery、settings revision bundle、operation warnings 和 SDK/TUI/Web Shell surface。
+#6825 新增 `extension_management_v2`，并保留旧 `workspace_extensions` 作为 primary compatibility/diagnostic surface。V2 不采用早期 workspace-qualified extensions 方案名：核心模型是 user-level artifact + workspace activation policy，而不是每个 workspace 拥有自己的安装物；#6825 取代 #6638 closed 未合入的早期观察版，补齐 transaction journal/recovery、settings revision bundle、operation warnings 和 SDK/TUI/Web Shell surface。
 
 资源拆分：
 
@@ -928,6 +937,13 @@ flowchart TD
 - `server.ts` 新增 `GET /workspace/extensions`，仅全局 bearer；`capabilities.ts` 注册 `workspace_extensions`。
 - ACP status ext-method 从 `config.getExtensions()` 读取实际加载状态，构造 `ServeWorkspaceExtensionsStatus`。
 - status payload 做 whitelist 序列化：extension 基本信息、安装来源（凭证脱敏）、active 状态、能力计数，不把内部 runtime 对象透出到 HTTP。
+
+### #8080 — workspace skill status read model（@doudouOUC）
+
+- `SkillManager.getCachedSkills()` 暴露 committed snapshot 读取入口，ACP child 的 workspace skill status 不再触发技能重扫描。
+- daemon `WorkspaceService` 对 workspace skill status 加 TTL、generation guard、single-flight 与 mutation invalidation；settings/content/all refresh reason 才更新 snapshot。
+- route 层支持 ETag / `If-None-Match`，未变状态返回 304；ExtensionManager 以 source fingerprint 避免无变化 extension-derived skills 刷新。
+- 测试覆盖 status cache、mutation-triggered refresh、ACP cache-only read、route ETag/304 与 ExtensionManager source fingerprint。
 
 ### #5903 — ACP `/cd` session cwd update（@doudouOUC）
 

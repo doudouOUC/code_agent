@@ -42,7 +42,7 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #6567 | feat(cli): Add workspace-qualified core REST routes | 2026-07-09 | 新增条件能力 `workspace_qualified_rest_core`：`/workspaces/:workspace/...` core REST 与 SDK `WorkspaceDaemonClient`，随 workspace settings/persist route deps 广告。 |
 | #6598 | feat(cli): Add channel worker settings reload for serve --channel | 2026-07-09 | 新增条件能力 `channel_reload`：仅 daemon wire channel worker reload deps 时广告。 |
 | #6621 | feat(cli): workspace-qualified ACP transport | 2026-07-11 | 新增条件能力 `workspace_qualified_acp`：ACP HTTP enabled 且 multi-workspace sessions enabled 时广告；legacy `/acp` 保持 primary。 |
-| #6825 | feat(serve): add extension management v2 | 2026-07-14 | 新增 additive `extension_management_v2`；user-level artifact 与 workspace activation policy 分离，事务式 store/operation queue/SDK surface 取代 #6638 观察版。 |
+| #6825 | feat(serve): add extension management v2 | 2026-07-14 | 新增 additive `extension_management_v2`；user-level artifact 与 workspace activation policy 分离，事务式 store/operation queue/SDK surface 取代 #6638 closed 未合入观察版。 |
 | #6826 | feat(serve): support multi-workspace rewind and shell | 2026-07-13 | 新增条件能力 `multi_workspace_session_rewind` / `multi_workspace_session_shell`，singular rewind/shell route 按 live owner runtime 分发。 |
 | #6839 | feat(serve): Add workspace-qualified Voice | 2026-07-14 | 新增条件能力 `workspace_qualified_voice`：workspace-qualified Voice REST/WS 按 selected trusted runtime 的 settings/env/admission 执行。 |
 | #6844 | feat(serve): Add workspace-qualified session export | 2026-07-14 | 新增 `workspace_session_export`：selected trusted workspace full transcript export，不从 `session_export` 推断 plural route。 |
@@ -50,9 +50,9 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #6950 | fix(cli): Preserve channel startup failure details | 2026-07-15 | 不新增 tag；扩展 channel worker snapshot 与 `channel_worker_start_failed` error body，暴露 bounded/redacted startup failures。 |
 | #6961 | feat(daemon): Aggregate deep health across workspaces | 2026-07-15 | 不新增 tag；`GET /health?deep=1` 改为 daemon-wide managed-runtime counter aggregation，并 additive 返回 `workspaceCount`。 |
 | #6969 | feat(cli): Add bounded daemon log rotation | 2026-07-15 | 不新增 tag；`GET /daemon/status` additive 暴露 daemon log mode/health/runId/issues/drop counters。 |
-| #7019 | docs(serve): Close multi-workspace hardening gaps | open | 不新增 tag；把 conditional capability 文档和 `CONDITIONAL_SERVE_FEATURES` 做 contract test 对齐，当前硬钉 27 个条件标签。 |
+| #7019 | docs(serve): Close multi-workspace hardening gaps | merged | 不新增 tag；把 conditional capability 文档和 `CONDITIONAL_SERVE_FEATURES` 做 contract test 对齐，当前硬钉 27 个条件标签。 |
 | #7200 | feat(daemon): Advertise ACP preheat readiness | 2026-07-19 | 新增 baseline `workspace_acp_status` / `workspace_acp_preheat`，把 primary workspace ACP status/preheat route 变成可发现契约，并规定 readiness、timeout 与 REST-only client 行为。 |
-| #7268 | feat(serve): Hot-reload workspace trust changes | open | 当前 open diff 新增 `workspace_trust_hot_reload`，把 workspace trust v2 status、same-process trust-change trigger 与 runtime generation reconcile 变成可发现契约。 |
+| #7268 | feat(serve): Hot-reload workspace trust changes | merged | 新增 `workspace_trust_hot_reload`，把 workspace trust v2 status、same-process trust-change trigger 与 runtime generation reconcile 变成可发现契约。 |
 | #7453 | fix(acp-bridge): close prompt-terminal follow-ups | 2026-07-22 | 不新增 tag；补 prompt terminal protocol 的运行时语义：queued deadline 传播 typed deadline error，queued terminal 不污染 session turn state。 |
 | #7458 | fix(serve): detect stale SSE cursors via epoch token | merged | 不新增 frame `v`；在 REST/SSE metadata 下发 `eventEpoch`，客户端重连回传后以 `state_resync_required{detail:'epoch_mismatch'}` 表达 daemon restart stale cursor。 |
 | #7463 | feat(sdk-java): Add daemon transport | merged | 不新增 daemon tag；Java daemon transport alpha 消费现有 HTTP/SSE 协议，并把 admission watermark、event cursor、terminal correlation 和 fail-closed exception taxonomy 固化为 JVM client surface。 |

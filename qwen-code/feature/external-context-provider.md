@@ -1,13 +1,13 @@
 # Direct External Context Search / Auto Recall 技术方案
 
-> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP 当前 open diff；#7877 submitted-prompt auto recall）。
-> 当前记录：#7586 仍为 open；#7877 已按 merged diff、changed files、测试路径与 examples 记录最终实现。
+> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening draft）。
+> 当前记录：#7586/#7877 已按 merged diff、changed files、测试路径与 examples 记录最终实现；#8206 仍为 draft open，只记录当前依赖收敛方案。
 
 ---
 
 ## 1. 背景与动机
 
-PR #7586 当前实现面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。两者都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
+PR #7586 面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。#8206 draft open 继续收敛 direct external-context MCP profile 的 MCP SDK / Hono / parser dependency path，但不扩大业务 surface，也不迁移 mobile-mcp；mobile-mcp 的 Node.js 22 / Hono 2 方案另由 #8311 记录。三者都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
 
 核心风险是把 provider 直接暴露给模型或 hook：模型不应知道 credential env 名称，不应选择 provider/corpus，不应看到 provider 内部错误，也不能把 provider 输出当作可信系统指令。因此方案把能力拆成两个互斥入口：retrieval-only MCP server 只暴露 `context_search({query})`；auto recall hook 只消费 `submitted_prompt` 并返回 bounded user-layer `additionalContext`。两者都不提供写入记忆工具或管理面。
 
@@ -91,6 +91,12 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 
 两者都不提供企业级隔离：没有 DLP、进程/credential 隔离、用户身份映射、文档 ACL、不可绕过确认、审计保留或 prompt injection 防护。需要这些能力时，应转向 enterprise memory gateway / governed profile，而不是把 #7586 的 direct extension 扩展成管理面。
 
+### 3.7 Dependency hardening（#8206 draft open）
+
+#8206 当前 draft 只处理 direct external-context integration 的依赖安全边界，不改变 retrieval-only MCP 或 auto recall 的业务契约。它把 `@qwen-code/external-context` 升到 MCP SDK 1.30.0，并只对 MCP SDK 1.30+ consumer 选择 patched Hono 2 line；`package-lock.json` 同步刷新 request/body/URI parsing 相关传递依赖并重新生成 notices。
+
+关键约束是 scoped override：#8206 自身不负责 mobile MCP package 的 runtime 迁移，避免把 external-context 的安全升级扩散成另一个 package 的 breaking change。后续 #8311 已单独提出 mobile-mcp Node.js 22 / MCP SDK 1.30.0 / Hono 2 迁移，见 [mobile-mcp.md](mobile-mcp.md)。
+
 ---
 
 ## 4. 验证方式
@@ -104,7 +110,7 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 
 ## 5. 已知限制 / 后续
 
-- #7586 仍为 open；不能视为 main 已落地。#7877 已合入，但只提供 direct auto recall profile，不改变 #7586 的 MCP profile 状态。
+- #8206 仍为 draft open；dependency hardening 只记录当前 diff，不能视为 main 已落地。
 - 当前实现仍是只读检索；auto recall 也只注入 untrusted context，不包含 remember writer、删除、审批、policy 或 management API。
 - provider credential 的最小权限、document ACL 和审计由外部系统保证；Qwen extension 只约束本地配置和请求边界。
 - provider 输出的相关性、排序、去重和安全过滤依赖 provider；本层只做结构校验、长度限制和非可信展示。
@@ -114,7 +120,8 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
-| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | OPEN | retrieval-only MCP | 固定 provider/corpus/credential，只暴露 `context_search({query})`，返回 bounded untrusted result。 |
+| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | MERGED | retrieval-only MCP | 固定 provider/corpus/credential，只暴露 `context_search({query})`，返回 bounded untrusted result。 |
 | [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | MERGED | submitted-prompt auto recall | 新增 `UserPromptSubmit` command hook profile，基于 `submitted_prompt` 自动检索一次并通过 user-layer `additionalContext` 注入。 |
+| [#8206](https://github.com/QwenLM/qwen-code/pull/8206) | OPEN draft | dependency hardening | 当前 draft 将 direct external-context integration 升到 MCP SDK 1.30.0 / patched Hono 2 line；mobile-mcp 迁移不属于 #8206，另见 #8311 / [mobile-mcp.md](mobile-mcp.md)。 |
 
-_按个人 PR 口径更新于 2026-07-29_
+_按个人 PR 口径更新于 2026-08-01_

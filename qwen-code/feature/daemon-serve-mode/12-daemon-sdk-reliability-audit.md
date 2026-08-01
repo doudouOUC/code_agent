@@ -22,9 +22,9 @@
 >
 > 后续修复状态（2026-07-24）：[#7603](https://github.com/QwenLM/qwen-code/pull/7603) 已合入并补齐 Java 侧 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering follow-up；[#7619](https://github.com/QwenLM/qwen-code/pull/7619) 已合入并补 load response `eventEpoch` / `replayDegraded` 回归；[#7622](https://github.com/QwenLM/qwen-code/pull/7622) 已合入并闭合 DAEMON-009/010/011（live journal cap、subscriber close dispose、publish serialization 与 replay byte budget）。
 >
-> 后续修复状态（2026-07-28）：[#7812](https://github.com/QwenLM/qwen-code/pull/7812) 已合入并补 managed daemon shutdown 下 exact-owned writer locks cooperative release；[#7821](https://github.com/QwenLM/qwen-code/pull/7821) 已合入并补 Todo Stop Guard continuation ordering/ownership hardening；[#7886](https://github.com/QwenLM/qwen-code/pull/7886) 当前 open diff 补 transcript timestamp drift tolerance，本文只将 #7886 作为当前实现观察。
+> 后续修复状态（2026-07-31）：[#7812](https://github.com/QwenLM/qwen-code/pull/7812) 已合入并补 managed daemon shutdown 下 exact-owned writer locks cooperative release；[#7821](https://github.com/QwenLM/qwen-code/pull/7821) 已合入并补 Todo Stop Guard continuation ordering/ownership hardening；[#7886](https://github.com/QwenLM/qwen-code/pull/7886) 已合入并补 transcript timestamp drift tolerance。
 >
-> 后续修复状态（2026-07-29）：[#7975](https://github.com/QwenLM/qwen-code/pull/7975) 当前 open diff 补 daemon session maintenance writer/runtime isolation；[#7976](https://github.com/QwenLM/qwen-code/pull/7976) 当前 open diff 补 certified session writer handoff。两者仍只作为当前实现观察，不能视为 `main` 已落地能力。
+> 后续修复状态（2026-07-30）：[#7975](https://github.com/QwenLM/qwen-code/pull/7975) 已合入并补 daemon session maintenance writer/runtime isolation；[#7976](https://github.com/QwenLM/qwen-code/pull/7976) 已合入并补 certified session writer handoff。
 
 这批问题中存在多条能够独立造成“流式输出只剩前半段、卡片提前结束或调用永久等待”的路径：
 
@@ -236,42 +236,42 @@ flowchart LR
 | 责任侧 | daemon session lifecycle / Guard continuation protocol。 |
 | 最小修复 | continuation ordering 必须 owner-scoped claim/release；恢复路径保留真实 user/function content，只移除 synthetic Guard prompt；workspace relocation/disposal/older prompt 不能跨 owner 修改新状态。 |
 
-### DAEMON-014：transcript timestamp drift 可误判 writer integrity failure（#7886 open）
+### DAEMON-014：transcript timestamp drift 可误判 writer integrity failure（已由 #7886 修复）
 
-> 当前修复状态：#7886 当前 open diff 将 `birthtime`、`ctime`、`mtime` 降为 advisory；timestamp-only drift 走 streaming SHA-256 full-content reconciliation，identity/owner/tail 等硬状态仍 fail-closed。
+> 当前修复状态：#7886 将 `birthtime`、`ctime`、`mtime` 降为 advisory；timestamp-only drift 走 streaming SHA-256 full-content reconciliation，identity/owner/tail 等硬状态仍 fail-closed。
 
 | 字段 | 内容 |
 |---|---|
 | 严重级别 | P2 |
 | 触发条件 | virtiofs、容器共享目录或平台 timestamp 粒度/漂移导致 transcript timestamp 改变，但文件 identity、length、owner、tail 和 content 没有被其它 writer 改写。 |
 | 用户影响 | opt-in writer lease 会误报 `session_transcript_changed`，导致 session writer 不可用；如果简单忽略 timestamp 又可能掩盖真实 replace/symlink/tail 改写。 |
-| 代码证据 | #7886 当前 diff 触达 `packages/core/src/services/session-writer-lease.ts` 与 `session-writer-lease.test.ts`，并更新 writer lease / managed shutdown 设计文档。 |
+| 代码证据 | #7886 触达 `packages/core/src/services/session-writer-lease.ts` 与 `session-writer-lease.test.ts`，并更新 writer lease / managed shutdown 设计文档。 |
 | 责任侧 | core writer lease integrity check。 |
 | 最小修复 | timestamp 只能作为 advisory drift 信号；硬状态继续 fail-closed，timestamp-only drift 必须经 digest baseline/full reconciliation 证明内容未变。 |
 
-### DAEMON-015：daemon maintenance 可能绕过 runtime-local writer 边界（#7975 open）
+### DAEMON-015：daemon maintenance 可能绕过 runtime-local writer 边界（#7975 merged）
 
-> 当前修复状态：#7975 当前 open diff 让 archive/delete/unarchive/scheduled cleanup/ACP orphan cleanup 在 selected runtime storage/session service 中执行，并在会写 transcript 前获取 daemon writer lease；shutdown seal maintenance admission 并等待已准入维护 lease。
+> 当前修复状态：#7975 让 archive/delete/unarchive/scheduled cleanup/ACP orphan cleanup 在 selected runtime storage/session service 中执行，并在会写 transcript 前获取 daemon writer lease；shutdown seal maintenance admission 并等待已准入维护 lease。
 
 | 字段 | 内容 |
 |---|---|
 | 严重级别 | P1 |
 | 触发条件 | multi-workspace daemon 中，session archive/delete/unarchive、scheduled rollback、keepalive late-spawn cleanup 或 ACP orphan cleanup 复用默认 storage/session service，或在没有 daemon writer lease 的情况下修改 transcript。 |
 | 用户影响 | 维护任务可能写错 runtime root、误改其它 workspace 的 session state，或与 live writer/shutdown replacement 交叉产生 writer conflict。 |
-| 代码证据 | #7975 当前 diff 触达 `packages/cli/src/serve/server/workspace-runtime-storage.ts`、`workspace-registry.ts`、`session-archive.ts`、`routes/session.ts`、scheduled-tasks、ACP orphan cleanup 与 `packages/core/src/services/sessionService.ts`。 |
+| 代码证据 | #7975 merged diff 触达 `packages/cli/src/serve/server/workspace-runtime-storage.ts`、`workspace-registry.ts`、`session-archive.ts`、`routes/session.ts`、scheduled-tasks、ACP orphan cleanup 与 `packages/core/src/services/sessionService.ts`。 |
 | 责任侧 | daemon session maintenance / workspace runtime storage。 |
 | 最小修复 | 维护任务必须先选定 owning runtime，再在该 runtime 的 storage/session service 下执行；任何 transcript mutation 都要获取 daemon writer lease，并在 shutdown draining 时拒绝新维护。 |
 
-### DAEMON-016：managed daemon replacement 缺少可证明 writer handoff（#7976 open）
+### DAEMON-016：managed daemon replacement 缺少可证明 writer handoff（#7976 merged）
 
-> 当前修复状态：#7976 当前 open diff 引入 v2 sealed writer lock record、runtime-relative transcript proof 与 fixed claim 文件，trusted managed replacement 只在验证 digest/metadata proof 后接手 sealed writer。
+> 当前修复状态：#7976 引入 v2 sealed writer lock record、runtime-relative transcript proof 与 fixed claim 文件，trusted managed replacement 只在验证 digest/metadata proof 后接手 sealed writer。
 
 | 字段 | 内容 |
 |---|---|
 | 严重级别 | P1 |
 | 触发条件 | managed daemon replacement 发生时，旧 writer 已完成 durable flush 但 active lock 不能被新 writer安全证明接手；或者新 writer 试图用 hostname/PID/age reclaim active lock。 |
 | 用户影响 | 不接手会留下不可恢复 writer conflict；错误接手会产生 split-brain transcript 双写或覆盖未知 successor。 |
-| 代码证据 | #7976 当前 diff 触达 `packages/core/src/services/session-writer-lease.ts`、`chatRecordingService.ts`、`config.ts`、`packages/cli/src/acp-integration/acpAgent.ts` 与 `docs/design/certified-session-writer-handoff.md`。 |
+| 代码证据 | #7976 merged diff 触达 `packages/core/src/services/session-writer-lease.ts`、`chatRecordingService.ts`、`config.ts`、`packages/cli/src/acp-integration/acpAgent.ts` 与 `docs/design/certified-session-writer-handoff.md`。 |
 | 责任侧 | core writer lease / managed ACP replacement。 |
 | 最小修复 | 旧 writer 只能在 durable flush 成功后 seal handoff proof；新 writer 只能在 fixed claim 保护下重新验证 sealed primary、transcript descriptor/path/metadata、length 与 SHA-256 digest 后安装 active owner。 |
 
@@ -868,7 +868,7 @@ PR #7463 已按独立 daemon transport alpha 落地在 `packages/sdk-java/qwenco
 
 PR #7603 已合入并补 Java follow-up：`PromptAcceptance` 保存 `eventEpoch`，SSE request/reconnect 携带 `X-Qwen-Event-Epoch`，response epoch mismatch fail closed；同时补 truncated JSON、null data、terminal-before-202 buffering、teardown ordering 和 real daemon E2E harness。#7619 另补 REST load response 的 `eventEpoch` / `replayDegraded` 传播回归；#7622 补 EventBus / compaction resource hardening，关闭 DAEMON-009/010/011。
 
-PR #7812/#7821 已合入，分别闭合 DAEMON-012/013。#7886 当前仍为 open diff，追踪 DAEMON-014 的 transcript timestamp drift tolerance；未合入前不能把 timestamp drift reconciliation 描述为 `main` 已落地。
+PR #7812/#7821 已合入，分别闭合 DAEMON-012/013。#7886 已合入，追踪 DAEMON-014 的 transcript timestamp drift tolerance；timestamp drift reconciliation 已可按 `main` 落地能力描述。
 
 ### Phase 5：独立修复旧 Java SDK
 
@@ -891,7 +891,7 @@ PR #7812/#7821 已合入，分别闭合 DAEMON-012/013。#7886 当前仍为 open
 | 最后客户端 detach | A active、B queued 后 detach | 重复 detach 幂等；已接受工作按声明策略 drain 或带 terminal 取消，不得静默丢失。#7386/#7400 已分别覆盖 detach 幂等与 pending prompt draining。 |
 | managed daemon shutdown | shutdown 时仍有 accepted transcript work 与 exact-owned writer lock | 先关闭 admission，drain accepted transcript work，retire exact-owned writer locks；新 daemon 不凭不可证明 owner evidence 抢 managed lock。#7812 覆盖。 |
 | Todo Stop Guard continuation | Guard continuation 与用户输入、relocation 或 overlapping prompt 并发 | continuation owner claim/release 原子化；失败恢复保留用户内容和成功 function responses；旧 owner 不能修改新 owner。#7821 覆盖。 |
-| transcript timestamp drift | timestamp 抖动但文件内容、identity、owner 与 tail 未变 | timestamp-only drift 走 digest baseline/full reconciliation；硬状态仍 fail-closed。#7886 当前 open diff 覆盖。 |
+| transcript timestamp drift | timestamp 抖动但文件内容、identity、owner 与 tail 未变 | timestamp-only drift 走 digest baseline/full reconciliation；硬状态仍 fail-closed。#7886 覆盖。 |
 | 慢消费者 | 暂停消费并注入 256+ events | transport 反压或明确 overflow/resync；禁止 silent drop-oldest。 |
 | gzip/buffering proxy | 代理默认开启压缩和缓冲 | identity header 生效；无数据超过 inactivity budget 时抛结构化 timeout。 |
 | malformed SSE frame | 插入带 cursor 的非法 JSON/schema | 流失败并 resync；不得越过该 cursor 后继续提交状态。 |
@@ -914,7 +914,7 @@ PR #7812/#7821 已合入，分别闭合 DAEMON-012/013。#7886 当前仍为 open
 - 两个 Java 模块在跳过现有集成式测试后均能完成 Maven package。
 - 审计前后 qwen-code 工作树保持干净。
 
-绿色测试不推翻本文结论。#7386/#7400 已补强 daemon 侧 duplicate detach、queued removal terminal、deadline FIFO release、teardown terminal flush 和 last-detach draining 覆盖；#7812/#7821 已补 managed shutdown writer release 与 Guard continuation ordering 测试；#7886 当前 open diff 继续补 timestamp-only drift reconciliation 测试。当前测试仍没有系统覆盖 terminal-before-202、epoch 数值碰撞、HTTP/WS dispose race、WS slow-consumer overflow、Java timeout 后 orphan reader 等路径。Java 现有部分测试还会调用真实 qwen/model，且只断言结果非 null，空结果或截短结果也可能通过。
+绿色测试不推翻本文结论。#7386/#7400 已补强 daemon 侧 duplicate detach、queued removal terminal、deadline FIFO release、teardown terminal flush 和 last-detach draining 覆盖；#7812/#7821 已补 managed shutdown writer release 与 Guard continuation ordering 测试；#7886 已补 timestamp-only drift reconciliation 测试。当前测试仍没有系统覆盖 terminal-before-202、epoch 数值碰撞、HTTP/WS dispose race、WS slow-consumer overflow、Java timeout 后 orphan reader 等路径。Java 现有部分测试还会调用真实 qwen/model，且只断言结果非 null，空结果或截短结果也可能通过。
 
 ---
 

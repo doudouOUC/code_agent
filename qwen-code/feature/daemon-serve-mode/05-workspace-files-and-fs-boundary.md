@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.6、§4.3）。本文在 file/symbol/line 级别**取代**总览的 §3.6 段落，深入到 `resolveWithinWorkspace` 的逐分支防穿越/防符号链接逃逸算法、CAS+原子写链路的每一步守卫、读路由的 fail-closed 参数校验，以及 `FileSystemService` / `BridgeFileSystem` 注入 seam。
 >
-> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads）、#7967（handle-bound text range refactor 当前 open diff）、#8002（byte-cursor paging 当前 open diff）。
+> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads）、#7967（handle-bound text range refactor 当前 open diff）、#8002（byte-cursor paging 已合入）。
 
 ---
 
@@ -19,7 +19,7 @@ Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP
 | HTTP 路由 | `packages/cli/src/serve/routes/workspaceFile{Read,Write}.ts` | 解析/校验 query/body、threading 审计上下文、序列化 `FsError` 为 typed JSON envelope。 |
 | 策略 / 错误 | `fs/policy.ts`、`fs/errors.ts` | 信任门（`assertTrustedForIntent`）、size 门、ignore 判定；`FsError` 类型化错误 + errno→kind 映射。 |
 
-能力分三档（`/capabilities` 的 `features[]`）：`workspace_file_read`（`GET /file|/list|/glob|/stat`，#4269）、`workspace_file_bytes`（`GET /file/bytes`，#4280）、`workspace_file_write`（`POST /file/write|/file/edit`，strict 门控，#4280）。#8002 当前 open diff 另以 additive `workspace_file_read_cursor` 标记 text cursor paging，旧客户端不传 `cursor` 时仍走原窗口读取。
+能力分三档（`/capabilities` 的 `features[]`）：`workspace_file_read`（`GET /file|/list|/glob|/stat`，#4269）、`workspace_file_bytes`（`GET /file/bytes`，#4280）、`workspace_file_write`（`POST /file/write|/file/edit`，strict 门控，#4280）。#8002 另以 additive `workspace_file_read_cursor` 标记 text cursor paging，旧客户端不传 `cursor` 时仍走原窗口读取。
 
 **核心安全契约**有两条，本文反复回到它们：
 
@@ -42,7 +42,7 @@ Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP
 | #4334 | acp-bridge F1 follow-up（adapter wiring） | `bridgeFileSystemAdapter.ts` 把 ACP `readTextFile`/`writeTextFile` 路由到**同一** `WorkspaceFileSystemFactory`，统一审计 + 信任门 + 路径约束。 |
 | #7947 | Serve large text bounded reads | 允许 Serve `/file` 对超过 256 KiB 的 UTF-8 文本返回 bounded line window，同时保留 full snapshot/edit/hash 的旧大小门。 |
 | #7967 | handle-bound text range refactor（open） | 当前 open diff 将 Core path reader 与 caller-owned handle reader 拆开，Serve large-window 复用 borrowed fd，避免混合 flag/死字段继续扩散。 |
-| #8002 | byte-cursor paging（open） | 当前 open diff 为 Serve `/file` 增加 `hasMore`/`nextCursor`/`cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
+| #8002 | byte-cursor paging（merged） | 为 Serve `/file` 增加 `hasMore`/`nextCursor`/`cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
 
 ---
 
@@ -204,7 +204,7 @@ return n;
 | `GET /file` | `maxBytes` | `[1, 262144]` | 256 KiB |
 | `GET /file` | `line` | `[1, MAX_SAFE_INTEGER]` | 1-based |
 | `GET /file` | `limit` | `[1, 2000]` | `MAX_FILE_LINE_LIMIT`（L37） |
-| `GET /file` | `cursor` | opaque string | #8002 当前 open diff；与 `line` 互斥，畸形值返回 `parse_error` |
+| `GET /file` | `cursor` | opaque string | #8002；与 `line` 互斥，畸形值返回 `parse_error` |
 | `GET /file/bytes` | `offset` | `[0, MAX_SAFE_INTEGER]` | 0-based |
 | `GET /file/bytes` | `maxBytes` | `[1, MAX_READ_BYTES]` | 256 KiB（`policy.ts:33`） |
 | `GET /glob` | `maxResults` | `[1, 50000]` | `MAX_GLOB_MAX_RESULTS`（L56） |
@@ -213,7 +213,7 @@ return n;
 
 ### 各路由要点
 
-- **`handleGetFile`（L200）**：`resolve(queryPath, 'read')` → `readText(resolved, {maxBytes, line, limit})`。响应 path 用 `workspaceRelative`（绝不回显绝对路径）。`readText` 底层（`workspaceFileSystem.ts:370`）在读前还有一道 `opts.line` 校验：`!Number.isSafeInteger(line) || line < 1` → `parse_error`，挡住 `Infinity`/浮点透传到 `readFileWithLineAndLimit` 导致诡异截断。#7947 在显式 bounded line-window 且文件为 UTF-8 文本时，允许超过 256 KiB 的文件走 streaming read；输出仍受 256 KiB cap，full snapshot/edit/hash 不放开。#8002 当前 open diff 进一步允许响应返回 `hasMore`/`nextCursor`，后续请求用 `cursor` 从下一行 byte offset 继续，且 `cursor` 与 `line` 互斥。
+- **`handleGetFile`（L200）**：`resolve(queryPath, 'read')` → `readText(resolved, {maxBytes, line, limit})`。响应 path 用 `workspaceRelative`（绝不回显绝对路径）。`readText` 底层（`workspaceFileSystem.ts:370`）在读前还有一道 `opts.line` 校验：`!Number.isSafeInteger(line) || line < 1` → `parse_error`，挡住 `Infinity`/浮点透传到 `readFileWithLineAndLimit` 导致诡异截断。#7947 在显式 bounded line-window 且文件为 UTF-8 文本时，允许超过 256 KiB 的文件走 streaming read；输出仍受 256 KiB cap，full snapshot/edit/hash 不放开。#8002 进一步允许响应返回 `hasMore`/`nextCursor`，后续请求用 `cursor` 从下一行 byte offset 继续，且 `cursor` 与 `line` 互斥。
 - **`handleGetFileBytes`（L270）**：`readBytesWindow`（`workspaceFileSystem.ts:425`）。这条路给二进制/大文件做字节窗口；返回 `contentBase64`。**仅当窗口覆盖整文件**（`offset===0 && buf.length===st.size`）才附 `hash`（全窗 sha256 当乐观并发 token）。读中做了 open-fd 双 stat + `assertSameFile`（dev/ino）+ "size/mtime 变了就 `hash_mismatch`"，把返回字节绑定到稳定快照。
 - **`handleGetStat`（L332）**：`resolve(queryPath, 'stat')`（容忍不存在）→ `stat`（底层 `fsp.lstat`，**不**跟随符号链接，故能如实报 `kind: 'symlink'`）。
 - **`handleGetList`（L364）**：探测用 `maxEntries: MAX_LIST_ENTRIES + 1 = 2001`，超 2000 则 slice 回 2000 且置 `truncated: true`——让 SDK 知道还有更多而不是静默假设全集。`list`（`workspaceFileSystem.ts:510`）把符号链接 dirent 标 `kind:'symlink'` 而非自动跟随（"Treating each child as implicitly-resolved here would be a brand-cast bypass"）。
@@ -442,7 +442,7 @@ sequenceDiagram
 
 3. **ACP 子进程侧 `params.path` 约束的渐进对齐**。#4334 adapter 已把 ACP fs 路由到同一 `WorkspaceFileSystem`，但 ACP `readTextFile` 的 `line`/`limit` 窗口在 adapter 里做**兼容性丢弃**（`bridgeFileSystemAdapter.ts:136-143`：null / 非正值回落 `undefined`），以贴近 pre-PR 内联 proxy 对 `limit<=0` 返回空内容的姿态，而非透传 `parse_error` 给老 agent。是渐进对齐而非一次到位。
 
-4. **#7967/#8002 仍为 open**。handle-bound range refactor 与 byte-cursor paging 只记录当前 open diff；尚不能视为 `main` 已落地能力。#7947 已合入，但仍只放行 UTF-8 bounded line-window，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。
+4. **#7967 仍为 open**。handle-bound range refactor 只记录当前 open diff；尚不能视为 `main` 已落地能力。#7947/#8002 已合入，但仍只放行 UTF-8 bounded line-window / cursor paging，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。
 
 5. **`io_error` 的 503 不可区分根因**。聚合的 `io_error`（ENOSPC/EIO/EBUSY/ENAMETOOLONG/EMFILE）都映射 503，监控只能知道"环境性故障"，需读 `message`/`hint` 才能分 `df -h`（满盘）vs fd 耗尽。
 
@@ -461,7 +461,7 @@ sequenceDiagram
 | `packages/cli/src/serve/bridgeFileSystemAdapter.test.ts` | 18 | ACP write/read 命中工作区内磁盘（happy path）+ 信任门（`trusted:false` factory 使 ACP 写以与 HTTP `POST /file` 同姿态 reject）+ line/limit null 丢弃。 |
 | #7947 merged focused suites | 158 | Serve workspace/ACP adapter/HTTP route 对 large UTF-8 text line-window、binary/unsupported encoding rejection、post-read identity check 和 metadata 的覆盖。 |
 | #7967 current open focused suites | 291 | Core/Serve range reader、handle-bound fd、path replacement 与 bridge fast path 回归。 |
-| #8002 current open focused suites | 177 CLI + 95 Core + 405 TS SDK | Cursor parse/encode、append-only continuation、replace/truncate mismatch、BOM/CRLF metadata、long-line cap、SDK/MCP additive fields。 |
+| #8002 merged focused suites | 177 CLI + 95 Core + 405 TS SDK | Cursor parse/encode、append-only continuation、replace/truncate mismatch、BOM/CRLF metadata、long-line cap、SDK/MCP additive fields。 |
 
 > 合计 ~163 个用例集中在文件子系统四层 + adapter。`workspaceFileSystem.test.ts` 的 75 例是密度最高的安全回归套件，逐一覆盖 §"写/编辑路由" 列出的每道守卫。
 

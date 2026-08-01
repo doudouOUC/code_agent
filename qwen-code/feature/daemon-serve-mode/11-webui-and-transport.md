@@ -23,14 +23,14 @@
 | #6625 | @doudouOUC | merged | Web Shell workspace management sidebar 与 dynamic workspace registration。 |
 | #6716 | @doudouOUC | merged | dynamic workspace registration 的 persistent desired-state、启动恢复和 lazy workspace-qualified ACP mount。 |
 | #6717 | @doudouOUC | merged | Web Shell 可查看 untrusted secondary workspace 的 persisted-only session catalog。 |
-| #7268 | @doudouOUC | open | workspace trust hot reload：Web Shell 读取 v2 trust status，展示 applying/failed/blocked，并在 runtime generation reconcile 后刷新 workspace/session 面。 |
+| #7268 | @doudouOUC | merged | workspace trust hot reload：Web Shell 读取 v2 trust status，展示 applying/failed/blocked，并在 runtime generation reconcile 后刷新 workspace/session 面。 |
 | #6740 | @doudouOUC | merged | untrusted secondary workspace 可通过 workspace-qualified persisted transcript reader 查看 active transcript page。 |
 | #6743 | @doudouOUC | merged | chat recording durable write failure 通过 `recording_stopped` 进入 WebUI warning/status。 |
 | #6745 | @doudouOUC | merged | removable secondary workspace 的 runtime removal、busy snapshot 与 force confirmation flow。 |
 | #6825 | @doudouOUC | merged | Extension Management V2 的 catalog/projection/action/warning surface 接入 TUI/Web Shell/SDK。 |
 | #6839 | @doudouOUC | merged | workspace-qualified Voice 的 selected runtime settings/transcribe/stream 与 workspace removal activity。 |
-| #7754 | @doudouOUC | open | Web Shell Voice 按 composer owning workspace 解析 fail-closed target；trusted secondary 使用 workspace-qualified Voice routes，owner 变化清理 capture generation。 |
-| #6910 | @doudouOUC | open | Web Shell archived rows 按 capability/trust 暴露 Export，并走 owning workspace client。 |
+| #7754 | @doudouOUC | merged | Web Shell Voice 按 composer owning workspace 解析 fail-closed target；trusted secondary 使用 workspace-qualified Voice routes，owner 变化清理 capture generation。 |
+| #6910 | @doudouOUC | merged | Web Shell archived rows 按 capability/trust 暴露 Export，并走 owning workspace client。 |
 | #6912 | @doudouOUC | merged | Web Shell non-primary archive/unarchive action identity、busy state 与 reconcile hardening。 |
 
 ---
@@ -194,7 +194,7 @@ sequenceDiagram
 
 #6717 让 untrusted secondary workspace 在 sidebar 中可展开查看 persisted-only session catalog。UI 不选择该 workspace、不打开 session、不做 10 秒 polling；只用非交互 read-only row 显示 session displayName/短 id 和创建时间，并提示需要 trust 后才能打开。trusted workspace 和 untrusted primary 的行为不变。
 
-#7268 open diff 把 trust 状态从“注册时一次性判断”扩展成可热重载的 v2 status。Web Shell 看到 `workspace_trust_hot_reload` capability 后，应轮询/刷新 selected workspace 的 trust status，区分 stable trusted/untrusted 与 applying、failed、blocked 等过渡/异常状态；过渡期间不把 workspace mutation fallback 到 primary，也不继续使用旧 generation 的 session/action 入口。trust grant/revoke 触发 runtime close/drain/recreate 后，sidebar 需要刷新 capabilities、workspace row、session list 和 busy state；failed/blocked 状态要作为可操作状态呈现，而不是当作普通未信任 workspace 静默折叠。
+#7268 把 trust 状态从“注册时一次性判断”扩展成可热重载的 v2 status。Web Shell 看到 `workspace_trust_hot_reload` capability 后，应轮询/刷新 selected workspace 的 trust status，区分 stable trusted/untrusted 与 applying、failed、blocked 等过渡/异常状态；过渡期间不把 workspace mutation fallback 到 primary，也不继续使用旧 generation 的 session/action 入口。trust grant/revoke 触发 runtime close/drain/recreate 后，sidebar 需要刷新 capabilities、workspace row、session list 和 busy state；failed/blocked 状态要作为可操作状态呈现，而不是当作普通未信任 workspace 静默折叠。
 
 #6740 在 REST 层允许 registered untrusted secondary workspace 读取 active persisted transcript page。Web Shell 仍不把 untrusted workspace 当成可执行 workspace，不选择、不 prompt、不 ACP attach；如果 UI 提供“查看历史”入口，应通过 `WorkspaceDaemonClient.getSessionTranscriptPage()` 直接拉 workspace-qualified REST，并按 #6769 的 page/cursor bounds 处理 `transcript_page_too_large`。
 
@@ -206,7 +206,7 @@ sequenceDiagram
 
 #6839 对 Web Shell 的直接影响不是新增 secondary workspace Voice 控件，而是让 workspace runtime lifecycle 能看见 Voice activity。workspace sidebar 的 removal/busy flow 需要展示 `activity.voiceSessions`：普通 remove 遇到 active Voice work 返回 busy，force remove 只 abort 目标 runtime 的 Voice stream/lease，不影响其它 workspace；成功后刷新 workspace/capabilities。客户端若要启用 selected workspace Voice 设置或 batch transcription，应同时 gate `workspace_qualified_voice` 和对应 legacy Voice 能力。
 
-#7754 open diff 则把 Web Shell Voice 从“selected workspace 能力”推进到“composer owner 能力”。新 `voice-workspace-target.ts` 根据 capabilities、composer intended cwd、session id/draft id 和 workspace list 解析 Voice target：primary 或旧单 workspace daemon 继续使用 legacy route；trusted secondary 必须唯一匹配 canonical cwd 或 workspace id，且拥有 `workspace_qualified_voice`，才走 `/workspaces/:workspace/voice/...` status/provider/settings/model/stream；unknown、ambiguous、untrusted、bootstrapping、draining 或 removed workspace 直接 fail closed，不 fallback primary。
+#7754 则把 Web Shell Voice 从“selected workspace 能力”推进到“composer owner 能力”。新 `voice-workspace-target.ts` 根据 capabilities、composer intended cwd、session id/draft id 和 workspace list 解析 Voice target：primary 或旧单 workspace daemon 继续使用 legacy route；trusted secondary 必须唯一匹配 canonical cwd 或 workspace id，且拥有 `workspace_qualified_voice`，才走 `/workspaces/:workspace/voice/...` status/provider/settings/model/stream；unknown、ambiguous、untrusted、bootstrapping、draining 或 removed workspace 直接 fail closed，不 fallback primary。
 
 UI 组件需要把 owner 信息一路传到 Voice 层。`App.tsx`、`ChatPane.tsx`、`SplitView.tsx` 和 `ChatEditor.tsx` 为 main、locked、split-view composer 传递 intended cwd、session id 与 merged workspace list；`VoiceButton` 以 target workspace/owner/settings revision 作为 status key，pending/error/unsupported/mismatch 时隐藏或禁用，而不是读取 primary 状态。`use-voice-workspace-settings.ts` 区分 user-scope 与 workspace-scope revision：user-level Voice 设置仍共享，workspace providers/settings/model 只通过 resolved owning workspace client 加载和保存。
 

@@ -87,12 +87,12 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 | #6098 | merged | daemon-managed worker 缺少 ready 后恢复、心跳、日志脱敏和 stale pid/status 诊断。 | ready 后按 5 分钟 3 次策略重启；15s heartbeat / 45s stale kill；worker stdout/stderr 脱敏与有界 buffer；status 暴露 partial connect、restart/error fields。 |
 | #6165 | merged | prompt 返回前靠 `setTimeout(0)` 等 late SSE chunks，时序不确定。 | `DaemonChannelBridge` 建 per-session turn barrier；`turn_complete` 释放正常完成，`turn_error` 记录协议错误后释放；drop/cancel/stop 也释放以防悬挂，非 SSE 路径保留 one-tick fallback。 |
 | #6182 | merged | adapter/诊断工具无法枚举 bridge 当前 sessions。 | `ChannelAgentBridge` 增加 optional `listSessions()`；`DaemonChannelBridge` 返回 session id、workspace 和 `hasActivePrompt` snapshot；daemon-worker facade 按 optional method 透传。 |
-| #6309 | open | 大历史 session load 逐帧 child-to-daemon replay 会污染 live fanout 与 ring。 | daemon bridge 可请求 response-mode replay，并用 ACP response 中的私有 replay payload seed snapshot；direct ACP 默认 streamed replay 兼容。 |
+| #6309 | merged | 大历史 session load 逐帧 child-to-daemon replay 会污染 live fanout 与 ring。 | daemon bridge 可请求 response-mode replay，并用 ACP response 中的私有 replay payload seed snapshot；direct ACP 默认 streamed replay 兼容。 |
 | #6598 | merged | channel settings 变更需要重启整个 daemon 才能生效。 | `ChannelWorkerSupervisor.restart()` relaunch worker 并重读 settings；新增 strict HTTP reload route、SDK helper、CLI `qwen channel reload` 和条件能力 `channel_reload`。 |
 | #6635 | merged | multi-workspace daemon 中 channel worker 仍绑定 primary workspace，secondary workspace channel 会读错 env/settings/status。 | selected channels 按 owning trusted workspace 分组，每组一个 supervisor；`ChannelWorkerGroup` 提供 fail-closed group restart、webhook owner routing、pidfile `workers[]` 与 status `channelWorkers[]`。 |
 | #6741 | merged | daemon 启动后无法启用、替换、查询或停止 channel worker selection。 | 新增 runtime `ChannelWorkerManager`、`channel_control` capability、HTTP/SDK/CLI selection control，并在替换失败时回滚旧 worker group/pidfile/webhook state。 |
 | #6950 | merged | adapter `connect()` 失败原因在 worker 启动边界丢失。 | 新增 startup failure IPC + ACK，snapshot/HTTP/SDK/CLI 暴露 bounded redacted failures；dynamic all-fail 返回 `channel_worker_start_failed` 和 attempted failures。 |
-| #7019 | open | multi-workspace hardening 文档仍可能把 channel workers 写成 primary-only 或全 workspace 自动展开。 | 用户/开发文档明确 worker selection 按 owning trusted workspace 分组，`--channel all` 暂保持 primary-only v1，并把 channel worker 归入 workspace-qualified / legacy-primary ownership 边界。 |
+| #7019 | merged | multi-workspace hardening 文档仍可能把 channel workers 写成 primary-only 或全 workspace 自动展开。 | 用户/开发文档明确 worker selection 按 owning trusted workspace 分组，`--channel all` 暂保持 primary-only v1，并把 channel worker 归入 workspace-qualified / legacy-primary ownership 边界。 |
 
 ---
 

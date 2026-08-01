@@ -3,20 +3,22 @@
 > 子文档；总览见 README.md
 > 本文 **取代并细化** 总览 `telemetry-observability.md` 的 §3.7（GenAI 语义双发 / TTFT / retry）与 §3.8（资源属性与基数控制），下沉到 function/line 级。
 > 代码均基于 `QwenLM/qwen-code@main`（除显式标注分支/PR 外）。引用格式 `file:symbol`（+行号），行号以阅读时的 `main` 为准。
-> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667 仍为 open；其行号以对应 PR diff 为准，合入后会漂移。
+> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667/#8150/#8176 已按 merged diff 更新。#8180 仍为 open，本文只记录当前 tool execution outcome diff 方案。
 
 ---
 
 ## 概述
 
-本文聚焦 `qwen-code.llm_request` span 的「请求计时与可观测语义」这一条线，五块内容彼此咬合：
+本文聚焦 `qwen-code.llm_request` span 的「请求计时与可观测语义」以及 tool-call outcome telemetry 这一条线，七块内容彼此咬合：
 
-1. **TTFT（time-to-first-token）采集**：在流式迭代中捕获「首个用户可见 chunk」的墙钟时延。关键点是**基线（baseline）的语义**——`ttftMs` 从 `generateContentStream` 进入点开始计时（含本次调用的 request setup），是**方法内闭包变量**（绝不能是实例字段），首 token 判定用 `hasUserVisibleContent` 并对 `thought === true` 做了精确修复。
-2. **GenAI 语义双发（dual-emit）**：在写私有属性（`input_tokens` / `output_tokens` / `ttft_ms` …）的同时，并行写一份 OTel GenAI 语义约定属性（`gen_ai.*`）。**关键设计：双发只写 span attribute，绝不再发一份 metric counter**——token 计量已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 承担一次，再发 counter 就会**双计**。
+1. **TTFT（time-to-first-token）与 first-chunk 采集**：内部 `ttftMs` 仍按「首个用户可见 chunk」计算，供 API response log、`sampling_ms` 与吞吐派生使用；#8150 另在流式 span 上记录标准 `gen_ai.response.time_to_first_chunk`，基线是 provider invocation 前的 monotonic timestamp，到首个 normalized response chunk 为止。
+2. **GenAI 语义双发（dual-emit）**：在写私有 token 属性（`input_tokens` / `output_tokens` …）的同时，并行写一份 OTel GenAI 语义约定属性（`gen_ai.*`）。#8150 后流式首块时延只写标准 `gen_ai.response.time_to_first_chunk`，不再写 span-level 私有 `ttft_ms`。**关键设计：双发只写 span attribute，绝不再发一份 metric counter**——token 计量已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 承担一次，再发 counter 就会**双计**。
 3. **重试可见性【#4432 已合入】**：通过 `AsyncLocalStorage`（`retryContext`）把「第几次尝试 / 累计退避 / 累计 setup」从 `retryWithBackoff` 透传到 `LoggingContentGenerator`。核心三处精妙：(a) `iterationCount` **单调计数器**与被 clamp 的 `attempt` 循环变量**解耦**；(b) `onRetry` 三汇（QwenLogger / OTel log / metric counter）；(c) 顺带修复 Phase 4a 的 `sampling_ms` **重复扣减 setup** bug。
 4. **LLM request phase breakdown（#5904 / Phase 4c）**：把已有但未接线的 `recordApiRequestBreakdown` histogram 接到 `endLLMRequestSpan`，每个 LLM request 最多记录 REQUEST_PREPARATION、NETWORK_LATENCY、RESPONSE_PROCESSING 三段耗时，便于判断延迟花在 retry/setup、TTFT 还是输出 streaming。
 5. **ARMS session user ID（#7921）**：operator 可通过 `telemetry.userId` 或 `QWEN_TELEMETRY_USER_ID` 提供稳定 pseudonymous user id，写入 span-level `gen_ai.user.id`，并传播到 interaction/LLM/tool/agent spans。
-6. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
+6. **Tool-call terminal status（#8176）**：tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前统一归一化 terminal `status`、兼容 `success` 与 error fields，避免同一次工具调用在不同 consumer 中被解释成不同结果。
+7. **Tool execution outcome（#8180 open）**：当前 open diff 在 terminal status 之外记录 execution-specific outcome，区分未进入 `invocation.execute()` 的 synthetic failure 与真正执行后的 success/failure/cancel。
+8. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
 
 一句话串起来：**一次 LLM 请求 = 一个 `llm_request` span**；TTFT/token/gen_ai.\* 都是这个 span 的**属性**；retry 在这个 span 之**上**（每次重试是一个**全新**的 span），靠 ALS 把上下文灌进每个 per-attempt span；只有 token 用量和 retry 次数会另外落 **metric counter**（受基数开关约束）。
 
@@ -36,8 +38,11 @@
 | #7536 | MERGED（2026-07-23） | GenAI / ARMS 字段对齐 | 新增 provider/operation/output type resolver、usage provenance，并让 LLM/tool/subagent span 写入与 OTel GenAI semconv 和 ARMS LLM Trace 对齐的字段。 |
 | #7635 | MERGED（2026-07-24） | GenAI request 参数字段 | 从 provider-final SDK request 捕获 choice count、max tokens、temperature、top_p、frequency/presence penalty 和 stop sequences，写入 ARMS/OTel 对齐字段。 |
 | #7650 | MERGED（2026-07-24） | OpenAI empty frame usage preservation | 修正 OpenAI-compatible stream 中 no-candidate empty frame 提前 flush finish 的问题，保留后续 usage-only frame。 |
-| #7667 | OPEN（2026-07-24） | GenAI content telemetry fields | 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，并移除等价私有字段。 |
+| #7667 | MERGED（2026-07-24） | GenAI content telemetry fields | 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，并移除等价私有字段。 |
 | #7921 | MERGED（2026-07-28） | ARMS session user ID | 新增 `telemetry.userId` / `QWEN_TELEMETRY_USER_ID`，在 interaction 创建时写 `gen_ai.user.id` 并传播到 LLM、Tool、Agent spans。 |
+| #8150 | MERGED（2026-07-31） | GenAI time-to-first-chunk tracing | 流式 span 写 `gen_ai.request.stream=true` 与 `gen_ai.response.time_to_first_chunk`；非流式保留 `llm_request.stream=false` 且不写 first-chunk；移除 span-level 私有 `ttft_ms`。 |
+| #8176 | MERGED（2026-07-31） | tool-call terminal telemetry | 统一 tool-call terminal normalization boundary，归一化 `status`、兼容 `success`、error fields、低基数 metric 维度和 QwenLogger 低敏字段。 |
+| #8180 | OPEN（2026-07-31） | tool execution outcome | 当前 open diff 在 terminal status 旁边新增 execution status、execution child span 和低基数 execution-outcome counter。 |
 
 ---
 
@@ -156,10 +161,10 @@ const attributes: Attributes = {
 | `input_tokens` (L411) | `gen_ai.usage.input_tokens` (L413) | Stable | 同值 |
 | `output_tokens` (L416) | `gen_ai.usage.output_tokens` (L417) | Stable | 同值 |
 | `cached_input_tokens` (L420) | `gen_ai.usage.cached_tokens` (L422) | Experimental | 同值 |
-| `ttft_ms` (L426) | `gen_ai.server.time_to_first_token` (L428) | Experimental | **`ttftMs / 1000`（秒，double）** |
+| internal `ttftMs` | `gen_ai.response.time_to_first_chunk`（#8150） | Experimental | **`timeToFirstChunkMs / 1000`（秒，double）** |
 | `qwen-code.model` (L362) | `gen_ai.request.model` (L368) | Stable | 同值 |
 
-私有名始终**权威**，`gen_ai.*` 仅为「懂 spec 的后端」提供兼容层。注意 `gen_ai.server.time_to_first_token` 的单位是**秒（double）**，与私有 `ttft_ms`（毫秒，int）不同——这是 OTel GenAI spec 的约定，代码在 L428–429 显式 `/1000`。
+token 私有名始终**权威**，`gen_ai.*` 仅为「懂 spec 的后端」提供兼容层。#8150 后流式首块时延不再写 span-level 私有 `ttft_ms`，而是在首个 normalized response chunk 到达时写 `gen_ai.response.time_to_first_chunk`，单位是**秒（double）**；内部 `ttftMs` 仍保留在调用链内，用于 API response log、`sampling_ms` 和 `output_tokens_per_second`。
 
 ### 2. 为什么双发写 attr 而**不发 counter**——避免 token 双计
 
@@ -217,9 +222,9 @@ PR #7650 修复 OpenAI-compatible provider 的流式边界：provider 可以发�
 
 最终实现把没有 candidate parts 的 frame 统一视为 empty，不论 candidates/choices 是空数组还是缺失。empty frame 不触发 pending finish flush；finish-only、usage-only、tool-call preparation frame 仍按有效 frame 处理。回归测试用 mutation guard 确认 finish 不是提前 yield 后又被后续对象修改出来的假阳性。
 
-### 6. GenAI content telemetry fields（#7667 当前 open）
+### 6. GenAI content telemetry fields（#7667）
 
-PR #7667 当前 open diff 把敏感内容字段对齐到 OTel GenAI / ARMS 可识别的 standard attributes：
+PR #7667 把敏感内容字段对齐到 OTel GenAI / ARMS 可识别的 standard attributes：
 
 - `gen_ai.input.messages`、`gen_ai.output.messages`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`。
 - tool spans 上的 `gen_ai.tool.description`、`gen_ai.tool.call.arguments`、`gen_ai.tool.call.result`。
@@ -236,7 +241,19 @@ PR #7921 增加的是 span-level end-user dimension，而不是 Resource 或 met
 
 该字段不写 Resource、LogRecord、Metric 或 Baggage，也不双写 `enduser.id` / `user.id`。Resource 会把用户 id 变成进程级维度并自动附到 metrics；Baggage/traceparent 会把身份传播到外部服务；两者都不符合本 PR 的低扩散目标。方案只适合一进程一用户部署，共享 multi-user daemon/channel 需要未来新增 per-session 或 per-request 身份面。
 
-### 8. 派生指标：`sampling_ms` 公式 + 除零守卫
+### 8. Tool-call terminal telemetry（#8176）
+
+PR #8176 把 tool-call terminal event 的最终状态统一到一个 normalization boundary。Core scheduler、ACP bridge、UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 在 fan-out 前先得到同一份 normalized terminal status：authoritative `status` 派生兼容 `success`，success/cancelled 清掉 stale error fields，soft error 未分类时归为 `unknown`，空 tool name 归为 `unknown_tool`。
+
+metrics 侧 tool-call counter 增加低基数 `status` 维度；QwenLogger 增加 `status` 与 `tool_type`，但继续不记录 tool arguments、results、stack trace 或 MCP server name。这个边界解决的是“同一次工具调用在日志、指标、recording、UI 里结果不一致”的问题。
+
+### 9. Tool execution outcome（#8180 当前 open）
+
+PR #8180 当前 open diff 在 terminal status 之外新增 execution-specific outcome。terminal `status` 仍描述整个 tool call 的最终结果；`executionStatus` 只描述是否真正进入 `invocation.execute()` 以及执行后的成功、失败或取消。
+
+validation、permission deny、PreToolUse blocking、host invocation guard、duplicate call 等 synthetic pre-execution 响应标记为 not started。真正进入工具实现后，execution outcome 会冻结并穿过 hooks、result persistence、recording、image bridging 与 batch post-processing。telemetry 侧只为 attempted execution 创建 execution child span，同时新增低基数 execution-outcome counter，避免把未开始的工具调用伪装成工具执行耗时。
+
+### 10. 派生指标：`sampling_ms` 公式 + 除零守卫
 
 `endLLMRequestSpan` 在 token/ttft 之外派生两个属性（`session-tracing.ts` L440–457，**main / Phase 4a 版本**）：
 

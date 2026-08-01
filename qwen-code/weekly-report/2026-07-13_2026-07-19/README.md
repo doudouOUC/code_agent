@@ -4,9 +4,9 @@
 
 **主题**: multi-workspace legacy session owner routing、Extension Management V2、workspace-qualified Voice/session export、PDF vision bridge fallback、shell timeout error semantics、silent shell heartbeat、cold first-session tracing、archived session export、Web Shell non-primary archive hardening、daemon Todo stop guard、channel startup failure diagnostics、daemon-global deep health、explicit Plan exit approval、bounded daemon log rotation、legacy session workspace telemetry、multi-workspace ownership guard hardening、multi-workspace hardening closeout、shell safety tri-state classification、ACP channel initialize profiling、single-writer session persistence、Plan-mode shell safety routing、ACP startup static closure slimming、conversation branch inspection、ACP preheat readiness、ACP session writer fencing
 
-**PR 统计**: 29 PRs - 27 merged / 1 open / 1 closed
-**当前已合并 PR 代码量**: +58,454 / -8,341，578 个文件变更
-**全量代码量**: +74,269 / -11,430，698 个文件变更
+**PR 统计**: 29 PRs - 28 merged / 0 open / 1 closed
+**当前已合并 PR 代码量**: +64,636 / -8,965，614 个文件变更
+**全量代码量**: +74,566 / -11,383，698 个文件变更
 **类型分布**: feat ×17, fix ×9, docs ×1, perf ×1, refactor ×1
 **范围 (scope)**: serve ×9, core ×9, cli ×5, daemon ×4, web-shell ×2
 
@@ -44,7 +44,7 @@
 | [#7182](https://github.com/QwenLM/qwen-code/pull/7182) | ✅ merged | @doudouOUC | perf(cli): Defer TUI runtime from ACP startup | +548/-228 | 17 | 07-18 15:55 | 07-19 00:10 |
 | [#7185](https://github.com/QwenLM/qwen-code/pull/7185) | ✅ merged | @doudouOUC | feat(core): inspect persisted conversation branches | +1114/-0 | 4 | 07-18 16:46 | 07-19 15:46 |
 | [#7200](https://github.com/QwenLM/qwen-code/pull/7200) | ✅ merged | @doudouOUC | feat(daemon): Advertise ACP preheat readiness | +610/-48 | 14 | 07-19 04:30 | 07-19 13:00 |
-| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | 🟡 open | @doudouOUC | fix(core): Fence concurrent ACP session writers | +5885/-671 | 36 | 07-19 15:01 | — |
+| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | ✅ merged | @doudouOUC | fix(core): Fence concurrent ACP session writers | +6182/-624 | 36 | 07-19 15:01 | 07-21 07:36 |
 
 ---
 
@@ -80,7 +80,7 @@
 | [#7182](https://github.com/QwenLM/qwen-code/pull/7182) | P0-A profile 显示 ACP child startup 静态闭包会加载 Ink/React/React Reconciler/Yoga 等 TUI-only runtime，无头 ACP 从不渲染却要编译整套 TUI。 | 把 API error classifier 与 suggestion contract 从 React/TUI 模块中拆出；`/init` 覆盖确认、`/approval-mode auto`、`/history expand-now` 的 React 依赖改成动作执行时动态导入；bundle metafile guard 阻止 Ink/React/Reconciler/Yoga 回到 ACP static closure。2C4G 对照中 ACP import P50 从 115.06ms 降到 52.00ms。 | 已更新 [cli-startup-performance.md](../../feature/cli-startup-performance.md)。完整实现见 [implementations/pr-7182.md](implementations/pr-7182.md)。 |
 | [#7185](https://github.com/QwenLM/qwen-code/pull/7185) | persisted session 已有 `parentUuid` 树，但 resume 只沿物理尾恢复一条链；rewind、压缩、metadata-only tail 或并发写入会留下多个可恢复分支和诊断盲区。 | 新增只读 `inspectConversationBranches()`：构建 conversation forest，识别 semantic leaves，折叠 neutral metadata tail，输出 branch point、depth、summary、tool result 计数、rewind descendant/sibling 分类，并报告 missing parent、cycle、conflicting duplicate parent。 | 已更新 [conversation-rewind.md](../../feature/conversation-rewind.md)。完整实现见 [implementations/pr-7185.md](implementations/pr-7185.md)。 |
 | [#7200](https://github.com/QwenLM/qwen-code/pull/7200) | ACP status/preheat routes 已存在但 released clients 无法发现；SDK 可能把 REST-only control-plane 调用误走 ACP transport，短 preheat waiter 也可能清掉共享初始化状态。 | 新增 `workspace_acp_status` / `workspace_acp_preheat` capability，定义 `ready === channelLive`、monotonic duration、timeout validation 和 sanitized failure contract；service-level single-flight 不被短 waiter 清理；SDK 强制 REST，Web UI 只在 capability 存在且 selected workspace 为 primary 时调用。 | 已更新 [daemon-serve-mode/04-capabilities-and-protocol.md](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) 与 [10-client-adapters-and-sdk.md](../../feature/daemon-serve-mode/10-client-adapters-and-sdk.md)。完整实现见 [implementations/pr-7200.md](implementations/pr-7200.md)。 |
-| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | ACP/daemon 路径仍可能让两个进程同时写同一个 persisted session，导致 JSONL parent chain 分叉；需要从 #7166 中抽出可独立合入的 P0a 防线。 | 当前 open diff 用 atomic hard-link writer lease 选出唯一 owner；owner acquisition 后权威重载物理尾，每次 append 校验 owner token、file identity、metadata 和 UTF-8 byte length。daemon 复用 live owner，prompt/cron/notification/teammate turns 先过 ownership gate，close drain 后才释放 lease，并用稳定 ACP/HTTP writer errors 暴露冲突。 | 已更新 [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md)。完整实现见 [implementations/pr-7237.md](implementations/pr-7237.md)。 |
+| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | ACP/daemon 路径仍可能让两个进程同时写同一个 persisted session，导致 JSONL parent chain 分叉；需要从 #7166 中抽出可独立合入的 P0a 防线。 | 最终实现用 atomic hard-link writer lease 选出唯一 owner；owner acquisition 后权威重载物理尾，每次 append 校验 owner token、file identity、metadata 和 UTF-8 byte length。daemon 复用 live owner，prompt/cron/notification/teammate turns 先过 ownership gate，close drain 后才释放 lease，并用稳定 ACP/HTTP writer errors 暴露冲突。 | 已更新 [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md)。完整实现见 [implementations/pr-7237.md](implementations/pr-7237.md)。 |
 
 ## PR 对应 feature 覆盖
 

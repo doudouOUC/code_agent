@@ -17,7 +17,7 @@
 | 03 | [上下文传播与并发隔离](03-context-propagation-and-concurrency.md) | ALS、resolveParentContext、subagent 并发隔离(#4410) |
 | 04 | [敏感属性 opt-in 与 PII](04-sensitive-attributes-and-pii.md) | 门控链、截断 / SHA-256 去重、response_text 未门控泄露面 |
 | 05 | [trace↔日志关联与 daemon 端遥测](05-correlation-and-daemon-telemetry.md) | getTraceContext、daemon route span、W3C 跨进程传播 |
-| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields、#7921 ARMS session user ID |
+| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields、#7921 ARMS session user ID、#8150 first-chunk latency、#8176 tool-call terminal status、#8180 execution outcome（open） |
 | 07 | [出站关联与 traceparent 传播](07-outbound-correlation.md) | 默认安全、OTLP 反馈环防护、opt-in 广播安全面 |
 
 ---
@@ -45,7 +45,8 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
 - **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup profile helper。
 - **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
-- **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 当前 open diff 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis。
+- **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921/#8150）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis，#8150 在流式 span 上写标准 `gen_ai.response.time_to_first_chunk` 秒级属性并移除 span-level 私有 `ttft_ms` 双发。
+- **Tool-call outcome 口径（#8176/#8180）**：#8176 已合入统一 terminal normalization boundary，所有 tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前先归一化 `status`、兼容 `success` 和 error fields；#8180 当前 open diff 继续把 terminal status 与 execution outcome 拆开，区分未进入 `invocation.execute()` 的 synthetic failure 和真正工具执行后的 success/failure/cancel。
 
 ---
 
@@ -278,16 +279,16 @@ PR #6907 已把 cold first-session startup 拆进同一棵 daemon trace：`POST 
 | `input_tokens` | `gen_ai.usage.input_tokens` | Stable |
 | `output_tokens` | `gen_ai.usage.output_tokens` | Stable |
 | `cached_input_tokens` | `gen_ai.usage.cached_tokens` | Experimental |
-| `ttft_ms` | `gen_ai.server.time_to_first_token`（秒，double） | Experimental |
+| internal `ttftMs` | `gen_ai.response.time_to_first_chunk`（秒，double，#8150） | Experimental |
 | `qwen-code.model`（start 时） | `gen_ai.request.model` | Stable |
 
-私有名始终权威，`gen_ai.*` 只是给「懂 spec 的后端」的兼容层。**关键设计：双发只写在 span attribute，而不再发一份 metric counter**——token 用量的 metric 已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 计过一次，再发 counter 会**双计**（详见第 5 节）。
+token 私有名仍为权威，`gen_ai.*` 只是给「懂 spec 的后端」的兼容层。#8150 后流式首块时延不再写 span-level 私有 `ttft_ms`，而是写标准 `gen_ai.response.time_to_first_chunk`；内部 `ttftMs` 仍用于 API response log、`sampling_ms` 与吞吐派生。**关键设计：双发只写在 span attribute，而不再发一份 metric counter**——token 用量的 metric 已由 `loggers.ts:logApiResponse → recordTokenUsageMetrics` 计过一次，再发 counter 会**双计**（详见第 5 节）。
 
 **ARMS Session User ID（#7921）**：`telemetry.userId` 与 `QWEN_TELEMETRY_USER_ID` 允许 operator 提供稳定 pseudonymous end-user id。环境变量 trim 后优先；空 env 回退 settings；非 string setting 直接配置失败，避免把 `null`、对象或数组导出为 span attribute。`Config.getTelemetryUserId()` 在 interaction span 创建时读取该值并写入 `gen_ai.user.id`，之后沿 interaction context 传播到 LLM、Tool、Agent spans，包括 tool-result continuation 与 linked-root background agents。
 
 这个字段只写 span attribute，不写 Resource、LogRecord、Metric 或 Baggage，也不别名到 `enduser.id` / `user.id`。原因是 ARMS Session Analysis 需要的是 span-level user dimension；Resource 会把 user id 变成进程级维度并自动附到 metrics，Baggage/traceparent 会把身份传播到外部请求。该方案假设一进程一用户；共享 multi-user daemon/channel 不能用进程级 settings/env 表达真实用户。
 
-**TTFT 采集**（`loggingContentGenerator.ts:loggingStreamWrapper` L468–535）：`ttftMs` 是**方法内闭包变量**（注释明确「绝不能是实例字段」，因为 `LoggingContentGenerator` 在并发 stream 间共享）。在流式迭代中，遇到**首个含用户可见内容**的 chunk（`hasUserVisibleContent`，跳过纯 role/usageMetadata chunk）时记录 `Date.now() - startTime`。语义上是「首个真实 token」的时间，与 claude-code 的 message_start 口径不同。
+**TTFT / first-chunk 采集**（`loggingContentGenerator.ts:loggingStreamWrapper`）：`ttftMs` 是**方法内闭包变量**（注释明确「绝不能是实例字段」，因为 `LoggingContentGenerator` 在并发 stream 间共享）。在流式迭代中，遇到**首个 normalized response chunk** 时用 monotonic `performance.now()` 记录 `gen_ai.response.time_to_first_chunk`（秒）；内部 `ttftMs` 仍按首个用户可见内容计算，供日志、`sampling_ms` 与吞吐派生使用。
 
 由 TTFT 进一步在 `endLLMRequestSpan` 派生：`sampling_ms = duration - ttft - requestSetupMs`、`output_tokens_per_second`（仅 `sampling_ms>0` 且有 outputTokens 时）。
 

@@ -5,7 +5,7 @@
 | PR | 状态 | 标题 | 文档 |
 |---|---|---|---|
 | [#7248](https://github.com/QwenLM/qwen-code/pull/7248) | ✅ merged | fix(core): Enforce Plan mode entry boundary | [pr-7248.md](pr-7248.md) |
-| [#7268](https://github.com/QwenLM/qwen-code/pull/7268) | 🟡 open | feat(serve): Hot-reload workspace trust changes | [pr-7268.md](pr-7268.md) |
+| [#7268](https://github.com/QwenLM/qwen-code/pull/7268) | ✅ merged | feat(serve): Hot-reload workspace trust changes | [pr-7268.md](pr-7268.md) |
 | [#7269](https://github.com/QwenLM/qwen-code/pull/7269) | ✅ merged | fix(sdk): clean up SSE requests on errors and dispose | [pr-7269.md](pr-7269.md) |
 | [#7276](https://github.com/QwenLM/qwen-code/pull/7276) | ✅ merged | perf(telemetry): lazy-load the SDK and split OTLP exporter chains by protocol | [pr-7276.md](pr-7276.md) |
 | [#7295](https://github.com/QwenLM/qwen-code/pull/7295) | ✅ merged | fix(cli): Preserve cancellation during permission prompts | [pr-7295.md](pr-7295.md) |
@@ -28,17 +28,17 @@
 | [#7512](https://github.com/QwenLM/qwen-code/pull/7512) | ✅ merged | perf(startup): lazy-load Google GenAI SDK on first use | [pr-7512.md](pr-7512.md) |
 | [#7536](https://github.com/QwenLM/qwen-code/pull/7536) | ✅ merged | feat(core): Align GenAI telemetry with ARMS | [pr-7536.md](pr-7536.md) |
 | [#7558](https://github.com/QwenLM/qwen-code/pull/7558) | ✅ merged | perf(cli): Defer ACP telemetry initialization | [pr-7558.md](pr-7558.md) |
-| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | 🟡 open | feat(integrations): add retrieval-only external context search | [pr-7586.md](pr-7586.md) |
+| [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | ✅ merged | feat(integrations): add retrieval-only external context search | [pr-7586.md](pr-7586.md) |
 | [#7594](https://github.com/QwenLM/qwen-code/pull/7594) | ✅ merged | perf(cli): Propagate compile cache to ACP children | [pr-7594.md](pr-7594.md) |
 | [#7603](https://github.com/QwenLM/qwen-code/pull/7603) | ✅ merged | fix(sdk-java): Harden daemon transport reliability | [pr-7603.md](pr-7603.md) |
 | [#7619](https://github.com/QwenLM/qwen-code/pull/7619) | ✅ merged | fix(daemon): address epoch cursor review follow-ups | [pr-7619.md](pr-7619.md) |
 | [#7622](https://github.com/QwenLM/qwen-code/pull/7622) | ✅ merged | fix(acp-bridge): resource hardening for the session event pipeline (DAEMON-009/010/011) | [pr-7622.md](pr-7622.md) |
 | [#7635](https://github.com/QwenLM/qwen-code/pull/7635) | ✅ merged | feat(core): Align GenAI request telemetry with ARMS | [pr-7635.md](pr-7635.md) |
 | [#7650](https://github.com/QwenLM/qwen-code/pull/7650) | ✅ merged | fix(core): Preserve usage after empty OpenAI stream frames | [pr-7650.md](pr-7650.md) |
-| [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | 🟡 open | feat(core): Align GenAI content telemetry fields | [pr-7667.md](pr-7667.md) |
-| [#7686](https://github.com/QwenLM/qwen-code/pull/7686) | 🟡 open | perf(core): Lazy-load first-use dependencies | [pr-7686.md](pr-7686.md) |
+| [#7667](https://github.com/QwenLM/qwen-code/pull/7667) | ✅ merged | feat(core): Align GenAI content telemetry fields | [pr-7667.md](pr-7667.md) |
+| [#7686](https://github.com/QwenLM/qwen-code/pull/7686) | ✅ merged | perf(core): Lazy-load first-use dependencies | [pr-7686.md](pr-7686.md) |
 | [#7744](https://github.com/QwenLM/qwen-code/pull/7744) | ✅ merged | fix(core): reliably deliver manual plan-exit notices | [pr-7744.md](pr-7744.md) |
 | [#7747](https://github.com/QwenLM/qwen-code/pull/7747) | ✅ merged | perf(cli): replace comment-json settings parser | [pr-7747.md](pr-7747.md) |
-| [#7754](https://github.com/QwenLM/qwen-code/pull/7754) | 🟡 open | feat(web-shell): Scope voice to composer workspace | [pr-7754.md](pr-7754.md) |
+| [#7754](https://github.com/QwenLM/qwen-code/pull/7754) | ✅ merged | feat(web-shell): Scope voice to composer workspace | [pr-7754.md](pr-7754.md) |
 
 _按个人 PR 口径更新于 2026-07-26_

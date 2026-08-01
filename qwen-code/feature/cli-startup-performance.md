@@ -23,7 +23,7 @@ epic #3011 通过与 Claude Code 的对比，识别出 qwen-code 启动路径上
 | #3223 | API 预连接降低首调用延迟 | #3318 |
 | #3224 | 早期输入捕获防止丢键 | #3319 |
 
-2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。2026-07-25 的 #7686 当前 open diff 继续把 `iconv-lite`、`@xterm/headless` 和 `simple-git` 改为首次真实使用时动态加载，并用 bundle guard 固定 ACP static closure 边界。2026-07-26 的 #7747 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，在保留 JSONC 格式语义的同时移除旧 parser cluster。2026-07-27 的 #7761 新增 daemon/ACP first-output latency benchmark；#7825/#7820 已修 artifact schema、measurement validity 与 serial runner；#7767 已基于该 benchmark 在 ACP session creation 后预加载 lazy Provider，以减少首 prompt 的 provider 构造成本。#7994 当前 open diff 继续把 immediate prompt dispatch 拆成 prompt accepted、user echo、queue wait 与 provider request arrival 等阶段。
+2026-07-18 的 #7145/#7182 把启动性能工作扩展到 daemon ACP child cold startup：#7145 先给 `channel.initialize` 加 opt-in child phase profile，#7182 再基于 P0-A 证据把 TUI-only runtime 从 ACP static startup closure 中移除。2026-07-21 合入的 #7276 继续处理 telemetry heavy cluster：默认 telemetry 关闭时不再静态加载 NodeSDK/exporters/instrumentation，开启时再按 protocol 动态加载对应 exporter chain；#7447 是同目标 closed 早期方案，最终口径由 #7276/#7456 承接。2026-07-22 的 #7455 进一步把 undici 移出 ACP eager closure；#7512 把 `@google/genai` 从 session create 之前的静态闭包里移走。2026-07-23 的 #7558 把 ACP telemetry init 后移到 initialize response 之后；#7594 已合入，让 ACP child 继承父进程启用的 Node compile cache。2026-07-25 的 #7686 已合入，把 `iconv-lite`、`@xterm/headless` 和 `simple-git` 改为首次真实使用时动态加载，并用 bundle guard 固定 ACP static closure 边界。2026-07-26 的 #7747 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，在保留 JSONC 格式语义的同时移除旧 parser cluster。2026-07-27 的 #7761 新增 daemon/ACP first-output latency benchmark；#7825/#7820 已修 artifact schema、measurement validity 与 serial runner；#7767 已基于该 benchmark 在 ACP session creation 后预加载 lazy Provider，以减少首 prompt 的 provider 构造成本。#7994 已合入，继续把 immediate prompt dispatch 拆成 prompt accepted、user echo、queue wait 与 provider request arrival 等阶段。
 
 > 历史：#3085 是「预连接 + 早期输入捕获」的合并版 PR，已 CLOSED，拆分为 #3318 与 #3319 分别合入；其原始实现中的安全缺陷（见 §5、§7）在拆分后被修正。
 
@@ -208,11 +208,11 @@ PR #7594 处理 Node compile cache 只在父进程生效的问题。production `
 
 最终实现把 compile cache 启用与传播封装到 `packages/cli/src/config/compile-cache.ts`。`scripts/cli-entry.js` 在进程早期启用 Node compile cache 后，通过 helper 决定是否把 resolved directory 发布到 child environment；用户显式配置、禁用、失败或 unsupported 情况下不会覆盖现状。`packages/cli/src/config/environment.ts` 和 `packages/cli/src/serve/fast-path-settings.ts` 确保 ACP child 在 normal serve 与 fast path 下都继承该目录，CLI/environment/fast-path tests 覆盖成功传播、用户配置不覆盖和失败/禁用边界。
 
-### 3.11 first-use dependency lazy loading（#7686 当前 open）
+### 3.11 first-use dependency lazy loading（#7686）
 
 PR #7686 继续处理 #7264 标出的 ACP static closure 剩余第三方依赖：`iconv-lite`、`@xterm/headless` 和 `simple-git`。这三个包分别对应非 UTF-8 编解码、PTY terminal replay 与 Git/worktree 操作，但多数 daemon child 在 initialize/session create 阶段不会触发这些能力。
 
-当前 open diff 为三类依赖分别提供 package-local first-use loader，loader 使用模块级 promise 做 single-flight，兼容 esbuild 产出的 default-only CommonJS chunk，并对导出 shape 做显式校验。坏 chunk 或 mock 不再以 `undefined` 形式泄漏到业务逻辑，而是在首次使用点抛出清晰错误。
+#7686 为三类依赖分别提供 package-local first-use loader，loader 使用模块级 promise 做 single-flight，兼容 esbuild 产出的 default-only CommonJS chunk，并对导出 shape 做显式校验。坏 chunk 或 mock 不再以 `undefined` 形式泄漏到业务逻辑，而是在首次使用点抛出清晰错误。
 
 编码路径分成同步兼容入口和内部异步路径。`sync-file-encoding.ts` 继续保留 package-root API 所需的同步 `iconv-lite` helper；内部 file service、file utils 和 text range reader 改走 async lazy codec，UTF-8、空文件、BOM 与 valid UTF-8 fast path 不加载 codec chunk，只有非 UTF-8 decode/encode 时才 import `iconv-lite`。为了避免同步兼容入口重新进入 ACP closure，`esbuild.config.js` 增加定向 tree-shake 插件，只在 Core package root 被引入时把该兼容模块标为 side-effect-free。
 
@@ -244,7 +244,7 @@ PR #7767 的目标不是再压缩 initialize，而是利用 #7761 benchmark 指�
 
 非 lazy generator 是 no-op。background failure 被捕获以避免 unhandled rejection，但 rejected promise 仍会 memoized 给首次真实调用观察。Qwen OAuth hot model switch 或 ACP worktree relocation 会丢弃尚未使用的 preload；已经用于请求的 generator 不会被替换，防止 mid-request 状态漂移。
 
-### 3.15 immediate prompt dispatch metrics（#7994 当前 open）
+### 3.15 immediate prompt dispatch metrics（#7994）
 
 #7994 不改变生产路径，只扩展 #7761 benchmark 的观测粒度。artifact schema 升到 v2 后，除原有 process/session/provider/first-output/terminal 指标外，还记录 `promptAcceptedAt`、`userEchoAt`、`daemonPromptQueueWaitMs`、`promptToAcceptanceMs`、`acceptanceToProviderRequestArrivalMs`、`promptToUserEchoMs` 与 `userEchoToProviderRequestArrivalMs`。
 
@@ -361,13 +361,13 @@ sequenceDiagram
 | #7512 | MERGED | Google GenAI SDK lazy loading | 用 SDK-parity sync surface 避免 ACP session create 急切加载 `@google/genai`，首次 async model operation 才构造 provider |
 | #7558 | MERGED | ACP telemetry init defer | ACP child 成功写出 matching initialize response 后才启动 telemetry init，避免 readiness 关键路径等待 lazy telemetry |
 | #7594 | MERGED | ACP compile cache propagation | 父进程启用 Node compile cache 后，把 resolved cache directory 安全传播给 ACP child |
-| #7686 | OPEN | first-use dependency lazy loading | 当前 diff 将 `iconv-lite`、`@xterm/headless`、`simple-git` 移出 ACP static closure，分别在非 UTF-8、PTY、Git 首次真实使用时动态加载 |
+| #7686 | MERGED | first-use dependency lazy loading | 将 `iconv-lite`、`@xterm/headless`、`simple-git` 移出 ACP static closure，分别在非 UTF-8、PTY、Git 首次真实使用时动态加载 |
 | #7747 | MERGED | lightweight JSONC settings editor | 用 path-based `jsonc-parser` editor 替换 `comment-json` settings/trusted-folders writer，保留 JSONC 格式语义并移除旧 parser cluster |
 | #7761 | MERGED | first-output latency benchmark | 新增 opt-in daemon/ACP benchmark，按 prompt/session/provider 事件关联度量 fresh process 到首个模型输出、首段 answer text 和 terminal 的阶段 |
 | #7767 | MERGED | ACP provider preload | 在 ACP session creation response 写回后 best-effort 预加载 lazy Provider，首 prompt 复用同一 in-flight preparation |
 | #7820 | MERGED | first-output benchmark validity/schema | 把 dwell anchor 改到 SSE readiness，拆 serial benchmark config，并用 paired bootstrap CI lower bound 做 Phase 1 gate |
 | #7825 | MERGED | first-output artifact schema simplification | 删除 bundle-level git commit、重命名 prompt shape 说明字段、提升 schema version，并合并 success predicate |
-| #7994 | OPEN | immediate prompt dispatch metrics | 当前 open diff 将 benchmark artifact 升到 v2，记录 prompt accepted、user echo、queue wait 与 provider request arrival 的细分阶段 |
+| #7994 | MERGED | immediate prompt dispatch metrics | 将 benchmark artifact 升到 v2，记录 prompt accepted、user echo、queue wait 与 provider request arrival 的细分阶段 |
 
 epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 
@@ -411,12 +411,12 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **隐私边界**：只记录静态 stage name、source、success、总耗时、阶段耗时和聚合计数；不记录 prompt、path、session id、model response、hook output 或 tool name。
 - **状态**：已合入 `main`；本文按 merged diff 记录最终实现。
 
-### #7686 first-use dependency lazy loading（OPEN）
+### #7686 first-use dependency lazy loading
 
 - **问题**：ACP child 启动期仍静态带上 `iconv-lite`、`@xterm/headless` 和 `simple-git`，但 bootstrap 大多不需要非 UTF-8 codec、PTY terminal replay 或 Git/worktree 操作。
 - **实现模式**：三类 package-local first-use loader 使用模块级 promise 做 single-flight，并做 CJS/default chunk 归一化和导出 shape validation；内部 file service 改走 async codec loader，package-root 同步 encoding helper 由 `sync-file-encoding.ts` 保留兼容。
 - **关键代码**：`shellExecutionService.ts` 在 PTY path 选中后才加载 xterm，首次加载后重查 abort；`gitWorktreeService.ts` 和 extension Git helper 到第一次真实 Git 操作才加载 `simple-git`；`serve/core-runtime.ts` / `deferred-core-runtime.ts` 窄化 Core deferred imports，配合 `syncFileEncodingTreeShakePlugin` 防止同步兼容入口进入 ACP static closure。
-- **验证**：新增 loader tests、file encoding tests、xterm abort tests、simple-git mock tests 和 serve fast-path bundle guard tests。PR 当前仍 open，本文只记录当前 diff，不把它视为 `main` 已落地能力。
+- **验证**：新增 loader tests、file encoding tests、xterm abort tests、simple-git mock tests 和 serve fast-path bundle guard tests。#7686 已合入，本文按 merged diff 记录最终实现。
 
 ### #7747 lightweight JSONC settings editor（MERGED）
 
@@ -446,11 +446,11 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **实现模式**：#7825 已删除 bundle-level git commit、重命名 prompt shape 说明字段、提升 schema version、合并 success predicate；#7820 把 dwell anchor 改为 SSE readiness，拆 serial benchmark config，并把 Phase 1 gate 改为 paired bootstrap CI lower bound。
 - **验证**：helper/fake-server suites、artifact fixtures、dwell error、target lint/format 与 patched tsconfig 类型检查；#7820 未重新跑 reference-host benchmark。
 
-### #7994 immediate prompt dispatch metrics（OPEN）
+### #7994 immediate prompt dispatch metrics
 
 - **问题**：first-output benchmark 缺少 prompt accepted、user echo 与 provider request arrival 之间的拆分，无法定位 immediate prompt 的延迟到底来自 queue wait、HTTP/SSE echo 还是 provider dispatch。
 - **实现模式**：artifact schema v2 增加 prompt acceptance、user echo、daemon queue wait 与 signed provider delta；tracker 只按 accepted top-level prompt id 关联 relayed user echo，排除 replay 与 model output。
-- **验证**：helper tests 与本地 opt-in benchmark run 覆盖 echo correlation、negative delta、queue-wait snapshot 和 artifact 字段；当前 open diff 尚不能视为 main 已落地能力。
+- **验证**：helper tests 与本地 opt-in benchmark run 覆盖 echo correlation、negative delta、queue-wait snapshot 和 artifact 字段。
 
 ### #3085（CLOSED，已拆分）
 - 为 #3318 + #3319 的合并版 PR，已关闭。原始 `isDefaultBaseUrl` 使用裸 `startsWith` 存在子域伪造缺陷（`dashscope.aliyuncs.com.evil.com` 误命中），在 #3318 修正为 `=== || startsWith(default + '/')`。
@@ -467,4 +467,4 @@ epic 父任务 #3011 [P1] Startup Optimization（OPEN）。
 - **import-order 依赖打包顺序**：`index.ts` 中 `initStartupProfiler()` 先于 `import './src/gemini.js'` 的 T0 早捕获，依赖 esbuild 打包保留语句顺序；若改为纯 ESM 运行（import 提升）或调整打包策略，T0 的「早于模块求值」语义需重新验证。
 - **后续方向（epic #3011 未尽项）**：分层零加载入口（`--version`/`--help` 零导入）、core barrel 拆分按需导入、重型依赖（OpenTelemetry/highlight.js/React-Ink）动态加载、esbuild code splitting（#3226，懒注册收益的真正前置），均尚未在本批 PR 覆盖。
 - **#7820 没有重新跑 reference-host benchmark**：该 PR 的价值主要是修正 measurement harness 自身，不能把历史 benchmark 结果简单外推为新的性能结论。
-- **#7994 仍为 open**：immediate prompt dispatch metrics 只记录当前 diff 方案，不能把 schema v2 字段视为 `main` 已落地能力。
+- **#7994 schema v2 是 opt-in benchmark artifact**：字段用于本地/CI benchmark 归因，不改变生产 prompt dispatch 行为。

@@ -32,6 +32,6 @@
 | [#7182](https://github.com/QwenLM/qwen-code/pull/7182) | ✅ merged | perf(cli): Defer TUI runtime from ACP startup | [pr-7182.md](pr-7182.md) |
 | [#7185](https://github.com/QwenLM/qwen-code/pull/7185) | ✅ merged | feat(core): inspect persisted conversation branches | [pr-7185.md](pr-7185.md) |
 | [#7200](https://github.com/QwenLM/qwen-code/pull/7200) | ✅ merged | feat(daemon): Advertise ACP preheat readiness | [pr-7200.md](pr-7200.md) |
-| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | 🟡 open | fix(core): Fence concurrent ACP session writers | [pr-7237.md](pr-7237.md) |
+| [#7237](https://github.com/QwenLM/qwen-code/pull/7237) | ✅ merged | fix(core): Fence concurrent ACP session writers | [pr-7237.md](pr-7237.md) |
 
 _按个人 PR 口径更新于 2026-07-19_
