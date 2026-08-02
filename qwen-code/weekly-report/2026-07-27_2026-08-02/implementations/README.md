@@ -29,5 +29,7 @@
 | [#8206](https://github.com/QwenLM/qwen-code/pull/8206) | 🟡 open draft | fix(external-context): harden MCP dependencies | [pr-8206.md](pr-8206.md) |
 | [#8245](https://github.com/QwenLM/qwen-code/pull/8245) | 🟡 open | feat(serve): resolve and report the daemon memory budget | [pr-8245.md](pr-8245.md) |
 | [#8311](https://github.com/QwenLM/qwen-code/pull/8311) | 🟡 open | fix(mobile-mcp): Remove legacy Hono dependency | [pr-8311.md](pr-8311.md) |
+| [#8352](https://github.com/QwenLM/qwen-code/pull/8352) | ✅ merged | fix(external-context): Dispose of Auto Recall proxy dispatcher | [pr-8352.md](pr-8352.md) |
+| [#8383](https://github.com/QwenLM/qwen-code/pull/8383) | 🟡 open | fix(serve): detect lineEnding across the file, not the returned slice | [pr-8383.md](pr-8383.md) |
 
-_按个人 PR 口径更新于 2026-08-01_
+_按个人 PR 口径更新于 2026-08-02_

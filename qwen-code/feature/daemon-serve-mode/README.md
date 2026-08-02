@@ -15,7 +15,7 @@
 | 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、replay byte budget、state_resync、event epoch、compaction degraded/truncated replay、协议帧 serverTimestamp/provenance/errorKind |
 | 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening、session writer lease opt-in（#7894）、managed writer shutdown（#7812）、timestamp drift reconciliation（#7886）、Todo Stop Guard continuation hardening（#7821）、maintenance writer isolation（#7975）与 certified writer handoff（#7976） |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268） |
-| 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写、Serve large-text bounded read（#7947）、handle-bound range reader（#7967 open）与 byte-cursor paging（#8002） |
+| 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写、Serve large-text bounded read（#7947）、handle-bound range reader（#7967 open）、byte-cursor paging（#8002）与 lineEnding metadata consistency（#8383 open） |
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
 | 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量 |
 | 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、workspace skill status read model（#8080）、绕过 prompt FIFO、shell `this`-binding 隐患 |
@@ -542,6 +542,7 @@ sequenceDiagram
 | #7976 | certified writer handoff | 引入 v2 sealed writer lock 与 fixed claim 文件，让 managed replacement 只在验证 transcript digest/metadata proof 后接手 writer。 |
 | #7994 | immediate prompt dispatch metrics | 为 first-output benchmark 增加 prompt acceptance、user echo、queue wait 与 provider request arrival 分段。 |
 | #8002 | Serve byte-cursor paging | 为 workspace `/file` 增加 `hasMore`/`nextCursor`/`cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
+| #8383(open) | Serve text lineEnding metadata | 当前 open diff 让 workspace text read 的 `meta.lineEnding` 从完整 decoded file 检测，避免 CRLF cursor paging 前后页不一致。 |
 
 ---
 
@@ -799,4 +800,4 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 7. **`/health` deep 探针非真实 liveness**。`?deep=1` 只读 Map-size getter（`sessionCount`/`pendingPermissionCount`），不 ping 各子进程，检测不出"wedged 但仍计数"的会话；真实 liveness 仍应靠 TCP 连接是否被接受。
 
-8. **#7967/#8093/#8245 仍未合入**。这些 open diff 只能作为当前方案记录，不能描述为 `main` 已落地能力。#7812/#7821/#7886/#7894/#7947/#7975/#7976/#7994/#8002/#8080 已按 merged diff 更新。
+8. **#7967/#8093/#8245/#8383 仍未合入**。这些 open diff 只能作为当前方案记录，不能描述为 `main` 已落地能力。#7812/#7821/#7886/#7894/#7947/#7975/#7976/#7994/#8002/#8080 已按 merged diff 更新。

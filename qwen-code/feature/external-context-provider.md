@@ -1,13 +1,13 @@
 # Direct External Context Search / Auto Recall 技术方案
 
-> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening draft）。
-> 当前记录：#7586/#7877 已按 merged diff、changed files、测试路径与 examples 记录最终实现；#8206 仍为 draft open，只记录当前依赖收敛方案。
+> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening draft；#8352 Auto Recall proxy lifecycle）。
+> 当前记录：#7586/#7877/#8352 已按 merged diff、changed files、测试路径与 examples 记录最终实现；#8206 仍为 draft open，只记录当前依赖收敛方案。
 
 ---
 
 ## 1. 背景与动机
 
-PR #7586 面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。#8206 draft open 继续收敛 direct external-context MCP profile 的 MCP SDK / Hono / parser dependency path，但不扩大业务 surface，也不迁移 mobile-mcp；mobile-mcp 的 Node.js 22 / Hono 2 方案另由 #8311 记录。三者都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
+PR #7586 面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。#8352 修复 Auto Recall Hook 的一次性 proxy dispatcher 生命周期，避免 provider timeout 后 CONNECT socket 留住 child process，并把 v1/v2 entrypoint 与 timeout ownership 文档纠正到实际实现。#8206 draft open 继续收敛 direct external-context MCP profile 的 MCP SDK / Hono / parser dependency path，但不扩大业务 surface，也不迁移 mobile-mcp；mobile-mcp 的 Node.js 22 / Hono 2 方案另由 #8311 记录。这些 PR 都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
 
 核心风险是把 provider 直接暴露给模型或 hook：模型不应知道 credential env 名称，不应选择 provider/corpus，不应看到 provider 内部错误，也不能把 provider 输出当作可信系统指令。因此方案把能力拆成两个互斥入口：retrieval-only MCP server 只暴露 `context_search({query})`；auto recall hook 只消费 `submitted_prompt` 并返回 bounded user-layer `additionalContext`。两者都不提供写入记忆工具或管理面。
 
@@ -67,6 +67,10 @@ hook 还会校验运行 cwd：真实 `cwd` 必须是配置 `autoRecall.repositor
 
 provider 调用最多一次，无 retry/cache，默认 1500ms timeout，配置范围 1..5000ms。结果最多 5 条，每条 content 1000 code points，序列化 envelope 4000 JS code units，尖括号转 Unicode escape；返回值写入 `hookSpecificOutput.additionalContext`，作为 user-layer untrusted JSON envelope 拼接，不提升为 system instruction。检索上下文会随会话历史被后续请求重放，因此 budget 是每次注入的边界，不是整个会话生命周期总边界。
 
+#8352 补上一次性 Hook 的 proxy dispatcher ownership：Hook 只有在 event/config/cwd/query 校验之后才安装 environment-aware proxy dispatcher，随后在 provider construction/search/rendering 之后通过 `finally` 等待 `dispatcher.destroy()`。成功、空结果、provider failure 和 render failure 都会释放 dispatcher；malformed event、v1 config、cwd 越界、空 query 等 early no-op 路径不安装 proxy。长驻 MCP 进程仍保留 process-lifetime dispatcher，不按请求销毁。
+
+配置入口也随 #8352 明确：shared loader 可解析 v1/v2，但 MCP process entrypoint 只接受 v1，Auto Recall Hook 只接受 v2；v2 顶层 `timeoutMs` 仅为兼容已有 v2 config file 保留，当前没有 runtime consumer，Hook 请求 timeout 只读 `autoRecall.timeoutMs`。
+
 ### 3.4 Provider adapters
 
 `integrations/external-context/src/providers.ts` 提供两类只读 provider：
@@ -105,6 +109,7 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 - `npm run build && npm run typecheck`
 - 单测覆盖 config strictness、provider binding、MCP tool registration、Generic HTTP/Mem0 adapter、timeout/cancel、redirect/HTTPS guard、invalid JSON/UTF-8、oversized response 和 provider failure redaction。
 - #7877 追加覆盖 config v1/v2、autoRecall root containment、submitted_prompt missing/invalid no-op、credential pattern、Unicode/query bounds、timeout cancellation、provider fail-open、context envelope budget，以及 interactive TUI → Hook → loopback Generic HTTP → model context E2E。
+- #8352 追加黑洞 CONNECT proxy 子进程回归，要求 stdout `{}`、stderr 为空、exit code 0、无 signal，并在 8000ms guard 前退出；同时覆盖 dispatcher mock cleanup、early no-op 不安装 proxy、proxy 返回值与 global dispatcher wiring。
 
 ---
 
@@ -112,6 +117,7 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 
 - #8206 仍为 draft open；dependency hardening 只记录当前 diff，不能视为 main 已落地。
 - 当前实现仍是只读检索；auto recall 也只注入 untrusted context，不包含 remember writer、删除、审批、policy 或 management API。
+- Auto Recall Hook 会等待 dispatcher cleanup 后再输出成功结果；若 cleanup 自身失败，现有 CLI fail-open wrapper 会返回 `{}`，不会注入已检索 context。
 - provider credential 的最小权限、document ACL 和审计由外部系统保证；Qwen extension 只约束本地配置和请求边界。
 - provider 输出的相关性、排序、去重和安全过滤依赖 provider；本层只做结构校验、长度限制和非可信展示。
 - Auto Recall retrieved context 会进入 conversation history 并在后续 turn 重放；当前只保证每次注入 bounded，不做会话生命周期总量回收、DLP、ACL 或审计保留。
@@ -123,5 +129,6 @@ Mem0 `app_id` 在这里是 classification / corpus selector，不是 Qwen 侧 au
 | [#7586](https://github.com/QwenLM/qwen-code/pull/7586) | MERGED | retrieval-only MCP | 固定 provider/corpus/credential，只暴露 `context_search({query})`，返回 bounded untrusted result。 |
 | [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | MERGED | submitted-prompt auto recall | 新增 `UserPromptSubmit` command hook profile，基于 `submitted_prompt` 自动检索一次并通过 user-layer `additionalContext` 注入。 |
 | [#8206](https://github.com/QwenLM/qwen-code/pull/8206) | OPEN draft | dependency hardening | 当前 draft 将 direct external-context integration 升到 MCP SDK 1.30.0 / patched Hono 2 line；mobile-mcp 迁移不属于 #8206，另见 #8311 / [mobile-mcp.md](mobile-mcp.md)。 |
+| [#8352](https://github.com/QwenLM/qwen-code/pull/8352) | MERGED | Auto Recall proxy lifecycle | 一次性 Hook 在检索尝试后销毁自己的 environment-aware proxy dispatcher，修复 provider timeout 后 child process 被 CONNECT socket 留住的问题，并修正文档中的 v1/v2 entrypoint 与 timeout 归属。 |
 
-_按个人 PR 口径更新于 2026-08-01_
+_按个人 PR 口径更新于 2026-08-02_
