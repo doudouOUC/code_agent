@@ -34,8 +34,15 @@ F2 之后整套机制的难点不在"共享"本身，而在**并发安全的引�
 | #4336 | feat(serve): shared MCP transport pool [F2] | 2026-05-21 | workspace 共享池本体（`McpTransportPool`/`PoolEntry`/`WorkspaceMcpBudget`/`SessionMcpView`），6 atomic + 6 fix commit + 32 review fold-in。 |
 | #4460 | fix(core): F2 cleanup PR B — self-heal observability (W133-a + W134) | 2026-05-23 | `lastTransportError` 透传上游 onerror 原因到 `'failed'` 事件；`SweepResult` 把 pid 清扫的部分信号上报为结构化 warn。 |
 | #4552 | feat(serve): runtime MCP server add/remove (T2.8 #4514) | 2026-05-30 | `addRuntimeMcpServer`/`removeRuntimeMcpServer`：运行时增删 + 幂等同指纹快路径 + 预算回滚。 |
+| #8387 | fix(core): Avoid replaying unsafe MCP tool calls | 2026-08-03 | MCP 连接丢失后的自动 replay 只允许 trusted workspace + trusted server + 明确幂等或无冲突只读 annotations；reconnect 后按 rediscovered tool 再校验，无法证明安全时返回固定 unsafe replay 错误。 |
 
 ---
+
+## 2026-08-03 补充：unsafe replay guard（#8387）
+
+#8387 不改变 MCP 共享池的预算/引用计数模型，但补齐了“连接断开后是否可以自动重放工具调用”的安全闸。旧路径在 connection lost 后会 reconnect/discover/retry；现在只有 `DiscoveredMCPTool.canSafelyReplay()` 同时确认 server trusted、workspace trusted、tool annotations 存在且声明 `idempotentHint:true` 或无 destructive 冲突的 `readOnlyHint:true`，才允许自动 replay。
+
+reconnect 后必须使用 rediscovered tool 再跑一遍同样的 trust/annotation/workspace 校验，防止 server 在断线期间改变工具语义或 workspace trust 被撤销。其它情况统一抛出 `UNSAFE_REPLAY_ERROR_MESSAGE`，明确提示“调用可能已经完成，自动 replay 被跳过，不要自动重试”。这个 guard 与共享池互补：共享池管理传输生命周期，#8387 管理跨连接失败边界上的副作用语义。
 
 ## 演进：per-session 预算 → workspace 共享池（动机与权衡）
 

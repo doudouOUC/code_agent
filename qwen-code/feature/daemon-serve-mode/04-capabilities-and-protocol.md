@@ -59,6 +59,7 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #7603 | fix(sdk-java): Harden daemon transport reliability | merged | 不新增 daemon tag；Java client 消费 #7458 event epoch，并补 terminal-before-202、SSE/JSON malformed path 与 teardown ordering 的可靠性边界。 |
 | #7619 | fix(daemon): address epoch cursor review follow-ups | merged | 不新增 daemon tag；补 `session/load` response 中 `eventEpoch` / `replayDegraded` 的 route 回归，并修正 SDK `detail` 注释。 |
 | #7622 | fix(acp-bridge): resource hardening for the session event pipeline | merged | 不新增 daemon tag；新增 `state_resync_required{reason:'replay_budget_exceeded'}` 运行时原因、拒绝不可序列化事件，并对 compaction live journal 加 bounded truncation marker。 |
+| #8415 | fix(serve): Coordinate caller-supplied session IDs | open | 新增 `session_id_override` capability；REST/ACP/SDK 只有在该 tag 存在时才能发送 caller-supplied UUID session id，并必须验证 response id 是否 honor 请求。 |
 | #6716 | feat(serve): persist dynamic workspace registrations | 2026-07-11 | 新增条件能力 `persistent_workspace_registration`；只有 workspace registration store 可用时广告，客户端才应发送 `POST /workspaces {persist:true}`。 |
 | #6740 | feat(serve): add workspace persisted transcript reader | 2026-07-12 | 新增 `workspace_persisted_transcript`：workspace-qualified persisted-only transcript pager，不启动 ACP、不加载 settings。 |
 | #6741 | feat(cli): Add runtime daemon channel control | 2026-07-13 | 新增条件能力 `channel_control`：daemon runtime channel selection 查询/设置/停止。 |
@@ -515,6 +516,8 @@ sequenceDiagram
 6. **`protocolVersions` 仅 `'v1'`，多版本路径未经实战**。`isFeatureAvailableInProtocol` 的版本裁剪逻辑当前恒真，`'v2'` 引入前其正确性只有单测覆盖、无线上验证。
 
 7. **W23/W24 新增诊断与控制能力继续扩大列表**。#4820 新增 `session_rewind`，#4822 新增 `workspace_hooks` / `session_hooks`，#4832 新增 `workspace_extensions`，#4816 新增条件能力 `workspace_settings`（仅 `persistSettingAvailable` 时广告），#4812 新增 `session_branch`（always-on），#4861 新增条件能力 `rate_limit`（仅 `toggles.rateLimit === true` 时广告）。集成测试 baseline 需同步。
+
+8. **#8415 仍是 open diff**。`session_id_override` 当前只记录方案：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。若最终合并时 tag 名或 request field 调整，本文需要按 merged diff 再同步。
 
 ---
 

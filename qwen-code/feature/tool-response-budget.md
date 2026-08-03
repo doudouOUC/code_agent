@@ -1,7 +1,7 @@
 # 最终工具响应预算技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的 Core scheduler、interactive TUI、headless、ACP session、Agent runtime 与 speculative follow-up。
-> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试。该方案按 merged diff、changed files 和当前 `main` 相邻实现整理。
+> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试；#8450 当前 open diff 只在 ACP transport 边界裁剪 textual tool-result projection，不改变 canonical transcript 或 model-facing response。
 
 ---
 
@@ -140,14 +140,16 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 |---|---|---|---|
 | [#7323](https://github.com/QwenLM/qwen-code/pull/7323) | merged | final tool response budget | 增加结构化 persisted-output metadata、共享 finalizer、runtime aggregation boundaries、send-boundary guard 和 Plan mode policy exception。 |
 | [#7470](https://github.com/QwenLM/qwen-code/pull/7470) | merged | Shell truncation without artifact regression | 为 Shell producer 没有 artifact 但已有短 preview 的路径补测试，固定 `persistedOutputFiles: []` sentinel 和三态语义。 |
+| [#8450](https://github.com/QwenLM/qwen-code/pull/8450) | open | ACP textual tool-result projection | 在 ACP live/history/subagent replay transport 上对 canonical text blocks 和 string `rawOutput` 做 65,536 byte JSON budget；不改变 model-facing finalizer、canonical transcript 或 offline export。 |
 
 ---
 
 ## 7. 已知限制 / 后续
 
 - #7323/#7470 已合入；文档记录当前 main 的最终实现方案。
+- #8450 仍是 open diff，且它是 transport-display projection，不是模型上下文预算；如果后续合并时字段集合、预算或 marker 调整，需要按最终 diff 再更新。
 - 不提供精确 token 预算，不改变 provider context window 估算与自动压缩策略。
 - 不保证 artifact path 在远端 UI 中可直接读取；这里只保证模型响应里有可诊断的 path reference。
 - 后续如要在 Ctrl+O transcript 中读取完整 artifact，需要独立设计权限、路径暴露、大小限制和 UI streaming。
 
-_按个人 PR 口径更新于 2026-07-22_
+_按个人 PR 口径更新于 2026-08-03_

@@ -1,7 +1,7 @@
 # 原子文件写技术方案
 
 > 适用代码库：`QwenLM/qwen-code`（TypeScript CLI agent）
-> 涉及 PR：#4096（MERGED，Phase 1）、#4333（MERGED 2026-06-02，Phase 2 rollout）、#4431（MERGED 2026-06-01，uid 保留修复）
+> 涉及 PR：#4096（MERGED，Phase 1）、#4333（MERGED 2026-06-02，Phase 2 rollout）、#4431（MERGED 2026-06-01，uid 保留修复）、#8428（MERGED 2026-08-03，`write_file` prior-read guidance）
 > 关联 issue：#4095（atomic write & transaction rollback）、#3681（JSONL reader/writer follow-ups）
 > 核心源文件：`packages/core/src/utils/atomicFileWrite.ts`
 
@@ -31,6 +31,7 @@ issue #4095 把这件事拆成两期：
 - **Phase 1（#4096，已合入 v0.16.0）**：实现通用原语 `atomicWriteFile`，接入 `FileSystemService`，使所有 Write/Edit 工具写入原子化。
 - **Phase 2（#4333，MERGED 2026-06-02）**：把 credentials / memory / config / JSONL 等安全敏感、数据完整性敏感路径里残留的裸 `fs.writeFile` / `appendFile` 全部迁移到原子助手，并关闭 #3681。
 - **回归修复（#4431，MERGED 2026-06-01）**：#4096 引入的 rename 换 inode 行为会丢失原文件 uid，破坏 Docker / 共享工作区场景，需补 uid 保留分支。
+- **提示边界修复（#8428，MERGED 2026-08-03）**：`write_file` 工具描述和系统 prompt 示例明确创建/生成请求不等于目标路径已确认不存在；除非本轮已读过目标或确认不存在，否则必须先 `read_file`，与 prior-read enforcement 对齐。
 
 ---
 
@@ -313,6 +314,7 @@ sequenceDiagram
 | **#4096** | MERGED (v0.16.0) | 通用原语 + 工具接入 | 新增 `atomicWriteFile`（temp+rename / fsync / mode 保留 / symlink 链解析 / EXDEV 回退 / FAT chmod 容忍）；接入 `StandardFileSystemService.writeTextFile`，Write/Edit 全部原子化；`atomicWriteJSON` 改为委托原语（补回 fsync）；从 `runtimeStatus.ts` 去重 `renameWithRetry`；`writeWithBackupSync` 加 `flush:true`；升 `@types/node` 到 `^22` |
 | **#4333** | MERGED | rollout（closes #3681, #4095 Phase 2） | 新增 `atomicWriteFileSync` + `forceMode` + `noFollow` + O_EXCL/fchmod EXDEV 回退 + `annotateWriteError` + 测试缝；迁移 credentials（0o600+forceMode+noFollow）、memory、config/state、JSONL（`writeLine`/`writeLineSync` flush、`write` 全量重写走 sync 原子）、extensionManager、NativeLspService（W_OK 检查）；含 3 轮 Codex review latent-bug 修复 |
 | **#4431** | MERGED | uid 保留（修 #4096 回归） | uid 与 euid 不同且为普通文件时回退原地 `writeFile` 保 inode/uid；只比 uid 不比 gid；root 也走原地（弃 chown 优化）；JSDoc 记录崩溃原子性/读者隔离/watcher 语义/EACCES 四项取舍 |
+| **#8428** | MERGED | `write_file` prior-read guidance | 收紧 `WriteFileTool` 描述和 prompt 示例：创建/生成目标文件前也必须先读目标或确认不存在；示例改为 `read_file` 报不存在后再 `write_file`，避免 blind overwrite 与 prior-read enforcement 冲突。 |
 
 > #4095 = atomic write & transaction rollback（总 issue）；#3681 = JSONL reader/writer follow-ups（由 #4333 关闭）。
 
@@ -363,3 +365,9 @@ sequenceDiagram
 - `atomicFileWrite.ts`：uid 不匹配且 `existingStat.isFile()` 时回退原地 `fs.writeFile(targetPath)` 保 inode/uid；FIFO/特殊文件不走回退（`open(O_WRONLY|O_TRUNC)` 会阻塞）。
 - `atomicFileWrite.test.ts`：新增 5 个测试——同属主 rename 换 inode、异属主原地保 inode、FIFO 跳过回退、symlink 穿透+原地、只读文件 EACCES。
 - `worktreeSessionService.ts:writeWorktreeSession` / `runtimeStatus.ts:writeRuntimeStatus`：JSDoc 精简，移除过时的”tmp+rename”措辞，改引 `atomicWriteJSON`（含 ownership 回退）。
+
+### #8428 — write_file prior-read guidance
+
+- `write-file.ts`：工具描述明确“创建/生成请求”不会自动证明目标路径是新文件；没有本轮 prior read 或不存在证明时，模型必须先调用 `read_file`。
+- `prompts.ts` 与 prompt snapshots：示例从直接写测试文件改为先读目标，再在 `read_file` 报不存在后写入。
+- `write-file.test.ts` / `prompts.test.ts`：锁定 prior-read guidance 和示例顺序，避免后续 prompt 回退成 blind overwrite 指导。

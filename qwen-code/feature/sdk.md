@@ -372,6 +372,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #4360 | MERGED | 协议补全（F4 前置） | daemon stamp `serverTimestamp`/`provenance`/`errorKind` + 发 `state_resync_required`；SDK reducer/normalizer 消费 |
 | #7269 | MERGED | REST SSE cleanup | `RestSseTransport` 跟踪 active request controllers，iterator/dispose/error 时 abort fetch 并 cancel body stream，保证 SSE request 生命周期与 consumer 生命周期绑定。 |
 | #8002 | MERGED | workspace file read cursor paging | 为 TS daemon SDK / workspace client 暴露 `cursor` request 与 `hasMore`/`nextCursor` response 字段，配合 `workspace_file_read_cursor` capability。 |
+| #8415 | OPEN | caller-supplied session ID override | TS/Java/daemon MCP surface 暴露 session id override，必须 gate `session_id_override` capability 并验证 daemon 返回 id 是否 honor 请求。 |
 
 ---
 
@@ -390,6 +391,8 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 5. **范围边界（非缺陷，记录待演进）**：Python SDK v1 不支持 `mcp_servers`、入站 `mcp_message` 控制子类型直接判为 unsupported（`query.py:235`）；这些是有意的 v1 边界，TS/Java daemon SDK 提供了对应的更完整能力（runtime MCP 增删、guardrail 事件、远端 daemon session 等）。跨 SDK 的能力对齐可作为后续方向。
 
 6. **workspace file read cursor paging 是 additive SDK surface**。#8002 已合入，但 client 仍必须 gate `workspace_file_read_cursor`，并兼容旧 daemon 不返回 `hasMore`/`nextCursor`。
+
+7. **caller-supplied session ID override 仍是 open diff**。#8415 当前方案让 TS/Java/daemon MCP 在 request 中带 `sessionId`，并要求 daemon capability gate 与 response verification；旧 daemon 或未广告 capability 的 daemon 必须走自动生成 session id，不能把本地 requested id 当作已创建事实。
 
 ---
 
@@ -427,3 +430,9 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - `RestSseTransport.subscribeEvents()`：为每次 SSE 请求创建 request-local `AbortController` 并登记 active set，连接超时、caller signal 与 request controller 组合为 fetch signal。
 - `RestSseTransport.dispose()`：幂等 abort 所有 active SSE 请求，清空 active set，使外部 dispose 能立即释放底层 HTTP/TCP 和 daemon EventBus subscriber。
 - `sse.ts:parseSseStream`：iterator cleanup 时 cancel response body stream；测试覆盖 early return、consumer throw、stream error、connect error、dispose 和多订阅 pending read。
+
+### #8415 — caller-supplied session ID override（当前 open）
+
+- TS daemon client、Java daemon SDK 与 daemon MCP route table 新增 optional `sessionId` request surface；调用前必须确认 daemon 广告 `session_id_override`。
+- SDK 发送后必须比较 response 中的 session id 和 requested id；不一致映射为 typed failure，避免调用方把 orphan 或自动生成 id 误绑定到外部 thread。
+- ACP 路径通过 `_meta["qwen-code/sessionId"]` 传递，REST 路径通过 `POST /session` body 传递；两者都强制 thread-scoped session。

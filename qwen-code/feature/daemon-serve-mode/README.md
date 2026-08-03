@@ -12,18 +12,18 @@
 | # | 子文档 | 覆盖 |
 |---|---|---|
 | 01 | [HTTP 服务 / 路由 / 中间件链](01-http-server-and-middleware.md) | 中间件链顺序、路由表、bearer / --require-auth / mutate / CORS / host allowlist 五道闸、prompt route 202 + bridge-owned deadline / 权限响应超时 / access log |
-| 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、replay byte budget、state_resync、event epoch、compaction degraded/truncated replay、协议帧 serverTimestamp/provenance/errorKind |
-| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening、session writer lease opt-in（#7894）、managed writer shutdown（#7812）、timestamp drift reconciliation（#7886）、Todo Stop Guard continuation hardening（#7821）、maintenance writer isolation（#7975）与 certified writer handoff（#7976） |
-| 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268） |
+| 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、replay byte budget、state_resync、event epoch、compaction degraded/truncated replay、live journal truncation repair marker（#8414 open）、协议帧 serverTimestamp/provenance/errorKind |
+| 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening、session writer lease opt-in（#7894）、managed writer shutdown（#7812）、timestamp drift reconciliation（#7886）、Todo Stop Guard continuation hardening（#7821）、maintenance writer isolation（#7975）、certified writer handoff（#7976）、caller-supplied session id admission（#8415 open）与 repeated ACP tool failure guard（#8469 draft open） |
+| 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268）、session_id_override capability（#8415 open） |
 | 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写、Serve large-text bounded read（#7947）、handle-bound range reader（#7967 open）、byte-cursor paging（#8002）与 lineEnding metadata consistency（#8383 open） |
-| 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离 |
-| 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量 |
+| 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离、unsafe replay guard（#8387） |
+| 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量、repeated tool execution failure guard（#8469 draft open） |
 | 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、workspace skill status read model（#8080）、绕过 prompt FIFO、shell `this`-binding 隐患 |
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor、Java daemon transport alpha 与 #7603 reliability follow-up、TS daemon file read cursor paging（#8002） |
-| 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754） |
+| 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754）、live journal repair（#8414 open）与 ACP textual tool-result projection（#8450 open） |
 | 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单，以及 #7458/#7463/#7603/#7622/#7812/#7821/#7886/#7975/#7976 已合入状态 |
-| 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 当前 draft diff 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，以及 #8245 当前 open diff 的 daemon memory budget reporting |
+| 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 当前 draft diff 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，#8245 当前 open diff 的 daemon memory budget reporting，#8423 当前 open diff 的 memory pressure observe mode，以及 #8462 已合入的 active ACP child RSS aggregate |
 
 ---
 
@@ -42,7 +42,7 @@ qwen-code 的原始形态是一次性 CLI 进程：用户在终端启动 `qwen`�
 - **shutdown 必须释放 exact-owned writer locks（#7812）**：daemon shutdown 时先关闭 session/turn admission，drain 已接受 transcript work，再原子 retire exact-owned writer locks；managed runtime 不再凭 hostname/age/PID 抢 existing owner。
 - **Todo Stop Guard continuation 必须 owner-scoped（#7821）**：bridge invocation prompt id claim/release continuation ordering，防止 Guard prompt 与用户输入、workspace relocation、session disposal 或 overlapping prompt 交错。
 - **只读 status 不应触发重扫描（#8080）**：workspace skill status 读取只消费已提交 snapshot，mutation 通过显式 refresh reason 更新 settings/content/extension-derived skills；daemon 侧用 TTL、generation guard、single-flight、ETag 与 mutation invalidation 控制可见性。
-- **资源预算 foundation 先独立落地（#8093 open draft）**：当前 draft 只提供 `ResourceBudget`、fair schedulers 与 buffered process runner primitives，不接生产路由、不广告 capability，也不改变 daemon 行为。
+- **资源预算 foundation 先独立落地（#8093 open draft，#8245/#8423 open，#8462 merged）**：#8093 当前 draft 只提供 `ResourceBudget`、fair schedulers 与 buffered process runner primitives，不接生产路由、不广告 capability，也不改变 daemon 行为；#8245/#8423 只补 status denominator/pressure observation；#8462 已把 active ACP child RSS aggregate 接入 status 观测。
 - **多客户端协作**：同一 session 可被多个客户端 attach，事件通过 SSE 扇出，权限通过仲裁器协调。
 - **协议向后兼容**：能力通过 `/capabilities` 的 `features[]` 标签协商，客户端 **gate on features 而非 mode**；老 daemon 缺失新标签即静默降级。
 
@@ -544,6 +544,18 @@ sequenceDiagram
 | #8002 | Serve byte-cursor paging | 为 workspace `/file` 增加 `hasMore`/`nextCursor`/`cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
 | #8383(open) | Serve text lineEnding metadata | 当前 open diff 让 workspace text read 的 `meta.lineEnding` 从完整 decoded file 检测，避免 CRLF cursor paging 前后页不一致。 |
 
+### W32 2026-08-03 daemon / serve follow-up
+
+| PR | 子主题 | 一句话作用 |
+| --- | --- | --- |
+| #8387 | MCP unsafe replay guard | MCP connection loss 后只有 trusted workspace + trusted server + 明确幂等或无冲突只读 annotations 才自动 replay；reconnect 后按 rediscovered tool 再校验。 |
+| #8414(open) | live journal truncation recovery | WebUI 在 live journal marker 后等待目标 prompt terminal，再用 same-session memory replay 重建完整 turn suffix。 |
+| #8415(open) | caller-supplied session id admission | REST/ACP/SDK 支持请求指定 UUID session id，并通过 daemon-wide admission 防 live/pending/history/archive/workspace 冲突。 |
+| #8423(open) | daemon memory pressure observe mode | status 用 daemon root RSS/heap 对真实 cgroup/host/heap denominator 计算 pressure ratio，默认 observe-only warning。 |
+| #8450(open) | ACP textual tool-result projection | ACP live/history/subagent replay 上对 canonical text payload 做 transport-only byte budget，canonical transcript 和 model response 保持 lossless。 |
+| #8462 | active ACP child RSS aggregate | `/daemon/status.runtime.memory.children` 汇总所有 live managed ACP child 的 cached RSS、sampled count 和最旧读数年龄。 |
+| #8469(open draft) | repeated ACP tool execution failure guard | draft guard 基于 execution outcome 识别同类前台 ACP 工具执行失败循环，warn/enforce 可注入纠偏或停止自动续跑。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -772,6 +784,13 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #8080 | workspace skill status read model | workspace skills status 读取不再触发 extension/skill 重扫描；daemon 侧 5s TTL、generation guard、single-flight、ETag 与 mutation invalidation，ACP child 只返回 committed cache。 |
 | #8093(open draft) | daemon resource budgeting foundations | 当前 draft diff 新增 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler 和 buffered process runner，但尚未接生产 route。 |
 | #8245(open) | daemon memory budget reporting | 当前 open diff 在 daemon boot 时解析 configured/effective/modeled memory budget，通过 `/daemon/status`、协议、SDK 类型和 docs 报告；wire 上 `enforced:false`，不改变 admission 或 ACP child spawn。 |
+| #8387 | MCP unsafe replay guard | 连接断开后自动 replay 只允许 trusted workspace + trusted server + 明确幂等或无冲突只读 annotations；无法证明安全时返回固定 unsafe replay error。 |
+| #8414(open) | WebUI live journal truncation recovery | marker 带 prompt id，WebUI 在 terminal 后用 same-session memory replay 重建完整 turn suffix；repair 失败只提示一次并继续 live SSE。 |
+| #8415(open) | caller-supplied session id admission | 通过 `session_id_override` capability、UUID validator 与 daemon-wide admission 协调 requested session id，防 live/pending/history/archive/workspace 冲突。 |
+| #8423(open) | daemon memory pressure observe mode | status 用 daemon root RSS/heap 对真实 cgroup/host/heap denominator 计算 pressure ratio，默认 observe-only warning，不做 enforcement。 |
+| #8450(open) | ACP textual tool-result projection | ACP live/history/subagent replay 上对 canonical text payload 做 transport-only byte budget，canonical transcript、offline export 与 model response 不裁剪。 |
+| #8462 | active ACP child RSS aggregate | `/daemon/status.runtime.memory.children` 汇总所有 live managed ACP child 的 cached RSS、sampled count 和最旧读数年龄。 |
+| #8469(open draft) | repeated ACP tool execution failure guard | draft guard 基于 execution outcome 识别同类前台 ACP 工具执行失败循环，warn/enforce 可注入纠偏或停止自动续跑。 |
 | #6716 | persistent workspace registration | dynamic workspace desired-state store、启动恢复与 registration list/forget API。 |
 | #6717 | untrusted read-only catalog | untrusted secondary workspace 的 persisted-only session/group catalog。 |
 | #6724 | workspace organization mutation | trusted secondary workspace 的 pin/group/color mutation。 |
@@ -800,4 +819,4 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 7. **`/health` deep 探针非真实 liveness**。`?deep=1` 只读 Map-size getter（`sessionCount`/`pendingPermissionCount`），不 ping 各子进程，检测不出"wedged 但仍计数"的会话；真实 liveness 仍应靠 TCP 连接是否被接受。
 
-8. **#7967/#8093/#8245/#8383 仍未合入**。这些 open diff 只能作为当前方案记录，不能描述为 `main` 已落地能力。#7812/#7821/#7886/#7894/#7947/#7975/#7976/#7994/#8002/#8080 已按 merged diff 更新。
+8. **open/draft diff 不能写成 main 已落地能力**。#7967/#8093/#8245/#8383/#8414/#8415/#8423/#8450 仍为 open，#8469 仍为 draft open；这些只能作为当前方案记录。#7812/#7821/#7886/#7894/#7947/#7975/#7976/#7994/#8002/#8080/#8387/#8462 已按 merged diff 更新。

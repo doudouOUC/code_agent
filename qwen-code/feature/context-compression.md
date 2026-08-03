@@ -473,6 +473,7 @@ stateDiagram-v2
 | **#3872** | 会话记录瘦身（fix #3822） | 落盘前非破坏性 `sanitizeToolCallResultForRecording` / `sanitizeFileDiffForRecording`：超限的 `fileDiff` 用合法占位、原文/新文中间截断；保留 `diffStat` 与 `*Length` 元数据 + `truncatedForSession` 标记；更新 TUI 渲染、ACP 回放、导出归一化与统计等消费者，共享 `buildTruncatedDiffPreviewText`。 |
 | **#5042** | 超大工具结果外置 | 超过 28K 字符的工具结果写入 `tool-results/<callId>.txt`；上下文只保留 `<persisted-output>` stub、2KB preview 和文件指针，并加 24h 清理与 session 磁盘预算。 |
 | **#5111** | active tool result history 预算 | 新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`（默认 500000，`-1` 禁用）；provider request 前把 pending ToolResult 作为虚拟尾部计入累计字符预算，超过阈值时用 microcompaction 清理较早 compactable results。 |
+| **#8464** | tool result low watermark microcompaction（open） | 当前 open diff 保持阈值触发语义不变，但触发后尽量清理到 `threshold / 2` low watermark，并修正 pending batch 不再占用 committed keep-recent slots。 |
 | **#5865** | compression summary streaming | 压缩摘要 side-query 显式 opt-in streaming，复用 `generateContentStream` 收集 delta 并返回同形 `{text, usage}`，避免代理/网关非流式 read timeout。 |
 | **#7323** | final tool response batch budget | 增加 structured persisted-output metadata、共享 finalizer、scheduler 与各 runtime 聚合边界、GeminiChat send-boundary hard cap，并把成功 `enter_plan_mode` reminder 从普通输出预算中排除。 |
 
@@ -500,6 +501,8 @@ Copilot review 指出：当 `fileDiff <= 50_000` 且两份内容各 `<= 16_000` 
 #5042 只影响新产生且超过阈值的工具结果，不会迁移旧 session 中已经完整写入的超大 result。#5111 只清理 compactable、成功、非媒体的历史工具结果；它不会改变 full chat compression，也不会引入 transcript-level replacement state。超过累计阈值后，较旧工具输出文本会被 placeholder 取代，模型不再能直接读取那些旧文本，除非它们已被外置并可通过文件指针重新读取。
 
 #7323 已合入，但它不提供 tokenizer 精确预算、media part 预算、artifact 生命周期管理或远端 artifact retrieval。其边界只保证 finalized model-facing text 在 record/send 两端一致并满足字符预算。
+
+#8464 仍是 open diff；low watermark 只影响 size-triggered active tool result history microcompaction，不改变 full chat compression、final tool response batch budget、provider context window 估算或 `-1` disable 语义。由于近期保护项可能过多，实际清理后仍可能 soft-exceeded。
 
 ### 7.7 自定义 auto threshold 在大窗口模型上可能无感
 
@@ -538,6 +541,12 @@ Copilot review 指出：当 `fileDiff <= 50_000` 且两份内容各 `<= 16_000` 
 - `config.ts` / settings schema：新增 `context.clearContextOnIdle.toolResultsTotalCharsThreshold`，默认 500000，`-1` 禁用；兼容旧的 `toolResultsThresholdMinutes: -1` 行为。
 - `client.ts` / microcompaction：provider request 前统计历史 compactable tool result + pending ToolResult 虚拟尾部，超过阈值则清理较早结果并保留近期输出。
 - `microcompact.ts`：size-triggered cleanup 跳过 error、already-cleared、non-compactable 和媒体输出，复用既有 cleared-result placeholder 与 file-read-cache disarm 语义。
+
+### PR #8464 — clear tool results to a low watermark（当前 open）
+
+- `tool-result-history-budget.ts`：size-triggered cleanup target 从“刚低于 threshold”改为 `floor(threshold / 2)` low watermark，减少长会话中频繁小幅 compaction 对 prompt cache 的破坏。
+- pending ToolResult 继续计入虚拟总量并参与 file-read-cache kept-path resolution，但不再消耗 committed history 的 keep-recent protection slots。
+- metadata/debug log 新增 `toolResultsLowWatermark` 与 `(soft-exceeded)` 标记，说明因 protected recent results 无法达到低水位的情况。
 
 ### PR #7323 — enforce final tool response budgets
 

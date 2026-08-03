@@ -590,6 +590,12 @@ session restore（load/resume）期间，ACP 子进程可能在 `entry` 就绪�
 - 修复 `ring_evicted` 分支未调 `reset()` 导致 `awaitingResync` 持续开启、replay 帧被 auto-skip、transcript 永久空洞。
 - 移除 `transcript.ts` 中误导性 "Reload the session to recover." 提示——reload 对长 session 反而可能再次触发 ring eviction。
 
+### #8414 — live journal truncation recovery（当前 open）
+
+- bridge 在 live journal `history_truncated` marker 中追加 `scope:"live_journal"`、`promptId` 与 `maxEvents`，把“当前 live journal 裁剪”与普通 replay history gap 分开表达。
+- WebUI 不把 marker 直接当成不可恢复空洞；它在看到目标 prompt terminal 后，用 same-session memory replay 校验并重建 marker 后的 turn suffix。
+- repair 失败不会关闭 SSE 或重复发起 prompt，只保留原 live stream 并发一次 notice；该 PR 仍是 open diff，不能视为 `main` 已落地能力。
+
 ### #4689 — subAgent stream isolation
 
 - `transcript.ts`：reducer 用 `activeAssistantBlockByParent: Map<parentToolCallId, activeBlock>` 按 `parentToolCallId` 维护独立 active block pointer。

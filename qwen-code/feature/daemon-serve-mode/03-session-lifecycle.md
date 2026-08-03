@@ -798,3 +798,17 @@ sequenceDiagram
 - `bridgeTypes.ts:BranchSessionRequest`/`BranchSessionResponse` 类型 + SDK `DaemonClient.branchSession` / `DaemonSessionClient.branch`。
 - 连接断开保护：`res.writable` false 时 kill 新 session（防孤儿积累）。
 - #7005 后 branch/fork/cd 归入 primary-only live-session guard：这些操作保留 legacy primary bridge 语义，不因 multi-workspace owner routing 自动扩展到 secondary runtime；secondary live session 命中时返回稳定 400 code，便于 Web Shell/SDK 显示明确不支持而不是误报 not found 或执行到错 workspace。
+
+### #8415 — caller-supplied session ID admission（当前 open）
+
+- `session-id.ts`：caller-supplied session id 只能是 lowercase RFC UUID v1-v5；nil、unsupported version/variant、Arena suffix、路径字符和非 string 均拒绝，内部 Arena session id 语义不受影响。
+- `requested-session-id-admission.ts`：创建路径同步安装 pending claim，检查 live bridges、draining/replaced generation、registered workspaces 的 active/archived/worktree history；restore 路径支持同一 bridge/workspace 的 shared claim，并拒绝其它 owner。
+- REST `POST /session {sessionId}` 与 ACP `session/new._meta["qwen-code/sessionId"]`：都强制 `sessionScope:'thread'`，并在 bridge 返回后验证 actual id 是否等于 requested id，不一致时映射 `session_id_not_honored` 并清理 orphan。
+- SDK/ACP agent：capability gate `session_id_override`，stdio agent 在读取 settings/fs 前先验证请求 id，同 ID startup 串行化，validation failure 返回 ACP INVALID_PARAMS。
+
+### #8469 — repeated ACP tool execution failure guard（当前 draft open）
+
+- `repeated-tool-failure-guard.ts`：prompt-local reducer 只统计完全 settle 的 foreground ACP batch；eligible event 必须是真正进入 execution 后的 terminal error，并有低基数 tool identity 与非 UNKNOWN execution error type。
+- guard key 只用 `(policyToolName, executionErrorType)`，不纳入 arguments、results、raw error、path 或 MCP server name；validation/permission/not_started/cancelled/post-execution/unknown/mixed batch 均排除。
+- 阈值为 8 次失败且跨至少 2 个 complete batch；warn/enforce 模式先注入固定纠偏提醒，enforce 在下一次 matching batch latched 后停止自动续跑并禁用 Todo continuation，直到新用户输入重置。
+- 当前 PR 仍是 draft：文档只记录当前 diff 方案，不能视为 `main` 已落地 session lifecycle 行为。

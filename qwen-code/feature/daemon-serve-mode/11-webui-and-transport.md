@@ -32,6 +32,8 @@
 | #7754 | @doudouOUC | merged | Web Shell Voice 按 composer owning workspace 解析 fail-closed target；trusted secondary 使用 workspace-qualified Voice routes，owner 变化清理 capture generation。 |
 | #6910 | @doudouOUC | merged | Web Shell archived rows 按 capability/trust 暴露 Export，并走 owning workspace client。 |
 | #6912 | @doudouOUC | merged | Web Shell non-primary archive/unarchive action identity、busy state 与 reconcile hardening。 |
+| #8414 | @doudouOUC | open | live journal truncation repair：marker 带 prompt id，WebUI 在 terminal 后用 same-session memory replay 重建完整 turn suffix。 |
+| #8450 | @doudouOUC | open | ACP transport textual tool-result projection：对 live/replay/subagent replay 的 canonical text payload 做 65,536 byte JSON 预算，不改 canonical transcript。 |
 
 ---
 
@@ -308,6 +310,14 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 
 ---
 
+## 2026-08-03 follow-up：live journal repair 与 ACP textual projection
+
+#8414 解决 WebUI 在 live journal ring 被截断后只能看到残缺 turn 的问题。daemon 在 `history_truncated` marker 中携带 `scope:"live_journal"`、`promptId` 与 `maxEvents`；WebUI 建立 marker checkpoint 后继续保持当前内容，直到目标 prompt 的 terminal 到达，再发起一次 same-session memory replay。repair 过程会校验目标 user input 与 terminal，重建 marker 之后的 suffix 并原子替换 UI tail；无法确认目标、replay degraded 或 suffix 不完整时 fail closed，只提示一次并继续消费原 SSE。
+
+#8450 处理的是 ACP transport 的显示投影，而不是模型上下文预算。它在 live `Session.sendUpdate`、history replay pages 与 virtual subagent replay 上裁剪 canonical text blocks 的 `content` 和 string `rawOutput`，每个字段按 JSON serialization 后的 UTF-8 byte 独立限制到 65,536 byte。A2UI、structured diff、terminal/media/mixed/non-canonical payload、canonical transcript、model-facing tool response 与 offline export 不裁剪，避免 UI 传输降载影响回放或模型语义。
+
+---
+
 ## 已知限制 / v0.16-alpha scope
 
 ### SDK daemon UI 剩余 ~5% 缺口
@@ -353,4 +363,4 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-26_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-03_

@@ -496,6 +496,12 @@ sequenceDiagram
 
 PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程把 event-loop snapshot 与 pipe byte 聚合同时接到 `/daemon/status.runtime.perf`，ACP child event-loop lag 不进入 status JSON，只通过 OTel gauge 和 forwarded stderr stall warning 暴露。这样 status endpoint 保持 daemon-local 诊断语义，跨进程细节仍交给 telemetry backend。
 
+### 6.8 ACP repeated execution failure guard telemetry
+
+| PR | 子主题 | 作用 | Phase |
+|---|---|---|---|
+| #8469 | repeated tool failure guard telemetry（draft open） | 新增 `qwen-code.repeated_tool_failure_guard` event/metric，记录 mode、phase、decision、bucket、reset reason、terminal/execution status、execution error type 和 tool type 等低基数字段；不采集参数、输出、路径、raw error、MCP server、session/user/private key。 | ACP guard |
+
 ---
 
 ## 7. 已知限制 / 后续
@@ -523,3 +529,5 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 11. **#6263 的 child lag 只走 telemetry/stderr**：`/daemon/status.runtime.perf` 只表示 daemon 进程；ACP child event-loop lag 不在 status JSON 内。dashboard 若只读 `/daemon/status`，不能把 child 卡顿误判为缺失数据，需要同时看 OTel gauge 或 stderr stall warning。
 
 12. **#7921 只适合一进程一用户部署**：`telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 是进程级配置。shared daemon、shared ACP channel 或任何一个进程服务多个 end user 的部署，如果直接配置该字段，会把不同用户归并成同一个 ARMS user id；这类场景需要后续增加 per-session/per-request identity surface。
+
+13. **#8469 仍是 draft open**：repeated tool execution failure guard telemetry 只记录当前 diff 方案。若后续阈值、mode、LoopType 或 execution outcome 契约调整，本文需要按最终 merged diff 再同步；当前不能把 `qwen-code.repeated_tool_failure_guard` 视为 `main` 已落地事件。
