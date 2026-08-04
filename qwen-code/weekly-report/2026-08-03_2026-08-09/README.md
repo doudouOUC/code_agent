@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-08-03 ~ 2026-08-09 (W32 周内累计)
 
-> 本文件已整理 2026-08-03 至 2026-08-03（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
+> 本文件已整理 2026-08-03 至 2026-08-04（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: MCP unsafe replay guard、WebUI live journal truncation recovery、caller-supplied session ID admission、daemon memory pressure observation、write_file prior-read prompt guidance、ACP tool-result text projection、daemon active ACP child RSS aggregation、tool-result microcompaction low watermark、ACP repeated tool execution failure guard
+**主题**: MCP unsafe replay guard、WebUI live journal truncation recovery、caller-supplied session ID admission、daemon memory pressure observation、write_file prior-read prompt guidance、ACP tool-result text projection、daemon active ACP child RSS aggregation、tool-result microcompaction low watermark、ACP repeated tool execution failure guard、Direct External Context Mem0 write variant、daemon child heap partition modeling
 
-**PR 统计**: 9 PRs - 3 merged / 6 open / 0 closed
-**当前已合并 PR 代码量**: +976 / -60，24 个文件变更
-**全量代码量**: +10,844 / -913，136 个文件变更
-**类型分布**: fix ×5, feat ×3, perf ×1
-**范围 (scope)**: core ×3, serve ×3, acp ×1, cli ×1, webui ×1
+**PR 统计**: 11 PRs - 4 merged / 7 open / 0 closed
+**当前已合并 PR 代码量**: +1,601 / -102，48 个文件变更
+**全量代码量**: +13,467 / -1,025，181 个文件变更
+**类型分布**: fix ×5, feat ×4, perf ×1, refactor ×1
+**范围 (scope)**: serve ×4, core ×3, acp ×1, cli ×1, external-context ×1, webui ×1
 
 ---
 
@@ -25,6 +25,8 @@
 | [#8462](https://github.com/QwenLM/qwen-code/pull/8462) | ✅ merged | @doudouOUC | feat(serve): report aggregate ACP child RSS, not just the primary's | +350/-38 | 12 | 08-03 13:47 | 08-03 14:01 |
 | [#8464](https://github.com/QwenLM/qwen-code/pull/8464) | 🟡 open | @doudouOUC | perf(core): clear tool results to a low watermark to preserve prompt cache | +265/-26 | 7 | 08-03 13:52 | — |
 | [#8469](https://github.com/QwenLM/qwen-code/pull/8469) | 🟡 open draft | @doudouOUC | feat(acp): Protect against repeated tool execution failures | +2081/-7 | 14 | 08-03 15:25 | — |
+| [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | 🟡 open draft | @doudouOUC | feat(external-context): Add optional Mem0 memory writes | +1998/-70 | 21 | 08-04 03:12 | — |
+| [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | ✅ merged | @doudouOUC | refactor(serve): model a per-child heap partition of the daemon budget | +625/-42 | 24 | 08-04 03:36 | 08-04 12:32 |
 
 ---
 
@@ -41,16 +43,19 @@
 | [#8462](https://github.com/QwenLM/qwen-code/pull/8462) | #8423/#8245 只能报告 daemon root 和 primary ACP child RSS；多 workspace 或多 active ACP child 时，status 会低估总子进程内存占用，操作者看不出是否有未采样 child。 | 最终实现把 status 的 `runtime.memory.childRssCoverage` 扩展为 `active_children`，新增 `runtime.memory.children`，同步遍历所有 live managed runtime child 并汇总已缓存 RSS，报告 `rssBytes`、`sampled` 和 `oldestReadingAgeMs`。它只做观测，不把 child aggregate 折入 memory pressure ratio。 | 已更新 daemon resource budgeting 口径。完整实现见 [implementations/pr-8462.md](implementations/pr-8462.md)。 |
 | [#8464](https://github.com/QwenLM/qwen-code/pull/8464) | active tool-result history budget 在刚超过阈值时只清到低于阈值，长会话会频繁小幅 compaction，破坏 prompt cache locality；pending batch 还可能错误消耗 committed history 的 keep-recent slots。 | 当前 open diff 把 size-triggered microcompaction 目标改为 `threshold / 2` 低水位，触发仍是超过阈值，`-1` disable 不变。pending result 继续计入虚拟总量但不再占 committed keep-recent 槽；metadata/debug log 暴露 low watermark 和 soft-exceeded 情况。 | 已更新 context compression 口径。当前实现见 [implementations/pr-8464.md](implementations/pr-8464.md)。 |
 | [#8469](https://github.com/QwenLM/qwen-code/pull/8469) | ACP 前台工具如果反复以同一种执行错误失败，模型可能不断重试同一工具，浪费 turn、打满日志并延迟用户可见失败；现有 stop guard 只覆盖 Todo 等特定模式，缺少基于 execution outcome 的通用保护。 | 当前 draft diff 新增 prompt-local repeated tool execution failure guard，默认 `shadow`。它只统计完全 settle 的前台 ACP batch 中真实进入 execution 后的 terminal error，key 为 `(policyToolName, executionErrorType)`；达到 8 次且跨至少 2 个 batch 后在 warn/enforce 模式注入固定纠偏提醒，再次匹配时 enforce 可停止自动续跑并关闭 Todo continuation，直到新用户输入重置。telemetry 只记录低基数字段，不采集参数、输出、路径或 MCP server 名。 | 已更新 daemon ACP/telemetry 口径。当前实现见 [implementations/pr-8469.md](implementations/pr-8469.md)。 |
+| [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | Direct External Context 已有只读检索和 submitted-prompt auto recall，但可信团队没有一个窄范围、管理员绑定 provider/app_id、内容可见确认的 Mem0 记忆写入入口；直接暴露 Mem0 MCP 又会扩大管理面和写入语义。 | 当前 draft diff 只在严格 v1 Mem0 config 且 `write.enabled=true` 时注册非幂等 `context_remember({content})`，把已确认内容原样作为一条 Mem0 V3 Direct Import user message 发送，固定 `app_id` 与 `infer:false`。写路径不预搜索、不规范化、不重试、不轮询、不缓存、不去重；`SUCCEEDED` 映射 `stored`，带有效 UUID 的 `PENDING` 映射 `accepted`，超时/取消/坏 JSON/redirect/非法状态等不确定结果映射为 `unknown` MCP 错误并明确禁止自动 retry。专用 `PreToolUse` Hook 展示完整可逆转义内容并二次确认，默认 approval 下仍先走普通 MCP prompt，YOLO 下也保留内容确认。 | 已更新 Direct External Context 口径。当前实现见 [implementations/pr-8507.md](implementations/pr-8507.md)。 |
+| [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | `getAcpMemoryArgs()` 把 host-derived heap ceiling 原样发给每个 ACP child，最多 25 个 workspace 会把 32GB 主机建模成 25×16GB 的子进程堆授权；早期按派生时刻递减 share 的方案又不能约束已运行 child，且零池时把 `--max-old-space-size=0` 误当作零上限。 | 最终实现只建模、不应用：新增 `--child-heap-mode off|observe`（默认 observe），status 报告 `limits.memory.childHeap.mode/maxConcurrentChildren/perChildCeilingMb/refusals`。模型给每个 child 一个恒定 ceiling，并让 `maxConcurrentChildren * perChildCeilingMb <= modeled.childPoolMb`；容不下一个 512MB floor child 时返回 `maxConcurrentChildren:0`、`perChildCeilingMb:null`。spawn argv 保持 host-derived ceiling，`limits.memory.enforced` 仍是字面量 `false`，`enforce` flag、`ChildHeapPoolExhaustedError` 和应用路径均被删除。 | 已更新 daemon resource budgeting 口径。完整实现见 [implementations/pr-8508.md](implementations/pr-8508.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [daemon-serve-mode/](../../feature/daemon-serve-mode/) | #8387 / #8414 / #8415 / #8423 / #8450(open) / #8462 / #8469(draft open) | 补 MCP unsafe replay guard、WebUI live journal repair、caller-supplied session id admission、memory pressure / active child RSS status、ACP tool-result transport projection 和 repeated execution failure guard 的 daemon 影响面。 |
+| [daemon-serve-mode/](../../feature/daemon-serve-mode/) | #8387 / #8414 / #8415 / #8423 / #8450(open) / #8462 / #8469(draft open) / #8508 | 补 MCP unsafe replay guard、WebUI live journal repair、caller-supplied session id admission、memory pressure / active child RSS status、ACP tool-result transport projection、repeated execution failure guard 和 child heap partition status model 的 daemon 影响面。 |
 | [sdk.md](../../feature/sdk.md) / [daemon-serve-mode/10-client-adapters-and-sdk.md](../../feature/daemon-serve-mode/10-client-adapters-and-sdk.md) | #8415 | 补 TS/Java/MCP SDK 的 `sessionId` override capability gate、response verification 与 typed conflict errors。 |
 | [atomic-file-write.md](../../feature/atomic-file-write.md) | #8428 | 补 `write_file` prior-read guidance 与 blind-overwrite enforcement 的提示边界。 |
 | [tool-response-budget.md](../../feature/tool-response-budget.md) | #8450(open) | 补 ACP transport-only textual projection 与 model-facing finalizer 的边界差异。 |
 | [context-compression.md](../../feature/context-compression.md) | #8464(open) | 补 active tool-result microcompaction 低水位目标和 pending result keep-recent 修正。 |
 | [telemetry-observability/](../../feature/telemetry-observability/) | #8469(draft open) | 补 repeated tool execution failure guard telemetry 的低基数字段与隐私边界。 |
+| [external-context-provider.md](../../feature/external-context-provider.md) | #8507(draft open) | 补可选 Mem0 write variant、`context_remember` 非幂等写入语义、内容可见确认 Hook 与不确定结果禁止自动重试边界。 |
 
-_周内累计按个人 PR 口径更新于 2026-08-03_
+_周内累计按个人 PR 口径更新于 2026-08-04_

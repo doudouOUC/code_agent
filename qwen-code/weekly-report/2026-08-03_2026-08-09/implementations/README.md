@@ -13,5 +13,7 @@
 | [#8462](https://github.com/QwenLM/qwen-code/pull/8462) | ✅ merged | feat(serve): report aggregate ACP child RSS, not just the primary's | [pr-8462.md](pr-8462.md) |
 | [#8464](https://github.com/QwenLM/qwen-code/pull/8464) | 🟡 open | perf(core): clear tool results to a low watermark to preserve prompt cache | [pr-8464.md](pr-8464.md) |
 | [#8469](https://github.com/QwenLM/qwen-code/pull/8469) | 🟡 open draft | feat(acp): Protect against repeated tool execution failures | [pr-8469.md](pr-8469.md) |
+| [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | 🟡 open draft | feat(external-context): Add optional Mem0 memory writes | [pr-8507.md](pr-8507.md) |
+| [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | ✅ merged | refactor(serve): model a per-child heap partition of the daemon budget | [pr-8508.md](pr-8508.md) |
 
-_按个人 PR 口径更新于 2026-08-03_
+_按个人 PR 口径更新于 2026-08-04_

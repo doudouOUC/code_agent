@@ -23,7 +23,7 @@
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor、Java daemon transport alpha 与 #7603 reliability follow-up、TS daemon file read cursor paging（#8002） |
 | 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754）、live journal repair（#8414 open）与 ACP textual tool-result projection（#8450 open） |
 | 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单，以及 #7458/#7463/#7603/#7622/#7812/#7821/#7886/#7975/#7976 已合入状态 |
-| 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 当前 draft diff 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，#8245 当前 open diff 的 daemon memory budget reporting，#8423 当前 open diff 的 memory pressure observe mode，以及 #8462 已合入的 active ACP child RSS aggregate |
+| 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 当前 draft diff 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，#8245 当前 open diff 的 daemon memory budget reporting，#8423 当前 open diff 的 memory pressure observe mode，#8462 已合入的 active ACP child RSS aggregate，以及 #8508 已合入的 child heap partition status model |
 
 ---
 
@@ -42,7 +42,7 @@ qwen-code 的原始形态是一次性 CLI 进程：用户在终端启动 `qwen`�
 - **shutdown 必须释放 exact-owned writer locks（#7812）**：daemon shutdown 时先关闭 session/turn admission，drain 已接受 transcript work，再原子 retire exact-owned writer locks；managed runtime 不再凭 hostname/age/PID 抢 existing owner。
 - **Todo Stop Guard continuation 必须 owner-scoped（#7821）**：bridge invocation prompt id claim/release continuation ordering，防止 Guard prompt 与用户输入、workspace relocation、session disposal 或 overlapping prompt 交错。
 - **只读 status 不应触发重扫描（#8080）**：workspace skill status 读取只消费已提交 snapshot，mutation 通过显式 refresh reason 更新 settings/content/extension-derived skills；daemon 侧用 TTL、generation guard、single-flight、ETag 与 mutation invalidation 控制可见性。
-- **资源预算 foundation 先独立落地（#8093 open draft，#8245/#8423 open，#8462 merged）**：#8093 当前 draft 只提供 `ResourceBudget`、fair schedulers 与 buffered process runner primitives，不接生产路由、不广告 capability，也不改变 daemon 行为；#8245/#8423 只补 status denominator/pressure observation；#8462 已把 active ACP child RSS aggregate 接入 status 观测。
+- **资源预算 foundation 先独立落地（#8093 open draft，#8245/#8423 open，#8462/#8508 merged）**：#8093 当前 draft 只提供 `ResourceBudget`、fair schedulers 与 buffered process runner primitives，不接生产路由、不广告 capability，也不改变 daemon 行为；#8245/#8423 只补 status denominator/pressure observation；#8462 已把 active ACP child RSS aggregate 接入 status 观测；#8508 已发布 observe-only child heap partition model，但不应用 per-child ceiling、不拒绝 spawn、不提供 enforce 模式。
 - **多客户端协作**：同一 session 可被多个客户端 attach，事件通过 SSE 扇出，权限通过仲裁器协调。
 - **协议向后兼容**：能力通过 `/capabilities` 的 `features[]` 标签协商，客户端 **gate on features 而非 mode**；老 daemon 缺失新标签即静默降级。
 
