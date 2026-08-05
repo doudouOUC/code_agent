@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 当前 draft open diff 增加 REST SSE stream id / connect reason / previous stream lineage 诊断），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -14,7 +14,7 @@ qwen-code 的主入口是交互式 CLI（TUI）与一次性非交互模式。但
 
 1. **本地子进程式（Python SDK，#3010 / #3494）**：调用方在本机拉起一个 `qwen` CLI 子进程，通过 `stdin/stdout` 上的 **stream-json** 协议双向通信。它不引入新的运行时——CLI 已有的非交互控制协议（control request/response、`can_use_tool` 权限回调）被原样复用，SDK 只是这套协议的 Python 客户端。优点是零额外部署、与本机 CLI 行为一致；适合脚本、CI、本地自动化。
 
-2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。#8002 还把 workspace text file read 的 `cursor`、`hasMore` 与 `nextCursor` 暴露为 additive 字段。适合「agent 即服务」的远程、多端、协作场景。
+2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。#8002 还把 workspace text file read 的 `cursor`、`hasMore` 与 `nextCursor` 暴露为 additive 字段；#8572 当前 draft open diff 让 REST SSE transport 学习 accepted stream id，并向 daemon 报告可解释的 reconnect reason 和 previous stream lineage。适合「agent 即服务」的远程、多端、协作场景。
 
 3. **Java daemon transport alpha（#7463/#7603）**：在既有 `com.alibaba:qwencode-sdk` artifact 中新增 Java 11 HTTP/SSE daemon transport，面向 JVM 应用提供 admission watermark、resumable SSE、typed/raw events、permission response、prompt terminal correlation、bounded promptText、resource cleanup 和 fail-closed exception taxonomy。#7603 已补齐 Java 对 #7458 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering 的消费边界。
 
@@ -200,7 +200,7 @@ CanUseTool = Callable[[str, dict, CanUseToolContext], Awaitable[PermissionResult
 - **路由覆盖**（节选）：lifecycle/discovery（`health`/`capabilities`）、workspace 只读（`workspaceMcp`/`workspaceSkills`/`workspaceProviders`/`workspaceTools`/`workspaceEnv`/`workspacePreflight`）、workspace 文件读写（`readWorkspaceFile`/`writeWorkspaceFile`/`editWorkspaceFile`/`fileStat`/`dirList`/`glob`）、workspace memory（`workspaceMemory`/`writeWorkspaceMemory`）、workspace agents CRUD、会话（`createOrAttachSession`/`listWorkspaceSessions`/`loadSession`/`resumeSession`/`closeSession`）、prompt（`prompt`/`promptNonBlocking`）、事件订阅（`subscribeEvents`）、权限（`respondToPermission`/`respondToSessionPermission`）、auth 设备码（`startDeviceFlow`/`getDeviceFlow`/`cancelDeviceFlow`/`getAuthStatus`，懒构造的 `auth` 访问器返回 `DaemonAuthFlow`）。
 - **能力门控约定**：大量方法的 JSDoc 要求调用前先 `caps.features.includes('<tag>')` 预检（如 `workspace_memory`/`session_recap`/`prompt_absolute_deadline`），老 daemon 缺失能力时返回 404。`requireWorkspaceCwd(caps)`（`types.ts`）在需要非空 `workspaceCwd` 时抛 `DaemonCapabilityMissingError` 而非让调用点踩 undefined。
 - **阻塞 vs 非阻塞 prompt**：`prompt()`（`DaemonClient.ts:1405`）兼容旧版 200 直返与新版 202 + SSE。202 时它**临时**开一条 SSE 订阅等匹配 `promptId` 的 `turn_complete`/`turn_error`（`_awaitTurnComplete` + `matchTurnEvent`，`DaemonClient.ts:1474, 2054`）。#7400 后 daemon bridge 对每个 202 accepted `promptId` 提供 exactly-once formal terminal：正常完成、queued removal、deadline、close/kill/crash/shutdown 都会走 `turn_complete` 或 `turn_error`，因此 SDK 不需要自行猜测这些失败路径。已维护长连 SSE 的调用方应改用 `promptNonBlocking()`（`DaemonClient.ts:1450`，只返回 `{promptId,lastEventId}`）以避免多开一条连接。
-- **SSE 订阅** `subscribeEvents`（`DaemonClient.ts:1564`）：仅对**连接阶段**（请求→收到响应头）套 `fetchTimeoutMs`，body 流本身长寿不计时；校验 `content-type` 必须含 `text/event-stream`（防代理把 SSE 替换成 JSON/HTML 导致「静默零事件」）；用 `Last-Event-ID` 头实现断点续传，可选 `?maxQueued=N`；最终 `yield* parseSseStream(res.body, signal)` 产出 `DaemonEvent` 帧。#7269 修复 REST SSE request cleanup：每条订阅登记 request-local `AbortController`，iterator early return/consumer throw/stream error/connect error/dispose 都会 abort 底层 fetch 并 cancel body stream，防 EventBus subscriber 与 pending read 泄漏。
+- **SSE 订阅** `subscribeEvents`（`DaemonClient.ts:1564`）：仅对**连接阶段**（请求→收到响应头）套 `fetchTimeoutMs`，body 流本身长寿不计时；校验 `content-type` 必须含 `text/event-stream`（防代理把 SSE 替换成 JSON/HTML 导致「静默零事件」）；用 `Last-Event-ID` 头实现断点续传，可选 `?maxQueued=N`；最终 `yield* parseSseStream(res.body, signal)` 产出 `DaemonEvent` 帧。#7269 修复 REST SSE request cleanup：每条订阅登记 request-local `AbortController`，iterator early return/consumer throw/stream error/connect error/dispose 都会 abort 底层 fetch 并 cancel body stream，防 EventBus subscriber 与 pending read 泄漏。#8572 draft open diff 额外发送 `X-Qwen-Client-Id`、`connectReason`、`previousStreamId`，并从 `X-Qwen-SSE-Stream-Id` response header 学习 daemon accepted stream id；这些字段仅用于诊断，旧 daemon 或剥离 header 时继续按原 cursor 工作。
 
 ### 4.2 workspace file read cursor fields（#8002）
 
@@ -215,6 +215,7 @@ CanUseTool = Callable[[str, dict, CanUseToolContext], Awaitable[PermissionResult
 - **三种入口**：`createOrAttach`/`load`/`resume`（静态工厂，`DaemonSessionClient.ts:90/130/166`）。它们会按窗口需要把首个订阅的 `lastEventId` 播种为 `0`（从 daemon replay ring 头部回放），以免会话创建/恢复期间产生的事件（如 MCP 预热的 `mcp_budget_warning`、`available_commands_update`）落在 ring 里却早于首次 `events()` 而丢失。
 - **SSE 续传状态**：内部维护 `lastSeenEventId`，每收到带 `id` 的事件就 `Math.max` 更新（`iterateEvents`，`DaemonSessionClient.ts`）。`events()`（`DaemonSessionClient.ts`）默认 `resume:true`，自动用上次游标续传；`setLastEventId`/`lastEventId` 暴露给需要持久化游标的适配器。`subscribeEvents` 是 `events` 的 `@deprecated` 别名。
 - **event epoch（#7458/#7619）**：daemon 提供 `eventEpoch` 后，TS SDK 会从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch，把它与 `lastSeenEventId` 一起保存；后续 reconnect 在 `Last-Event-ID` 旁回传 epoch，daemon 若发现 epoch mismatch 会强制 `state_resync_required{detail:'epoch_mismatch'}`。旧 daemon 不下发 epoch 时，SDK 自动回落到既有 numeric heuristic。#7619 进一步把 SDK 注释修正为显式 `detail` 字段，避免消费者误解为任意 index signature。
+- **REST stream lineage（#8572 draft open）**：`DaemonSessionClient` 维护 `lastAcceptedRestStreamId` 和 `hasAcceptedRestStream`；REST 订阅默认首连 `initial`、后续 `resume`，WebUI 等调用方可传白名单 `sseConnectReason`。SDK 会在运行时删除 untyped caller 传入的 `clientId`、`previousSseStreamId` 和 `onSseStreamAccepted`，避免外部覆盖 session-owned stream identity。
 - **单订阅保护**：`openEventSubscription` 用 `acquire`/`release` 闸保证同一会话同时只有一条活跃订阅（否则抛错提示复用现有 generator）。
 - **prompt 关联**：当已有活跃订阅时，`prompt()` 走 `promptNonBlocking` 并把 `promptId` 登记到 `_pendingPrompts`，由订阅循环里的 `_dispatchTurnEvent` 用 `matchTurnEvent` 完成 resolve/reject（复用 `DaemonClient` 的同一匹配逻辑），从而**不额外开 SSE 连接**。`AbortSignal` 触发时会 `cancel()` 会话并 reject；daemon-side terminal latch 会把并发 cancel/remove/deadline/teardown 竞态折叠成一个 terminal。
 - 其余方法（`setModel`/`recap`/`shellCommand`/`context`/`contextUsage`/`supportedCommands`/`tasks`/`respondToPermission`/`heartbeat`/`updateMetadata`/`close`）都是绑定 `sessionId`+`clientId` 的转发。
@@ -373,6 +374,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #7269 | MERGED | REST SSE cleanup | `RestSseTransport` 跟踪 active request controllers，iterator/dispose/error 时 abort fetch 并 cancel body stream，保证 SSE request 生命周期与 consumer 生命周期绑定。 |
 | #8002 | MERGED | workspace file read cursor paging | 为 TS daemon SDK / workspace client 暴露 `cursor` request 与 `hasMore`/`nextCursor` response 字段，配合 `workspace_file_read_cursor` capability。 |
 | #8415 | OPEN | caller-supplied session ID override | TS/Java/daemon MCP surface 暴露 session id override，必须 gate `session_id_override` capability 并验证 daemon 返回 id 是否 honor 请求。 |
+| #8572 | OPEN DRAFT | REST SSE stream observability | TS daemon SDK / WebUI 传递 connect reason、previous stream lineage，并从 `X-Qwen-SSE-Stream-Id` 学习 accepted stream id；字段仅用于诊断，兼容旧 daemon。 |
 
 ---
 
@@ -393,6 +395,8 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 6. **workspace file read cursor paging 是 additive SDK surface**。#8002 已合入，但 client 仍必须 gate `workspace_file_read_cursor`，并兼容旧 daemon 不返回 `hasMore`/`nextCursor`。
 
 7. **caller-supplied session ID override 仍是 open diff**。#8415 当前方案让 TS/Java/daemon MCP 在 request 中带 `sessionId`，并要求 daemon capability gate 与 response verification；旧 daemon 或未广告 capability 的 daemon 必须走自动生成 session id，不能把本地 requested id 当作已创建事实。
+
+8. **REST SSE stream observability 仍是 draft open diff**。#8572 的 stream id、connect reason 和 previous stream lineage 只是诊断面，不能替代 `eventEpoch` / `Last-Event-ID` cursor、session id 或 client id；header 被代理剥离时客户端必须继续正常工作。
 
 ---
 
@@ -436,3 +440,10 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - TS daemon client、Java daemon SDK 与 daemon MCP route table 新增 optional `sessionId` request surface；调用前必须确认 daemon 广告 `session_id_override`。
 - SDK 发送后必须比较 response 中的 session id 和 requested id；不一致映射为 typed failure，避免调用方把 orphan 或自动生成 id 误绑定到外部 thread。
 - ACP 路径通过 `_meta["qwen-code/sessionId"]` 传递，REST 路径通过 `POST /session` body 传递；两者都强制 thread-scoped session。
+
+### #8572 — REST SSE stream observability（当前 draft open）
+
+- `RestSseTransport.subscribeEvents()`：发送 `X-Qwen-Client-Id`、`connectReason`、`previousStreamId`，并校验/学习 `X-Qwen-SSE-Stream-Id`。
+- `DaemonSessionClient.events()`：基于是否已有 accepted REST stream 自动选择 `initial` / `resume`，并允许调用方传有限 `sseConnectReason`。
+- `DaemonSessionClient.events()`：运行时删除 untyped JS caller 传入的 `clientId`、`previousSseStreamId` 和 `onSseStreamAccepted`，防止伪造 session-owned lineage。
+- `DaemonSessionProvider.tsx`：WebUI 在 prompt restart、normal stream end、transport error、state resync 四类可判定场景填 reason，其余场景交给 SDK 默认。

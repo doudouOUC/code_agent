@@ -22,6 +22,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **permission prompt cancellation preservation**：ACP permission prompt、Plan unknown shell approval、Stop hook permission 与 background notification 等等待点若被父级 abort，session 终态保持 `cancelled`，并保留已 recovered 的 mid-turn message（#7295）。
 - **prompt terminal exactly-once**：每个已返回 202 的 prompt 在 agent settle、queued removal、deadline、close/kill/crash/shutdown 等路径上恰好收到一个 `turn_complete` 或 `turn_error`；deadline 由 bridge admission/dispatch race 拥有（#7400）。
 - **prompt terminal follow-up hardening**：running prompt 从 UI-visible list 移除时不立刻丢 pending entry，queued terminal 不污染 session-level turn error/retry 状态，queued deadline 保留 typed `PromptDeadlineExceededError`（#7453）。
+- **activeWork idle/restart guard**：#8588 当前 draft open diff 把 close-on-last-detach、attach rollback、idle reaper 等自动清理门控从仅看 `pendingPromptCount` 扩展到 `entryHasActiveWork()`，覆盖 accepted prompt、background Agent 和 Agent terminal notification；显式 close/kill/shutdown 仍强制。
 - **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458）。
 
 核心工厂闭包 `createHttpAcpBridge`（`packages/acp-bridge/src/bridge.ts`），HTTP 路由层在 `packages/cli/src/serve/routes/session.ts` 与 `server.ts`。会话的并发安全建立在一个反复出现的不变式上：**所有改写 `byId` / `attachCount` / `attachRefs` / `defaultEntry` 的关键步骤都在 async 函数 `await` 之前的同步前缀里完成**，使得跨微任务边界的竞争（reaper vs attach、close vs spawn）天然原子；prompt 终态则通过 per-prompt latch 把多条异步竞争路径收敛到一个发布点。
@@ -79,6 +80,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#4751](https://github.com/QwenLM/qwen-code/pull/4751) | merged | — | ACP 子进程生命周期优化：跳过 `relaunchAppInChildProcess` 冗余 grandchild spawn（直传 `--max-old-space-size`+cgroup 感知）；daemon 启动时 `bridge.preheat()` 预热 ACP child（首 session 延迟降 0-0.5s）；新增 `--channel-idle-timeout-ms` 使 ACP child 在末 session 关闭后保活避免冷启 |
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
 | [#4812](https://github.com/QwenLM/qwen-code/pull/4812) | merged | session branching | `POST /session/:id/branch`：fork 活跃 session 的 JSONL transcript → restore 为新 session；409 prompt 活跃中、session 上限拒绝；失败自动清理孤儿 |
+| [#8588](https://github.com/QwenLM/qwen-code/pull/8588) | open draft | activeWork deep health / lifecycle gate | ACP child 上报 active-work transition + 15s heartbeat；bridge 用 `entryHasActiveWork()` 防自动 detach/idle reap 过早清理仍有后台 Agent 或 terminal notification 的 session |
 
 ---
 
@@ -98,6 +100,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | `events` | `EventBus` | per-session SSE 总线，驱动 `GET /session/:id/events`（`bridge.ts:226`） |
 | `promptQueue` | `Promise<void>` | per-session prompt FIFO 串行化尾指针（`bridge.ts:234`） |
 | `pendingPromptCount` | `number` | 已被 admission 接受但尚未完全 settle 的 prompt 数；覆盖 active + queued，用于 max-pending、close-on-last-detach 与 idle reaper 门控（#7400） |
+| `pendingAgentNotificationCount` / `childActiveWork` | `number` / `boolean` | #8588 当前 draft open diff 新增：bridge 侧跟踪 Agent terminal notification 受理/处理窗口与 ACP child 上报的 background Agent active 状态，和 `pendingPromptCount` 一起组成 `entryHasActiveWork()` |
+| `childActiveWorkSeq` / `childActiveWorkAt` / `activeWorkDeadline` | `number` / `number|null` / `Timeout?` | #8588 draft open 的 child active-work heartbeat 状态：只接受 owning channel 的单调 seq；active 期间 45s 缺预期上报会回收 owning channel，session teardown 时清 timer |
 | `pendingPromptList` | `PendingPromptEntry[]` | 记录每个 accepted prompt 的 `promptId`、文本摘要、originator、queued/running 状态、abort controller 与 `terminalPublished` latch（#7400） |
 | `modelChangeQueue` / `approvalModeQueue` | `Promise<void>` | model-switch / approval-mode 的 FIFO，防并发 roundtrip 竞态（`bridge.ts:242/262`） |
 | `transportClosedReject?` | `Promise<never>` | 懒建的 "transport 已关" 竞速 promise，单 listener 不变式（`bridge.ts:270` / `getTransportClosedReject:1484`） |
@@ -283,7 +287,7 @@ recordHeartbeat(sessionId, context) {
    - `!session.attached`（我们刚 spawn 了新 child）→ `bridge.killSession(id, { requireZeroAttaches: true })`。
    - `session.attached`（attach 到既有会话）→ `bridge.detachClient(id, clientId)` 回滚 fictitious 计数。
 2. **`killSession({requireZeroAttaches:true})` 的 BQ9tV 守卫**（`bridge.ts:4263-4266`）：若 `attachCount>0`（spawn 窗口内已有别人 attach），**不拆**，置 `spawnOwnerWantedKill=true` tombstone 后 return。
-3. **`detachClient` 的 BkwQP 补完拆除**：先按 `clientId` 释放 `attachRefs`，只有释放成功才减 `attachCount`；随后无条件 `unregisterClient`，保持注册清理幂等。仅当 `spawnOwnerWantedKill && attachCount===0 && events.subscriberCount===0` 时才补调 `killSession` 完成延迟拆除。若所有 client 和 subscriber 都已离开，但仍有 active/queued prompt（`pendingPromptCount>0`），不会立即 close，而是等待 prompt terminal 广播后由 deferred close 补完。
+3. **`detachClient` 的 BkwQP 补完拆除**：先按 `clientId` 释放 `attachRefs`，只有释放成功才减 `attachCount`；随后无条件 `unregisterClient`，保持注册清理幂等。仅当 `spawnOwnerWantedKill && attachCount===0 && events.subscriberCount===0` 时才补调 `killSession` 完成延迟拆除。若所有 client 和 subscriber 都已离开，但仍有 active/queued prompt（`pendingPromptCount>0`），不会立即 close，而是等待 prompt terminal 广播后由 deferred close 补完；#8588 draft open 将这条自动清理门控扩展到 `entryHasActiveWork()`，使 background Agent 和 Agent terminal notification 未 settle 时同样不自动 close/kill。
 
 restore 路径（`POST /session/:id/load|resume`）镜像同一 `res.writable` 清理（`server.ts:1519-1533`）。
 
@@ -327,7 +331,7 @@ restore 路径（`POST /session/:id/load|resume`）镜像同一 `res.writable` �
 
 `killSession` 同步前缀：`requireZeroAttaches` 守卫 → `forgetSession`/`clear` → `defaultEntry` 清 → `byId.delete`（await 前）→ `channelInfoForEntry` + `sessionIds.delete`；await `notifyAgentSessionClose` → `markSessionClosed` → **`flushPromptTerminals(entry, 'session_killed', ...)`** → 发 `session_died{reason:'killed'}`（在 close bus 前发，因为 eager delete 后 channel.exited 的自动 publish 已 `byId.get===undefined` 不会触发）→ `events.close` → 末会话且无 pending restore 才 kill/idle channel。
 
-`detachClient` 见上节 BkwQP 补完拆除。#7386 后它不再把 `attachCount` 当作可无条件递减的全局数，而是先释放 `attachRefs`；#7400 后 last-client close 条件还要求 `pendingPromptCount===0`，否则等待 prompt terminal 广播后的 deferred close。
+`detachClient` 见上节 BkwQP 补完拆除。#7386 后它不再把 `attachCount` 当作可无条件递减的全局数，而是先释放 `attachRefs`；#7400 后 last-client close 条件还要求 `pendingPromptCount===0`，否则等待 prompt terminal 广播后的 deferred close。#8588 draft open 进一步要求 `!entryHasActiveWork()`，避免主 prompt settle 后仍有 background Agent 或 Agent terminal notification 时被当作空闲拆除。
 
 ---
 
@@ -346,6 +350,8 @@ deadline 也在同一个状态机里。HTTP route 只计算 `effectiveDeadlineMs
 `removePendingPrompt()` 对 queued prompt 的行为也从“只发 `pending_prompt_completed{state:'removed'}`”改为“两条信号”：队列 UI 仍收到 `pending_prompt_completed{removed}`，等待 prompt result 的消费者还会收到一次 `turn_complete{stopReason:'cancelled'}`。running prompt 继续走 cooperative cancel；如果 cancel、deadline、remove 和 shutdown 竞态重叠，仍只发布一个 terminal。
 
 close-on-last-detach 的门控从 `promptActive` 改成 `pendingPromptCount`。它同时覆盖 active prompt、queued prompt，以及两个 prompt 之间 `promptActive` 短暂为 false 的 FIFO hand-off gap。真正的 deferred close 放在 prompt `result.finally()` 中，并要求 `entry.clientIds.size===0`、`subscriberCount===0`、`pendingPromptCount===0` 且 `byId.get(sessionId)===entry`，保证 terminal 已广播、且迟到 settle 不会关掉同 id 的新 entry。
+
+#8588 当前 draft open diff 把这里的“prompt 已 settle”扩展为“active work 已 settle”。`entryHasActiveWork()` 同时检查 pending prompt、bridge 正在等待/处理的 Agent terminal notification、child-reported background Agent active 状态；child Session 通过 private initialize `_meta` 协商后，在 active transition 和 15s heartbeat 上报单调 seq。daemon 只在 owning channel、session membership 和 seq 都合法时更新状态；45s 缺 expected heartbeat 会回收 owning ACP channel，防 stale activeWork 永久阻塞 idle 判断。
 
 ---
 
@@ -556,7 +562,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#7967 仍为 open diff**。handle-bound range refactor 只记录当前实现观察，不能视为 `main` 已落地能力；#7886/#7975/#7976 已按 merged diff 更新。
+6. **#7967/#8588 仍为 open/draft diff**。handle-bound range refactor 与 activeWork lifecycle gate 只记录当前实现观察，不能视为 `main` 已落地能力；#7886/#7975/#7976 已按 merged diff 更新。若 #8588 最终调整 heartbeat interval、active work 范围或自动 cleanup 门控，需要按最终 diff 再同步。
 
 ---
 
@@ -571,6 +577,7 @@ sequenceDiagram
 - **heartbeat**：`describe('recordHeartbeat')`（`:680`）。
 - **close/kill/detach/metadata**：`describe('closeSession')`（`:7813`）、`describe('updateSessionMetadata')`（`:8010`）、`describe('listWorkspaceSessions')`（`:4709`/ enriched `:8076`）、`publishWorkspaceEvent + knownClientIds`（`:8100`）。
 - **prompt terminal exactly-once**：`describe('prompt terminal exactly-once (DAEMON-002/003/004/005)')` 覆盖 queued removal terminal、wedged deadline、queued deadline、close/kill terminal-before-bus-close、last detach draining、cancel/remove/deadline race、channel crash exactly-once（#7400）。
+- **activeWork lifecycle gate（#8588 draft open）**：PR diff 覆盖 child active/idle transition、heartbeat timeout、non-owning session/channel/old seq 忽略、last-client-detach 延迟 close、prompt settle cleanup 与 deep-health aggregation。
 - **managed writer shutdown**：#7812 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
 - **Todo Stop Guard continuation hardening**：#7821 覆盖 owner claim/release、失败恢复、Stop hook 重跑、workspace relocation、session disposal、overlapping prompt 与 cron queue cap。
 - **session writer lease opt-in / timestamp drift / maintenance / handoff**：#7894 覆盖 restart-required opt-in 与 ACP bootstrap gate；#7886 覆盖 timestamp-only drift reconciliation、digest baseline 和 release-aware baseline read；#7975 覆盖 selected runtime maintenance storage、daemon writer lease 与 shutdown draining；#7976 覆盖 sealed lock proof、fixed claim、certified takeover 与 failure-closed races。
@@ -812,3 +819,11 @@ sequenceDiagram
 - guard key 只用 `(policyToolName, executionErrorType)`，不纳入 arguments、results、raw error、path 或 MCP server name；validation/permission/not_started/cancelled/post-execution/unknown/mixed batch 均排除。
 - 阈值为 8 次失败且跨至少 2 个 complete batch；warn/enforce 模式先注入固定纠偏提醒，enforce 在下一次 matching batch latched 后停止自动续跑并禁用 Todo continuation，直到新用户输入重置。
 - 当前 PR 仍是 draft：文档只记录当前 diff 方案，不能视为 `main` 已落地 session lifecycle 行为。
+
+### #8588 — activeWork deep health / lifecycle gate（当前 draft open）
+
+- `bridgeTypes.ts`：定义 `qwen.daemon.activeWorkHeartbeat` private initialize meta、15s heartbeat interval、45s timeout 与 `qwen/notify/session/active-work` notification method。
+- `bridge.ts`：`entryHasActiveWork()` 合并 pending prompt、pending Agent notification 与 child active-work 状态；自动 detach cleanup、attach rollback、idle reap 和 last-client-detach close 改用该 predicate。
+- `bridgeClient.ts`：active-work notification 必须来自 owning session/channel，且 seq 必须严格递增；非法或 stale 上报直接忽略。
+- `Session.ts`：跟踪 active prompt request、background task registry、Agent notification queue/acceptance/processing，并在 transition 与 heartbeat 上报 active 状态。
+- `routes/health-demo.ts`：`GET /health?deep=1.activeWork` 聚合所有 managed runtime；该字段是 restart/idle guard，不是真实 liveness。

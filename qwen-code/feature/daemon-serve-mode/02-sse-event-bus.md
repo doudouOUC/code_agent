@@ -43,6 +43,7 @@ daemon（`qwen serve`）下，一个工作区会被多个客户端（CLI / webui
 | [#7458](https://github.com/QwenLM/qwen-code/pull/7458) | W30 merged | 为每个 EventBus mint 显式 `eventEpoch`，通过 REST/SSE headers 与客户端重连回传检测 daemon restart 后的 stale cursor；compaction replay 保留 attribution，并在 ingest failure 后暴露 degraded snapshot。 |
 | [#7619](https://github.com/QwenLM/qwen-code/pull/7619) | W30 merged | 补 session load route 对 `eventEpoch` / `replayDegraded` response 字段的回归覆盖，并修正 degraded breadcrumb 与 SDK `detail` 注释。 |
 | [#7622](https://github.com/QwenLM/qwen-code/pull/7622) | W30 merged | EventBus publish 前 eager 序列化并拒绝不可 JSON 事件；replay 增加 byte budget 与 `replay_budget_exceeded` resync；close 统一 dispose subscriber；compaction live journal 增加 event/byte cap。 |
+| [#8572](https://github.com/QwenLM/qwen-code/pull/8572) | W32 draft open | 为每条 REST SSE stream 增加 daemon 分配的 stream UUID、客户端 connect reason / previous stream lineage、EventBus subscriber diagnostics callback，以及 open/resync/slow-client/eviction/close telemetry。 |
 
 
 ---
@@ -117,6 +118,8 @@ interface BoundedQueueEntry<T> { value: T; forced: boolean; }
 PR #6314 在同一队列层补上 **live serialized-byte cap**：除 `liveCount` 外再维护 live bytes，默认每 subscriber 2 MiB。`forcePush` 的 replay / warning / eviction 仍不计入 live bytes，保护 `Last-Event-ID` replay 契约；单个 oversized event 在空队列上允许通过，防止健康消费者因单帧过大被误杀。byte 阈值上穿会复用 `slow_client_warning`，并在 payload 中带 queued/max byte telemetry；累计 live bytes 超预算时返回 `client_evicted{reason:'queue_bytes_overflow'}`，只关闭受影响 subscriber，不影响 session 或其它订阅者。
 
 PR #7622 在 publish 前 eager 计算并 memoize serialized byte length。不可 JSON 序列化的事件（例如 circular / BigInt payload）会被拒绝发布，记录诊断且不消耗 event id，不写入 ring、subscriber queue 或 compaction journal；同一个 byte length 复用于 live byte cap 与 compaction sizing，避免各层估算漂移。
+
+PR #8572 当前 draft open diff 不改变 EventBus 的 replay/背压语义，只把慢客户端诊断从 legacy stderr 扩展为可由 SSE route 接管的 subscriber diagnostic callback。`slow_client_warning` 和 `client_evicted` diagnostic payload 带 queue frame/byte 水位、trigger event type/bytes、last event id 或 droppedAfter；route 成功写结构化 daemon log 后返回 `true`，EventBus 就不再重复写旧 fallback。logger 抛错或未处理时仍保留 legacy stderr，保证诊断失败不影响 stream。
 
 ### 帧序列化 `formatSseFrame`（`server.ts:3629`）
 
@@ -301,6 +304,8 @@ TS SDK 保存 `eventEpoch` 与 `lastSeenEventId`，重连时随 `Last-Event-ID` 
 ### SSE 写侧观测（`server.ts:2972-2990`）
 
 主循环里若 `next.value.type === 'state_resync_required'`，daemon 侧额外写一行 stderr：`gap = earliestAvailableId - lastDeliveredId - 1`，输出 `SSE ring eviction detected (session …): lastEventId=…, earliestInRing=…, gap=N events, reason=…. Consumer must call loadSession to recover.`。刻意放在 SSE 写边界而非 EventBus 内（保持 bus 纯净，daemon 侧可观测性集中在已记 socket 错误/心跳的路由）。
+
+#8572 draft open diff 把这条观测升级为 stream-scoped telemetry：SSE route 先给 accepted stream 生成 `X-Qwen-SSE-Stream-Id`，再把 resync reason/detail/gap、slow-client diagnostics、EventBus eviction、writer idle、socket error 和最终 close reason 与同一 stream id 关联。close finalizer 还记录 settled frame count、last written event id、backpressure count、max drain wait 和 live publish-to-write-settled lag。它只在 REST SSE route 层处理，EventBus 仍不持有 client identity、HTTP headers 或 daemon logger。
 
 ### SDK reducer 的 awaitingResync 消费（`events.ts`）
 
@@ -538,12 +543,14 @@ session restore（load/resume）期间，ACP 子进程可能在 `entry` 就绪�
 - 生命周期：BmJT1 驱逐摘 abort 监听（L324）、abort 退订（L360）、`bus.close()` 关所有订阅者（L375）、立即 dispose（L477/L495）。
 - replay cap：force-push replay 绕过 maxQueued（L390）、大 replay 后 live publish 不 evict resumed 订阅者（L413）、只在 **live** backlog（不含 replay）打满才丢 live（L451）。
 - **state_resync_required（L536 describe）**：past ring head 触发 ring_evicted（L537）、在 ring 内不触发（L578）、恰好边界 `lastEventId===earliest-1` 不触发（L599）、past high-water 触发 epoch_reset（L627）、epoch_reset 全量重放新 ring（L667）、caught-up 边界不触发 epoch_reset（L694）、无 lastEventId（首连）不触发（L719）。#7458 另补 eventEpoch mismatch、epoch header/response propagation、compaction attribution 和 degraded snapshot 测试。
+- #8572 draft open diff 另覆盖 `onSubscriberDiagnostic` 被调用、handled 时 suppress legacy log、throw/false 时保留 fallback，以及 trigger event type/bytes 不污染 EventBus frame payload。
 
 ### SSE handler（`packages/cli/src/serve/server.test.ts`）
 
 - 流式 SSE 帧（L5913）、**每帧 stamp `_meta.serverTimestamp`**（L5954）、保留既有 `_meta` 键（L5994）、forward `Last-Event-ID`（L6028）、forward `?maxQueued`（L6052）/缺省省略（L6074）。
 - `?maxQueued` fail-closed：空串 400（L6096）、非十进制 400（L6118）、越界 400（L6138）——均在开流前。
 - 未知 session 404（L6158）、客户端断连 abort 订阅（L6176）、mid-stream iterator 抛错发 `stream_error`（L6213）、**分类错误 stamp errorKind**（L6243）、ring eviction 写 daemon stderr（L6271）、partial resync data 回落 `?` 占位（L6320）、bridge iterator error 写 stderr（L6368）。
+- #8572 draft open diff 补 stream id header、connect reason/previous stream id parsing、opened/closed telemetry、slow-client diagnostic、EventBus eviction、socket error、writer idle 与 close reason attribution 的 focused SSE route tests。
 - writer idle：超 JS timer cap 接受（L5146）、env var 非法 boot 拒绝（L5215）/合法 happy path（L5239）；`writer_idle_timeout` 能力标签（L5156/5236）。
 
 ### SDK reducer（`packages/sdk-typescript/test/unit/daemonEvents.test.ts`）
@@ -595,6 +602,13 @@ session restore（load/resume）期间，ACP 子进程可能在 `entry` 就绪�
 - bridge 在 live journal `history_truncated` marker 中追加 `scope:"live_journal"`、`promptId` 与 `maxEvents`，把“当前 live journal 裁剪”与普通 replay history gap 分开表达。
 - WebUI 不把 marker 直接当成不可恢复空洞；它在看到目标 prompt terminal 后，用 same-session memory replay 校验并重建 marker 后的 turn suffix。
 - repair 失败不会关闭 SSE 或重复发起 prompt，只保留原 live stream 并发一次 notice；该 PR 仍是 open diff，不能视为 `main` 已落地能力。
+
+### #8572 — REST SSE stream/client observability（draft open）
+
+- `eventBus.ts`：新增 `EventBusSubscriberDiagnostic`、`EventBusSlowClientWarningData`、`EventBusClientEvictedData` 和 `onSubscriberDiagnostic` callback。
+- `eventBus.ts`：slow-client warning / eviction diagnostic 带 queue frame/byte 水位与 trigger event metadata；callback 处理失败时保留 `logSlowClientWarning` / `logSubscriberEvicted` fallback。
+- `routes/sse-events.ts`：accepted stream 生成 UUID header，关联 connect reason、previous stream id、client id、resync gap、slow warning、eviction 与 close telemetry。
+- `RestSseTransport` / `DaemonSessionClient` / WebUI provider：传播 stream id lineage 与有限 connect reason，旧 daemon 或 stripped header 继续按原 SSE cursor 工作。
 
 ### #4689 — subAgent stream isolation
 

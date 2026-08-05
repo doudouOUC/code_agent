@@ -15,5 +15,7 @@
 | [#8469](https://github.com/QwenLM/qwen-code/pull/8469) | 🟡 open draft | feat(acp): Protect against repeated tool execution failures | [pr-8469.md](pr-8469.md) |
 | [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | 🟡 open draft | feat(external-context): Add optional Mem0 memory writes | [pr-8507.md](pr-8507.md) |
 | [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | ✅ merged | refactor(serve): model a per-child heap partition of the daemon budget | [pr-8508.md](pr-8508.md) |
+| [#8572](https://github.com/QwenLM/qwen-code/pull/8572) | 🟡 open draft | feat(daemon): Add SSE stream and client observability | [pr-8572.md](pr-8572.md) |
+| [#8588](https://github.com/QwenLM/qwen-code/pull/8588) | 🟡 open draft | feat(serve): Expose active work state | [pr-8588.md](pr-8588.md) |
 
-_按个人 PR 口径更新于 2026-08-04_
+_按个人 PR 口径更新于 2026-08-05_

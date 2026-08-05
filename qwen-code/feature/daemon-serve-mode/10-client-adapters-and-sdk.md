@@ -55,6 +55,7 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #7603 | @doudouOUC | merged | Java daemon transport reliability hardening：消费 event epoch，收紧 SSE/JSON malformed path、terminal-before-202 和 teardown ordering。 |
 | #7619 | @doudouOUC | merged | epoch cursor review follow-up：固定 `eventEpoch` / `replayDegraded` response propagation，并修正 SDK `detail` 注释。 |
 | #8002 | @doudouOUC | merged | workspace file read cursor paging：为 TS daemon client / workspace client 暴露 `cursor` request 与 `hasMore`/`nextCursor` response 字段。 |
+| #8572 | @doudouOUC | open draft | REST SSE stream observability：TS SDK 学习 daemon accepted stream id，发送 connect reason / previous stream lineage，并保护 session-owned client id 不被 caller 覆盖。 |
 
 ---
 
@@ -131,6 +132,8 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 #7269 进一步修复 REST SSE transport 的底层 request 生命周期：每次 `RestSseTransport.subscribeEvents()` 都创建 request-local `AbortController` 并登记到 active set，连接超时、caller `AbortSignal` 与 request controller 组合成 fetch signal。无论 consumer 正常 early return、抛错、stream error、connect error 还是 transport `dispose()`，generator `finally` 都会 abort 底层 fetch/TCP 并从 active set 移除；`dispose()` 幂等 abort 所有 active SSE 请求。`parseSseStream` 的 cleanup 改为 cancel body stream，防止 daemon EventBus subscriber 或 pending read 因 iterator 不再消费而悬挂。
 
 #7458 让 TS SDK 把 SSE cursor 从单个数字扩展成 `(eventEpoch,lastSeenEventId)`。`DaemonSessionClient` 从 create/load/resume response、non-blocking prompt 202 envelope 和 SSE response header 学习 epoch；后续 reconnect 回传该 epoch，daemon 若发现 mismatch 会用 `state_resync_required{detail:'epoch_mismatch'}` 要求快照恢复。旧 daemon 不返回 epoch 时，SDK 保持原有 `Last-Event-ID` 数字续传行为。#7619 将 `state_resync_required.detail` 文档化为显式可选字段，并补 route 回归，避免 load response 过滤掉 `eventEpoch` / `replayDegraded`。
+
+#8572 当前 draft open diff 在 REST SSE transport 上新增物理 stream 诊断字段。`RestSseTransport.subscribeEvents()` 发送 `X-Qwen-Client-Id`、`connectReason` 与 `previousStreamId`，并从 response header 校验/学习 `X-Qwen-SSE-Stream-Id`。`DaemonSessionClient` 保存最近 accepted REST stream id，默认首连为 `initial`、已有 accepted stream 后为 `resume`；caller 可提供有限 `sseConnectReason`，但不能覆盖 session-owned `clientId`、`previousSseStreamId` 或 `onSseStreamAccepted`。非 REST transport 会清空 lineage。旧 daemon 不返回 header 或代理剥离 header 时，只是少一个 previous stream diagnostic，不影响 `(eventEpoch,lastEventId)` cursor。
 
 实际迭代发生在 `iterateEvents()`（L462-488）：
 
@@ -370,5 +373,6 @@ sequenceDiagram
 2. **orphan prompt**：客户端断连后 prompt 仍跑到完成（结果 publish 到 SSE bus 无人消费）——这是设计选择，非 bug。
 3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
 4. **#8002 是 additive TS SDK surface**：客户端必须 gate `workspace_file_read_cursor` 并兼容旧 daemon 缺字段。
+5. **#8572 是 draft open 诊断 surface**：`sseConnectReason`、previous stream lineage 和 accepted stream id 不参与业务正确性；调用方不能用它们替代 event cursor、client id 或 session id。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-07-29_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-05_
