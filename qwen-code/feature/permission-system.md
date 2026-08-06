@@ -1,7 +1,7 @@
 # 权限系统技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的工具调用权限子系统。
-> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）、plan-required teammate leader approval（#6138）、main-session `exit_plan_mode` 显式用户批准（#6967）、shell safety 三态事实层（#7053）、Plan-mode shell safety routing（#7172）、`enter_plan_mode` 执行边界（#7248）、ACP permission cancel stopReason 保留（#7295）与手动退出 Plan 后的 per-conversation notice delivery（#7744）已在 `main`。
+> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）、plan-required teammate leader approval（#6138）、main-session `exit_plan_mode` 显式用户批准（#6967）、shell safety 三态事实层（#7053）、Plan-mode shell safety routing（#7172）、`enter_plan_mode` 执行边界（#7248）、ACP permission cancel stopReason 保留（#7295）、手动退出 Plan 后的 per-conversation notice delivery（#7744）与 read-file 默认权限 symlink canonicalization（#8636）已在 `main`。
 
 ---
 
@@ -14,7 +14,7 @@ qwen-code 在执行任何工具（读文件、写文件、跑 shell、抓网页�
 - `ask` —— 弹确认框，交给用户裁决；
 - （内部还有第四态 `default` —— "没有任何规则命中"，会进入默认裁决兜底，最终一定收敛成上面三者之一）。
 
-围绕这套三态决策，演进出十二个相互独立又彼此咬合的子问题，正是本方案要解决的：
+围绕这套三态决策，演进出十三个相互独立又彼此咬合的子问题，正是本方案要解决的：
 
 1. **规则模型与匹配**：用户/SDK/设置文件用 `Tool(specifier)` 这种 DSL 配置 allow/ask/deny 三张规则表（`permissions.allow` / `permissions.ask` / `permissions.deny`）。需要一套解析 + 匹配引擎，支持 shell 命令 glob、gitignore 风格路径、域名、MCP 通配等多种 specifier 语义。
 
@@ -40,7 +40,9 @@ qwen-code 在执行任何工具（读文件、写文件、跑 shell、抓网页�
 
 12. **手动退出 Plan 后要可靠通知下一次 live model request（#7744）**：Shift+Tab 或 ACP `session/set_mode` 这类手动 Plan -> non-Plan 切换不是 `exit_plan_mode` tool approval，模型下一轮必须收到一次明确提醒；提醒不能被其它 conversation 抢走，也不能在 retry、fallback、compression 或 tool-result continuation 中漏投/重投。
 
-前三点、第八点到第十点是**单进程内**的规则/事实/Plan lifecycle 策略（`packages/core`），第四点是**跨进程多客户端**的协调层（`packages/acp-bridge`，早期落在 `daemon_mode_b_main`，现随 #4490 进入 `main`），第五点和第十一点把取消/超时结果接回 ACP turn loop，确保权限层的"取消"不会被后续工具继续执行或错误终态稀释，第六点限制 subagent/team agent 对主会话 plan lifecycle 的控制权，第七点把 main-session Plan mode 退出从自动权限放行面里拆出来，第十二点则把手动退出 Plan 的状态变化投递到后续 live conversation 的 model-bound history 边界。本方案逐层展开。
+13. **read_file 默认权限必须先解析符号链接（#8636）**：always-allow roots 只能自动放行真实落在受管边界内的路径。若 agent 可写目录里存在 symlink 指向外部敏感文件，权限层必须在 allow 前看见真实目标，把旧的静默 allow 降级成 ask。
+
+前三点、第八点到第十点和第十三点是**单进程内**的规则/事实/Plan lifecycle/文件读取默认权限策略（`packages/core`），第四点是**跨进程多客户端**的协调层（`packages/acp-bridge`，早期落在 `daemon_mode_b_main`，现随 #4490 进入 `main`），第五点和第十一点把取消/超时结果接回 ACP turn loop，确保权限层的"取消"不会被后续工具继续执行或错误终态稀释，第六点限制 subagent/team agent 对主会话 plan lifecycle 的控制权，第七点把 main-session Plan mode 退出从自动权限放行面里拆出来，第十二点则把手动退出 Plan 的状态变化投递到后续 live conversation 的 model-bound history 边界。本方案逐层展开。
 
 ---
 
@@ -280,6 +282,14 @@ unknown 被用户允许后，host 在执行前重新校验 Plan revision、cwd�
 
 rollback 与 retry 边界也在 `GeminiChat` 内统一处理：claim 后同步 setup 失败会 restore 该 version；provider retry/fallback 复用已提交的 history entry，不重新 claim；reactive context-overflow compression 重建 retry history 时保留已经提交的精确 notice。只有主 chat 和 interactive agent chat 调用 `enableManualPlanExitNotices()`，fork/speculation、headless agent、workflow、memory helper 和 compaction side query 不启用，避免后台或派生会话消费 live 用户可见提醒。
 
+### 3.3.5 read_file 默认权限 symlink canonicalization（#8636）
+
+#8636 修的是 file read 默认权限的 auto-allow 边界。`read_file` 会对若干 always-allow roots 自动放行，但旧实现用请求路径的 lexical 形态比较 root，攻击者只要在 agent 可写目录下放 symlink 指向 workspace 外文件，就可能让路径看起来仍在 allow root 内。
+
+最终实现让 `getFileReadDefaultPermission()` 在比较前先对 `path.resolve(requestedPath)` 调 `realpathNearestExisting()`。always-allow roots 也用同一 helper canonicalize 后再比较，因此 symlink 的真实目标会参与权限判断；若真实目标不在 allow root 下，旧的静默 allow 会降级成 ask。
+
+managed memory 分支只 canonicalize candidate，memory root 自身保持 lexical。这是为了避免 repo-tracked `.qwen/` 下的 symlink 把受管 memory root 边界搬到其它位置。`realpathNearestExisting()` 被提升到 shared `utils/paths.ts`，支持不存在尾段和 dangling symlink 叶子，最多 40 跳，出错时保守返回可比较路径而不是让权限层崩溃。
+
 ---
 
 ### 3.4 多客户端权限协调（#4335）
@@ -510,6 +520,7 @@ stateDiagram-v2
 | **#7248** | Plan mode entry boundary | `enter_plan_mode` 成为同批 executable tool 的执行边界；第一个 entry tool 执行，其它 executable sibling fail-closed，并返回完整 Plan mode reminder 作为 lifecycle policy。 |
 | **#7295** | permission prompt cancellation preservation | 权限等待、Plan unknown shell approval、Stop hook permission 与 background notification 在 parent abort 后报告 `cancelled`，并保留 recovered mid-turn message。 |
 | **#7744** | manual Plan-exit notice delivery | 手动 Plan -> non-Plan 切换生成 approval-mode event，每个 live conversation 用独立 cursor 在 `GeminiChat` history commit 边界投递一次提醒；approved `exit_plan_mode` 退出不发提醒，retry/fallback/compression 保持 exactly-once。 |
+| **#8636** | read-file symlink canonicalization | `read_file` 默认权限在 always-allow roots 比较前 canonicalize 请求路径和安全 allow roots；allow root 内 planted symlink 指向外部文件时降级为 ask，managed memory root 保持 lexical 边界。 |
 
 ---
 
@@ -532,6 +543,8 @@ stateDiagram-v2
 8. **#7295 修 stopReason 和 preservation，不放宽权限。** parent abort 优先只会把终态从 `end_turn` 改成 `cancelled` 并保留已恢复上下文，不会把被拒或取消的工具重新执行。
 
 9. **#7744 不做跨进程持久化。** manual Plan-exit notice event/cursor 是当前进程内 live conversation delivery state；进程重启后不会尝试补发历史手动退出提醒。这个限制与 PR 范围一致，避免把一次性 conversation 边界信号升级成持久 session migration 语义。
+
+10. **#8636 只收紧默认 allow，不扩大读取能力。** canonicalization 只影响 `read_file` 默认权限判定，把 symlink 逃逸从 allow 降级为 ask；它不替代实际读取阶段的路径/文件类型检查，也不把原本 ask 的路径变成 allow。Windows symlink/junction 测试受平台权限限制按能力跳过。
 
 
 ---
@@ -667,3 +680,10 @@ stateDiagram-v2
 - reactive context-overflow compression：重建 retry history 时保留已提交 notice，避免 compression 后请求丢失手动退出信号。
 - `client.ts` / `agent-core.ts` / `agent.ts`：主 chat 与 interactive agent chat opt-in；fork/speculation、headless agent、workflow、memory helper 和 compaction side query 排除；agent approval-mode override 继承当前 event snapshot。
 - tests：覆盖 config transition/cursor、main chat/interactive agent ownership、fork 排除、part ordering、rollback、retry/fallback、compression、chat rebuild 与 prompt 文案。
+
+### #8636 — read-file 默认权限 symlink canonicalization
+
+- `tools/file-read-permission.ts`：`getFileReadDefaultPermission()` 在 always-allow roots 判定前 canonicalize requested path，防 allow root 内 planted symlink 指向外部文件。
+- `utils/paths.ts`：提升 shared `realpathNearestExisting()`，支持最近存在前缀、dangling symlink 叶子和最多 40 跳解析。
+- `memory/paths.ts`：删除本地 helper，复用 shared utils；managed memory root 保持 lexical，只 canonicalize candidate，避免 repo 内 `.qwen/` symlink 改写受管边界。
+- tests：覆盖 always-allow root 内 symlink、目录 symlink traversal、dangling/outside symlink、missing file under real root、symlinked roots 双向匹配与 Windows link skip。

@@ -34,7 +34,7 @@
 | #6912 | @doudouOUC | merged | Web Shell non-primary archive/unarchive action identity、busy state 与 reconcile hardening。 |
 | #8414 | @doudouOUC | open | live journal truncation repair：marker 带 prompt id，WebUI 在 terminal 后用 same-session memory replay 重建完整 turn suffix。 |
 | #8450 | @doudouOUC | open | ACP transport textual tool-result projection：对 live/replay/subagent replay 的 canonical text payload 做 65,536 byte JSON 预算，不改 canonical transcript。 |
-| #8572 | @doudouOUC | open draft | WebUI SSE reconnect reason：只在 prompt restart、normal stream end、transport error、state resync 可判定时向 TS SDK 传 `sseConnectReason`。 |
+| #8572 | @doudouOUC | open | WebUI SSE reconnect reason：只在 prompt restart、normal stream end、transport error、state resync 可判定时向 TS SDK 传 `sseConnectReason`。 |
 
 ---
 
@@ -311,7 +311,7 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 
 ---
 
-## 2026-08-03 ~ 2026-08-05 follow-up：live journal repair、ACP textual projection 与 SSE reconnect reason
+## 2026-08-03 ~ 2026-08-06 follow-up：live journal repair、ACP textual projection 与 SSE reconnect reason
 
 #8414 解决 WebUI 在 live journal ring 被截断后只能看到残缺 turn 的问题。daemon 在 `history_truncated` marker 中携带 `scope:"live_journal"`、`promptId` 与 `maxEvents`；WebUI 建立 marker checkpoint 后继续保持当前内容，直到目标 prompt 的 terminal 到达，再发起一次 same-session memory replay。repair 过程会校验目标 user input 与 terminal，重建 marker 之后的 suffix 并原子替换 UI tail；无法确认目标、replay degraded 或 suffix 不完整时 fail closed，只提示一次并继续消费原 SSE。
 
@@ -366,4 +366,4 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-05_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-06_

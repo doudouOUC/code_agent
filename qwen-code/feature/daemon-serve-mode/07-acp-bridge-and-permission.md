@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 当前 open diff 中 same-host daemon read/write delegation 能力拆分，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -21,7 +21,7 @@
 
 | seam | 声明位置 | 生产实现 | 作用 |
 | --- | --- | --- | --- |
-| `BridgeOptions` | `bridgeOptions.ts:BridgeOptions` | `runQwenServe.ts` 装配 | 工厂构造契约：唯一必填 `boundWorkspace`，其余是带默认值的旋钮 + 注入回调 |
+| `BridgeOptions` | `bridgeOptions.ts:BridgeOptions` | `runQwenServe.ts` 装配 | 工厂构造契约：唯一必填 `boundWorkspace`，其余是带默认值的旋钮 + 注入回调；#8620 open diff 新增 `delegateReadTextFileToClient` 读委派旋钮 |
 | `DaemonStatusProvider` | `bridgeOptions.ts:DaemonStatusProvider` | `daemonStatusProvider.ts:createDaemonStatusProvider` | daemon-host 专属状态格（`process.env` 快照 + 节点/二进制 preflight） |
 | `BridgeFileSystem` | `bridgeFileSystem.ts:BridgeFileSystem` | serve 侧 adapter 包 PR 18 `WorkspaceFileSystem` | ACP fs 代理：把 `readTextFile`/`writeTextFile` 路由到带 TOCTOU/symlink/审计的实现 |
 
@@ -48,6 +48,7 @@
 | #5174 | daemon status API | 诊断面 | 通过 bridge / ACP registry snapshot helper 暴露 `GET /daemon/status`，让权限压力、SSE/ACP 连接和 capability 状态进入统一 JSON 诊断面。 |
 | #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
+| #8620 | same-host daemon text read delegation | FS seam follow-up | 当前 open diff 用 `delegateReadTextFileToClient:false` 让 daemon-owned same-host bridge 广告 read local / write delegated，避免批准后的 direct read 被 WorkspaceFileSystem workspace 边界拒绝。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -76,7 +77,9 @@
 
 **`DaemonStatusProvider`（`bridgeOptions.ts:DaemonStatusProvider`）** 是 22b/2（#4304）新增的窄 seam，只有两个方法：`getEnvStatus(boundWorkspace, acpChannelLive)` 与 `getDaemonPreflightCells(boundWorkspace)`。它把 daemon-host 专属的状态格（`process.versions`、运行时/sandbox/proxy 状态、Node 版本、CLI entry path、ripgrep/git/npm 探测）从 bridge 里剥出去。生产实现 `daemonStatusProvider.ts:createDaemonStatusProvider` 包了 `buildEnvStatusFromProcess` + `buildDaemonPreflightCells`；**省略 provider 时** bridge 回落 idle 占位符（空 `cells: []`），让 Mode A in-process 消费者（不跑独立 daemon、host env 格无意义）也能照常查询那些诊断路由。seam scope 刻意收窄到「当前 bridge 委派的两个 host 格」，注释明说**不是**通用 logger/metrics seam。
 
-**`BridgeFileSystem`（`bridgeFileSystem.ts`）** 是 F1（#4319/#4334）新增的 ACP fs 代理 seam。方法签名刻意镜像 ACP SDK 的 `ReadTextFileRequest`/`WriteTextFileRequest` 形状，让 adapter 做最少翻译。当通过 `BridgeOptions.fileSystem` 接线时，`BridgeClient.readTextFile`/`writeTextFile` 把每次 ACP fs 调用委派给它，而非用 `BridgeClient` 内联的 `fs.realpath`/`fs.writeFile`/`fs.readFile` 代理。契约要求 adapter **复刻内联代理的两道防御**（非常规文件拒绝 + `READ_FILE_SIZE_CAP=100 MiB`），并提供写-then-rename 原子性、目标 mode 保留、新文件 `0o600` 默认、symlink 拒绝、workspace 边界。其中 **symlink 拒绝是相对 pre-F1 内联代理的有意分歧**——内联代理会解析 symlink 并写穿到目标，F1 后生产路径改为与 PR 18 / `POST /file`（PR 20）一致的保守姿态。
+**`BridgeFileSystem`（`bridgeFileSystem.ts`）** 是 F1（#4319/#4334）新增的 ACP fs 代理 seam。方法签名刻意镜像 ACP SDK 的 `ReadTextFileRequest`/`WriteTextFileRequest` 形状，让 adapter 做最少翻译。当通过 `BridgeOptions.fileSystem` 接线时，`BridgeClient.readTextFile`/`writeTextFile` 把 ACP fs 调用委派给它，而非用 `BridgeClient` 内联的 `fs.realpath`/`fs.writeFile`/`fs.readFile` 代理。契约要求 adapter **复刻内联代理的两道防御**（非常规文件拒绝 + `READ_FILE_SIZE_CAP=100 MiB`），并提供写-then-rename 原子性、目标 mode 保留、新文件 `0o600` 默认、symlink 拒绝、workspace 边界。其中 **symlink 拒绝是相对 pre-F1 内联代理的有意分歧**——内联代理会解析 symlink 并写穿到目标，F1 后生产路径改为与 PR 18 / `POST /file`（PR 20）一致的保守姿态。
+
+#8620 当前 open diff 没有移除 `BridgeFileSystem` seam，而是在 `BridgeOptions` 上增加 `delegateReadTextFileToClient`。same-host daemon-owned bridge 传 `false` 后，initialize capability 广告 `readTextFile:false, writeTextFile:true`：子进程本地处理 direct read 和各种 pre-read，最终 text write 仍委派 WorkspaceFileSystem。通用 ACP bridge、caller-injected bridge 和非 same-host 宿主保持默认 delegated read/write；adapter 的 read 分支保留为异常 delegated read 的 fail-closed fallback。
 
 ### `ChannelFactory`：第四个 seam
 
@@ -517,3 +520,10 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - guard key 是 `(policyToolName, executionErrorType)`，刻意排除工具参数、输出、raw error、路径和 MCP server 名；permission/validation/not-started/cancelled/post-execution/unknown/mixed batch 不进入计数。
 - 阈值为 8 次失败且跨至少 2 个 complete batch。shadow 只记录 would_warn/would_stop，warn/enforce 注入固定纠偏提醒；enforce 在下一次 matching batch latched 后停止自动续跑并禁用 Todo continuation，直到新用户输入重置。
 - 当前仍是 draft open diff，不能视为 `main` 已落地行为；后续需按最终 merged diff 更新阈值、mode 和 telemetry 字段。
+
+### #8620 — same-host daemon text read delegation（当前 open）
+
+- `bridgeOptions.ts`：新增 `delegateReadTextFileToClient`，默认保持 delegated read/write，避免破坏通用 ACP/caller-injected bridge。
+- `bridge.ts`：initialize capability 根据该选项发布 `readTextFile:false/writeTextFile:true`，让 child-local `FileSystemService` 接手 approved text reads。
+- `server.ts` / `run-qwen-serve.ts`：daemon-owned same-host default、primary、static secondary、dynamic runtime 统一传 `delegateReadTextFileToClient:false`。
+- 保留 `BridgeFileSystem.writeText` 委派和 read fallback，明确 same-host read 与 final write 的安全边界不同：读走 CLI 权限，最终写仍走 WorkspaceFileSystem workspace/trust/atomic/audit。
