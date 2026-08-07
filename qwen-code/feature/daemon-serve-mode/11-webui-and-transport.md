@@ -32,9 +32,10 @@
 | #7754 | @doudouOUC | merged | Web Shell Voice 按 composer owning workspace 解析 fail-closed target；trusted secondary 使用 workspace-qualified Voice routes，owner 变化清理 capture generation。 |
 | #6910 | @doudouOUC | merged | Web Shell archived rows 按 capability/trust 暴露 Export，并走 owning workspace client。 |
 | #6912 | @doudouOUC | merged | Web Shell non-primary archive/unarchive action identity、busy state 与 reconcile hardening。 |
-| #8414 | @doudouOUC | open | live journal truncation repair：marker 带 prompt id，WebUI 在 terminal 后用 same-session memory replay 重建完整 turn suffix。 |
-| #8450 | @doudouOUC | open | ACP transport textual tool-result projection：对 live/replay/subagent replay 的 canonical text payload 做 65,536 byte JSON 预算，不改 canonical transcript。 |
-| #8572 | @doudouOUC | open | WebUI SSE reconnect reason：只在 prompt restart、normal stream end、transport error、state resync 可判定时向 TS SDK 传 `sseConnectReason`。 |
+| #8414 | @doudouOUC | merged | live journal truncation repair：marker 带 prompt id，WebUI 在 terminal 后用 same-session memory replay 重建完整 turn suffix。 |
+| #8450 | @doudouOUC | merged | ACP transport textual tool-result projection：对 live/replay/subagent replay 的 canonical text payload 做 65,536 byte JSON 预算，不改 canonical transcript。 |
+| #8572 | @doudouOUC | merged | WebUI SSE reconnect reason：只在 prompt restart、normal stream end、transport error、state resync 可判定时向 TS SDK 传 `sseConnectReason`。 |
+| #8691 | @doudouOUC | open | WebUI restore timeout budget：load/resume 使用 server restore budget 派生 request timeout 与 watchdog，并把 retryable 504 作为可恢复 restore failure。 |
 
 ---
 
@@ -311,13 +312,15 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 
 ---
 
-## 2026-08-03 ~ 2026-08-06 follow-up：live journal repair、ACP textual projection 与 SSE reconnect reason
+## 2026-08-03 ~ 2026-08-07 follow-up：live journal repair、ACP textual projection、SSE reconnect reason 与 restore timeout
 
 #8414 解决 WebUI 在 live journal ring 被截断后只能看到残缺 turn 的问题。daemon 在 `history_truncated` marker 中携带 `scope:"live_journal"`、`promptId` 与 `maxEvents`；WebUI 建立 marker checkpoint 后继续保持当前内容，直到目标 prompt 的 terminal 到达，再发起一次 same-session memory replay。repair 过程会校验目标 user input 与 terminal，重建 marker 之后的 suffix 并原子替换 UI tail；无法确认目标、replay degraded 或 suffix 不完整时 fail closed，只提示一次并继续消费原 SSE。
 
 #8450 处理的是 ACP transport 的显示投影，而不是模型上下文预算。它在 live `Session.sendUpdate`、history replay pages 与 virtual subagent replay 上裁剪 canonical text blocks 的 `content` 和 string `rawOutput`，每个字段按 JSON serialization 后的 UTF-8 byte 独立限制到 65,536 byte。A2UI、structured diff、terminal/media/mixed/non-canonical payload、canonical transcript、model-facing tool response 与 offline export 不裁剪，避免 UI 传输降载影响回放或模型语义。
 
 #8572 只给 WebUI 增加诊断意图，不改变重连策略。`DaemonSessionProvider` 在 state resync 后把下一条 SSE 标成 `state_resync`，prompt restart path 标成 `prompt_restart`，正常流结束后续连标成 `stream_end`，可重试 transport error 标成 `transport_error`；其它不确定场景不硬猜，由 `DaemonSessionClient` 默认成 `initial` / `resume`。这些 reason 会经 TS SDK 作为 query diagnostic 传给 daemon，用于和 `X-Qwen-SSE-Stream-Id` / previous stream lineage 关联排障；旧 daemon 忽略字段时 WebUI 行为不变。
+
+#8691 当前 open diff 让 WebUI restore 与 attach 使用不同时间预算。load/resume restore 先读取 `/capabilities.limits.sessionRestoreTimeoutMs`，request timeout 使用 server budget + 10s，外层 watchdog 使用 server budget + 15s；attach 仍保持 30s。REST 504 `restore_timeout` 被识别为 retryable restore failure，UI 不把它误归类为普通 transport error，也不会把过大 timer 交给 Node/browser 定时器导致 overflow。
 
 ---
 
@@ -366,4 +369,4 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-06_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-07_

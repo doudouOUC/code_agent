@@ -1,6 +1,6 @@
 # daemon 资源预算、容量模型与公平调度
 
-> 口径：本文记录 #8093 当前 draft/open diff 的 resource foundation、#8245 当前 open diff 的 daemon memory budget reporting、#8423 当前 open diff 的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate，以及 #8508 已合入的 child heap partition status model。open/draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
+> 口径：本文记录 #8093 当前 draft/open diff 的 resource foundation、#8245 当前 open diff 的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate，以及 #8508 已合入的 child heap partition status model。open/draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
 
 ## 背景
 
@@ -53,7 +53,7 @@ scheduler 按 workspace round-robin drain，避免单 workspace 队列占满 glo
 - `packages/cli/src/serve/types.ts` 与 `packages/sdk-typescript/src/daemon/`: wire protocol / SDK 类型。
 - `docs/design/2026-07-31-daemon-capacity-model-and-memory-bounds.md`: 容量模型与非 enforcement 边界。
 
-## Memory Pressure Observe Mode（#8423 当前 open）
+## Memory Pressure Observe Mode（#8423 已合入）
 
 #8423 不接 admission 或 kill 逻辑，只在 status 中报告 daemon root 的真实内存压力。`--memory-pressure-mode off|observe` 默认 `observe`；`runtime.memory.pressure` 同时计算 daemon root RSS / available memory 与 V8 heap used / heap size limit，取较大者作为 `ratio`，并标注 `source` 为 `rss`、`heap` 或 `unknown`。
 
@@ -90,8 +90,8 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 - 不接 EventBus replay、workspace transcript、session archive/export、Voice、process shell、MCP 或 route body admission。
 - #8245 只报告 configured/effective/modeled budget 与 status denominator，不做 admission、enforcement、ACP child argv 调整、process-tree shutdown 或 workspace lifecycle cleanup。
 - #8423 只观察 daemon root RSS/heap pressure，不做 admission、throttle、kill 或 child aggregate pressure。
-- #8462 已合入 active child RSS aggregate，但该 aggregate 仍是 status 观测字段，不代表完整进程树，也不参与 enforcement。
-- #8508 已合入 child heap partition status model，但不应用 per-child ceiling、不拒绝 spawn、不提供 enforce 模式，也不声称 `refusals:0` 可作为强制启用信号。
+- #8462 已合入的 active child RSS aggregate，但该 aggregate 仍是 status 观测字段，不代表完整进程树，也不参与 enforcement。
+- #8508 已合入的 child heap partition status model，但不应用 per-child ceiling、不拒绝 spawn、不提供 enforce 模式，也不声称 `refusals:0` 可作为强制启用信号。
 
 这些内容应在后续 PR 按 route ownership、error taxonomy 与 client compatibility 分批接入。
 
@@ -104,8 +104,8 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 - `buffered-process-budget.test.ts`: 先预留 process bytes、完成路径释放、admission failure 不进入 lane。
 - #8245 当前 diff 另覆盖 daemon memory budget unit tests、serve status wiring tests、protocol/SDK type tests 和 docs 更新；重点确认 configured/effective budget 分离、cgroup/host cap 截断、低于 minimum 时报告 `insufficientMemory`、wire 上 `enforced:false`，以及 ACP child argv/spawn 行为不变。
 - #8423 当前 diff 覆盖 memory pressure unit/status/SDK tests，验证 rss/heap winner、unknown denominator、off/observe issue behavior 与 status shape。
-- #8462 已合入 focused status tests，覆盖 sampled gaps、pre-age bridge、dormant exclusion 与 active child aggregate response。
-- #8508 已合入 child heap policy / daemon status / serve flag tests，覆盖 2/8/32/256GB host 下的 partition invariant、零池 `null` ceiling、observe/off child argv 不变、`enforce` 被 yargs 与 fast path 拒绝，以及 `limits.memory.enforced:false` 的协议兼容。
+- #8462 已合入的 focused status tests，覆盖 sampled gaps、pre-age bridge、dormant exclusion 与 active child aggregate response。
+- #8508 已合入的 child heap policy / daemon status / serve flag tests，覆盖 2/8/32/256GB host 下的 partition invariant、零池 `null` ceiling、observe/off child argv 不变、`enforce` 被 yargs 与 fast path 拒绝，以及 `limits.memory.enforced:false` 的协议兼容。
 
 ## PR 归因
 
@@ -113,6 +113,6 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 |---|---|---|
 | [#8093](https://github.com/QwenLM/qwen-code/pull/8093) | open draft | 新增 daemon resource budget foundation、fair schedulers、buffered process runner 和 Phase 1 设计文档。 |
 | [#8245](https://github.com/QwenLM/qwen-code/pull/8245) | open | 解析并报告 daemon memory budget figures，给 `/daemon/status`、协议与 SDK 增加 configured/effective/modeled budget 和 non-enforcement 口径。 |
-| [#8423](https://github.com/QwenLM/qwen-code/pull/8423) | open | 在真实 cgroup/host/heap denominator 上观察 daemon root memory pressure，默认 observe-only 并通过 status issue 报告 warning。 |
+| [#8423](https://github.com/QwenLM/qwen-code/pull/8423) | merged | 在真实 cgroup/host/heap denominator 上观察 daemon root memory pressure，默认 observe-only 并通过 status issue 报告 warning。 |
 | [#8462](https://github.com/QwenLM/qwen-code/pull/8462) | merged | 汇总所有 live managed ACP child 的 cached RSS，报告 aggregate bytes、sampled count 和 oldest reading age。 |
 | [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | merged | 发布 observe-only child heap partition model，报告 `limits.memory.childHeap`，保持 child argv 与 `limits.memory.enforced:false` 不变，并移除不安全的 enforce 路径。 |

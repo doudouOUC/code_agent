@@ -60,8 +60,9 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #7619 | fix(daemon): address epoch cursor review follow-ups | merged | 不新增 daemon tag；补 `session/load` response 中 `eventEpoch` / `replayDegraded` 的 route 回归，并修正 SDK `detail` 注释。 |
 | #7622 | fix(acp-bridge): resource hardening for the session event pipeline | merged | 不新增 daemon tag；新增 `state_resync_required{reason:'replay_budget_exceeded'}` 运行时原因、拒绝不可序列化事件，并对 compaction live journal 加 bounded truncation marker。 |
 | #8415 | fix(serve): Coordinate caller-supplied session IDs | open | 新增 `session_id_override` capability；REST/ACP/SDK 只有在该 tag 存在时才能发送 caller-supplied UUID session id，并必须验证 response id 是否 honor 请求。 |
-| #8572 | feat(daemon): Add SSE stream and client observability | open | 不新增 daemon tag；REST SSE response additive 返回 `X-Qwen-SSE-Stream-Id`，客户端可传 `connectReason`/`previousStreamId` 作为诊断线索，旧 daemon/代理剥离 header 时保持兼容。 |
-| #8588 | feat(serve): Expose active work state | open draft | 不新增 daemon tag；`GET /health?deep=1` additive 返回 `activeWork`，ACP parent/child 用 private `_meta` 协商 active-work heartbeat，不进入 public capability registry。 |
+| #8572 | feat(daemon): Add SSE stream and client observability | merged | 不新增 daemon tag；REST SSE response additive 返回 `X-Qwen-SSE-Stream-Id`，客户端可传 `connectReason`/`previousStreamId` 作为诊断线索，旧 daemon/代理剥离 header 时保持兼容。 |
+| #8588 | feat(serve): Expose active work state | open | 不新增 daemon tag；`GET /health?deep=1` additive 返回 `activeWork`，ACP parent/child 用 private `_meta` 协商 active-work heartbeat，不进入 public capability registry。 |
+| #8691 | fix(serve): Make session restore timeouts safe and observable | open | 不新增 feature tag；`GET /capabilities` 在 `limits.sessionRestoreTimeoutMs` additive 公告 restore deadline，REST/ACP 错误面新增 retryable `restore_timeout` 与 cleanup quarantine 的 `acp_channel_unavailable`。 |
 | #6716 | feat(serve): persist dynamic workspace registrations | 2026-07-11 | 新增条件能力 `persistent_workspace_registration`；只有 workspace registration store 可用时广告，客户端才应发送 `POST /workspaces {persist:true}`。 |
 | #6740 | feat(serve): add workspace persisted transcript reader | 2026-07-12 | 新增 `workspace_persisted_transcript`：workspace-qualified persisted-only transcript pager，不启动 ACP、不加载 settings。 |
 | #6741 | feat(cli): Add runtime daemon channel control | 2026-07-13 | 新增条件能力 `channel_control`：daemon runtime channel selection 查询/设置/停止。 |
@@ -210,12 +211,12 @@ flowchart LR
 
 | 能力 tag | HTTP surface | SSE / 推送信号 | SDK / reducer surface |
 |---|---|---|---|
-| `health`, `capabilities` | `GET /health`, `GET /capabilities` | 无 | `DaemonClient.health()`, `capabilities()`；#8588 draft open 中 deep health payload additive 增加 `activeWork`，客户端应把它当 restart/idle guard，而不是 liveness proof |
+| `health`, `capabilities` | `GET /health`, `GET /capabilities` | 无 | `DaemonClient.health()`, `capabilities()`；#8588 open 中 deep health payload additive 增加 `activeWork`，客户端应把它当 restart/idle guard，而不是 liveness proof；#8691 open 中 capabilities additive 增加 `limits.sessionRestoreTimeoutMs`，用于 SDK/WebUI restore timeout derivation |
 | `daemon_status` | `GET /daemon/status`, `GET /daemon/status?detail=full` | 无，JSON snapshot；`detail=full` 各 workspace section 独立降级；#6969 additive `daemon.runId/logMode/logHealth`，full detail 可含 `logPath/logIssues/logDroppedRecords/logDroppedBytes` | 无专用 SDK helper；SDK daemon status types 镜像 optional log fields |
 | `session_create`, `session_scope_override` | `POST /session` | spawn 期可能有模型切换/错误事件 | `createOrAttachSession()` |
-| `session_load`, `unstable_session_resume` | `POST /session/:id/load`, `POST /session/:id/resume` | load 会重放历史帧；resume 不重放 UI 历史 | `loadSession()`, `resumeSession()` |
+| `session_load`, `unstable_session_resume` | `POST /session/:id/load`, `POST /session/:id/resume` | load 会重放历史帧；resume 不重放 UI 历史；#8691 open 中 restore public timeout 返回 retryable `restore_timeout`，late settlement 负责 cleanup/quarantine | `loadSession()`, `resumeSession()`；TS SDK 用 per-request timeout、explicit fetch timeout、server restore budget + 10s、默认 70s 的顺序派生客户端计时 |
 | `session_prompt`, `non_blocking_prompt`, `prompt_absolute_deadline` | `POST /session/:id/prompt` | `session_update`, `permission_request`, `prompt_cancelled`, `turn_complete`, `turn_error` | `prompt()`, reducer 记录 turn 终态；#7400 后每个 202 accepted `promptId` 在正常 settle、queued removal、deadline、teardown 路径上恰好收到一个 `turn_complete` 或 `turn_error`；#7453 补 queued deadline typed error 和 terminal state cleanup |
-| `session_events`, `slow_client_warning`, `typed_event_schema` | `GET /session/:id/events` | `state_resync_required`, `replay_complete`, `slow_client_warning`, `client_evicted`, `stream_error`；#7458 用 `X-Qwen-Event-Epoch` response header 表达 stream epoch，#7622 增加 `replay_budget_exceeded` resync reason；#8572 open 另用 `X-Qwen-SSE-Stream-Id` 标识物理 stream | `asKnownDaemonEvent()`, `reduceDaemonSessionEvent()`；TS/Java daemon clients 将 cursor 解释为 `(eventEpoch,lastEventId)`，旧 daemon 缺 epoch 时回退数字 heuristic；#7619 固定 `detail` 为显式字段说明；#8572 open 中 TS SDK 发送可选 `connectReason`/`previousStreamId` 并兼容旧 daemon |
+| `session_events`, `slow_client_warning`, `typed_event_schema` | `GET /session/:id/events` | `state_resync_required`, `replay_complete`, `slow_client_warning`, `client_evicted`, `stream_error`；#7458 用 `X-Qwen-Event-Epoch` response header 表达 stream epoch，#7622 增加 `replay_budget_exceeded` resync reason；#8572 merged 另用 `X-Qwen-SSE-Stream-Id` 标识物理 stream | `asKnownDaemonEvent()`, `reduceDaemonSessionEvent()`；TS/Java daemon clients 将 cursor 解释为 `(eventEpoch,lastEventId)`，旧 daemon 缺 epoch 时回退数字 heuristic；#7619 固定 `detail` 为显式字段说明；#8572 merged 中 TS SDK 发送可选 `connectReason`/`previousStreamId` 并兼容旧 daemon |
 | `session_cancel`, `client_heartbeat`, `session_close` | `POST /session/:id/cancel`, `POST /session/:id/heartbeat`, `POST /session/:id/detach`, `DELETE /session/:id` | `prompt_cancelled`, `session_closed`, `session_died` | `cancelSession()`, `heartbeat()`, `closeSession()` |
 | `session_permission_vote`, `permission_vote`, `permission_mediation` | `POST /session/:id/permission/:requestId`, `POST /permission/:requestId` | `permission_resolved`, `permission_partial_vote`, `permission_forbidden` | `respondToSessionPermission()`, permission reducer 状态 |
 | `session_context`, `session_context_usage`, `session_supported_commands`, `session_tasks`, `session_stats`, `session_transcript` | `GET /session/:id/context`, `/context-usage`, `/supported-commands`, `/tasks`, `/stats`, `/transcript` | 无，均为 snapshot；transcript page 返回 id-less replay frames | `context()`, `contextUsage()`, `supportedCommands()`, `tasks()`, `stats()`, `getSessionTranscriptPage()` |
@@ -496,7 +497,7 @@ sequenceDiagram
 
 3. **镜像故意手抄、不 import**。#3 集成镜像作为"对真实 spawn daemon 的外部 wire 契约"，若 import 注册表常量则注册表 typo 会随之传染、测试永绿。代价是必然漂移——这是清醒接受的 trade-off，而非疏漏。真正的根治（搬到 PR-CI 快车道 / 去内嵌列表）被反复推迟。
 
-4. **协议字段全 additive、wire 边界 stamp**。`serverTimestamp`/`errorKind`/`provenance`/`protocolVersions`/`workspaceCwd`/`policy`/`activeWork` 与 `X-Qwen-SSE-Stream-Id` 一律可选；daemon 不发=老 daemon，SDK 读不到=回落。`serverTimestamp` 在 SSE wire 边界 stamp 而非 `publish`，让内存 `BridgeEvent` 类型零改动、内部消费者无感。#8572 的 stream id 是物理连接诊断 id，不参与 cursor 合法性；#8588 的 activeWork 是 health payload 字段，不进入 capability registry。
+4. **协议字段全 additive、wire 边界 stamp**。`serverTimestamp`/`errorKind`/`provenance`/`protocolVersions`/`workspaceCwd`/`policy`/`activeWork`/`limits.sessionRestoreTimeoutMs` 与 `X-Qwen-SSE-Stream-Id` 一律可选；daemon 不发=老 daemon，SDK 读不到=回落。`serverTimestamp` 在 SSE wire 边界 stamp 而非 `publish`，让内存 `BridgeEvent` 类型零改动、内部消费者无感。#8572 的 stream id 是物理连接诊断 id，不参与 cursor 合法性；#8588 的 activeWork 是 health payload 字段，不进入 capability registry；#8691 的 restore timeout limit 是 client deadline hint，不是 admission guarantee。
 
 5. **resync 选"流 OPEN + 继续 replay"而非终止**。让 SDK 能在不再次重连的前提下计算"错过了什么"diff（网络友好）；reducer 用 `awaitingResync` + passthrough 白名单把"自动跳过 stale delta"与"仍放行终止信号"两件事干净分开。
 
@@ -521,7 +522,7 @@ sequenceDiagram
 
 7. **#8415 仍是 open diff**。`session_id_override` 当前只记录方案：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。若最终合并时 tag 名或 request field 调整，本文需要按 merged diff 再同步。
 
-8. **#8572 仍是 open diff，#8588 仍是 draft open diff**。SSE stream id、connect reason、previous stream lineage 与 health `activeWork` 只记录当前方案；若最终合并时 header/query 名、reason 枚举、private active-work heartbeat meta 或 deep health payload 调整，本文需要按最终 diff 再同步。
+8. **#8588/#8691 仍是 open diff**。health `activeWork`、restore timeout limit、`restore_timeout` error 与 quarantine error 只记录当前方案；若最终合并时 private active-work heartbeat meta、deep health payload、timeout 字段、error code 或 retry contract 调整，本文需要按最终 diff 再同步。#8572 已按 merged diff 更新。
 
 ---
 
@@ -570,14 +571,20 @@ sequenceDiagram
 
 - #5174 注册 `daemon_status` baseline capability，新增 `GET /daemon/status` summary/full JSON surface。
 
-### #8572 — SSE stream diagnostics（当前 open）
+### #8572 — SSE stream diagnostics（已合入）
 
 - `routes/sse-events.ts`：`X-Qwen-SSE-Stream-Id` 是 response header additive 字段，旧 client 忽略、旧 daemon 不发时 SDK 回落。
 - `RestSseTransport` / `DaemonSessionClient`：`connectReason` 与 `previousStreamId` 是 query diagnostic，不是 capability-gated 行为；untyped caller 不能覆盖 session-owned client id / previous stream id。
 - `events.ts` / EventBus schema 不新增 event type；slow-client warning、client eviction 和 resync 的 wire frame 仍复用既有 event taxonomy。
 
-### #8588 — activeWork health field（draft open）
+### #8588 — activeWork health field（open）
 
 - `routes/health-demo.ts`：`activeWork` 是 `GET /health?deep=1` response 的 additive boolean，不进入 `SERVE_CAPABILITY_REGISTRY`。
 - `bridgeTypes.ts`：parent/child active-work heartbeat 使用 private `_meta` key 与 ext notification method，属于 daemon-managed ACP child protocol，不暴露为 public serve capability。
 - SDK/ops 口径：`activeWork` 适合 restart/idle guard，与 `activePrompts` 组合使用；不能当作 liveness proof。
+
+### #8691 — restore timeout limits and errors（当前 open）
+
+- `capabilities.ts`：`limits.sessionRestoreTimeoutMs` 是 `/capabilities` additive field，不是 feature tag；旧 daemon 不返回时客户端回落默认 restore timeout。
+- `server/error-response.ts` / `serve/acp-http/dispatch.ts`：`restore_timeout` 统一带 `sessionId`、`action`、`timeoutMs`、retryable 标志和 HTTP 504；cleanup quarantine 统一落到 `acp_channel_unavailable` / 503。
+- SDK/WebUI 口径：server restore budget 只用于派生客户端 request/watchdog timeout；业务正确性仍以最终 load/resume response、SSE terminal、retryable error 和后续 attach/load 操作为准。

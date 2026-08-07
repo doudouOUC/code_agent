@@ -43,7 +43,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
-- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes；#8572 当前 open diff 给 REST SSE stream 增加 stream id、connect reason、previous stream lineage、slow-client/resync/eviction/close lifecycle telemetry，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup profile helper。
+- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes；#8572 已合入后给 REST SSE stream 增加 stream id、connect reason、previous stream lineage、slow-client/resync/eviction/close lifecycle telemetry；#8691 当前 open diff 补 restore public timeout、late result、cleanup/quarantine outcome 与 child restore stage timing，见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup/session restore helpers。
 - **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
 - **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921/#8150）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis，#8150 在流式 span 上写标准 `gen_ai.response.time_to_first_chunk` 秒级属性并移除 span-level 私有 `ttft_ms` 双发。
 - **Tool-call outcome 口径（#8176/#8180）**：#8176 已合入统一 terminal normalization boundary，所有 tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前先归一化 `status`、兼容 `success` 和 error fields；#8180 当前 open diff 继续把 terminal status 与 execution outcome 拆开，区分未进入 `invocation.execute()` 的 synthetic failure 和真正工具执行后的 success/failure/cancel。
@@ -481,7 +481,8 @@ sequenceDiagram
 | #6907 | cold first-session startup trace | deferred runtime wait、`channel.wait`、`session_start` stage timing 与 session-start profiler `sessionId` | Daemon |
 | #6969 | bounded daemon log status | stable daemon/access log rotation 的 mode/health/issues/drop counters 进入 `/daemon/status`，辅助和 OTel trace/log 对照 | Daemon logs |
 | #7003 | legacy session workspace telemetry | 48 条 legacy session/permission route catalog + handler-resolved workspace hash attribution；unresolved/ambiguous 不 fallback primary，SSE request spans 与普通 latency metrics 分离 | Daemon |
-| #8572 | REST SSE stream lifecycle telemetry（open） | 每条 accepted SSE stream 生成低基数 UUID，记录 open、slow-client warning、client eviction、state resync、writer idle、socket error 和 close attribution；诊断只含 stream/client/session、queue/gap/trigger metadata，不采集 payload 或 auth data。 | Daemon SSE |
+| #8572 | REST SSE stream lifecycle telemetry（merged） | 每条 accepted SSE stream 生成低基数 UUID，记录 open、slow-client warning、client eviction、state resync、writer idle、socket error 和 close attribution；诊断只含 stream/client/session、queue/gap/trigger metadata，不采集 payload 或 auth data。 | Daemon SSE |
+| #8691 | session restore timeout telemetry（open） | 记录 restore public result、late ACP result、cleanup/quarantine outcome、session/action/channel/timeout 与 child stage timing；不采集 transcript、prompt payload、auth token 或文件内容。 | Daemon restore |
 
 ### 6.6 文档/schema 对齐与事件名规范化
 
@@ -509,9 +510,17 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 | PR | 子主题 | 作用 | Phase |
 |---|---|---|---|
-| #8572 | SSE stream diagnostics（open） | `routes/sse-events.ts` 把 `X-Qwen-SSE-Stream-Id`、client id、connect reason、previous stream id 写入 daemon request attributes 和 `qwen-code.daemon.sse.*` lifecycle logs；close 记录 duration、settled frame、last event id、backpressure/drain/live-lag、terminal event type 和 close reason。 | Daemon SSE |
+| #8572 | SSE stream diagnostics（merged） | `routes/sse-events.ts` 把 `X-Qwen-SSE-Stream-Id`、client id、connect reason、previous stream id 写入 daemon request attributes 和 `qwen-code.daemon.sse.*` lifecycle logs；close 记录 duration、settled frame、last event id、backpressure/drain/live-lag、terminal event type 和 close reason。 | Daemon SSE |
 
 #8572 的 telemetry 设计保持低敏：trigger event 只记录 type 与 serialized bytes，不记录 event data；client-reported reason 只接受白名单值；previous stream id 必须是 UUID；logger/telemetry 失败被吞掉，不能影响 SSE cleanup 或 EventBus 背压。
+
+### 6.10 Session restore timeout observability
+
+| PR | 子主题 | 作用 | Phase |
+|---|---|---|---|
+| #8691 | restore timeout / cleanup quarantine telemetry（open） | `session.restore` span 和 `qwen-code.daemon.session_restore` 记录 public timeout、late result、cleanup close、quarantine/recovery 与 stage timing；prompt trace context 经 ACP metadata 透传。 | Daemon restore |
+
+#8691 的 restore telemetry 保持低敏：只记录 session id、restore action、channel id、timeout、public/late/cleanup/quarantine 结果和阶段耗时；不记录 transcript 内容、用户 prompt、文件路径正文或 auth data。telemetry/logger 失败不能改变 restore timeout、cleanup 或 quarantine 行为。
 
 ## 7. 已知限制 / 后续
 
@@ -539,4 +548,4 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 12. **#7921 只适合一进程一用户部署**：`telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 是进程级配置。shared daemon、shared ACP channel 或任何一个进程服务多个 end user 的部署，如果直接配置该字段，会把不同用户归并成同一个 ARMS user id；这类场景需要后续增加 per-session/per-request identity surface。
 
-13. **#8469 仍是 draft open，#8572 仍是 open**：repeated tool execution failure guard telemetry 与 REST SSE stream lifecycle telemetry 只记录当前 diff 方案。若后续阈值、mode、LoopType、execution outcome、SSE attribute key、close reason 或 stream lineage 契约调整，本文需要按最终 merged diff 再同步；当前不能把 `qwen-code.repeated_tool_failure_guard` 或 `qwen-code.daemon.sse.*` 视为 `main` 已落地事件。
+13. **#8469 仍是 draft open，#8691 仍是 open**：repeated tool execution failure guard telemetry 与 session restore timeout telemetry 只记录当前 diff 方案。若后续阈值、mode、LoopType、execution outcome、restore timeout/error code、cleanup/quarantine 或 stage timing 契约调整，本文需要按最终 merged diff 再同步；当前不能把 `qwen-code.repeated_tool_failure_guard` 或 #8691 的 restore telemetry 视为 `main` 已落地事件。#8572 的 `qwen-code.daemon.sse.*` 已按 merged diff 更新。

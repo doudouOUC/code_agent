@@ -40,8 +40,9 @@
 | #4861 | per-tier HTTP rate limiting（T3.4） | `rateLimiter.ts`：token-bucket per-tier（prompt/mutation/read）、key 策略（loopback=clientId / non-loopback=IP+clientId）、fail-open 10K cap、sampled logging、graceful shutdown drain |
 | #7003 | legacy session workspace telemetry | `daemonTelemetryMiddleware` route catalog、handler-resolved workspace hash late bind、SSE request metric exclusion |
 | #7005 | primary-only ownership guard | `withPrimaryOnlyLiveSession()`、branch/fork/cd explicit primary-only guard、secondary owner fail-closed response |
-| #8572 | REST SSE stream/client observability（open） | `routes/sse-events.ts`：stream UUID header、connect reason / previous stream lineage、slow-client/resync/close telemetry、close reason attribution |
-| #8588 | activeWork deep health（draft open） | `routes/health-demo.ts`：`GET /health?deep=1` additive 返回 daemon-wide `activeWork`，聚合所有 managed/draining runtime |
+| #8572 | REST SSE stream/client observability（merged） | `routes/sse-events.ts`：stream UUID header、connect reason / previous stream lineage、slow-client/resync/close telemetry、close reason attribution |
+| #8588 | activeWork deep health（open） | `routes/health-demo.ts`：`GET /health?deep=1` additive 返回 daemon-wide `activeWork`，聚合所有 managed/draining runtime |
+| #8691 | safe session restore timeout（open） | session load/resume restore timeout 映射为 retryable 504 / ACP `restore_timeout`，cleanup 不确定时返回 `acp_channel_unavailable` |
 
 ---
 
@@ -114,7 +115,7 @@ flowchart TD
 - **loopback 且未 `--require-auth`**（开发默认）→ 注册在 bearer **之前**（L864-867）：k8s/Compose 探针无需带 token 即可 `200 {"status":"ok"}`。
 - **非 loopback，或 loopback 但开了 `--require-auth`** → 注册在 bearer **之后**（L943-944）：否则未授权者可探测任意 `IP:port` 确认 daemon 存在，且 `/demo` 会泄露完整 API 面（路由枚举 + 交互控制台，比 `/health` 的 `{"status":"ok"}` 危险得多，L804-815 注释）。
 
-无论哪种位置，CORS deny + host allowlist 都先于 `/health` 生效。`/demo` 还硬编码了 `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` 防点击劫持（L790-794）。#6961 后 `/health?deep=1` 不再只读 primary bridge，而是聚合 `WorkspaceRegistry.listManaged()` 里所有 runtime（含 draining）的 session、pending permission、active prompt、latest activity 与任一 live channel，并 additive 返回 `workspaceCount`。#8588 当前 draft open diff 继续 additive 返回 `activeWork`：任一 runtime 里有 accepted-but-unsettled prompt、running background Agent，或 Agent terminal notification 正在接受/排队/持久化/父 continuation 处理时为 true；但它仍是 getter/state snapshot，**不 ping 子进程**，检测不出"wedged 但仍计数/active"的会话。
+无论哪种位置，CORS deny + host allowlist 都先于 `/health` 生效。`/demo` 还硬编码了 `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` 防点击劫持（L790-794）。#6961 后 `/health?deep=1` 不再只读 primary bridge，而是聚合 `WorkspaceRegistry.listManaged()` 里所有 runtime（含 draining）的 session、pending permission、active prompt、latest activity 与任一 live channel，并 additive 返回 `workspaceCount`。#8588 当前 open diff 继续 additive 返回 `activeWork`：任一 runtime 里有 accepted-but-unsettled prompt、running background Agent，或 Agent terminal notification 正在接受/排队/持久化/父 continuation 处理时为 true；但它仍是 getter/state snapshot，**不 ping 子进程**，检测不出"wedged 但仍计数/active"的会话。
 
 ### legacy route telemetry ownership（#7003）
 
@@ -128,7 +129,7 @@ flowchart TD
 
 | Method | Path | 门控 | capability tag | 注册行 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/health` | bearer*（条件豁免） | `health` | L865/L943 | `?deep=1` 聚合所有 managed runtime 的 session/permission/prompt 计数；#8588 draft open 另 additive 返回 `activeWork`；豁免见上 |
+| GET | `/health` | bearer*（条件豁免） | `health` | L865/L943 | `?deep=1` 聚合所有 managed runtime 的 session/permission/prompt 计数；#8588 open 另 additive 返回 `activeWork`；豁免见上 |
 | GET | `/demo` | bearer*（条件豁免） | — | L866/L944 | 交互式 HTML 控制台 |
 | GET | `/capabilities` | bearer | `capabilities` | L961 | 返回 `{v,protocolVersions,mode,features[],modelServices,workspaceCwd,policy}` |
 | GET | `/daemon/status` | bearer | `daemon_status` | #5174 | `summary`/`detail=full` 诊断 JSON；full 聚合 session、ACP、auth、workspace section |
@@ -332,7 +333,7 @@ bridge 在 prompt admission（也就是 202 语义点）arm deadline，因此 bu
 
 写侧并发控制：**所有写经 `writeChain` 单飞串行化**（L2807-2815），心跳/replay/主循环不会交错写半个 SSE 帧。`doWrite`（L2761-2806）在 `res.write` 返回 false（内核发送缓冲满）时 `await drain`，避免用户态无界堆积；`trackWriterIdle` 为 true 时才在每次成功 flush 刷新 `lastWriteAt`（L2783/2790），默认不开避免 chatty 流上每帧一次 `Date.now()`（L2754-2760 注释）。
 
-#8572 当前 open diff 在这条 route 上新增物理 stream 观测，不改变写侧行为：成功握手后设置 `X-Qwen-SSE-Stream-Id`，并把 stream id、client id、connect reason、previous stream id 写入 daemon log / OTel attributes。close finalizer 统一归因 `writer_idle_timeout`、`socket_error`、`iterator_error`、`event_bus_evicted`、`session_terminal`、`source_complete` 或 `client_disconnect`，并记录 settled frame 数、last event id、backpressure 次数、最大 drain 等待与 live publish-to-write-settled 延迟。slow-client warning、EventBus eviction 和 `state_resync_required` 的日志只带 queue/gap/trigger metadata，不带 event payload。
+#8572 已合入后在这条 route 上新增物理 stream 观测，不改变写侧行为：成功握手后设置 `X-Qwen-SSE-Stream-Id`，并把 stream id、client id、connect reason、previous stream id 写入 daemon log / OTel attributes。close finalizer 统一归因 `writer_idle_timeout`、`socket_error`、`iterator_error`、`event_bus_evicted`、`session_terminal`、`source_complete` 或 `client_disconnect`，并记录 settled frame 数、last event id、backpressure 次数、最大 drain 等待与 live publish-to-write-settled 延迟。slow-client warning、EventBus eviction 和 `state_resync_required` 的日志只带 queue/gap/trigger metadata，不带 event payload。
 
 `SubscriberLimitExceededError` → `429 + Retry-After:5`（L2689-2700），**不是** `200 + stream_error`，因为后者会触发 `EventSource` 自动重连放大攻击面（L2676-2688 注释）。`?maxQueued=N` 经 `parseMaxQueuedQuery`（L3478-3522）在 `[16,2048]` 内校验，malformed → **握手前** `400 invalid_max_queued`（fail-closed，避免半开 SSE 流）。
 
@@ -449,6 +450,7 @@ sequenceDiagram
 | `InvalidSessionScopeError` | 400 | `invalid_session_scope` | L3853 |
 | `SessionLimitExceededError` | 503 | `session_limit_exceeded` + `Retry-After:5` | limit（L3874） |
 | `RestoreInProgressError` | 409 | `restore_in_progress` + `Retry-After:5` | activeAction, requestedAction（L3888） |
+| `SessionRestoreTimeoutError` | 504 | `restore_timeout` + `Retry-After:5` | sessionId, action, timeoutMs（#8691） |
 | ACP 子进程 `data.errorKind` | 409/502/400/503 | `mcp_budget_would_exceed`/`mcp_server_spawn_failed`/`invalid_config`/`acp_channel_unavailable` | L3906-3954 |
 | 兜底 | 500 | `errorPayload` 转发 `{error, code?, data?}` | L3963-3995 |
 
@@ -496,7 +498,7 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 1. **`--token ""` 门控不一致**（#4236，本文 §鉴权）。trim 后归 `undefined` → 静默开放 daemon，与其它三处 boot-loud 拒绝不齐；当前靠文档 + strict 路由兜底。
 2. **`DELETE /session/:id` / `PATCH /session/:id/metadata` 缺 `mutate()` 标记**。破坏性/变更路由仅靠全局 bearer，未挂集中化门，审计面与其它会话路由不齐。
 3. **strict mutate 门在 body 解析之后**。no-token loopback 上 strict 路由先 parse 再 401，留 `10mb × maxConnections` 放大面（loopback-only，被接受）；大 body 的未来 strict 路由需把门提到 app 级（`auth.ts` 注释标记为 Wave 4 follow-up）。
-4. **`/health?deep=1` 非真实 liveness**。#6961 已把计数范围从 primary bridge 扩到所有 managed runtime；#8588 当前 draft open 的 `activeWork` 能补 restart idle guard，但仍只读 getter/state snapshot，检测不出 wedged 会话。
+4. **`/health?deep=1` 非真实 liveness**。#6961 已把计数范围从 primary bridge 扩到所有 managed runtime；#8588 当前 open 的 `activeWork` 能补 restart idle guard，但仍只读 getter/state snapshot，检测不出 wedged 会话。
 5. **`/workspace/env`、`/preflight` 等只读侦察面缺 audit**（L1080-1088 TODO）。`bridge.emitAudit` 基础设施（PR 24）落地前，"谁何时读了什么"无审计。
 6. **访问日志依赖 `daemonLog` 注入**。测试/直接嵌入若不传 `deps.daemonLog` 则无访问日志；生产 `runQwenServe` 总是注入（L565）。
 
@@ -560,16 +562,23 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - 生命周期：中间件注册在 `bearerAuth` **之后**（未认证请求不消耗配额）；`dispose()` 清 GC timer + drain 模式下所有请求放行。
 - 已知权衡：loopback 无 client-id 时所有请求共享 `"anonymous"` bucket；高基数 DDoS 下 fail-open by design。
 
-### #8572 — REST SSE stream/client observability（open）
+### #8572 — REST SSE stream/client observability（merged）
 
 - `routes/sse-events.ts`：每条成功 accepted REST SSE stream 生成 UUID，写入 `X-Qwen-SSE-Stream-Id` response header，并记录 opened/closed daemon log 与 OTel log。
 - `routes/sse-events.ts`：解析白名单 `connectReason`、UUID 格式 `previousStreamId` 和受限 client id；诊断字段为低敏 attribute，不信任它作为授权事实。
 - `eventBus.ts` diagnostic callback：把 slow-client warning / eviction 的 queue size、byte size、trigger event type/bytes 交给 route；route 成功结构化记录后 suppress legacy stderr fallback。
 - close finalizer：聚合 settled frame、last written id、backpressure/drain/live-lag、EventBus eviction reason、terminal event type 和 close reason。
 
-### #8588 — activeWork deep health（draft open）
+### #8588 — activeWork deep health（open）
 
 - `routes/health-demo.ts`：deep health 聚合每个 managed runtime bridge 的 `activeWork` getter，任一 true 则全局 true。
 - `acp-bridge/src/bridge.ts`：`entryHasActiveWork()` 覆盖 pending prompt、pending Agent notification 和 child-reported background Agent active 状态，自动 detach/idle reap/last-client-detach 不再提前清理仍有 active work 的 session。
 - `acpAgent.ts` / `Session.ts`：通过 private initialize `_meta` 协商 active-work heartbeat，Session 在 active transition 和 15s heartbeat 上报单调 seq。
 - restart controller 口径：`activeWork` 是 idle/restart guard，不替代 TCP/进程级 liveness。
+
+### #8691 — safe session restore timeout（open）
+
+- `commands/serve.ts` / `capabilities.ts`：新增 `--session-restore-timeout-ms`，并在 `/capabilities.limits.sessionRestoreTimeoutMs` 公告 effective restore deadline。
+- `server/error-response.ts` / `routes/session.ts`：`SessionRestoreTimeoutError` 映射为 retryable 504 JSON，带 `restore_timeout`、`Retry-After: 5`、`sessionId`、`action` 和 `timeoutMs`。
+- `serve/acp-http/dispatch.ts`：ACP HTTP/WS 把同一 restore timeout 映射为 JSON-RPC `-32603` data，保留 `httpStatus:504` 和 retryable 标志。
+- `bridge.ts`：cleanup 不确定时 quarantine channel，后续新 session 操作 fail-closed 为 `acp_channel_unavailable` / 503，不影响已有 sibling session 继续运行。
