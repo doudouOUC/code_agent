@@ -16,10 +16,11 @@
 | [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | ✅ merged | feat(external-context): Add optional Mem0 memory writes | [pr-8507.md](pr-8507.md) |
 | [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | ✅ merged | refactor(serve): model a per-child heap partition of the daemon budget | [pr-8508.md](pr-8508.md) |
 | [#8572](https://github.com/QwenLM/qwen-code/pull/8572) | ✅ merged | feat(daemon): Add SSE stream and client observability | [pr-8572.md](pr-8572.md) |
-| [#8588](https://github.com/QwenLM/qwen-code/pull/8588) | 🟡 open | feat(serve): Expose active work state | [pr-8588.md](pr-8588.md) |
+| [#8588](https://github.com/QwenLM/qwen-code/pull/8588) | ✅ merged | feat(serve): Expose active work state | [pr-8588.md](pr-8588.md) |
 | [#8620](https://github.com/QwenLM/qwen-code/pull/8620) | ✅ merged | fix(serve): Allow approved same-host text reads outside workspace | [pr-8620.md](pr-8620.md) |
 | [#8636](https://github.com/QwenLM/qwen-code/pull/8636) | ✅ merged | fix(core): Resolve symlinks before granting read permission | [pr-8636.md](pr-8636.md) |
 | [#8691](https://github.com/QwenLM/qwen-code/pull/8691) | 🟡 open | fix(serve): Make session restore timeouts safe and observable | [pr-8691.md](pr-8691.md) |
-| [#8693](https://github.com/QwenLM/qwen-code/pull/8693) | 🟡 open | fix(integration-tests): make the project typecheckable and fix what that found | [pr-8693.md](pr-8693.md) |
+| [#8693](https://github.com/QwenLM/qwen-code/pull/8693) | ✅ merged | fix(integration-tests): make the project typecheckable and fix what that found | [pr-8693.md](pr-8693.md) |
+| [#8743](https://github.com/QwenLM/qwen-code/pull/8743) | 🟡 open draft | docs(design): Plan selective session restore | [pr-8743.md](pr-8743.md) |
 
-_按个人 PR 口径更新于 2026-08-07_
+_按个人 PR 口径更新于 2026-08-08_

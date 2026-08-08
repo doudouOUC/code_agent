@@ -61,8 +61,9 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #7622 | fix(acp-bridge): resource hardening for the session event pipeline | merged | 不新增 daemon tag；新增 `state_resync_required{reason:'replay_budget_exceeded'}` 运行时原因、拒绝不可序列化事件，并对 compaction live journal 加 bounded truncation marker。 |
 | #8415 | fix(serve): Coordinate caller-supplied session IDs | open | 新增 `session_id_override` capability；REST/ACP/SDK 只有在该 tag 存在时才能发送 caller-supplied UUID session id，并必须验证 response id 是否 honor 请求。 |
 | #8572 | feat(daemon): Add SSE stream and client observability | merged | 不新增 daemon tag；REST SSE response additive 返回 `X-Qwen-SSE-Stream-Id`，客户端可传 `connectReason`/`previousStreamId` 作为诊断线索，旧 daemon/代理剥离 header 时保持兼容。 |
-| #8588 | feat(serve): Expose active work state | open | 不新增 daemon tag；`GET /health?deep=1` additive 返回 `activeWork`，ACP parent/child 用 private `_meta` 协商 active-work heartbeat，不进入 public capability registry。 |
-| #8691 | fix(serve): Make session restore timeouts safe and observable | open | 不新增 feature tag；`GET /capabilities` 在 `limits.sessionRestoreTimeoutMs` additive 公告 restore deadline，REST/ACP 错误面新增 retryable `restore_timeout` 与 cleanup quarantine 的 `acp_channel_unavailable`。 |
+| #8588 | feat(serve): Expose active work state | merged | 不新增 daemon tag；`GET /health?deep=1` additive 返回 `activeWork`，ACP parent/child 用 private `_meta` 协商 active-work heartbeat，不进入 public capability registry。 |
+| #8691 | fix(serve): Make session restore timeouts safe and observable | open | 不新增 feature tag；`GET /capabilities` 在 `limits.sessionRestoreTimeoutMs` additive 公告 restore deadline，REST/ACP 错误面新增 retryable `restore_timeout` 与 cleanup/settlement quarantine 的 `acp_channel_unavailable`。 |
+| #8743 | docs(design): Plan selective session restore | draft open | docs-only 设计；不新增 public capability、REST/SDK 字段或 event type，后续 selective projection 若需要 replay anchor 应保持 internal/additive。 |
 | #6716 | feat(serve): persist dynamic workspace registrations | 2026-07-11 | 新增条件能力 `persistent_workspace_registration`；只有 workspace registration store 可用时广告，客户端才应发送 `POST /workspaces {persist:true}`。 |
 | #6740 | feat(serve): add workspace persisted transcript reader | 2026-07-12 | 新增 `workspace_persisted_transcript`：workspace-qualified persisted-only transcript pager，不启动 ACP、不加载 settings。 |
 | #6741 | feat(cli): Add runtime daemon channel control | 2026-07-13 | 新增条件能力 `channel_control`：daemon runtime channel selection 查询/设置/停止。 |
@@ -211,10 +212,10 @@ flowchart LR
 
 | 能力 tag | HTTP surface | SSE / 推送信号 | SDK / reducer surface |
 |---|---|---|---|
-| `health`, `capabilities` | `GET /health`, `GET /capabilities` | 无 | `DaemonClient.health()`, `capabilities()`；#8588 open 中 deep health payload additive 增加 `activeWork`，客户端应把它当 restart/idle guard，而不是 liveness proof；#8691 open 中 capabilities additive 增加 `limits.sessionRestoreTimeoutMs`，用于 SDK/WebUI restore timeout derivation |
+| `health`, `capabilities` | `GET /health`, `GET /capabilities` | 无 | `DaemonClient.health()`, `capabilities()`；#8588 已合入，deep health payload additive 增加 `activeWork`，客户端应把它当 restart/idle guard，而不是 liveness proof；#8691 open 中 capabilities additive 增加 `limits.sessionRestoreTimeoutMs`，用于 SDK/WebUI restore timeout derivation |
 | `daemon_status` | `GET /daemon/status`, `GET /daemon/status?detail=full` | 无，JSON snapshot；`detail=full` 各 workspace section 独立降级；#6969 additive `daemon.runId/logMode/logHealth`，full detail 可含 `logPath/logIssues/logDroppedRecords/logDroppedBytes` | 无专用 SDK helper；SDK daemon status types 镜像 optional log fields |
 | `session_create`, `session_scope_override` | `POST /session` | spawn 期可能有模型切换/错误事件 | `createOrAttachSession()` |
-| `session_load`, `unstable_session_resume` | `POST /session/:id/load`, `POST /session/:id/resume` | load 会重放历史帧；resume 不重放 UI 历史；#8691 open 中 restore public timeout 返回 retryable `restore_timeout`，late settlement 负责 cleanup/quarantine | `loadSession()`, `resumeSession()`；TS SDK 用 per-request timeout、explicit fetch timeout、server restore budget + 10s、默认 70s 的顺序派生客户端计时 |
+| `session_load`, `unstable_session_resume` | `POST /session/:id/load`, `POST /session/:id/resume` | load 会重放历史帧；resume 不重放 UI 历史；#8691 open 中 restore public timeout 返回 retryable `restore_timeout`，late settlement 负责 cleanup/quarantine；#8743 draft 只设计内部 selective restore projection，不改变当前 wire | `loadSession()`, `resumeSession()`；TS SDK 用 per-request timeout、explicit fetch timeout、server restore budget + 10s、默认 70s 的顺序派生客户端计时 |
 | `session_prompt`, `non_blocking_prompt`, `prompt_absolute_deadline` | `POST /session/:id/prompt` | `session_update`, `permission_request`, `prompt_cancelled`, `turn_complete`, `turn_error` | `prompt()`, reducer 记录 turn 终态；#7400 后每个 202 accepted `promptId` 在正常 settle、queued removal、deadline、teardown 路径上恰好收到一个 `turn_complete` 或 `turn_error`；#7453 补 queued deadline typed error 和 terminal state cleanup |
 | `session_events`, `slow_client_warning`, `typed_event_schema` | `GET /session/:id/events` | `state_resync_required`, `replay_complete`, `slow_client_warning`, `client_evicted`, `stream_error`；#7458 用 `X-Qwen-Event-Epoch` response header 表达 stream epoch，#7622 增加 `replay_budget_exceeded` resync reason；#8572 merged 另用 `X-Qwen-SSE-Stream-Id` 标识物理 stream | `asKnownDaemonEvent()`, `reduceDaemonSessionEvent()`；TS/Java daemon clients 将 cursor 解释为 `(eventEpoch,lastEventId)`，旧 daemon 缺 epoch 时回退数字 heuristic；#7619 固定 `detail` 为显式字段说明；#8572 merged 中 TS SDK 发送可选 `connectReason`/`previousStreamId` 并兼容旧 daemon |
 | `session_cancel`, `client_heartbeat`, `session_close` | `POST /session/:id/cancel`, `POST /session/:id/heartbeat`, `POST /session/:id/detach`, `DELETE /session/:id` | `prompt_cancelled`, `session_closed`, `session_died` | `cancelSession()`, `heartbeat()`, `closeSession()` |
@@ -522,7 +523,7 @@ sequenceDiagram
 
 7. **#8415 仍是 open diff**。`session_id_override` 当前只记录方案：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。若最终合并时 tag 名或 request field 调整，本文需要按 merged diff 再同步。
 
-8. **#8588/#8691 仍是 open diff**。health `activeWork`、restore timeout limit、`restore_timeout` error 与 quarantine error 只记录当前方案；若最终合并时 private active-work heartbeat meta、deep health payload、timeout 字段、error code 或 retry contract 调整，本文需要按最终 diff 再同步。#8572 已按 merged diff 更新。
+8. **#8691 仍是 open diff，#8743 仍是 draft design**。restore timeout limit、`restore_timeout` error、quarantine error 与 selective restore projection 只记录当前方案；若最终合并时 timeout 字段、error code、retry contract 或 selective restore wire/internal anchor 调整，本文需要按最终 diff 再同步。#8572/#8588 已按 merged diff 更新。
 
 ---
 
@@ -577,7 +578,7 @@ sequenceDiagram
 - `RestSseTransport` / `DaemonSessionClient`：`connectReason` 与 `previousStreamId` 是 query diagnostic，不是 capability-gated 行为；untyped caller 不能覆盖 session-owned client id / previous stream id。
 - `events.ts` / EventBus schema 不新增 event type；slow-client warning、client eviction 和 resync 的 wire frame 仍复用既有 event taxonomy。
 
-### #8588 — activeWork health field（open）
+### #8588 — activeWork health field（merged）
 
 - `routes/health-demo.ts`：`activeWork` 是 `GET /health?deep=1` response 的 additive boolean，不进入 `SERVE_CAPABILITY_REGISTRY`。
 - `bridgeTypes.ts`：parent/child active-work heartbeat 使用 private `_meta` key 与 ext notification method，属于 daemon-managed ACP child protocol，不暴露为 public serve capability。
@@ -586,5 +587,11 @@ sequenceDiagram
 ### #8691 — restore timeout limits and errors（当前 open）
 
 - `capabilities.ts`：`limits.sessionRestoreTimeoutMs` 是 `/capabilities` additive field，不是 feature tag；旧 daemon 不返回时客户端回落默认 restore timeout。
-- `server/error-response.ts` / `serve/acp-http/dispatch.ts`：`restore_timeout` 统一带 `sessionId`、`action`、`timeoutMs`、retryable 标志和 HTTP 504；cleanup quarantine 统一落到 `acp_channel_unavailable` / 503。
+- `server/error-response.ts` / `serve/acp-http/dispatch.ts`：`restore_timeout` 统一带 `sessionId`、`action`、`timeoutMs`、retryable 标志和 HTTP 504；cleanup/settlement quarantine 统一落到 `acp_channel_unavailable` / 503，reason 可区分 cleanup failed、awaiting abandoned cleanup 和 settlement overdue。
 - SDK/WebUI 口径：server restore budget 只用于派生客户端 request/watchdog timeout；业务正确性仍以最终 load/resume response、SSE terminal、retryable error 和后续 attach/load 操作为准。
+
+### #8743 — selective restore design（当前 draft open）
+
+- 当前不新增 public feature tag、capabilities field、REST/SDK request/response 字段或 SSE event type。
+- 设计中的 recent/all/none replay、anchor、`hasMore`、`partial` 和 bounded replay error 都应先保持 daemon 内部 projection 语义；只有未来需要对外暴露时才作为 additive field 单独审计。
+- `historyPageSize` 仍是旧 load replay 兼容入口；selective restore 的目标是避免 restore 内部重复 full materialization，而不是改变老客户端省略该字段时的 full replay wire 行为。
