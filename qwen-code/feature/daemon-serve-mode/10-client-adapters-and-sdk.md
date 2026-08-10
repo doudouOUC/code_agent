@@ -56,7 +56,7 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #7619 | @doudouOUC | merged | epoch cursor review follow-up：固定 `eventEpoch` / `replayDegraded` response propagation，并修正 SDK `detail` 注释。 |
 | #8002 | @doudouOUC | merged | workspace file read cursor paging：为 TS daemon client / workspace client 暴露 `cursor` request 与 `hasMore`/`nextCursor` response 字段。 |
 | #8572 | @doudouOUC | merged | REST SSE stream observability：TS SDK 学习 daemon accepted stream id，发送 connect reason / previous stream lineage，并保护 session-owned client id 不被 caller 覆盖。 |
-| #8691 | @doudouOUC | open | restore timeout derivation：TS SDK 从 capabilities 学习 server restore budget，为 load/resume 派生 request timeout，并保留 per-request override。 |
+| #8691 | @doudouOUC | merged | restore timeout derivation：TS SDK 从 capabilities 学习 server restore budget，为 load/resume 派生 request timeout，并保留 per-request override。 |
 | #8743 | @doudouOUC | draft open | selective session restore design：当前不改 public SDK；后续如暴露 replay anchor/partial 信息，应作为 additive field 单独审计。 |
 
 ---
@@ -137,7 +137,7 @@ seed `lastEventId = 0` 的语义（`DaemonSessionClient.ts:131`）：daemon 将 
 
 #8572 已合入后在 REST SSE transport 上新增物理 stream 诊断字段。`RestSseTransport.subscribeEvents()` 发送 `X-Qwen-Client-Id`、`connectReason` 与 `previousStreamId`，并从 response header 校验/学习 `X-Qwen-SSE-Stream-Id`。`DaemonSessionClient` 保存最近 accepted REST stream id，默认首连为 `initial`、已有 accepted stream 后为 `resume`；caller 可提供有限 `sseConnectReason`，但不能覆盖 session-owned `clientId`、`previousSseStreamId` 或 `onSseStreamAccepted`。非 REST transport 会清空 lineage。旧 daemon 不返回 header 或代理剥离 header 时，只是少一个 previous stream diagnostic，不影响 `(eventEpoch,lastEventId)` cursor。
 
-#8691 当前 open diff 让 `DaemonClient.loadSession()` / `resumeSession()` 的 timeout 不再复用普通 fetch 默认值。SDK 顺序为：per-request `timeoutMs`（`0` 表示禁用客户端 timer）、显式全局 `fetchTimeoutMs`、capabilities 中 `limits.sessionRestoreTimeoutMs + 10000`、最后默认 70s。`timeoutMs` 只在客户端侧控制 fetch deadline，不序列化到 request body；旧 daemon 缺 limits 时自动回落默认值。#8743 的 selective restore 目前是 daemon 内部设计，不要求 SDK 发送新字段或消费新 response shape。
+#8691 已合入，让 `DaemonClient.loadSession()` / `resumeSession()` 的 timeout 不再复用普通 fetch 默认值。SDK 顺序为：per-request `timeoutMs`（`0` 表示禁用客户端 timer）、显式全局 `fetchTimeoutMs`、capabilities 中 `limits.sessionRestoreTimeoutMs + 10000`、最后默认 70s。`timeoutMs` 只在客户端侧控制 fetch deadline，不序列化到 request body；旧 daemon 缺 limits 时自动回落默认值。#8743 的 selective restore 目前是 daemon 内部设计，不要求 SDK 发送新字段或消费新 response shape。
 
 实际迭代发生在 `iterateEvents()`（L462-488）：
 
@@ -378,6 +378,6 @@ sequenceDiagram
 3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
 4. **#8002 是 additive TS SDK surface**：客户端必须 gate `workspace_file_read_cursor` 并兼容旧 daemon 缺字段。
 5. **#8572 是诊断 surface**：`sseConnectReason`、previous stream lineage 和 accepted stream id 不参与业务正确性；调用方不能用它们替代 event cursor、client id 或 session id。
-6. **#8691 restore timeout 仍是 open diff，#8743 selective restore 仍是 draft design**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。selective restore 如未来引入 SDK-visible replay anchor、partial 或 error 字段，必须保持 additive 并兼容旧 daemon。
+6. **#8691 restore timeout 已合入，#8743 selective restore 仍是 draft design**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。selective restore 如未来引入 SDK-visible replay anchor、partial 或 error 字段，必须保持 additive 并兼容旧 daemon。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-08_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-10_

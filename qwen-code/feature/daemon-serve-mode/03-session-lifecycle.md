@@ -23,7 +23,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **prompt terminal exactly-once**：每个已返回 202 的 prompt 在 agent settle、queued removal、deadline、close/kill/crash/shutdown 等路径上恰好收到一个 `turn_complete` 或 `turn_error`；deadline 由 bridge admission/dispatch race 拥有（#7400）。
 - **prompt terminal follow-up hardening**：running prompt 从 UI-visible list 移除时不立刻丢 pending entry，queued terminal 不污染 session-level turn error/retry 状态，queued deadline 保留 typed `PromptDeadlineExceededError`（#7453）。
 - **activeWork idle/restart guard**：#8588 已合入，把 close-on-last-detach、attach rollback、idle reaper 等自动清理门控从仅看 `pendingPromptCount` 扩展到 `entryHasActiveWork()`，覆盖 accepted prompt、background Agent 和 Agent terminal notification；显式 close/kill/shutdown 仍强制。
-- **safe session restore timeout**：#8691 当前 open diff 将 load/resume restore 从 initialize timeout 中拆出专用 deadline；public caller 超时后保留真实 ACP settle/cleanup，不误杀 sibling session，cleanup/settlement 不确定时 quarantine channel 或返回 `acp_channel_unavailable` 并阻止新 session 操作。
+- **safe session restore timeout**：#8691 已合入，将 load/resume restore 从 initialize timeout 中拆出专用 deadline；public caller 超时后保留真实 ACP settle/cleanup，不误杀 sibling session，cleanup/settlement 不确定时 quarantine channel 或返回 `acp_channel_unavailable` 并阻止新 session 操作。
 - **selective session restore design**：#8743 当前 draft 只新增设计/计划文档，提出 daemon 内部 selective restore projection，把 runtime resume state 与 UI replay page 分离，目标是避免大型 persisted transcript 在 `loadCliConfig()` 和 `Config.initialize()` 中两次全量 materialize 后才裁剪。
 - **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458）。
 
@@ -83,7 +83,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#4765](https://github.com/QwenLM/qwen-code/pull/4765) | merged | compaction 修复 | `TurnBoundaryCompactionEngine` 双路径 merge：subagent chunks 按 `(kind, parentToolCallId)` 索引、top-level 按连续同 kind；tool call eviction 保留段边界 |
 | [#4812](https://github.com/QwenLM/qwen-code/pull/4812) | merged | session branching | `POST /session/:id/branch`：fork 活跃 session 的 JSONL transcript → restore 为新 session；409 prompt 活跃中、session 上限拒绝；失败自动清理孤儿 |
 | [#8588](https://github.com/QwenLM/qwen-code/pull/8588) | merged | activeWork deep health / lifecycle gate | ACP child 上报 active-work transition + 15s heartbeat；bridge 用 `entryHasActiveWork()` 防自动 detach/idle reap 过早清理仍有后台 Agent 或 terminal notification 的 session |
-| [#8691](https://github.com/QwenLM/qwen-code/pull/8691) | open | safe session restore timeout | restore 专用 deadline、public timeout 与 real settlement 分离、late result exactly-once cleanup、cleanup 不确定时 quarantine channel |
+| [#8691](https://github.com/QwenLM/qwen-code/pull/8691) | merged | safe session restore timeout | restore 专用 deadline、public timeout 与 real settlement 分离、late result exactly-once cleanup、cleanup 不确定时 quarantine channel |
 | [#8743](https://github.com/QwenLM/qwen-code/pull/8743) | draft open | selective session restore design | docs-only 设计 selective restore projection、runtime/replay uuid 分离、recent/all/none replay 与 413/fallback/partial 失败语义，当前不改运行时代码 |
 
 ---
@@ -566,7 +566,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#7967/#8691 仍为 open diff，#8743 仍为 draft design**。handle-bound range refactor、safe restore timeout 与 selective restore 只记录当前方案，不能视为 `main` 已落地能力；#8588/#7886/#7975/#7976 已按 merged diff 更新。若 #8691 调整 timeout/error/quarantine contract，或 #8743 后续 runtime PR 调整 projection/replay/failure contract，需要按最终 diff 再同步。
+6. **#7967 仍为 open diff，#8743 仍为 draft design**。handle-bound range refactor 与 selective restore 只记录当前方案，不能视为 `main` 已落地能力；#8588/#8691/#7886/#7975/#7976 已按 merged diff 更新。若 #8743 后续 runtime PR 调整 projection/replay/failure contract，需要按最终 diff 再同步。
 
 ---
 
@@ -582,7 +582,7 @@ sequenceDiagram
 - **close/kill/detach/metadata**：`describe('closeSession')`（`:7813`）、`describe('updateSessionMetadata')`（`:8010`）、`describe('listWorkspaceSessions')`（`:4709`/ enriched `:8076`）、`publishWorkspaceEvent + knownClientIds`（`:8100`）。
 - **prompt terminal exactly-once**：`describe('prompt terminal exactly-once (DAEMON-002/003/004/005)')` 覆盖 queued removal terminal、wedged deadline、queued deadline、close/kill terminal-before-bus-close、last detach draining、cancel/remove/deadline race、channel crash exactly-once（#7400）。
 - **activeWork lifecycle gate（#8588）**：PR diff 覆盖 child active/idle transition、heartbeat timeout、non-owning session/channel/old seq 忽略、last-client-detach 延迟 close、prompt settle cleanup 与 deep-health aggregation。
-- **safe restore timeout（#8691 open）**：PR diff 覆盖空 channel timeout/reap、sibling session survival、same-id fencing/coalescing、late close exactly-once、cleanup quarantine/recovery、capacity retention、transport close 与 hanging request shutdown。
+- **safe restore timeout（#8691 merged）**：PR diff 覆盖空 channel timeout/reap、sibling session survival、same-id fencing/coalescing、late close exactly-once、cleanup quarantine/recovery、capacity retention、transport close 与 hanging request shutdown。
 - **selective restore design（#8743 draft open）**：当前只要求设计审计和后续测试计划；runtime PR 需要补 parity fixtures、paging/limit、413 sibling survival 与 lifecycle 单次 index 构建断言。
 - **managed writer shutdown**：#7812 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
 - **Todo Stop Guard continuation hardening**：#7821 覆盖 owner claim/release、失败恢复、Stop hook 重跑、workspace relocation、session disposal、overlapping prompt 与 cron queue cap。
@@ -812,19 +812,19 @@ sequenceDiagram
 - 连接断开保护：`res.writable` false 时 kill 新 session（防孤儿积累）。
 - #7005 后 branch/fork/cd 归入 primary-only live-session guard：这些操作保留 legacy primary bridge 语义，不因 multi-workspace owner routing 自动扩展到 secondary runtime；secondary live session 命中时返回稳定 400 code，便于 Web Shell/SDK 显示明确不支持而不是误报 not found 或执行到错 workspace。
 
-### #8415 — caller-supplied session ID admission（当前 open）
+### #8415 — caller-supplied session ID admission（merged）
 
 - `session-id.ts`：caller-supplied session id 只能是 lowercase RFC UUID v1-v5；nil、unsupported version/variant、Arena suffix、路径字符和非 string 均拒绝，内部 Arena session id 语义不受影响。
 - `requested-session-id-admission.ts`：创建路径同步安装 pending claim，检查 live bridges、draining/replaced generation、registered workspaces 的 active/archived/worktree history；restore 路径支持同一 bridge/workspace 的 shared claim，并拒绝其它 owner。
 - REST `POST /session {sessionId}` 与 ACP `session/new._meta["qwen-code/sessionId"]`：都强制 `sessionScope:'thread'`，并在 bridge 返回后验证 actual id 是否等于 requested id，不一致时映射 `session_id_not_honored` 并清理 orphan。
 - SDK/ACP agent：capability gate `session_id_override`，stdio agent 在读取 settings/fs 前先验证请求 id，同 ID startup 串行化，validation failure 返回 ACP INVALID_PARAMS。
 
-### #8469 — repeated ACP tool execution failure guard（当前 draft open）
+### #8469 — repeated ACP tool execution failure guard（merged）
 
 - `repeated-tool-failure-guard.ts`：prompt-local reducer 只统计完全 settle 的 foreground ACP batch；eligible event 必须是真正进入 execution 后的 terminal error，并有低基数 tool identity 与非 UNKNOWN execution error type。
 - guard key 只用 `(policyToolName, executionErrorType)`，不纳入 arguments、results、raw error、path 或 MCP server name；validation/permission/not_started/cancelled/post-execution/unknown/mixed batch 均排除。
 - 阈值为 8 次失败且跨至少 2 个 complete batch；warn/enforce 模式先注入固定纠偏提醒，enforce 在下一次 matching batch latched 后停止自动续跑并禁用 Todo continuation，直到新用户输入重置。
-- 当前 PR 仍是 draft：文档只记录当前 diff 方案，不能视为 `main` 已落地 session lifecycle 行为。
+- PR 已合入：文档按最终 diff 记录阈值、mode、Todo continuation gate 与 telemetry 字段。
 
 ### #8588 — activeWork deep health / lifecycle gate（merged）
 
@@ -834,7 +834,7 @@ sequenceDiagram
 - `Session.ts`：跟踪 active prompt request、background task registry、Agent notification queue/acceptance/processing，并在 transition 与 heartbeat 上报 active 状态。
 - `routes/health-demo.ts`：`GET /health?deep=1.activeWork` 聚合所有 managed runtime；该字段是 restart/idle guard，不是真实 liveness。
 
-### #8691 — safe session restore timeout（当前 open）
+### #8691 — safe session restore timeout（merged）
 
 - `session-restore-timeout.ts`：新增 restore timeout 默认 60s、最大定时器上限和 option resolver；显式 `sessionRestoreTimeoutMs` 即使低于默认值也优先，未显式配置时只有大于 60s 的 `initializeTimeoutMs` 会抬高 restore budget。
 - `bridge.ts`：restore in-flight 拆成 public promise 与 settlement promise；public timeout 只释放 caller，不释放 session id fence、capacity 或真实 cleanup 责任。

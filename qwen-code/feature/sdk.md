@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 当前 open diff 增加 restore timeout derivation，#8743 当前 draft 设计不改 public SDK），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8743 当前 draft 设计不改 public SDK），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -14,7 +14,7 @@ qwen-code 的主入口是交互式 CLI（TUI）与一次性非交互模式。但
 
 1. **本地子进程式（Python SDK，#3010 / #3494）**：调用方在本机拉起一个 `qwen` CLI 子进程，通过 `stdin/stdout` 上的 **stream-json** 协议双向通信。它不引入新的运行时——CLI 已有的非交互控制协议（control request/response、`can_use_tool` 权限回调）被原样复用，SDK 只是这套协议的 Python 客户端。优点是零额外部署、与本机 CLI 行为一致；适合脚本、CI、本地自动化。
 
-2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。#8002 还把 workspace text file read 的 `cursor`、`hasMore` 与 `nextCursor` 暴露为 additive 字段；#8572 已合入后让 REST SSE transport 学习 accepted stream id，并向 daemon 报告可解释的 reconnect reason 和 previous stream lineage；#8691 当前 open diff 让 load/resume restore 根据 server budget 派生客户端 timeout。#8743 的 selective restore 目前是 daemon 内部 projection 设计，不要求 SDK 发送新字段。适合「agent 即服务」的远程、多端、协作场景。
+2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。#8002 还把 workspace text file read 的 `cursor`、`hasMore` 与 `nextCursor` 暴露为 additive 字段；#8572 已合入后让 REST SSE transport 学习 accepted stream id，并向 daemon 报告可解释的 reconnect reason 和 previous stream lineage；#8691 已合入，让 load/resume restore 根据 server budget 派生客户端 timeout。#8743 的 selective restore 目前是 daemon 内部 projection 设计，不要求 SDK 发送新字段。适合「agent 即服务」的远程、多端、协作场景。
 
 3. **Java daemon transport alpha（#7463/#7603）**：在既有 `com.alibaba:qwencode-sdk` artifact 中新增 Java 11 HTTP/SSE daemon transport，面向 JVM 应用提供 admission watermark、resumable SSE、typed/raw events、permission response、prompt terminal correlation、bounded promptText、resource cleanup 和 fail-closed exception taxonomy。#7603 已补齐 Java 对 #7458 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering 的消费边界。
 
@@ -373,9 +373,9 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #4360 | MERGED | 协议补全（F4 前置） | daemon stamp `serverTimestamp`/`provenance`/`errorKind` + 发 `state_resync_required`；SDK reducer/normalizer 消费 |
 | #7269 | MERGED | REST SSE cleanup | `RestSseTransport` 跟踪 active request controllers，iterator/dispose/error 时 abort fetch 并 cancel body stream，保证 SSE request 生命周期与 consumer 生命周期绑定。 |
 | #8002 | MERGED | workspace file read cursor paging | 为 TS daemon SDK / workspace client 暴露 `cursor` request 与 `hasMore`/`nextCursor` response 字段，配合 `workspace_file_read_cursor` capability。 |
-| #8415 | OPEN | caller-supplied session ID override | TS/Java/daemon MCP surface 暴露 session id override，必须 gate `session_id_override` capability 并验证 daemon 返回 id 是否 honor 请求。 |
+| #8415 | MERGED | caller-supplied session ID override | TS/Java/daemon MCP surface 暴露 session id override，必须 gate `session_id_override` capability 并验证 daemon 返回 id 是否 honor 请求。 |
 | #8572 | MERGED | REST SSE stream observability | TS daemon SDK / WebUI 传递 connect reason、previous stream lineage，并从 `X-Qwen-SSE-Stream-Id` 学习 accepted stream id；字段仅用于诊断，兼容旧 daemon。 |
-| #8691 | OPEN | restore timeout derivation | TS daemon SDK 从 capabilities 学习 `limits.sessionRestoreTimeoutMs`，按 per-request/global/server/default 顺序派生 load/resume request timeout，不把 `timeoutMs` 写入 body。 |
+| #8691 | MERGED | restore timeout derivation | TS daemon SDK 从 capabilities 学习 `limits.sessionRestoreTimeoutMs`，按 per-request/global/server/default 顺序派生 load/resume request timeout，不把 `timeoutMs` 写入 body。 |
 | #8743 | DRAFT OPEN | selective session restore design | 当前不改 public SDK；如后续暴露 replay anchor、partial 或 bounded replay error，必须作为 additive surface 单独审计。 |
 
 ---
@@ -396,11 +396,11 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 6. **workspace file read cursor paging 是 additive SDK surface**。#8002 已合入，但 client 仍必须 gate `workspace_file_read_cursor`，并兼容旧 daemon 不返回 `hasMore`/`nextCursor`。
 
-7. **caller-supplied session ID override 仍是 open diff**。#8415 当前方案让 TS/Java/daemon MCP 在 request 中带 `sessionId`，并要求 daemon capability gate 与 response verification；旧 daemon 或未广告 capability 的 daemon 必须走自动生成 session id，不能把本地 requested id 当作已创建事实。
+7. **caller-supplied session ID override 已合入**。#8415 让 TS/Java/daemon MCP 在 request 中带 `sessionId`，并要求 daemon capability gate 与 response verification；旧 daemon 或未广告 capability 的 daemon 必须走自动生成 session id，不能把本地 requested id 当作已创建事实。
 
 8. **REST SSE stream observability 已按 merged diff 更新**。#8572 的 stream id、connect reason 和 previous stream lineage 只是诊断面，不能替代 `eventEpoch` / `Last-Event-ID` cursor、session id 或 client id；header 被代理剥离时客户端必须继续正常工作。
 
-9. **restore timeout derivation 仍是 open diff**。#8691 的 server restore budget 只是 client timer hint；旧 daemon 缺 `limits.sessionRestoreTimeoutMs` 时必须回落默认 70s，`restore_timeout` 后仍要按 retryable error 和后续 session 状态处理。
+9. **restore timeout derivation 已合入**。#8691 的 server restore budget 只是 client timer hint；旧 daemon 缺 `limits.sessionRestoreTimeoutMs` 时必须回落默认 70s，`restore_timeout` 后仍要按 retryable error 和后续 session 状态处理。
 
 10. **selective session restore 仍是 draft design**。#8743 当前不改变 SDK contract；SDK 不应预先依赖 replay anchor、partial 或 projection-specific fields。
 
@@ -441,7 +441,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - `RestSseTransport.dispose()`：幂等 abort 所有 active SSE 请求，清空 active set，使外部 dispose 能立即释放底层 HTTP/TCP 和 daemon EventBus subscriber。
 - `sse.ts:parseSseStream`：iterator cleanup 时 cancel response body stream；测试覆盖 early return、consumer throw、stream error、connect error、dispose 和多订阅 pending read。
 
-### #8415 — caller-supplied session ID override（当前 open）
+### #8415 — caller-supplied session ID override（merged）
 
 - TS daemon client、Java daemon SDK 与 daemon MCP route table 新增 optional `sessionId` request surface；调用前必须确认 daemon 广告 `session_id_override`。
 - SDK 发送后必须比较 response 中的 session id 和 requested id；不一致映射为 typed failure，避免调用方把 orphan 或自动生成 id 误绑定到外部 thread。
@@ -454,7 +454,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - `DaemonSessionClient.events()`：运行时删除 untyped JS caller 传入的 `clientId`、`previousSseStreamId` 和 `onSseStreamAccepted`，防止伪造 session-owned lineage。
 - `DaemonSessionProvider.tsx`：WebUI 在 prompt restart、normal stream end、transport error、state resync 四类可判定场景填 reason，其余场景交给 SDK 默认。
 
-### #8691 — restore timeout derivation（当前 open）
+### #8691 — restore timeout derivation（merged）
 
 - `DaemonClient.capabilities()`：缓存 `/capabilities.limits.sessionRestoreTimeoutMs`，供后续 load/resume 派生 timeout。
 - `DaemonClient.loadSession()` / `resumeSession()`：timeout 优先级为 per-request `timeoutMs`、显式全局 `fetchTimeoutMs`、server budget + 10s、默认 70s；`timeoutMs:0` 禁用客户端 timer。

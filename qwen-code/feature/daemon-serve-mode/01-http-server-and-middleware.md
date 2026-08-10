@@ -42,7 +42,7 @@
 | #7005 | primary-only ownership guard | `withPrimaryOnlyLiveSession()`、branch/fork/cd explicit primary-only guard、secondary owner fail-closed response |
 | #8572 | REST SSE stream/client observability（merged） | `routes/sse-events.ts`：stream UUID header、connect reason / previous stream lineage、slow-client/resync/close telemetry、close reason attribution |
 | #8588 | activeWork deep health（merged） | `routes/health-demo.ts`：`GET /health?deep=1` additive 返回 daemon-wide `activeWork`，聚合所有 managed/draining runtime |
-| #8691 | safe session restore timeout（open） | session load/resume restore timeout 映射为 retryable 504 / ACP `restore_timeout`，cleanup 不确定时返回 `acp_channel_unavailable` |
+| #8691 | safe session restore timeout（merged） | session load/resume restore timeout 映射为 retryable 504 / ACP `restore_timeout`，cleanup 不确定时返回 `acp_channel_unavailable` |
 
 ---
 
@@ -576,7 +576,7 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - `acpAgent.ts` / `Session.ts`：通过 private initialize `_meta` 协商 active-work heartbeat，Session 在 active transition 和 15s heartbeat 上报单调 seq。
 - restart controller 口径：`activeWork` 是 idle/restart guard，不替代 TCP/进程级 liveness。
 
-### #8691 — safe session restore timeout（open）
+### #8691 — safe session restore timeout（merged）
 
 - `commands/serve.ts` / `capabilities.ts`：新增 `--session-restore-timeout-ms`，并在 `/capabilities.limits.sessionRestoreTimeoutMs` 公告 effective restore deadline。
 - `server/error-response.ts` / `routes/session.ts`：`SessionRestoreTimeoutError` 映射为 retryable 504 JSON，带 `restore_timeout`、`Retry-After: 5`、`sessionId`、`action` 和 `timeoutMs`。

@@ -514,12 +514,12 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `runQwenServe.ts`：启动期拒绝非有限、负数、非整数，避免 `NaN` 静默关闭 deadline。
 - `bridge.ts`：超大 timeout clamp 到 `2^31-1`；默认仍 5 分钟，`0` 表示无限等待。
 
-### #8469 — repeated ACP tool execution failure guard（当前 draft open）
+### #8469 — repeated ACP tool execution failure guard（merged）
 
 - 在 ACP session 层新增 prompt-local guard，复用 tool execution outcome 契约，只统计完全 settle 的前台 batch 中真实进入 execution 后的 terminal error。
 - guard key 是 `(policyToolName, executionErrorType)`，刻意排除工具参数、输出、raw error、路径和 MCP server 名；permission/validation/not-started/cancelled/post-execution/unknown/mixed batch 不进入计数。
 - 阈值为 8 次失败且跨至少 2 个 complete batch。shadow 只记录 would_warn/would_stop，warn/enforce 注入固定纠偏提醒；enforce 在下一次 matching batch latched 后停止自动续跑并禁用 Todo continuation，直到新用户输入重置。
-- 当前仍是 draft open diff，不能视为 `main` 已落地行为；后续需按最终 merged diff 更新阈值、mode 和 telemetry 字段。
+- PR 已合入，本文按最终 diff 记录阈值、mode、fail-open 边界和 telemetry 字段。
 
 ### #8620 — same-host daemon text read delegation（已合入）
 
