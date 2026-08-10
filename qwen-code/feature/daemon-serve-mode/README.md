@@ -15,13 +15,13 @@
 | 02 | [SSE 事件总线](02-sse-event-bus.md) | EventBus 环形缓冲、replay、BoundedAsyncQueue 背压、live byte cap、replay byte budget、state_resync、event epoch、compaction degraded/truncated replay、live journal truncation repair marker（#8414 merged）、REST SSE stream/client observability（#8572 merged）、协议帧 serverTimestamp/provenance/errorKind |
 | 03 | [会话生命周期](03-session-lifecycle.md) | spawn/attach/close/delete、sessionScope single/thread、heartbeat、load/resume、session archive/unarchive、session organization、batch load replay、attach-ref ledger、prompt terminal exactly-once 与 follow-up hardening、session writer lease opt-in（#7894）、managed writer shutdown（#7812）、timestamp drift reconciliation（#7886）、Todo Stop Guard continuation hardening（#7821）、maintenance writer isolation（#7975）、certified writer handoff（#7976）、caller-supplied session id admission（#8415 merged）、restore timeout / late cleanup quarantine（#8691 merged）、selective session restore 设计（#8743 draft open）、repeated ACP tool failure guard（#8469 merged）与 activeWork lifecycle gate（#8588 merged） |
 | 04 | [能力注册表与协议](04-capabilities-and-protocol.md) | SERVE_CAPABILITY_REGISTRY、协议版本、typed event schema、协议补全、能力覆盖矩阵、workspace trust hot reload capability（#7268）、session_id_override capability（#8415 merged）、SSE stream diagnostics、session restore timeout limits/error taxonomy 与 activeWork health additive wire 字段（#8572 merged / #8691 merged / #8588 merged） |
-| 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写、Serve large-text bounded read（#7947）、handle-bound range reader（#7967 open）、byte-cursor paging（#8002）、lineEnding metadata consistency（#8383 open）与 same-host daemon text read delegation（#8620 merged） |
+| 05 | [工作区文件路由与 FS 边界](05-workspace-files-and-fs-boundary.md) | resolveWithinWorkspace 防穿越、editAtomic hash CAS、原子写、Serve large-text bounded read（#7947）、handle-bound range reader（#7967 open）、byte-cursor paging（#8002）、lineEnding metadata consistency（#8383 open）、same-host daemon text read delegation（#8620 merged）与 approved external built-in text writes（#8852 merged） |
 | 06 | [MCP 守卫与共享传输池](06-mcp-guardrails-and-pool.md) | per-session 预算 → workspace 共享池、引用计数、env 隔离、unsafe replay guard（#8387） |
-| 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量、same-host read/write delegation 能力分离（#8620 merged）与 repeated tool execution failure guard（#8469 merged） |
+| 07 | [acp-bridge 抽包与多客户端权限协调](07-acp-bridge-and-permission.md) | 抽包 seam、四策略权限仲裁、并发不变量、same-host read/write delegation 能力分离（#8620 merged）、approved external built-in text writes provenance/host route（#8852 merged）与 repeated tool execution failure guard（#8469 merged） |
 | 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、workspace skill status read model（#8080）、绕过 prompt FIFO、shell `this`-binding 隐患 |
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor、Java daemon transport alpha 与 #7603 reliability follow-up、TS daemon file read cursor paging（#8002）、REST SSE stream id / connect reason / lineage（#8572 merged）和 restoreSession timeout derivation（#8691 merged） |
-| 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754）、live journal repair（#8414 merged）、ACP textual tool-result projection（#8450 merged）、WebUI SSE reconnect reason（#8572 merged）与 restore request/watchdog timeout（#8691 merged） |
+| 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754）、live journal repair（#8414 merged）、ACP textual tool-result projection（#8450 merged）、WebUI SSE reconnect reason（#8572 merged）、restore request/watchdog timeout（#8691 merged）、same-id attachment stale-work fencing（#8833 merged）与 transactional cross-session switching open diff（#8882） |
 | 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单，以及 #7458/#7463/#7603/#7622/#7812/#7821/#7886/#7975/#7976 已合入状态 |
 | 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 当前 draft diff 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，#8245 当前 open diff 的 daemon memory budget reporting，#8423 已合入的 memory pressure observe mode，#8462 已合入的 active ACP child RSS aggregate，以及 #8508 已合入的 child heap partition status model |
 
@@ -562,6 +562,15 @@ sequenceDiagram
 | #8691 | safe session restore timeout | load/resume restore 使用专用 deadline、retryable 504/ACP `restore_timeout`、late cleanup exactly-once 与 cleanup 不确定时的 channel quarantine，避免单个超时误杀 sibling session。 |
 | #8743(open draft) | selective session restore design | docs-only draft 设计 daemon 内部 selective restore projection，避免 load/resume 对大型 persisted transcript 两次全量 materialize 后才按 `historyPageSize` 裁剪。 |
 
+### W33 2026-08-10 daemon / serve follow-up
+
+| PR | 子主题 | 一句话作用 |
+| --- | --- | --- |
+| #8824(closed draft) | transactional WebUI restore precursor | 关闭的 PR3a 完整草案，曾把 ordinary load/resume/reload/full-resync/live-journal repair 都做成 source 保留 + target staging + final commit；最终拆分给 #8833/#8882。 |
+| #8833 | WebUI same-id attachment fencing | 已合入，WebUI Provider/actions 按精确 attachment 对象隔离 stale metadata、SSE、heartbeat、`session_closed` 和 cleanup，不再只看 `sessionId`。 |
+| #8852 | approved external built-in text writes | 已合入，core built-in write 通过版本化 `tool-write-origin` 元数据进入 daemon-owned same-host host writer，已授权的 workspace 外文本写入不再被最终 delegated ACP write 拒绝。 |
+| #8882(open) | transactional cross-session switching | 当前 open diff 让现代 WebUI cross-session load/resume 在 target restore/replay staging 完成并赢得仲裁前保留 source visible owner，legacy daemon 继续 detach-first。 |
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -831,4 +840,4 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 7. **`/health` deep 探针非真实 liveness**。`?deep=1` 只读 Map-size getter（`sessionCount`/`pendingPermissionCount`）和 #8588 已合入的 `activeWork` 状态，不 ping 各子进程；它能阻止“仍有后台 Agent/terminal notification 时被当作空闲重启”，但检测不出"wedged 但仍计数/仍 active"的会话，真实 liveness 仍应靠 TCP/进程/trace/log 等观测。
 
-8. **open/draft diff 不能写成 main 已落地能力**。#7967/#8093/#8245/#8383 仍为 open，#8743 仍为 draft open；这些只能作为当前方案记录。#7812/#7821/#7886/#7894/#7947/#7975/#7976/#7994/#8002/#8080/#8387/#8414/#8415/#8423/#8450/#8462/#8464/#8469/#8508/#8572/#8588/#8620/#8691 已按 merged diff 更新。
+8. **open/draft diff 不能写成 main 已落地能力**。#7967/#8093/#8245/#8383/#8882 仍为 open，#8743 仍为 draft open，#8824 为 closed draft；这些只能作为当前方案或历史前身记录。#7812/#7821/#7886/#7894/#7947/#7975/#7976/#7994/#8002/#8080/#8387/#8414/#8415/#8423/#8450/#8462/#8464/#8469/#8508/#8572/#8588/#8620/#8691/#8833/#8852 已按 merged diff 更新。

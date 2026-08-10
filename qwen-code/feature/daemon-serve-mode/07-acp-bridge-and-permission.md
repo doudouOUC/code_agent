@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -49,6 +49,7 @@
 | #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
 | #8620 | same-host daemon text read delegation | FS seam follow-up | 最终实现用 `delegateReadTextFileToClient:false` 让 daemon-owned same-host bridge 广告 read local / write delegated，避免批准后的 direct read 被 WorkspaceFileSystem workspace 边界拒绝。 |
+| #8852 | approved external built-in text writes | FS seam follow-up | 最终实现用 versioned `tool-write-origin` provenance 让已批准的内置 text write 在 daemon-owned same-host adapter 上进入受控 host writer；HTTP/通用 ACP 不放宽。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -80,6 +81,8 @@
 **`BridgeFileSystem`（`bridgeFileSystem.ts`）** 是 F1（#4319/#4334）新增的 ACP fs 代理 seam。方法签名刻意镜像 ACP SDK 的 `ReadTextFileRequest`/`WriteTextFileRequest` 形状，让 adapter 做最少翻译。当通过 `BridgeOptions.fileSystem` 接线时，`BridgeClient.readTextFile`/`writeTextFile` 把 ACP fs 调用委派给它，而非用 `BridgeClient` 内联的 `fs.realpath`/`fs.writeFile`/`fs.readFile` 代理。契约要求 adapter **复刻内联代理的两道防御**（非常规文件拒绝 + `READ_FILE_SIZE_CAP=100 MiB`），并提供写-then-rename 原子性、目标 mode 保留、新文件 `0o600` 默认、symlink 拒绝、workspace 边界。其中 **symlink 拒绝是相对 pre-F1 内联代理的有意分歧**——内联代理会解析 symlink 并写穿到目标，F1 后生产路径改为与 PR 18 / `POST /file`（PR 20）一致的保守姿态。
 
 #8620 已合入后没有移除 `BridgeFileSystem` seam，而是在 `BridgeOptions` 上增加 `delegateReadTextFileToClient`。same-host daemon-owned bridge 传 `false` 后，initialize capability 广告 `readTextFile:false, writeTextFile:true`：子进程本地处理 direct read 和各种 pre-read，最终 text write 仍委派 WorkspaceFileSystem。通用 ACP bridge、caller-injected bridge 和非 same-host 宿主保持默认 delegated read/write；adapter 的 read 分支保留为异常 delegated read 的 fail-closed fallback。
+
+#8852 已合入后，same-host final write 的一小段已授权外部路径不再无条件回落到 WFS workspace boundary。core built-in `write_file`、edit、notebook edit 和 controlled shell sed edit 会携带版本化 `qwen-code/tool-write-origin` `_meta`；只有 daemon-owned adapter、trusted runtime、live generation、合法 marker 和 workspace 外目标同时成立时，`BridgeFileSystem.writeText` 才路由到 host writer。workspace 内写入仍走 WFS；HTTP `/file`、通用 ACP、caller-injected bridge、伪造/缺失 marker 或 untrusted/stale runtime 继续 fail closed。
 
 ### `ChannelFactory`：第四个 seam
 
@@ -527,3 +530,11 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `bridge.ts`：initialize capability 根据该选项发布 `readTextFile:false/writeTextFile:true`，让 child-local `FileSystemService` 接手 approved text reads。
 - `server.ts` / `run-qwen-serve.ts`：daemon-owned same-host default、primary、static secondary、dynamic runtime 统一传 `delegateReadTextFileToClient:false`。
 - 保留 `BridgeFileSystem.writeText` 委派和 read fallback，明确 same-host read 与 final write 的安全边界不同：读走 CLI 权限，最终写仍走 WorkspaceFileSystem workspace/trust/atomic/audit。
+
+### #8852 — approved external built-in text writes（已合入）
+
+- `core/src/services/tool-write-origin.ts`：新增内部 provenance marker，source 限定为受支持 built-in text write，`buildToolWriteOriginMeta` 会替换 caller-supplied marker。
+- `acp-integration/service/filesystem.ts`：只有 trusted core origin 才把 provenance 序列化到 ACP `_meta`，普通 ACP 调用无法伪造。
+- `serve/bridge-file-system-adapter.ts`：adapter 先用 workspace resolver 分流；workspace 内保留 WFS，workspace 外只有 opt-in + valid provenance 才调用 host writer。
+- `serve/fs/workspace-file-system.ts`：host writer 校验 runtime trust/generation、canonical target、普通文件和 leaf symlink，持有 path lock 后用 atomic write 完成，保留 mode 或新建 `0600`，编码后 5MiB 上限，记录一次 success/denied audit。
+- 测试覆盖 approve/reject/YOLO 外部写入、无 marker ACP/HTTP 拒绝、factory capability 缺失、untrusted/stale generation、special file/symlink/race/encoding/BOM/CRLF/oversize 等路径。

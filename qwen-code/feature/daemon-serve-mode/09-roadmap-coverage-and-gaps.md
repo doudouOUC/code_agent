@@ -16,7 +16,7 @@
 
 #7019（2026-07-16 merged）又把 multi-workspace hardening 文档作为当前口径补齐：一个 daemon 可管理多个 isolated workspace runtime，第一项 workspace 是 primary / legacy default；后续 route 和 capability 应按 process-global、legacy-primary、workspace-qualified、live-session-owner、persisted-workspace 五类 ownership 判断，不再沿用本文早期“1 daemon = 1 workspace”的设计前提。
 
-2026-08-10 的最新增量集中在 restore 性能与安全边界：#8691 已合入，先把大型 session restore 的 timeout、late cleanup、quarantine 与 telemetry 安全化；#8743 当前 draft open 只新增 selective session restore 设计/计划文档，目标是在 #8691 之后把 load/resume 从“两次全量 materialize persisted transcript 后再按 `historyPageSize` 裁剪”改为内部 projection。它不替代 transactional WebUI switching，也不等同于 durable checkpoint follow-up；这些仍应作为独立路线图项按各自数据一致性和兼容性边界审计。
+2026-08-11 的最新增量继续收敛 restore/WebUI 一致性边界：#8691 已合入，先把大型 session restore 的 timeout、late cleanup、quarantine 与 telemetry 安全化；#8743 当前 draft open 只新增 selective session restore 设计/计划文档，目标是在 #8691 之后把 load/resume 从“两次全量 materialize persisted transcript 后再按 `historyPageSize` 裁剪”改为内部 projection。#8833 已合入 same-id attachment stale-work fencing，解决同一个 persisted session reload/reattach 后旧 metadata/SSE/heartbeat/cleanup 污染 replacement 的问题；#8882 当前 open diff 才是 cross-session visible-state transaction，目标是在 target restore/staging commit 前保留 source 可见 owner。#8824 为 closed draft 前身，不计作落地能力；durable checkpoint follow-up 仍是独立路线图项。
 
 ---
 

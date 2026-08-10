@@ -47,6 +47,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
 - **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921/#8150）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis，#8150 在流式 span 上写标准 `gen_ai.response.time_to_first_chunk` 秒级属性并移除 span-level 私有 `ttft_ms` 双发。
 - **Tool-call outcome 口径（#8176/#8180）**：#8176 已合入统一 terminal normalization boundary，所有 tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前先归一化 `status`、兼容 `success` 和 error fields；#8180 当前 open diff 继续把 terminal status 与 execution outcome 拆开，区分未进入 `invocation.execute()` 的 synthetic failure 和真正工具执行后的 success/failure/cancel。
+- **OpenAI API 本地日志保留（#8862）**：interactive housekeeping 现在按 `model.openAILogRetentionDays` 清理 `OpenAILogger` 写出的本地 request/response JSON 文件，默认 7 天，`0` 约等于 1 小时；只删除真实 writer 文件名，不触碰用户自有 `openai-*.json`，自定义目录要求 user/system 级单一策略。
 
 ---
 
@@ -524,6 +525,16 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 #8691/#8743 的 restore telemetry 保持低敏：只记录 session id、restore action、channel id、timeout、public/late/cleanup/quarantine 结果、阶段耗时、bounded counts/bytes 和 cache state；不记录 transcript 内容、用户 prompt、record id、cursor、文件路径正文或 auth data。telemetry/logger 失败不能改变 restore timeout、cleanup、quarantine 或 selective projection 行为。
 
+### 6.11 OpenAI API log retention
+
+| PR | 子主题 | 作用 | Phase |
+|---|---|---|---|
+| #8862 | OpenAI API 本地日志保留清理（merged） | `model.enableOpenAILogging` 产生的本地 JSON request/response 日志由 interactive housekeeping 按 `model.openAILogRetentionDays` 清理；默认 7 天，`0` 约等于 1 小时。 | Local logs |
+
+#8862 不改变 OTel logs/traces export，也不改变 OpenAI-compatible 请求内容；它只控制本地 flat-file 日志的磁盘和敏感数据保留期。清理器只匹配 `OpenAILogger` 当前 timestamp+id 文件名契约，用 UTC 文件名日期快速筛除大部分文件，cutoff 当天再用 mtime 判定。每个 log dir 有独立 marker，最多每天成功 sweep 一次；OpenAI marker 缺失或超过 7 天时，首次 housekeeping 使用 1 分钟 catch-up delay。
+
+默认 per-workspace log dir 使用 merged retention setting；自定义 `model.openAILoggingDir` 的扁平文件不编码 workspace owner，因此只能接受 user/system scope 的 retention。trusted workspace 若给同一自定义目录提供 workspace-scoped retention，会跳过清理且不写 success marker，避免用某个 workspace 的策略删除其它 workspace/用户共享目录里的日志。
+
 ## 7. 已知限制 / 后续
 
 1. **HTTP log→span 桥接默认不可达（#3779）**：`getTelemetryOtlpEndpoint()` 因 `?? DEFAULT_OTLP_ENDPOINT` 恒非空，叠加默认 grpc 协议（grpc 分支无条件建 logExporter），导致桥接路径只在「显式 http + 仅 traces endpoint」时才触发。建议：要么让默认 endpoint 真正可为 undefined，要么把桥接判定上移到协议无关层。
@@ -551,3 +562,5 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 12. **#7921 只适合一进程一用户部署**：`telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 是进程级配置。shared daemon、shared ACP channel 或任何一个进程服务多个 end user 的部署，如果直接配置该字段，会把不同用户归并成同一个 ARMS user id；这类场景需要后续增加 per-session/per-request identity surface。
 
 13. **#8743 仍是 draft open**：#8469 repeated tool execution failure guard telemetry 与 #8691 session restore timeout telemetry 已按 merged diff 更新；#8743 selective restore stage telemetry 仍只记录设计方案。若后续 selective restore stage 名、bounded count/byte 字段或 cache state 调整，本文需要按最终 runtime diff 再同步。#8572 的 `qwen-code.daemon.sse.*` 已按 merged diff 更新。
+
+14. **#8862 只覆盖 interactive housekeeping**：headless `-p` 和 SDK-only 进程不会启动这条后台清理流水线，仍可能积累 OpenAI API 本地日志；写入路径上的同步清理和非交互进程的 retention 需要后续单独设计。

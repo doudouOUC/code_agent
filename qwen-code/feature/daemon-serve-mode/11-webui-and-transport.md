@@ -37,6 +37,9 @@
 | #8572 | @doudouOUC | merged | WebUI SSE reconnect reason：只在 prompt restart、normal stream end、transport error、state resync 可判定时向 TS SDK 传 `sseConnectReason`。 |
 | #8691 | @doudouOUC | merged | WebUI restore timeout budget：load/resume 使用 server restore budget 派生 request timeout 与 watchdog，并把 retryable 504 作为可恢复 restore failure。 |
 | #8743 | @doudouOUC | draft open | selective session restore design：当前不改 WebUI runtime；设计要求 recent replay 仍通过有界 replay page/anchor 表达，并与 transactional WebUI switching 分开推进。 |
+| #8824 | @doudouOUC | closed draft | transactional WebUI restore 完整草案；未合入，后续拆分为 #8833 same-id attachment fencing 与 #8882 cross-session switching。 |
+| #8833 | @doudouOUC | merged | same-id attachment stale-work fencing：metadata、SSE、heartbeat、`session_closed` 和 cleanup 按精确 attachment object 归属。 |
+| #8882 | @doudouOUC | open | transactional cross-session switching：source 在 target restore/staging 成功 commit 前保持 visible owner，legacy daemon 仍走 detach-first。 |
 
 ---
 
@@ -325,6 +328,18 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 
 #8743 当前 draft open 只补 selective session restore 设计/计划，不改 WebUI 代码。后续 runtime 实现需要保持两个边界：recent replay page 是 UI 可见恢复页，不等于模型 runtime history；transactional WebUI switching 仍是独立工作，不能把 selective restore 的 bounded replay 当作 UI 原子切换保障。
 
+## 2026-08-10 follow-up：same-id attachment fencing 与 transactional switching
+
+#8824 是关闭的 PR3a 完整草案，曾把 ordinary load/resume/reload/full-resync/live-journal repair 全部设计为 source visible owner + target staging + deadline/generation checked commit，并让 WebShell 分离 desired/committed session/workspace。它未合入 `main`，不能作为落地能力；最终可合并边界被拆开。
+
+#8833 已合入第一段基础能力：`DaemonSessionProvider` 和 `actions.ts` 不再只用 `sessionId` 判断异步结果归属，而是按启动 runner/action 时捕获的 attachment 对象和 `clientId` fence。旧 attachment 的 metadata refresh、streamed events、terminal frame、heartbeat failure、`session_closed`、transcript batch 或 reload cleanup 到达时，如果当前 provider 已切到同 id replacement，就丢弃结果或只清理自己，不能覆盖新 connection/transcript，也不能 detach replacement。
+
+#8882 当前 open diff 继续推进跨 session 可见状态事务化。Provider 引入 `CrossSessionIntent` / `StagedCrossSession` / `stageCrossSession` / `commitCrossSession`：普通 restore raw RPC 同时最多一个，相同 target coalesce，只保留 latest queued target；target replay 在隔离 store 中按 batch reducer staging，commit 前复核 attachment、environment、deadline 和 lifecycle。commit 同步安装 target transcript/history/session/workspace/client refs、connection state、notices 与 side channels，然后才 resolve public load promise 并启动 prepared runner。
+
+WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 desired target 与 committed target；workspace 解析 pending/failed 时继续显示 committed App，并只向 host 做一次 rollback。`App.tsx`、queued prompts、background tasks 和 artifacts hooks 通过 `useDaemonSessionOwnerGuard()` 绑定 owner；target pending/failed 时保留 source metadata，新写入在 optimistic UI side effect 前被 gate，scheduled-run catch-up timer 延后到 restore commit 后才开始。
+
+open 边界：#8882 不处理 same-logical-session reload、clientId-only handoff、epoch/ring resync、live-journal repair transaction、branch creation/adoption、selective JSONL restore、checkpoint 或 global attachment scheduler。legacy daemon 明确缺少 `client_identity` 时保持 detach-first；unknown capability 或 malformed modern target fail closed。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -372,4 +387,4 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-10_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-11_

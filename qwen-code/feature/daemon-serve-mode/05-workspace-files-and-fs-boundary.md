@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.6、§4.3）。本文在 file/symbol/line 级别**取代**总览的 §3.6 段落，深入到 `resolveWithinWorkspace` 的逐分支防穿越/防符号链接逃逸算法、CAS+原子写链路的每一步守卫、读路由的 fail-closed 参数校验，以及 `FileSystemService` / `BridgeFileSystem` 注入 seam。
 >
-> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads）、#7967（handle-bound text range refactor 当前 open diff）、#8002（byte-cursor paging 已合入）、#8383（lineEnding metadata consistency 当前 open diff）、#8620（same-host daemon text read delegation 已合入）。
+> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads）、#7967（handle-bound text range refactor 当前 open diff）、#8002（byte-cursor paging 已合入）、#8383（lineEnding metadata consistency 当前 open diff）、#8620（same-host daemon text read delegation 已合入）、#8852（approved external built-in text writes 已合入）。
 
 ---
 
@@ -45,6 +45,7 @@ Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP
 | #8002 | byte-cursor paging（merged） | 为 Serve `/file` 增加 `hasMore`/`nextCursor`/`cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
 | #8383 | lineEnding metadata consistency（open） | 当前 open diff 让 Serve text `meta.lineEnding` 从完整 decoded file 检测一次，避免 CRLF cursor paging 前后页报告不同 line ending。 |
 | #8620 | same-host daemon text read delegation（merged） | 最终实现让 daemon-owned same-host bridge 关闭 delegated text read、保留 delegated text write，direct read/pre-read 回到子进程本地 CLI 权限，最终写入仍走 WorkspaceFileSystem。 |
+| #8852 | approved external built-in text writes（merged） | 最终实现让已授权的内置 `write_file`/edit/notebook/sed 对 workspace 外文本的最终写入，经严格 `tool-write-origin` 元数据进入 same-host host writer；HTTP/通用 ACP 边界不放宽。 |
 
 ---
 
@@ -434,7 +435,7 @@ sequenceDiagram
 
 6. **CAS（`expectedHash`）+ per-path 锁的乐观并发**。`editAtomic`/`replace` 强制客户端基于读到的 hash 写，冲突 `409 hash_mismatch` 让客户端重读重试；per-path 锁串行化同文件并发写防撕裂。`ambiguous_text_match`（>1 匹配拒绝）强制唯一 span，杜绝歧义替换的静默错改。
 
-7. **ACP fs 复用同一 factory（#4334 / #8620）**。agent 侧最终 `writeTextFile` 经 adapter 走 `writeTextOverwrite`，与 HTTP `POST /file` 共享 trust 门 + TOCTOU + 审计，且是对 pre-F1 内联 proxy 的刻意 divergence（不再写穿符号链接）。#8620 已合入后让 same-host daemon 的 text read 不再走该 factory，direct read/pre-read 回到子进程本地 CLI 权限；代价是 read-side 不再获得 WorkspaceFileSystem 的 read audit、256 KiB full-snapshot cap、8 MiB large-text scan cap 和 read-side symlink/TOCTOU 守卫。
+7. **ACP fs 复用同一 factory（#4334 / #8620 / #8852）**。agent 侧最终 `writeTextFile` 经 adapter 走 `writeTextOverwrite`，与 HTTP `POST /file` 共享 trust 门 + TOCTOU + 审计，且是对 pre-F1 内联 proxy 的刻意 divergence（不再写穿符号链接）。#8620 已合入后让 same-host daemon 的 text read 不再走该 factory，direct read/pre-read 回到子进程本地 CLI 权限；代价是 read-side 不再获得 WorkspaceFileSystem 的 read audit、256 KiB full-snapshot cap、8 MiB large-text scan cap 和 read-side symlink/TOCTOU 守卫。#8852 已合入后只对带合法 core `tool-write-origin` 的内置工具最终写入新增 same-host host writer：workspace 内仍走 WFS，workspace 外通过 canonical path lock、普通文件/symlink/generation/5MiB/atomic/audit 守卫完成已授权写入；HTTP `/file`、通用 ACP 和伪造/缺失 provenance 的请求继续 fail closed。
 
 ---
 
@@ -446,7 +447,7 @@ sequenceDiagram
 
 3. **ACP 子进程侧 `params.path` 约束的渐进对齐**。#4334 adapter 已把 delegated ACP fs 路由到同一 `WorkspaceFileSystem`，但 ACP `readTextFile` 的 `line`/`limit` 窗口在 adapter 里做**兼容性丢弃**（`bridgeFileSystemAdapter.ts:136-143`：null / 非正值回落 `undefined`），以贴近 pre-PR 内联 proxy 对 `limit<=0` 返回空内容的姿态，而非透传 `parse_error` 给老 agent。#8620 已合入后 same-host daemon-owned bridge 正常不再 delegated read；该 adapter read 路径主要是异常/capability-violating fallback。
 
-4. **#7967/#8383 仍为 open**。handle-bound range refactor、lineEnding metadata consistency 只记录当前 open diff；尚不能视为 `main` 已落地能力。#7947/#8002/#8620 已合入，但仍只放行 UTF-8 bounded line-window / cursor paging，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。#8620 不把最终 text write 移出 WorkspaceFileSystem，因此 #8618 类 write/edit outside-workspace final write 拒绝仍会复现。
+4. **#7967/#8383 仍为 open**。handle-bound range refactor、lineEnding metadata consistency 只记录当前 open diff；尚不能视为 `main` 已落地能力。#7947/#8002/#8620/#8852 已合入，但仍只放行 UTF-8 bounded line-window / cursor paging，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。#8852 只放行 daemon-owned same-host built-in 工具在用户已授权后的 final text write；未带合法 provenance 的 HTTP/通用 ACP external write 仍被 workspace boundary 拒绝。
 
 5. **`io_error` 的 503 不可区分根因**。聚合的 `io_error`（ENOSPC/EIO/EBUSY/ENAMETOOLONG/EMFILE）都映射 503，监控只能知道"环境性故障"，需读 `message`/`hint` 才能分 `df -h`（满盘）vs fd 耗尽。
 
@@ -468,6 +469,7 @@ sequenceDiagram
 | #8002 merged focused suites | 177 CLI + 95 Core + 405 TS SDK | Cursor parse/encode、append-only continuation、replace/truncate mismatch、BOM/CRLF metadata、long-line cap、SDK/MCP additive fields。 |
 | #8383 current open focused suite | 119 CLI | CRLF 文件用 `limit:1` 读取第一页并沿 `nextCursor` 读取第二页，两页都报告 `crlf`。 |
 | #8620 focused suites | 255 targeted | same-host daemon-owned bridge capability、默认/primary/static/dynamic runtime 接线、批准后 direct external text read、最终 delegated write 仍拒绝 workspace 外路径。 |
+| #8852 focused suites | 564 Core + 336 CLI + integration | `tool-write-origin` metadata、adapter fail-closed、host writer symlink/regular-file/generation/encoding/5MiB/audit 守卫，以及 approve/reject/YOLO external built-in write 无 shell fallback。 |
 
 > 文件子系统四层 + adapter 已有密集回归覆盖；#8620 另补 same-host daemon read/write delegation focused suites。`workspaceFileSystem.test.ts` 的 75 例仍是密度最高的安全回归套件，逐一覆盖 §"写/编辑路由" 列出的每道守卫。
 
@@ -530,3 +532,12 @@ sequenceDiagram
 - `acp-integration/service/filesystem.ts`：direct `read_file` 与 write/edit/notebook/sed/artifact prior read 使用子进程本地 `FileSystemService` 和普通 CLI 权限。
 - `bridge-file-system-adapter.ts`：final `writeTextFile` 继续委派到 WorkspaceFileSystem；read adapter 保留为异常 delegated read 的 fail-closed fallback。
 - 文档明确记录 read-side 不再享有 WFS read audit/size cap/symlink/TOCTOU 守卫，且 final write outside-workspace 仍被拒绝。
+
+### #8852 — approved external built-in text writes（已合入）
+
+- `core/src/services/tool-write-origin.ts`：新增版本化 `qwen-code/tool-write-origin` `_meta`，只允许 core built-in 来源构造，caller-supplied provenance 会被替换/剥离。
+- `core/src/tools/write-file.ts` / `edit.ts` / `notebook-edit.ts` / `shell.ts`：内置 `write_file`、edit、notebook edit 和 controlled shell sed edit 在最终写入时携带来源。
+- `acp-integration/service/filesystem.ts`：只有 trusted core origin 会序列化 provenance；普通 ACP client 不能伪造 same-host external write。
+- `serve/bridge-file-system-adapter.ts`：workspace 内写入保持原 WFS 路径；workspace 外仅在 daemon-owned adapter opt-in、provenance 合法、runtime trusted/generation live 时调用 host writer。
+- `serve/fs/workspace-file-system.ts`：新增 `writeSameHostToolTextOutsideWorkspace`，用 canonical path lock、普通文件/leaf symlink/TOCTOU/generation guard、编码后 5MiB 上限、mode 保留或 `0600` 新建、atomic replace 与单次 audit 闭合外部写入。
+- 文档边界：HTTP `/file`、通用 ACP、caller-injected bridge、缺失/格式错误 marker 和 untrusted/stale runtime 继续 fail closed；普通 shell redirection 仍走 shell 权限系统。
