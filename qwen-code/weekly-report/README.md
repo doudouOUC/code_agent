@@ -2,9 +2,9 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文最终实现文档放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-**时间范围**: 2026-04-06 ~ 2026-08-10（持续更新）
-**总计**: 380 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33 见对应周目录（W33 周内累计个人增量 +13,909 / -1,184，80 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-08-11（持续更新）
+**总计**: 390 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33 见对应周目录（W33 周内累计个人增量 +29,405 / -2,784，181 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -28,11 +28,11 @@
 | [2026-07-20 ~ 2026-07-26](2026-07-20_2026-07-26/) (W30 最终版) | 36 | 29/5/2 | +74,992/-6,440 | Plan mode entry boundary、workspace trust hot reload、SDK SSE request cleanup、lazy telemetry SDK / OTLP protocol split、ACP permission cancellation preservation、final tool response budget、daemon detach attach-ref ledger、exactly-once prompt terminal events、prompt-terminal follow-up hardening、lazy undici、daemon replay epoch/compaction hardening、Java daemon SDK alpha、Shell truncation regression、enterprise memory gateway stack、lazy Google GenAI SDK、GenAI telemetry ARMS alignment、deferred ACP telemetry init、retrieval-only external context search、ACP compile cache propagation、Java daemon transport reliability hardening、epoch cursor review follow-up、daemon event pipeline resource hardening、GenAI request telemetry/content fields、OpenAI empty-frame usage preservation、first-use dependency lazy loading、manual Plan-exit notice delivery、lightweight JSONC settings editor、workspace-scoped Web Shell Voice |
 | [2026-07-27 ~ 2026-08-02](2026-07-27_2026-08-02/) (W31 周内累计) | 27 | 20/7/0 | +41,296/-5,001 | daemon first-output latency benchmark、submitted prompt provenance、ACP provider preload、managed writer shutdown、benchmark validity/schema hardening、Todo Guard continuation、external-context auto recall、transcript timestamp drift、writer lease opt-in、ARMS user id、large text bounded reads、handle-bound text range reader、maintenance writer isolation、certified writer handoff、immediate dispatch metrics、byte-cursor paging、workspace skill status read model、resource budgeting foundation、GenAI first-chunk tracing、tool-call terminal telemetry、tool execution outcome、external-context dependency hardening、daemon memory budget reporting、mobile-mcp dependency hardening、Auto Recall proxy lifecycle、lineEnding metadata consistency |
 | [2026-08-03 ~ 2026-08-09](2026-08-03_2026-08-09/) (W32 最终版) | 18 | 17/1/0 | +29,637/-2,289 | MCP unsafe replay guard、WebUI live journal truncation recovery、caller-supplied session id admission、daemon memory pressure observation、write_file prior-read guidance、ACP tool-result text projection、active ACP child RSS aggregation、tool-result low watermark microcompaction、ACP repeated tool execution failure guard、Direct External Context Mem0 writes、daemon child heap partition modeling、REST SSE stream/client observability、activeWork deep health、same-host daemon text read delegation、read permission symlink canonicalization、safe session restore timeout observability、integration-tests typecheckability、selective session restore design |
-| [2026-08-10 ~ 2026-08-16](2026-08-10_2026-08-16/) (W33 周内累计) | 5 | 3/1/1 | +13,909/-1,184 | WebUI same-id attachment stale-work fencing、approved external built-in text writes、OpenAI API log retention、transactional WebUI cross-session switching |
+| [2026-08-10 ~ 2026-08-16](2026-08-10_2026-08-16/) (W33 周内累计) | 15 | 9/5/1 | +29,405/-2,784 | WebUI/WebShell session switching 与 catalog consistency、approved external built-in text writes、OpenAI API log retention、daemon session catalog/cache/standalone design、ACP NDJSON/resource guard hardening、continuation admission observability |
 
 ## 类型分布
 
-feat ×184, fix ×131, refactor ×15, other ×8, docs ×10, chore ×6, perf ×14, test ×6, merge ×1
+feat ×187, fix ×135, refactor ×15, other ×8, docs ×11, chore ×7, perf ×15, test ×6, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

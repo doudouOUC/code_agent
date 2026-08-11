@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 当前 open diff 的 ACP transport resource guard，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -50,6 +50,8 @@
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
 | #8620 | same-host daemon text read delegation | FS seam follow-up | 最终实现用 `delegateReadTextFileToClient:false` 让 daemon-owned same-host bridge 广告 read local / write delegated，避免批准后的 direct read 被 WorkspaceFileSystem workspace 边界拒绝。 |
 | #8852 | approved external built-in text writes | FS seam follow-up | 最终实现用 versioned `tool-write-origin` provenance 让已批准的内置 text write 在 daemon-owned same-host adapter 上进入受控 host writer；HTTP/通用 ACP 不放宽。 |
+| #8911 | bound daemon ACP NDJSON buffers | transport resource guard | 已合入，daemon-owned ACP child 的 NDJSON frame 与 decoded inbound queue 使用固定 bounds，超限低敏记录并终止精确 child。 |
+| #8947 | close daemon ACP resource guard gaps | transport resource guard | 当前 open diff 在 #8911 raw stream bounds 之外补 handler、prepared response、outbound op 与 outstanding request 的 count/byte guard。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -538,3 +540,15 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `serve/bridge-file-system-adapter.ts`：adapter 先用 workspace resolver 分流；workspace 内保留 WFS，workspace 外只有 opt-in + valid provenance 才调用 host writer。
 - `serve/fs/workspace-file-system.ts`：host writer 校验 runtime trust/generation、canonical target、普通文件和 leaf symlink，持有 path lock 后用 atomic write 完成，保留 mode 或新建 `0600`，编码后 5MiB 上限，记录一次 success/denied audit。
 - 测试覆盖 approve/reject/YOLO 外部写入、无 marker ACP/HTTP 拒绝、factory capability 缺失、untrusted/stale generation、special file/symlink/race/encoding/BOM/CRLF/oversize 等路径。
+
+### #8911 — daemon ACP NDJSON buffer bounds（已合入）
+
+- `ndJsonStream.ts` 新增可选 frame limit 与 decoded queue limit；`qwen serve` 创建的 daemon-owned ACP child 固定使用 64 MiB frame limit、256 条 / 64 MiB decoded inbound queue。
+- admission 在 decode/parse 前完成；frame 超限、queue saturation 或 unterminated EOF 会报告 typed transport cause、cancel input、正常关闭 decoded stream 并终止 exact tracked child。
+- parse failure 日志只输出 error kind、byte length、SHA-256 digest 和 payloadOmitted，不记录 child payload；公开/standalone ACP streams 不自动启用这些 bounds。
+
+### #8947 — ACP transport resource guard gaps（当前 open）
+
+- 当前 open diff 在 daemon-owned channel 上增加 bounded JSON-RPC envelope admission，并为 active handlers、prepared responses、pre-SDK outbound operations、outstanding request IDs 做 count/byte accounting。
+- fatal protocol、serialization、EOF 或 admission failure 会立即标记精确 workspace channel generation unavailable，终止 tracked child，并阻止 initialize/create/restore/attach/prompt/status 复用该 channel。
+- 该 PR 未合入 `main`；本文只记录当前实现观察。合入前不能把 handler/outbound/request queue guard 写成已落地能力。

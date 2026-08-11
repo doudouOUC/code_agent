@@ -36,7 +36,7 @@ qwen-code 的「认证 + 模型」并不是单一来源，而是一个**多 prov
 
 - **OpenAI-compatible stream 卡死（#5827/#5845）**：OpenAI SDK 的 request `timeout` 通常只覆盖连接或首包；一旦流式响应已经开始但长时间没有新 chunk，旧实现可能一直挂住。需要 provider pipeline 内部的 inactivity timeout，让“无流量”也能 abort 并复用既有 retry 分类，同时允许部署通过环境变量统一覆盖默认 idle timeout。
 
-- **OpenAI-compatible API 日志保留（#8862）**：`model.enableOpenAILogging` 会把 OpenAI-compatible 请求/响应落为本地 JSON 日志。缺少保留策略时，长期开启调试会持续增长 `~/.qwen/tmp` 或自定义日志目录；需要把 provider 日志清理纳入 CLI 交互态后台 housekeeping，并让用户通过 settings 明确配置保留天数。
+- **OpenAI-compatible API 日志保留（#8862/#8893）**：`model.enableOpenAILogging` 会把 OpenAI-compatible 请求/响应落为本地 JSON 日志。缺少保留策略时，长期开启调试会持续增长 `~/.qwen/tmp` 或自定义日志目录；需要把 provider 日志清理纳入 interactive 与 non-interactive best-effort housekeeping，并让用户通过 settings 明确配置保留天数。
 
 本方案的目标即：用**统一的 source 溯源 + 优先级**解决前四个配置问题，用**设备流注册表**解决远程登录，在全过程对凭据/密文做脱敏与原子落盘，并把 provider 侧调试日志纳入有界本地保留。
 
@@ -326,9 +326,9 @@ if (entry.status === 'pending') {
 
 `deviceFlow.ts:sanitizeForStderr(value)` + 正则 `SANITIZE_FOR_STDERR_RE`：把可伪造日志行/注入终端控制序列的字节替换为 `?`（长度保持）。覆盖 ASCII C0/C1+DEL，以及 round-5/round-6 追加的 Unicode 仿冒控制符——`U+200B-U+200F`（零宽 + LRM/RLM）、`U+2028-U+2029`（行/段分隔=终端换行）、`U+202A-U+202E`（bidi embedding/override）、`U+2066-U+2069`（bidi isolate，CVE-2021-42574 Trojan Source）、`U+FEFF`（BOM）。该 helper 被下沉到 `deviceFlow.ts` 供两层共享：`qwenDeviceFlowProvider.ts` 对 attacker-controlled 的 `err.oauthError`（#4291）与 `err.name`（#4305 #4）脱敏；registry 的 late-poll/late-rejection observer 对 `latePollResult.kind`/`lateErr.name` 脱敏（#4305 #7 改 `name+length` 模式，不再 slice 原始 message）。
 
-### 3.6 OpenAI API 日志保留（#8862）
+### 3.6 OpenAI API 日志保留（#8862/#8893）
 
-#8862 不是认证协议改动，但属于 OpenAI-compatible provider 的本地运行边界：开启 `model.enableOpenAILogging` 后，CLI 会在日志目录写入请求/响应 JSON 文件；这些文件可能含 prompt、工具结果和服务返回内容，必须有默认保留策略。
+#8862/#8893 不是认证协议改动，但属于 OpenAI-compatible provider 的本地运行边界：开启 `model.enableOpenAILogging` 后，CLI 会在日志目录写入请求/响应 JSON 文件；这些文件可能含 prompt、工具结果和服务返回内容，必须有默认保留策略。
 
 最终实现把清理放入 `packages/cli/src/utils/housekeeping`：
 
@@ -336,7 +336,8 @@ if (entry.status === 'pending') {
 - `cleanupOldOpenAILogs` 只匹配 writer 自己生成的 OpenAI API 日志文件名，不扫描或删除同目录的其它用户文件。
 - 每个日志目录有独立 marker，避免每次启动都遍历目录；若 OpenAI 日志 marker 缺失或过旧，会触发补偿扫描，不被通用 tmp marker 覆盖。
 - 自定义日志目录只应用用户配置或系统默认保留天数，不继承内部 tmp 目录清理策略，避免在用户指定目录里扩大删除范围。
-- 该任务挂在 interactive CLI housekeeping scheduler 上，清理失败只记录告警，不阻断 CLI 启动、provider 初始化或正在进行的模型调用。
+- #8862 先把任务挂在 interactive CLI housekeeping scheduler 上；#8893 再把同一 retention 逻辑接到 headless CLI、stream-json 与 ACP lifecycle 的 non-interactive queue。清理失败只记录告警，不阻断 CLI 启动、provider 初始化或正在进行的模型调用。
+- 非交互队列按 log dir 去重、FIFO 串行；退出时拒绝新任务、丢弃等待项、abort 当前扫描并最多等待 250ms，因此它是 best-effort retention，不是写入路径同步清理。
 
 ---
 
@@ -470,6 +471,7 @@ sequenceDiagram
 | #5827 | merged | OpenAI stream inactivity timeout | 流式请求长时间无 chunk 时 abort per-request controller，合成 `ETIMEDOUT` 并复用既有 retry 分类；默认 120s，`<=0` 禁用 |
 | #5845 | merged | stream idle timeout env override | 新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，显式 config > env > 默认；非法 env 忽略并 debug warning |
 | #8862 | merged | OpenAI API log retention | 新增 `model.openAILogRetentionDays` 与 interactive housekeeping 清理，默认保留 7 天、`0` 约 1 小时，并按 writer-owned 文件名和 per-directory marker 限定删除范围 |
+| #8893 | merged | non-interactive OpenAI log retention | headless CLI、stream-json 与 ACP lifecycle 启动同一 retention queue，按目录去重/FIFO 串行，退出时 best-effort abort/drain |
 
 ---
 
@@ -502,8 +504,8 @@ sequenceDiagram
 
 10. **Anthropic abort listener 隔离只覆盖 Anthropic generator**
 
-11. **#8862：日志保留清理只随交互态 housekeeping 运行**
-   - `model.openAILogRetentionDays` 约束的是 CLI 交互态后台清理；headless SDK、只启动部分 core/provider 流程或长期不进入 interactive CLI 的使用方式，不保证按日触发清理。自定义日志目录虽然会使用相同保留天数，但只清理 writer-owned OpenAI API 日志文件，不会替用户管理目录内其它调试产物。
+11. **#8862/#8893：日志保留清理是 best-effort**
+   - `model.openAILogRetentionDays` 会在 interactive 和 non-interactive 流程中触发后台清理，但写入路径不会同步删除日志；短进程退出时只等待有限 drain。自定义日志目录虽然会使用相同保留天数，但只清理 writer-owned OpenAI API 日志文件，不会替用户管理目录内其它调试产物。
 
 ---
 
@@ -542,12 +544,12 @@ sequenceDiagram
 - **优先级**：显式 `ContentGeneratorConfig.streamIdleTimeoutMs`（包括 0 禁用）> env > 默认 `120000`。
 - **边界**：该 env 只提供 OpenAI-compatible stream inactivity timeout 的默认值，不改变用户主动 abort、partial-output recovery 或 retry classifier 的语义。
 
-### #8862 — OpenAI API log retention
+### #8862/#8893 — OpenAI API log retention
 
 - **配置入口**：`settingsSchema.ts` 与 VS Code companion schema 新增 `model.openAILogRetentionDays`，默认 7 天；设置为 `0` 时保留约 1 小时内文件，作为“尽快清理历史日志”的安全下限。
 - **清理实现**：`cleanupOldOpenAILogs` 只按 OpenAI API 日志 writer 的文件名模式匹配，删除超过 cutoff 的日志文件；非匹配文件、目录和其它工具产物不处理。
-- **调度边界**：`scheduler.ts` 为 OpenAI 日志目录维护独立 marker；marker stale 或缺失时补偿运行，避免被通用 tmp marker 掩盖。自定义日志目录只使用用户/默认保留策略，不继承内部 tmp 目录策略。
-- **验证**：housekeeping focused tests 覆盖默认 7 天、`0` 约 1 小时、writer-owned 匹配、marker catch-up、自定义目录策略和清理失败不阻断启动。
+- **调度边界**：`scheduler.ts` 为 OpenAI 日志目录维护独立 marker；marker stale 或缺失时补偿运行，避免被通用 tmp marker 掩盖。自定义日志目录只使用用户/默认保留策略，不继承内部 tmp 目录策略。#8893 的 non-interactive queue 按目录去重、串行扫描，退出时 best-effort abort/drain。
+- **验证**：housekeeping focused tests 覆盖默认 7 天、`0` 约 1 小时、writer-owned 匹配、marker catch-up、自定义目录策略、non-interactive dedupe/FIFO/abort 与清理失败不阻断启动。
 
 ### #3495 — apiKey 跨重启保留
 

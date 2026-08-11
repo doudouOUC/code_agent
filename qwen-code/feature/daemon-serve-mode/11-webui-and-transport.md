@@ -40,6 +40,10 @@
 | #8824 | @doudouOUC | closed draft | transactional WebUI restore 完整草案；未合入，后续拆分为 #8833 same-id attachment fencing 与 #8882 cross-session switching。 |
 | #8833 | @doudouOUC | merged | same-id attachment stale-work fencing：metadata、SSE、heartbeat、`session_closed` 和 cleanup 按精确 attachment object 归属。 |
 | #8882 | @doudouOUC | open | transactional cross-session switching：source 在 target restore/staging 成功 commit 前保持 visible owner，legacy daemon 仍走 detach-first。 |
+| #8891 | @doudouOUC | merged | shared session catalog scheduling：WebShell 多消费者共享 catalog cache/in-flight/scheduler，mutation 后按 owning workspace invalidate/patch。 |
+| #8931 | @doudouOUC | merged | prompt-safe session navigation：async host admission hook 返回后重查 session write gate，navigation preparing 时保留 source draft。 |
+| #8933 | @doudouOUC | open | restore request shape fencing：按 target + replay shape 区分 load/resume/all/recent coalescing，防止不同 replay 语义互相满足。 |
+| #8939 | @doudouOUC | draft open | transactional same-session refresh：same logical session refresh/rebind 使用 candidate staging，commit 前 source attachment/transcript/event stream 保持活动。 |
 
 ---
 
@@ -340,6 +344,16 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 
 open 边界：#8882 不处理 same-logical-session reload、clientId-only handoff、epoch/ring resync、live-journal repair transaction、branch creation/adoption、selective JSONL restore、checkpoint 或 global attachment scheduler。legacy daemon 明确缺少 `client_identity` 时保持 detach-first；unknown capability 或 malformed modern target fail closed。
 
+## 2026-08-11 follow-up：shared catalog、prompt-safe navigation、restore shape 与 same-session refresh
+
+#8891 已合入 WebShell session catalog store。`SessionCatalogStore` 以 `DaemonClient` 为共享边界，合并相同 query 的 cached page 与 in-flight request；client-wide scheduler 限制 list work 并保留显式用户动作 slot。sidebar、overview、split picker、dialogs 和 command lookup 都消费同一 source，mutation 后按 owning workspace invalidate 或保守 patch。
+
+#8931 已合入 prompt-safe navigation hardening。direct/queued prompt 在 async host `onSubmitBefore` hook 返回后再次检查 session write gate；如果切换已进入 queued/preparing，提交停止且 source draft/follow-up 不被清空。navigation 自身不得生成 cancel、continuation、prompt replay 或 mid-turn 请求。
+
+#8933 当前 open diff 把 restore request identity 改成 shape-aware。相同 target 仍要区分 `resume/none`、`load/all`、`load/recent(N)`；非等价 raw result 不能 commit 给 later intent。ACP bridge 也在 restore admission 前校验 effective page，避免 WebUI 与 daemon coalescing 口径不一致。
+
+#8939 当前 draft open diff 把 same logical session 的 load/reload/resume/clientId rebind 做成事务候选。source attachment、transcript、event stream、prompt state 和 controls 保持活动；candidate restore 校验 epoch、cursor、replay completeness、ownership 与 bounded live tail 后才原子替换。失败、超时或 superseded candidate 只 retire 自己。该能力依赖 #8933，当前不能写成 `main` 已落地。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -387,4 +401,4 @@ open 边界：#8882 不处理 same-logical-session reload、clientId-only handof
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-11_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-12_

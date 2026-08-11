@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-08-10 ~ 2026-08-16 (W33 周内累计)
 
-> 本文件已整理 2026-08-10（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
+> 本文件已整理 2026-08-10 与 2026-08-11（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: WebUI same-id attachment stale work fencing、approved external built-in text writes、OpenAI API log retention、transactional WebUI cross-session switching
+**主题**: WebUI/WebShell session switching 与 catalog consistency、approved external built-in text writes、OpenAI API log retention、daemon session catalog/cache/standalone design、ACP NDJSON/resource guard hardening、continuation admission observability
 
-**PR 统计**: 5 PRs - 3 merged / 1 open / 1 closed
-**当前已合并 PR 代码量**: +2,934 / -159，43 个文件变更
-**全量代码量**: +13,909 / -1,184，80 个文件变更
-**类型分布**: fix ×4, feat ×1
-**范围 (scope)**: webui ×3, serve ×1, cli ×1
+**PR 统计**: 15 PRs - 9 merged / 5 open / 1 closed
+**当前已合并 PR 代码量**: +11,591 / -1,214，119 个文件变更
+**全量代码量**: +29,405 / -2,784，181 个文件变更
+**类型分布**: fix ×8, feat ×4, docs ×1, perf ×1, chore ×1
+**范围 (scope)**: webui/web-shell ×6, serve ×5, cli ×3, docs/design ×1
 
 ---
 
@@ -21,6 +21,16 @@
 | [#8852](https://github.com/QwenLM/qwen-code/pull/8852) | ✅ merged | @doudouOUC | fix(serve): Allow approved external built-in text writes | +1495/-56 | 31 | 08-10 08:25 | 08-10 12:20 |
 | [#8862](https://github.com/QwenLM/qwen-code/pull/8862) | ✅ merged | @doudouOUC | feat(cli): add background cleanup for OpenAI API logs | +715/-8 | 8 | 08-10 09:28 | 08-10 12:20 |
 | [#8882](https://github.com/QwenLM/qwen-code/pull/8882) | 🟡 open | @doudouOUC | fix(webui): Make cross-session switching transactional | +5210/-459 | 21 | 08-10 13:54 | — |
+| [#8890](https://github.com/QwenLM/qwen-code/pull/8890) | 🟡 open draft | @doudouOUC | docs: Design standalone daemon sessions | +476/-0 | 1 | 08-10 16:36 | — |
+| [#8891](https://github.com/QwenLM/qwen-code/pull/8891) | ✅ merged | @doudouOUC | feat(web-shell): Share session catalog scheduling | +4486/-808 | 32 | 08-10 16:40 | 08-11 09:13 |
+| [#8892](https://github.com/QwenLM/qwen-code/pull/8892) | ✅ merged | @doudouOUC | perf(cli): Cache persisted session catalogs | +1683/-116 | 12 | 08-10 16:40 | 08-11 09:35 |
+| [#8893](https://github.com/QwenLM/qwen-code/pull/8893) | ✅ merged | @doudouOUC | feat(cli): clean up OpenAI logs in non-interactive sessions | +1028/-86 | 14 | 08-10 16:46 | 08-11 07:09 |
+| [#8911](https://github.com/QwenLM/qwen-code/pull/8911) | ✅ merged | @doudouOUC | feat(serve): bound daemon ACP NDJSON buffers | +758/-36 | 7 | 08-11 04:20 | 08-11 14:37 |
+| [#8931](https://github.com/QwenLM/qwen-code/pull/8931) | ✅ merged | @doudouOUC | fix(web-shell): Enforce prompt-safe session navigation | +636/-0 | 7 | 08-11 11:37 | 08-11 14:33 |
+| [#8932](https://github.com/QwenLM/qwen-code/pull/8932) | ✅ merged | @doudouOUC | chore(serve): Log session continuation admissions | +66/-9 | 4 | 08-11 11:44 | 08-11 14:34 |
+| [#8933](https://github.com/QwenLM/qwen-code/pull/8933) | 🟡 open | @doudouOUC | fix(serve): Keep restore request shapes distinct | +902/-26 | 7 | 08-11 11:45 | — |
+| [#8939](https://github.com/QwenLM/qwen-code/pull/8939) | 🟡 open draft | @doudouOUC | fix(webui): Make same-session refresh transactional | +2992/-351 | 9 | 08-11 13:38 | — |
+| [#8947](https://github.com/QwenLM/qwen-code/pull/8947) | 🟡 open | @doudouOUC | fix(serve): Close daemon ACP resource guard gaps | +2469/-168 | 8 | 08-11 15:18 | — |
 
 ---
 
@@ -33,14 +43,27 @@
 | [#8852](https://github.com/QwenLM/qwen-code/pull/8852) | same-host `qwen serve` 中，用户已经批准内置 `write_file`/edit/notebook/sed 对 workspace 外文本的写入后，最终 ACP `writeTextFile` 仍会被 WorkspaceFileSystem 以 `path_outside_workspace` 拒绝，导致工具失败并诱导模型用 shell 重试。 | 最终实现为 core built-in write 请求注入严格版本化 `qwen-code/tool-write-origin` 内部来源元数据；只有 daemon-owned same-host adapter 且元数据合法时，workspace 外写入才会走受控 host writer。host writer 保留 trust/generation guard、canonical path lock、普通文件/symlink 校验、5MiB 编码上限、mode 保留或新建 `0600`、原子替换和单次审计；workspace 内、HTTP、通用 ACP、伪造/缺失元数据继续走原 WorkspaceFileSystem 边界并 fail closed。 | 已更新 daemon 文件系统边界与 ACP bridge 权限口径。完整实现见 [implementations/pr-8852.md](implementations/pr-8852.md)。 |
 | [#8862](https://github.com/QwenLM/qwen-code/pull/8862) | `model.enableOpenAILogging` 会把完整 OpenAI-compatible 请求/响应写成独立 JSON 文件，长期没有轮转；重度使用会累积大量磁盘、inode 和敏感 prompt/response 数据。 | 最终实现把 OpenAI API log retention 接入 interactive housekeeping：新增 `model.openAILogRetentionDays` 默认 7 天，`0` 表示约 1 小时最短保留；每个解析后的 log dir 每天最多清理一次，只删除 `OpenAILogger` 真实 timestamp+id 文件名，按文件名 UTC 日期快速跳过大多数文件，并用 bounded concurrency 流式删除。默认 workspace log dir 用 merged retention；自定义目录只接受 user/system 级单一策略，workspace-scoped 歧义时跳过。 | 已更新 telemetry/auth-provider 的 OpenAI 日志保留口径。完整实现见 [implementations/pr-8862.md](implementations/pr-8862.md)。 |
 | [#8882](https://github.com/QwenLM/qwen-code/pull/8882) | 跨 session load/resume 选择另一个会话时，WebUI 仍可能在目标 restore 成功前先暴露 target/loading 并停止 source；#8691 只解决 daemon restore timeout lifecycle，#8833 只解决 stale attachment，缺少客户端可见状态的事务边界。 | 当前 open diff 让现代 WebUI cross-session switching 事务化：source 继续作为可见 owner，target restore 在隔离 staging store 中有界 replay；一个普通 restore RPC in flight，相同 target coalesce，只保留 latest queued target；commit 前按 attachment/environment/deadline 做最终仲裁，同步安装 target transcript、session/client/workspace refs、connection state、notices 与 side channels，再启动 prepared runner。legacy daemon 缺 `client_identity` 时保留 detach-first 兼容路径，未知 capability 或 malformed modern target fail closed。 | 已在 WebUI/transport 与 roadmap 登记为 open diff，不能视为已落地。完整观察见 [implementations/pr-8882.md](implementations/pr-8882.md)。 |
+| [#8890](https://github.com/QwenLM/qwen-code/pull/8890) | 顶层聊天/standalone session 仍会隐式绑定 primary workspace；缺 `cwd` 的创建请求在 workspace 被移动、删除或不应绑定项目时语义不清。 | 当前 draft 只新增 standalone daemon sessions 设计文档：standalone session 由 daemon 管理私有 work dir，不 fallback primary workspace；显式区分 standalone/workspace/Live context；create/delete/restore、缺失目录、崩溃恢复和兼容策略都先写成验收矩阵。 | 登记为设计观察，未作为已落地能力。完整观察见 [implementations/pr-8890.md](implementations/pr-8890.md)。 |
+| [#8891](https://github.com/QwenLM/qwen-code/pull/8891) | WebShell sidebar、overview、dialog、split picker 等各自拉 session catalog，重复 polling 且可能用 stale 响应覆盖刚完成的 mutation。 | 最终实现 page-scoped `SessionCatalogStore`：同一 `DaemonClient` 的相同查询共享 cached page 与 in-flight promise；client-wide scheduler 总 list 并发 2、background 并发 1；mutation 会 invalidate 或保守 patch owning workspace；hidden page 暂停自动工作，visible 后只补过期查询。 | 已更新 WebUI/transport 与 daemon 总览。完整实现见 [implementations/pr-8891.md](implementations/pr-8891.md)。 |
+| [#8892](https://github.com/QwenLM/qwen-code/pull/8892) | organized/pinned/source-filtered/LiveTask session list 在并发下重复扫描 JSONL 与 worktree sidecar，session 数量大时 route 延迟和 event-loop lag 明显。 | 最终实现 process-local 2 秒 `PersistedSessionListCache`：按 runtime root、workspace identity 和 archive state 做 single-flight 缓存；只缓存 persisted JSONL/worktree sidecar catalog，Live bridge 状态、organization、过滤排序分页仍按请求计算；metadata/close/delete/archive/unarchive 等 mutation 在响应前失效对应 catalog。 | 已更新 session lifecycle。完整实现见 [implementations/pr-8892.md](implementations/pr-8892.md)。 |
+| [#8893](https://github.com/QwenLM/qwen-code/pull/8893) | #8862 只覆盖 interactive housekeeping；headless CLI、stream-json SDK 和 ACP 进程同样会写 OpenAI API 日志，却可能不触发清理。 | 最终实现非交互 OpenAI 日志清理队列：按 log dir 去重、FIFO 串行扫描、保留 retry/marker 语义；CLI non-interactive、stream-json 与 ACP 生命周期启动队列，退出时拒绝新任务、丢弃待处理、abort 当前扫描并最多等 250ms。 | 已更新 telemetry/auth-provider 的非交互 best-effort 口径。完整实现见 [implementations/pr-8893.md](implementations/pr-8893.md)。 |
+| [#8911](https://github.com/QwenLM/qwen-code/pull/8911) | daemon ACP child 的 NDJSON 未终止 chunk 和 decoded queue 没有 count/byte 上限，恶意或失控 child 可用超大 frame 或 notification flood 增长 daemon root 内存。 | 最终实现为 `qwen serve` 创建的 ACP child 启用 bounded NDJSON stream：frame 上限 64 MiB，decoded inbound queue 上限 256 条/64 MiB conservative charge；超限在 decode/parse 前关闭输入、正常关闭 decoded stream 并终止精确 child；大 parse failure 只记录 error kind、字节数和 SHA-256 digest。 | 已更新 ACP bridge 与 resource budgeting。完整实现见 [implementations/pr-8911.md](implementations/pr-8911.md)。 |
+| [#8931](https://github.com/QwenLM/qwen-code/pull/8931) | 事务化 session navigation 准备期间，prompt submission 的异步 host hook 可能先通过旧检查，随后在切换已开始时清空 draft/follow-up 或提交到错误状态。 | 最终实现让 direct/queued prompt 在 async host admission hook 返回后再次检查 session write gate；若 target 处于 queued/preparing，提交停止且 source draft 保留。navigation 本身不得生成 cancel/continuation/prompt replay/mid-turn 请求。 | 已更新 WebUI/transport。完整实现见 [implementations/pr-8931.md](implementations/pr-8931.md)。 |
+| [#8932](https://github.com/QwenLM/qwen-code/pull/8932) | prompt/cancel 有生命周期日志，但 continuation admission 没有；排查 navigation 与 controller identity 时缺少 accepted continuation 的 promptId/clientId 线索。 | 最终实现为成功 accepted 的 session continuation 增加 info 级结构化日志 `continuation enqueued`，仅含 `sessionId`、生成的 `promptId` 和可选 `clientId`，不记录 prompt 内容；rejected/failed continuation 不误报 enqueued。 | 已更新 session lifecycle 与 telemetry/observability。完整实现见 [implementations/pr-8932.md](implementations/pr-8932.md)。 |
+| [#8933](https://github.com/QwenLM/qwen-code/pull/8933) | 不同 replay 语义的 restore 请求可能被错误 coalesce：`load` 可满足 `resume`，`recent(100)` 可共享 `recent(500)` 或 `all`，返回错误 replay。 | 当前 open diff 让 WebUI 与 ACP bridge 的 restore coalescing 按 request shape 区分：identity 包含 target、`resume/none`、`load/all` 或 `load/recent(N)`；非等价请求串行/冲突，superseded raw result 不能 commit；bridge 在 restore admission 前校验 effective page。 | 已在 session lifecycle 与 WebUI/transport 登记为 open diff。完整观察见 [implementations/pr-8933.md](implementations/pr-8933.md)。 |
+| [#8939](https://github.com/QwenLM/qwen-code/pull/8939) | same logical session refresh/rebind 仍走 destructive runner path；慢/失败/partial/stale restore 会打断健康 source session 或丢 live events。 | 当前 draft diff 把同 session `load`、configured reload、`resume` 和 clientId rebind 做成事务候选：source attachment/transcript/event stream/prompt state 保持活动，candidate restore 校验 epoch、cursor、replay completeness、ownership 和 bounded tail 后原子替换；失败/超时/过期候选 retire。 | 已在 WebUI/transport 登记为 draft open，依赖 #8933。完整观察见 [implementations/pr-8939.md](implementations/pr-8939.md)。 |
+| [#8947](https://github.com/QwenLM/qwen-code/pull/8947) | #8911 只限制 raw NDJSON/decoded stream；ACP SDK 私有 handler、pending response、outbound op 和 outstanding request 队列仍可能被 child 绕过 watermark 放大。 | 当前 open diff 在 daemon-owned channel 上增加 envelope admission 与 transport guard：限制 active handlers、prepared responses、pre-SDK outbound operations、outstanding request IDs 的 count/bytes；fatal protocol/serialization/EOF/admission failure 会立即标记精确 workspace channel generation unavailable、终止 tracked child，并阻止复用。 | 已在 ACP bridge 与 resource budgeting 登记为 open diff，不能视为已落地。完整观察见 [implementations/pr-8947.md](implementations/pr-8947.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [daemon-serve-mode/](../../feature/daemon-serve-mode/) | #8824(closed draft) / #8833 / #8852 / #8882(open) | 补 WebUI same-id attachment fencing、approved external built-in text write host route，以及 transactional WebUI cross-session switching open diff 与 #8824 superseded 关系。 |
+| [daemon-serve-mode/](../../feature/daemon-serve-mode/) | #8824(closed draft) / #8833 / #8852 / #8882(open) / #8890(open draft) / #8891 / #8892 / #8911 / #8931 / #8932 / #8933(open) / #8939(open draft) / #8947(open) | 补 WebUI/WebShell session catalog 与 switching、standalone daemon session 设计、persisted session catalog cache、ACP NDJSON/resource guard、continuation admission logs 与 restore shape/same-session refresh open diff。 |
 | [daemon-serve-mode/05-workspace-files-and-fs-boundary.md](../../feature/daemon-serve-mode/05-workspace-files-and-fs-boundary.md) / [07-acp-bridge-and-permission.md](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #8852 | 补 `tool-write-origin` provenance、daemon-owned same-host host writer、canonical path/symlink/generation/audit 边界，以及 HTTP/通用 ACP 不放宽的兼容性。 |
-| [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #8824 / #8833 / #8882(open) | 补 attachment identity owner guard、source-visible transactional target staging、WebShell desired/committed target、write gate 与 scheduled-run catch-up timer 语义。 |
-| [telemetry-observability/](../../feature/telemetry-observability/) / [auth-providers.md](../../feature/auth-providers.md) | #8862 | 补 OpenAI API log retention 的默认保留期、marker 调度、自定义目录策略和只删除 writer-owned 文件名的隐私/磁盘控制口径。 |
+| [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #8890 / #8892 / #8932 / #8933(open) | 补 standalone session 设计、persisted session list cache、continuation admission log 和 restore request shape-aware coalescing。 |
+| [daemon-serve-mode/07-acp-bridge-and-permission.md](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) / [13-resource-budgeting.md](../../feature/daemon-serve-mode/13-resource-budgeting.md) | #8911 / #8947(open) | 补 daemon-owned ACP NDJSON 帧/decoded queue bounds、child termination 语义，以及 transport guard open diff 的 handler/outbound/request 队列预算。 |
+| [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #8824 / #8833 / #8882(open) / #8891 / #8931 / #8933(open) / #8939(open draft) | 补 attachment identity owner guard、shared session catalog scheduling、source-visible transactional target staging、write gate、restore shape fencing 与 same-session refresh draft。 |
+| [sdk.md](../../feature/sdk.md) | #8939(open draft) | 补 TS daemon SDK restore epoch / partial replay diagnostics 的 draft open 观察，明确未合入 `main` 且必须保持 additive。 |
+| [telemetry-observability/](../../feature/telemetry-observability/) / [auth-providers.md](../../feature/auth-providers.md) | #8862 / #8893 / #8932 | 补 OpenAI API log retention 的 interactive + non-interactive best-effort 调度、默认保留期、marker 策略、只删除 writer-owned 文件名，以及 continuation admission 结构化日志。 |
 
-_按个人 PR 口径更新于 2026-08-11_
+_按个人 PR 口径更新于 2026-08-12_

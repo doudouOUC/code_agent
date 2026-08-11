@@ -1,12 +1,12 @@
 # daemon 资源预算、容量模型与公平调度
 
-> 口径：本文记录 #8093 当前 draft/open diff 的 resource foundation、#8245 当前 open diff 的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate，以及 #8508 已合入的 child heap partition status model。open/draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
+> 口径：本文记录 #8093 当前 draft/open diff 的 resource foundation、#8245 当前 open diff 的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers，以及 #8947 当前 open diff 的 ACP transport resource guard。open/draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
 
 ## 背景
 
 multi-workspace daemon 已经把 workspace runtime、session ownership、EventBus replay、file/transcript paging 等边界拆开，但资源保护仍主要停留在 workspace/session 数量、MCP client budget 和各 route 的局部 byte cap。缺口在于：bulk 操作、spawn/process work、buffered process output、fanout/replay/export 等路径可能共享同一 Node 进程内存与队列；单个 workspace 的重活如果没有全局和 per-workspace 公平 admission，会挤占其它 workspace 的 prompt completion、错误响应、cleanup 和 shutdown 空间。
 
-#8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型，但仍不应用、不拒绝 spawn。
+#8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型，但仍不应用、不拒绝 spawn。#8911 是第一段已接入生产 daemon-owned ACP child 的 buffer bound：它限制 NDJSON frame 与 decoded inbound queue；#8947 当前 open diff 继续覆盖 ACP SDK dispatch 后的 handler/outbound/request 队列。
 
 ## ResourceBudget
 
@@ -80,6 +80,20 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 
 `refusals` 只代表 admission pressure，不代表 partition 可以安全 enforce。是否能 enforce 还需要每个 child 的 peak old-space measurement，而不是现有 RSS 或 `heapUsed`；这条测量链不在 #8508 范围内。
 
+## Daemon ACP NDJSON Buffer Bounds（#8911 已合入）
+
+#8911 将 resource budgeting 从 observe-only 状态推进到一条具体生产通路：`qwen serve` 创建的 daemon-owned ACP child 会启用 bounded `ndJsonStream`。入站/出站 NDJSON frame limit 固定为 64 MiB；decoded inbound queue 同时限制 256 条消息和 64 MiB retained wire bytes，并使用 conservative charge 防止大量小消息绕过 byte cap。
+
+admission 在 decode/parse 前完成。frame 超限、decoded queue 饱和或 EOF 时仍有 unterminated frame，都会报告 typed transport cause、cancel input、正常关闭 decoded stream 并终止精确 tracked child。这样既阻断 daemon root memory growth，也避免 ACP SDK receive loop 因 rejected stream 出现 unhandled rejection。parse failure 日志只记录 error kind、byte length 与 SHA-256 digest，不记录 child-controlled payload。
+
+这条能力和 #8093 的 `ResourceBudget` 不是同一个 enforcement plane：#8911 使用固定 transport-local bounds，不广告 daemon-wide resource capability，也不把 EventBus/export/process 等其它 route 纳入预算。
+
+## ACP Transport Resource Guard Follow-up（#8947 当前 open）
+
+#8947 当前 open diff 继续补 #8911 覆盖不到的 ACP SDK 内部队列。它在 daemon-owned channel 上做 bounded JSON-RPC envelope admission，并为 active handlers、prepared responses、pre-SDK outbound operations、outstanding request IDs 维护 count/byte 账本；release 点分别绑定 handler response delivery、outbound notification local delivery 和 request settlement。
+
+fatal protocol、serialization、EOF 或 admission failure 会立即把精确 workspace channel generation 标记 unavailable，终止 tracked child，并阻止 initialize/create/restore/attach/prompt/status 复用该 channel。已经在 fatal 前 complete admitted 的 frame 仍按顺序交付。该 PR 仍 open，当前文档只能作为方案观察，不能写成 `main` 已落地资源 enforcement。
+
 ## 当前未接入项
 
 #8093 明确不做以下事情：
@@ -92,6 +106,8 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 - #8423 只观察 daemon root RSS/heap pressure，不做 admission、throttle、kill 或 child aggregate pressure。
 - #8462 已合入的 active child RSS aggregate，但该 aggregate 仍是 status 观测字段，不代表完整进程树，也不参与 enforcement。
 - #8508 已合入的 child heap partition status model，但不应用 per-child ceiling、不拒绝 spawn、不提供 enforce 模式，也不声称 `refusals:0` 可作为强制启用信号。
+- #8911 已对 daemon-owned ACP child 的 raw NDJSON 与 decoded inbound queue 接入固定 bounds，但不覆盖 ACP SDK handler/outbound/pending-response/outstanding request 队列。
+- #8947 当前 open diff 才补 handler/outbound/request 队列 guard；在合入前不能作为生产行为承诺。
 
 这些内容应在后续 PR 按 route ownership、error taxonomy 与 client compatibility 分批接入。
 
@@ -106,6 +122,8 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 - #8423 当前 diff 覆盖 memory pressure unit/status/SDK tests，验证 rss/heap winner、unknown denominator、off/observe issue behavior 与 status shape。
 - #8462 已合入的 focused status tests，覆盖 sampled gaps、pre-age bridge、dormant exclusion 与 active child aggregate response。
 - #8508 已合入的 child heap policy / daemon status / serve flag tests，覆盖 2/8/32/256GB host 下的 partition invariant、零池 `null` ceiling、observe/off child argv 不变、`enforce` 被 yargs 与 fast path 拒绝，以及 `limits.memory.enforced:false` 的协议兼容。
+- #8911 已合入的 ACP bridge / daemon runtime focused tests，覆盖 frame limit、decoded queue count/bytes、unterminated EOF、metadata-only parse failure 和 exact child termination。
+- #8947 当前 open diff 声明覆盖 ACP bridge guard、daemon runtime、build/typecheck/lint、Prettier 与 SDK backpressure probes；合入前仍按 open diff 观察处理。
 
 ## PR 归因
 
@@ -116,3 +134,5 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 | [#8423](https://github.com/QwenLM/qwen-code/pull/8423) | merged | 在真实 cgroup/host/heap denominator 上观察 daemon root memory pressure，默认 observe-only 并通过 status issue 报告 warning。 |
 | [#8462](https://github.com/QwenLM/qwen-code/pull/8462) | merged | 汇总所有 live managed ACP child 的 cached RSS，报告 aggregate bytes、sampled count 和 oldest reading age。 |
 | [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | merged | 发布 observe-only child heap partition model，报告 `limits.memory.childHeap`，保持 child argv 与 `limits.memory.enforced:false` 不变，并移除不安全的 enforce 路径。 |
+| [#8911](https://github.com/QwenLM/qwen-code/pull/8911) | merged | 为 daemon-owned ACP child 启用 bounded NDJSON frame 与 decoded queue，超限时低敏记录并终止精确 child。 |
+| [#8947](https://github.com/QwenLM/qwen-code/pull/8947) | open | 当前 open diff 补 ACP SDK handler/outbound/prepared response/outstanding request guard 与 fatal channel generation isolation。 |
