@@ -39,11 +39,14 @@
 | #8743 | @doudouOUC | draft open | selective session restore design：当前不改 WebUI runtime；设计要求 recent replay 仍通过有界 replay page/anchor 表达，并与 transactional WebUI switching 分开推进。 |
 | #8824 | @doudouOUC | closed draft | transactional WebUI restore 完整草案；未合入，后续拆分为 #8833 same-id attachment fencing 与 #8882 cross-session switching。 |
 | #8833 | @doudouOUC | merged | same-id attachment stale-work fencing：metadata、SSE、heartbeat、`session_closed` 和 cleanup 按精确 attachment object 归属。 |
-| #8882 | @doudouOUC | open | transactional cross-session switching：source 在 target restore/staging 成功 commit 前保持 visible owner，legacy daemon 仍走 detach-first。 |
+| #8882 | @doudouOUC | merged | transactional cross-session switching：source 在 target restore/staging 成功 commit 前保持 visible owner，legacy daemon 仍走 detach-first。 |
 | #8891 | @doudouOUC | merged | shared session catalog scheduling：WebShell 多消费者共享 catalog cache/in-flight/scheduler，mutation 后按 owning workspace invalidate/patch。 |
 | #8931 | @doudouOUC | merged | prompt-safe session navigation：async host admission hook 返回后重查 session write gate，navigation preparing 时保留 source draft。 |
-| #8933 | @doudouOUC | open | restore request shape fencing：按 target + replay shape 区分 load/resume/all/recent coalescing，防止不同 replay 语义互相满足。 |
-| #8939 | @doudouOUC | draft open | transactional same-session refresh：same logical session refresh/rebind 使用 candidate staging，commit 前 source attachment/transcript/event stream 保持活动。 |
+| #8933 | @doudouOUC | merged | restore request shape fencing：按 target + replay shape 区分 load/resume/all/recent coalescing，防止不同 replay 语义互相满足。 |
+| #8939 | @doudouOUC | merged | transactional same-session refresh：same logical session refresh/rebind 使用 candidate staging，commit 前 source attachment/transcript/event stream 保持活动。 |
+| #8955 | @doudouOUC | merged | prompt admission ownership hardening：async host admission/lazy preparation 后重校 owner/generation，并用 stable transcript identity 恢复 source-owned retry。 |
+| #8990 | @doudouOUC | merged | same-session refresh race closeout：补 event epoch、candidate cleanup、turn+shell settle、controlled target 与 committed client identity recovery。 |
+| #9007 | @doudouOUC | open | ACP HTTP pre-attach byte bounds：当前 open diff 限制 pre-attach buffered replies 的 frame/byte budget，并把 ownership grant 绑定到 local delivery。 |
 
 ---
 
@@ -338,21 +341,29 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 
 #8833 已合入第一段基础能力：`DaemonSessionProvider` 和 `actions.ts` 不再只用 `sessionId` 判断异步结果归属，而是按启动 runner/action 时捕获的 attachment 对象和 `clientId` fence。旧 attachment 的 metadata refresh、streamed events、terminal frame、heartbeat failure、`session_closed`、transcript batch 或 reload cleanup 到达时，如果当前 provider 已切到同 id replacement，就丢弃结果或只清理自己，不能覆盖新 connection/transcript，也不能 detach replacement。
 
-#8882 当前 open diff 继续推进跨 session 可见状态事务化。Provider 引入 `CrossSessionIntent` / `StagedCrossSession` / `stageCrossSession` / `commitCrossSession`：普通 restore raw RPC 同时最多一个，相同 target coalesce，只保留 latest queued target；target replay 在隔离 store 中按 batch reducer staging，commit 前复核 attachment、environment、deadline 和 lifecycle。commit 同步安装 target transcript/history/session/workspace/client refs、connection state、notices 与 side channels，然后才 resolve public load promise 并启动 prepared runner。
+#8882 已合入跨 session 可见状态事务化。Provider 引入 `CrossSessionIntent` / `StagedCrossSession` / `stageCrossSession` / `commitCrossSession`：普通 restore raw RPC 同时最多一个，相同 target coalesce，只保留 latest queued target；target replay 在隔离 store 中按 batch reducer staging，commit 前复核 attachment、environment、deadline 和 lifecycle。commit 同步安装 target transcript/history/session/workspace/client refs、connection state、notices 与 side channels，然后才 resolve public load promise 并启动 prepared runner。
 
 WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 desired target 与 committed target；workspace 解析 pending/failed 时继续显示 committed App，并只向 host 做一次 rollback。`App.tsx`、queued prompts、background tasks 和 artifacts hooks 通过 `useDaemonSessionOwnerGuard()` 绑定 owner；target pending/failed 时保留 source metadata，新写入在 optimistic UI side effect 前被 gate，scheduled-run catch-up timer 延后到 restore commit 后才开始。
 
-open 边界：#8882 不处理 same-logical-session reload、clientId-only handoff、epoch/ring resync、live-journal repair transaction、branch creation/adoption、selective JSONL restore、checkpoint 或 global attachment scheduler。legacy daemon 明确缺少 `client_identity` 时保持 detach-first；unknown capability 或 malformed modern target fail closed。
+落地边界：#8882 不处理 same-logical-session reload、clientId-only handoff、epoch/ring resync、live-journal repair transaction、branch creation/adoption、selective JSONL restore、checkpoint 或 global attachment scheduler。legacy daemon 明确缺少 `client_identity` 时保持 detach-first；unknown capability 或 malformed modern target fail closed。
 
-## 2026-08-11 follow-up：shared catalog、prompt-safe navigation、restore shape 与 same-session refresh
+## 2026-08-11 ~ 2026-08-12 follow-up：shared catalog、prompt ownership、restore shape 与 same-session refresh
 
 #8891 已合入 WebShell session catalog store。`SessionCatalogStore` 以 `DaemonClient` 为共享边界，合并相同 query 的 cached page 与 in-flight request；client-wide scheduler 限制 list work 并保留显式用户动作 slot。sidebar、overview、split picker、dialogs 和 command lookup 都消费同一 source，mutation 后按 owning workspace invalidate 或保守 patch。
 
 #8931 已合入 prompt-safe navigation hardening。direct/queued prompt 在 async host `onSubmitBefore` hook 返回后再次检查 session write gate；如果切换已进入 queued/preparing，提交停止且 source draft/follow-up 不被清空。navigation 自身不得生成 cancel、continuation、prompt replay 或 mid-turn 请求。
 
-#8933 当前 open diff 把 restore request identity 改成 shape-aware。相同 target 仍要区分 `resume/none`、`load/all`、`load/recent(N)`；非等价 raw result 不能 commit 给 later intent。ACP bridge 也在 restore admission 前校验 effective page，避免 WebUI 与 daemon coalescing 口径不一致。
+#8933 已合入 restore request identity 的 shape-aware fencing。相同 target 仍要区分 `resume/none`、`load/all`、`load/recent(N)`；非等价 raw result 不能 commit 给 later intent。ACP bridge 也在 restore admission 前校验 effective page，避免 WebUI 与 daemon coalescing 口径不一致。
 
-#8939 当前 draft open diff 把 same logical session 的 load/reload/resume/clientId rebind 做成事务候选。source attachment、transcript、event stream、prompt state 和 controls 保持活动；candidate restore 校验 epoch、cursor、replay completeness、ownership 与 bounded live tail 后才原子替换。失败、超时或 superseded candidate 只 retire 自己。该能力依赖 #8933，当前不能写成 `main` 已落地。
+#8939 已合入 same logical session 的 load/reload/resume/clientId rebind 事务化。source attachment、transcript、event stream、prompt state 和 controls 保持活动；candidate restore 校验 epoch、cursor、replay completeness、ownership 与 bounded live tail 后才原子替换。失败、超时或 superseded candidate 只 retire 自己，并复用 #8933 的 restore shape fencing。
+
+#8954 已合入 session list cancellation 透传。WebShell/sidebar/list hooks 在 list 请求被 supersede、unmount 或 client disposal 时把 `AbortSignal` 传到 SDK 和 daemon HTTP 层，过期 list 不再占用 scheduler slot 或把 stale page 写回 shared catalog。
+
+#8955 已合入 prompt admission ownership hardening。WebShell prompt 提交在 async admission hook、queued prompt flush、follow-up dispatch 和 background catch-up 等路径统一携带 owner token；owner 不匹配时 fail closed，source draft 保留，避免 cross-session restore pending 时旧 owner 清空输入或向新 attachment 发 prompt。
+
+#8990 已合入 same-session refresh race closeout。它补齐 #8939 后的 refresh/reload/rebind 边界：late restore、late metadata、stream restart、candidate retirement 和 replay suffix 写入都按 current candidate/attachment gate 检查，防止 same logical session refresh 失败后污染 source visible owner。
+
+#9007 当前 open diff 只覆盖 ACP HTTP pre-attach buffer byte bounds：buffered JSON-RPC reply 按 serialized bytes 获取 lease，per-stream、per-connection 和 process-global budget 超限时关闭精确 logical connection，并把 session/new/load/resume/fork ownership 改成 delivery 成功后才 commit 的 provisional receipt。该能力未合入 `main`，不能写成生产能力。
 
 ---
 
@@ -401,4 +412,4 @@ open 边界：#8882 不处理 same-logical-session reload、clientId-only handof
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-12_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-13_

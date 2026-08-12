@@ -24,9 +24,9 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **prompt terminal follow-up hardening**：running prompt 从 UI-visible list 移除时不立刻丢 pending entry，queued terminal 不污染 session-level turn error/retry 状态，queued deadline 保留 typed `PromptDeadlineExceededError`（#7453）。
 - **activeWork idle/restart guard**：#8588 已合入，把 close-on-last-detach、attach rollback、idle reaper 等自动清理门控从仅看 `pendingPromptCount` 扩展到 `entryHasActiveWork()`，覆盖 accepted prompt、background Agent 和 Agent terminal notification；显式 close/kill/shutdown 仍强制。
 - **safe session restore timeout**：#8691 已合入，将 load/resume restore 从 initialize timeout 中拆出专用 deadline；public caller 超时后保留真实 ACP settle/cleanup，不误杀 sibling session，cleanup/settlement 不确定时 quarantine channel 或返回 `acp_channel_unavailable` 并阻止新 session 操作。
-- **selective / shape-aware session restore**：#8743 当前 draft 只新增设计/计划文档，提出 daemon 内部 selective restore projection，把 runtime resume state 与 UI replay page 分离，目标是避免大型 persisted transcript 在 `loadCliConfig()` 和 `Config.initialize()` 中两次全量 materialize 后才裁剪；#8933 当前 open diff 进一步要求 restore coalescing 按 `resume/none`、`load/all`、`load/recent(N)` 区分，避免不同 replay 语义互相满足。
-- **standalone daemon sessions design**：#8890 当前 open draft 只新增设计文档，规定缺 `cwd` 的 standalone session 不 fallback primary workspace，而由 daemon 管理私有 work dir、context kind、create/delete/restore 与兼容策略。
-- **persisted session catalog cache**：#8892 已合入，用 2 秒 process-local single-flight cache 复用 persisted JSONL/worktree sidecar catalog；Live state、organization、filter/sort/pagination 仍按请求计算。
+- **selective / shape-aware session restore**：#8743 当前 draft 只新增设计/计划文档，提出 daemon 内部 selective restore projection，把 runtime resume state 与 UI replay page 分离，目标是避免大型 persisted transcript 在 `loadCliConfig()` 和 `Config.initialize()` 中两次全量 materialize 后才裁剪；#8933 已合入，要求 restore coalescing 按 `resume/none`、`load/all`、`load/recent(N)` 区分，避免不同 replay 语义互相满足。
+- **Conversations runtime foundation**：#8890 当前 open diff 把 Conversations workspace/source helper 从 Live 命名空间迁到 shared `serve/conversations`，用 `ConversationRuntimeManager` one-flight 创建或采用唯一 Conversations runtime；仍不新增 standalone route、capability、SDK/UI 或每会话 ACP child。
+- **persisted session catalog cache + cancellation**：#8892 已合入 2 秒 process-local single-flight cache；#8954 再把 REST/ACP waiter cancellation 传播到 JSONL、runtime-status、worktree sidecar、project membership 与分页读取，最后一个 waiter 取消才 abort physical scan。
 - **continuation admission logs**：#8932 已合入，在 daemon 接受 session continuation 后写低敏 `continuation enqueued` 结构化日志，记录 `sessionId`、生成的 `promptId` 和可选 `clientId`。
 - **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458）。
 
@@ -88,22 +88,23 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#8588](https://github.com/QwenLM/qwen-code/pull/8588) | merged | activeWork deep health / lifecycle gate | ACP child 上报 active-work transition + 15s heartbeat；bridge 用 `entryHasActiveWork()` 防自动 detach/idle reap 过早清理仍有后台 Agent 或 terminal notification 的 session |
 | [#8691](https://github.com/QwenLM/qwen-code/pull/8691) | merged | safe session restore timeout | restore 专用 deadline、public timeout 与 real settlement 分离、late result exactly-once cleanup、cleanup 不确定时 quarantine channel |
 | [#8743](https://github.com/QwenLM/qwen-code/pull/8743) | draft open | selective session restore design | docs-only 设计 selective restore projection、runtime/replay uuid 分离、recent/all/none replay 与 413/fallback/partial 失败语义，当前不改运行时代码 |
-| [#8890](https://github.com/QwenLM/qwen-code/pull/8890) | draft open | standalone daemon sessions design | docs-only 设计 daemon-managed standalone session、私有 work dir、context kind、create/delete/restore 与兼容策略，当前不改运行时代码 |
+| [#8890](https://github.com/QwenLM/qwen-code/pull/8890) | open | Conversations runtime foundation | 当前 open diff 抽出 shared Conversations runtime manager，让 Live 与未来 standalone/projectless sessions 共用唯一 Conversations runtime，当前不新增 standalone API |
 | [#8892](https://github.com/QwenLM/qwen-code/pull/8892) | merged | persisted session catalog cache | 2 秒 process-local single-flight cache 复用 persisted JSONL/worktree sidecar catalog；mutation 在响应前 invalidate 对应 active/archive catalog |
+| [#8954](https://github.com/QwenLM/qwen-code/pull/8954) | merged | session list cancellation | waiter-aware cancellation：单个 REST/ACP caller 取消不 abort shared scan，最后 waiter 取消才中止 physical load，并向 JSONL/runtime/worktree/pagination 传播 signal |
 | [#8932](https://github.com/QwenLM/qwen-code/pull/8932) | merged | continuation admission logs | accepted continuation 写低敏 `continuation enqueued` 结构化日志，只含 `sessionId`、`promptId` 和可选 `clientId` |
-| [#8933](https://github.com/QwenLM/qwen-code/pull/8933) | open | restore request shape-aware coalescing | 当前 open diff 按 target + `resume/none` / `load/all` / `load/recent(N)` 区分 coalescing，避免不同 replay 语义互相复用 |
+| [#8933](https://github.com/QwenLM/qwen-code/pull/8933) | merged | restore request shape-aware coalescing | 按 target + `resume/none` / `load/all` / `load/recent(N)` 区分 coalescing，避免不同 replay 语义互相复用 |
 
 ---
 
-## 2026-08-11 follow-up：standalone design、catalog cache、continuation logs 与 restore shape fencing
+## 2026-08-12 follow-up：Conversations runtime、catalog cache/cancellation、continuation logs 与 restore shape fencing
 
-#8890 是 docs-only open draft，先把 standalone daemon session 的业务语义从 workspace session 中拆出来。关键约束是：缺 `cwd` 的 standalone create 不允许隐式使用 primary workspace；session 由 daemon-managed 私有 work dir 承载，route/SDK shape 必须显式表达 context kind；managed dir 缺失、删除、迁移、compromised 和 rollback 都需要确定错误与恢复策略。
+#8890 当前 open diff 先落 PR0 Conversations runtime foundation。它把 Conversations workspace/source helper 从 Live 专属路径抽到 `serve/conversations`，用 `ConversationRuntimeManager` one-flight 创建、采用并重新校验唯一 Conversations runtime；Live Voice 只作为事务式安装 bridge handler 的 adapter。该 PR 仍不新增 standalone route、capability、SDK/UI、virtual workspace 或每会话 ACP child。
 
-#8892 已合入 session list 的 persisted catalog cache。缓存 scope 是 resolved runtime root、workspace identity 与 active/archive state；缓存值只覆盖 JSONL summaries 与 worktree sidecar。Live bridge state、organization sidecar、filter/sort/page 仍按请求计算，因此短 TTL 不冻结 UI 所需动态状态。metadata、close、delete、archive、unarchive 等 mutation 会在 response 前 invalidate owning catalog。
+#8892 已合入 session list 的 persisted catalog cache。缓存 scope 是 resolved runtime root、workspace identity 与 active/archive state；缓存值只覆盖 JSONL summaries 与 worktree sidecar。#8954 在该缓存上追加 waiter-aware cancellation：单个 waiter abort 只取消自己的 promise，最后一个 waiter 取消才 abort physical scan；signal 继续传播到 JSONL、runtime-status、worktree sidecar、project membership、numeric pagination 与 trusted-secondary preflight。
 
 #8932 已合入 continuation admission observability。daemon route 在 continuation accepted 后输出 `continuation enqueued`，payload 只包含 `sessionId`、生成的 `promptId` 和可选 `clientId`；`accepted:false` 和 mapped error 不写该日志，避免把失败 admission 误认为已排队。开发者文档同步要求独立 controller 使用不同稳定 client ID。
 
-#8933 当前 open diff 对 restore coalescing 增加 request shape。`resume/none`、`load/all` 与 `load/recent(N)` 不再只靠 target session/workspace 合并；非等价 restore 需要串行、冲突或被 lifecycle cancel fence 隔离。该 PR 未合入 `main`，只能作为后续实现观察，尤其是 #8939 same-session refresh 的前置条件。
+#8933 已合入 restore request shape-aware coalescing。`resume/none`、`load/all` 与 `load/recent(N)` 不再只靠 target session/workspace 合并；非等价 restore 需要串行、冲突或被 lifecycle cancel fence 隔离。这是 #8939 same-session refresh 事务候选的前置不变量。
 
 ## 数据结构
 

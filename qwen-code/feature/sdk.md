@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8743 当前 draft 设计不改 public SDK，#8939 当前 draft open 只记录 TS restore epoch / partial replay diagnostics 方案观察），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8743 当前 draft 设计不改 public SDK，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -14,7 +14,7 @@ qwen-code 的主入口是交互式 CLI（TUI）与一次性非交互模式。但
 
 1. **本地子进程式（Python SDK，#3010 / #3494）**：调用方在本机拉起一个 `qwen` CLI 子进程，通过 `stdin/stdout` 上的 **stream-json** 协议双向通信。它不引入新的运行时——CLI 已有的非交互控制协议（control request/response、`can_use_tool` 权限回调）被原样复用，SDK 只是这套协议的 Python 客户端。优点是零额外部署、与本机 CLI 行为一致；适合脚本、CI、本地自动化。
 
-2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。#8002 还把 workspace text file read 的 `cursor`、`hasMore` 与 `nextCursor` 暴露为 additive 字段；#8572 已合入后让 REST SSE transport 学习 accepted stream id，并向 daemon 报告可解释的 reconnect reason 和 previous stream lineage；#8691 已合入，让 load/resume restore 根据 server budget 派生客户端 timeout。#8743 的 selective restore 目前是 daemon 内部 projection 设计，不要求 SDK 发送新字段；#8939 当前 draft open 在 TS daemon client/types 上记录 restore epoch 与 partial replay diagnostics，尚未合入。适合「agent 即服务」的远程、多端、协作场景。
+2. **远程守护进程式（TS daemon SDK，#4226 / #4360）**：调用方通过 HTTP + SSE 连接一个常驻的 `qwen serve` 守护进程（见 daemon/serve 技术方案）。一个 daemon 绑定一个 workspace，多个客户端（Web UI、IDE、TUI、第三方适配器）可同时 attach 到同一会话，共享 MCP 连接池、跨客户端权限协商、断线重连续传事件。#8002 还把 workspace text file read 的 `cursor`、`hasMore` 与 `nextCursor` 暴露为 additive 字段；#8572 已合入后让 REST SSE transport 学习 accepted stream id，并向 daemon 报告可解释的 reconnect reason 和 previous stream lineage；#8691 已合入，让 load/resume restore 根据 server budget 派生客户端 timeout。#8743 的 selective restore 目前是 daemon 内部 projection 设计，不要求 SDK 发送新字段；#8939 已合入，在 TS daemon client/types 上暴露 restore epoch 与 partial replay diagnostics，服务 WebUI same-session refresh fail-closed 校验。适合「agent 即服务」的远程、多端、协作场景。
 
 3. **Java daemon transport alpha（#7463/#7603）**：在既有 `com.alibaba:qwencode-sdk` artifact 中新增 Java 11 HTTP/SSE daemon transport，面向 JVM 应用提供 admission watermark、resumable SSE、typed/raw events、permission response、prompt terminal correlation、bounded promptText、resource cleanup 和 fail-closed exception taxonomy。#7603 已补齐 Java 对 #7458 event epoch、SSE/JSON malformed path、terminal-before-202 与 teardown ordering 的消费边界。
 
@@ -377,7 +377,8 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #8572 | MERGED | REST SSE stream observability | TS daemon SDK / WebUI 传递 connect reason、previous stream lineage，并从 `X-Qwen-SSE-Stream-Id` 学习 accepted stream id；字段仅用于诊断，兼容旧 daemon。 |
 | #8691 | MERGED | restore timeout derivation | TS daemon SDK 从 capabilities 学习 `limits.sessionRestoreTimeoutMs`，按 per-request/global/server/default 顺序派生 load/resume request timeout，不把 `timeoutMs` 写入 body。 |
 | #8743 | DRAFT OPEN | selective session restore design | 当前不改 public SDK；如后续暴露 replay anchor、partial 或 bounded replay error，必须作为 additive surface 单独审计。 |
-| #8939 | DRAFT OPEN | same-session refresh diagnostics | 当前 draft open 在 TS daemon SDK 上暴露 restore epoch / partial replay diagnostics 方案，用于 WebUI same-session refresh 事务候选；未合入 `main`。 |
+| #8939 | MERGED | same-session refresh diagnostics | 在 TS daemon SDK 上暴露 restore epoch / partial replay diagnostics，用于 WebUI same-session refresh 事务候选 fail-closed 校验。 |
+| #9007 | OPEN | ACP HTTP pre-attach diagnostics | 当前 open diff 在 daemon status / TS SDK types 上暴露 ACP HTTP pre-attach limits、frames/bytes、pending delivery 与 guard failures。 |
 
 ---
 
@@ -405,7 +406,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 10. **selective session restore 仍是 draft design**。#8743 当前不改变 SDK contract；SDK 不应预先依赖 replay anchor、partial 或 projection-specific fields。
 
-11. **same-session refresh diagnostics 仍是 draft open**。#8939 当前只作为 TS daemon SDK 类型/诊断观察；旧 SDK 和当前 `main` 不能依赖 restore epoch 或 partial replay diagnostics 字段。
+11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 
 ---
 
@@ -469,7 +470,11 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 当前 docs-only draft 不新增 SDK request/response 字段，不改变 `loadSession()` / `resumeSession()` 的 public signature。
 - 后续若 daemon 暴露 replay anchor、partial replay 或 bounded replay error，必须保持 optional/additive；旧 daemon 和旧 SDK 仍按现有 full/recent replay 行为工作。
 
-### #8939 — same-session refresh diagnostics（当前 draft open）
+### #8939 — same-session refresh diagnostics（已合入）
 
-- 当前 draft open 在 `DaemonSessionClient` 与 TS daemon types/tests 上增加 restore epoch 与 partial replay diagnostics 方案观察，服务 WebUI same-session refresh candidate staging。
+- `DaemonSessionClient` 与 TS daemon types/tests 已增加 restore epoch 与 partial replay diagnostics，服务 WebUI same-session refresh candidate staging 与 fail-closed 校验。
+
+### #9007 — ACP HTTP pre-attach diagnostics（当前 open）
+
+- 当前 open diff 在 daemon status 与 TS SDK types 上增加 ACP HTTP pre-attach limit、current/high-water frame/byte usage、pending delivery ownership、guard failure、mount attribution 与 per-connection owned frames/bytes；未合入前不能作为 SDK 稳定面承诺。
 - 该能力未合入 `main`；字段必须保持 optional/additive，旧 daemon/旧 SDK 仍按现有 restore result 行为工作。
