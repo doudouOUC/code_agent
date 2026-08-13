@@ -378,6 +378,6 @@ sequenceDiagram
 3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
 4. **#8002 是 additive TS SDK surface**：客户端必须 gate `workspace_file_read_cursor` 并兼容旧 daemon 缺字段。
 5. **#8572 是诊断 surface**：`sseConnectReason`、previous stream lineage 和 accepted stream id 不参与业务正确性；调用方不能用它们替代 event cursor、client id 或 session id。
-6. **#8691 restore timeout 已合入，#8743 selective restore 仍是 draft design**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。selective restore 如未来引入 SDK-visible replay anchor、partial 或 error 字段，必须保持 additive 并兼容旧 daemon。
+6. **#8691 restore timeout 与 #9055 selective restore 已合入，#9007 仍是 open diff**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。#9055 的 selective restore 对既有 load/resume API 保持 additive，SDK-visible replay anchor、pagination/partial/error 字段必须兼容旧 daemon；#9007 的 ACP HTTP pre-attach counters 仍只记录当前 open diff。
 
 _生成于 2026-06-05；按个人 PR 口径更新于 2026-08-10_

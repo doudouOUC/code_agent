@@ -43,6 +43,7 @@ qwen-code 的解法是 **AsyncLocalStorage（ALS）+ OTel `Context` 双轨**：
 | #4367 | Resource + 基数控制；`session.id` 始终上 span/log | `getCommonAttributes` | **MERGED** |
 | **#4410** | **Phase 3：subagent span + 并发隔离 + fork hybrid traceId + 4h TTL** | **`subagentContext` / `runInSubagentSpanContext` / `startSubagentSpan` / `ttlFor`** | MERGED（2026-06-05） |
 | **#4432** | **Phase 4b：retry 可见性（per-attempt span）** | **`utils/retryContext.ts:retryContext`** | MERGED（2026-06-05） |
+| #9077 | daemon request-scoped OTel session ownership | request-local session identity / scoped OTel Context / callback context | MERGED（2026-08-13） |
 
 > `getParentContext`（`tracer.ts`）与 `resolveParentContext`（`session-tracing.ts`）是一对**手工同步的镜像实现**，二者用 `// SYNC:` 注释互相约束（见下文）。
 
@@ -582,3 +583,8 @@ flowchart LR
 - `utils/retry.ts:retryWithBackoff` — 每 attempt `retryContext.run({ attempt, requestSetupMs, retryTotalDelayMs }, fn)`
 - `loggingContentGenerator.ts:snapshotRetryMetadata` — 同步 prelude 快照 ALS → 闭包传递到 success/error/idle-timeout/abort 4 条 `endLLMRequestSpan` 路径
 - `client.ts`/`baseLlmClient.ts`/`geminiChat.ts` — 4 个 `retryWithBackoff` 调用点新增 `onRetry` → `logApiRetry(ApiRetryEvent)`
+
+### #9077 — request-scoped OTel session ownership
+- content generator 在每次模型请求开始时冻结 immutable session owner，优先使用 interaction/tool/subagent 逻辑父级，其次 request-owned session、scoped OTel Context、request-local Context，最后才回退 process-global CLI session。
+- native LLM span、instrumented HTTP child spans、API request/response/error logs 与 daemon callback context 使用同一个 owner，并在 async stream iteration 期间保持不变，解决 daemon/ACP child 多会话同进程下 span 与 logs 归属分裂。
+- process-global session 继续作为兼容 fallback，但不再能覆盖已有 request-scoped owner。

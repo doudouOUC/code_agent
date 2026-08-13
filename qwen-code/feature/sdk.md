@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8743 当前 draft 设计不改 public SDK，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 当前 open diff 增加 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -404,7 +404,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 9. **restore timeout derivation 已合入**。#8691 的 server restore budget 只是 client timer hint；旧 daemon 缺 `limits.sessionRestoreTimeoutMs` 时必须回落默认 70s，`restore_timeout` 后仍要按 retryable error 和后续 session 状态处理。
 
-10. **selective session restore 仍是 draft design**。#8743 当前不改变 SDK contract；SDK 不应预先依赖 replay anchor、partial 或 projection-specific fields。
+10. **selective session restore 已由 #9055 合入，#9007 仍是 open diff**。#9055 对 SDK contract 保持 additive：旧 daemon 缺 replay pagination/partial/projection-specific fields 时仍按既有 load/resume 语义降级；#9007 的 ACP HTTP pre-attach status/counters 仍不能视为已落地 public SDK 能力。
 
 11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 

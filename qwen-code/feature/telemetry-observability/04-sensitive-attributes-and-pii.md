@@ -30,6 +30,8 @@ qwen-code 把「可能含 PII / 机密的高价值内容」分成两类载体写
 | **#4097** | MERGED (2026-05-16) | interaction span + detailed sensitive attrs | 新增 `detailed-span-attributes.ts` 全套 helper（`addUserPromptAttributes` / `addSystemPromptAttributes` / `addToolSchemaAttributes` / `addModelOutputAttributes` / `addToolInputAttributes` / `addToolResultAttributes`），并在调用方（`client.ts` / `coreToolScheduler.ts` / `loggingContentGenerator.ts`）加「双守卫」。这些 SPAN 属性是**双重门控**（`isEnabled` + 调用方守卫）。 |
 | #3847 | MERGED | traceId/spanId 注入 | 部分相关：桥接 span 的 traceId 派生与本文的脱敏发生在同一个 `LogToSpanProcessor.onEmit` 里。 |
 | #5804 | MERGED (2026-06-25) | sensitive span attr length configurable | 将 sensitive span attributes 的截断上限从旧的 60KB 常量改成可配置值：`telemetry.sensitiveSpanAttributeMaxLength` / `QWEN_TELEMETRY_SENSITIVE_SPAN_ATTRIBUTE_MAX_LENGTH` / 默认 1 MiB。 |
+| #9039 | OPEN | privacy-safe tool-result boundary diagnostics | 当前 open diff 的 diagnostics 只记录 size、process-local HMAC、mutation state 与 closed artifact summary，不记录 tool result 正文、prompt、raw id、tool name、artifact path/title/url 或文件路径。 |
+| #9107 | OPEN draft | main agent invocation sensitive fields | 当前 draft 只有在 sensitive opt-in 时才把 raw user prompt 与最终可见 assistant response 写到 interaction/invocation span，不记录中间 tool result 或 raw stream chunks。 |
 
 ---
 
@@ -479,3 +481,7 @@ sequenceDiagram
 - `config.ts:Config` — 暴露 resolved max length getter；非法 env 不覆盖默认值，只写 debug warning。
 - `detailed-span-attributes.ts:truncateContent` — 从固定 60KB 常量改为调用 resolved max length，覆盖 user prompt、system prompt 全文、tool schema、model output、tool input/result。
 - tests — 覆盖默认 1 MiB、settings/env 覆盖、非法 env 忽略，以及各 helper 使用配置后的 truncation metadata。
+
+### #9039 / #9107 — diagnostics 与 invocation sensitive 边界
+- #9039 当前 open diff 将 tool-result boundary diagnostics 限定为 file debug logging 下的低敏元数据：size、HMAC、mutation state、closed artifact summary 与 writer frame size；HMAC key 为 process-local random，不能跨进程长期关联。
+- #9107 当前 draft open 将 main agent invocation 的 sensitive fields 限定在 opt-in 之后的 raw user prompt 与最终可见 assistant response。它不把中间工具输出、approval 内容、artifact path 或 raw model stream 扩大到默认 telemetry。

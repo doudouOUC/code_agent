@@ -1,7 +1,7 @@
 # 最终工具响应预算技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的 Core scheduler、interactive TUI、headless、ACP session、Agent runtime 与 speculative follow-up。
-> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试；#8450 已合入，只在 ACP transport 边界裁剪 textual tool-result projection；#9012 当前 open diff 在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界裁剪 `tool_result.content`，不改变 canonical transcript、producer artifact 或 model-facing response。
+> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试；#8450 已合入，只在 ACP transport 边界裁剪 textual tool-result projection；#9012 已合入，在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界裁剪 `tool_result.content`，不改变 canonical transcript、producer artifact 或 model-facing response；#9039 当前 open diff 只增加 opt-in、privacy-safe 的 tool-result boundary diagnostics，不记录正文或 raw id。
 
 ---
 
@@ -111,6 +111,14 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 
 失败 text 不安装 lifecycle policy，仍按普通 tool error 参与预算。同批其它工具输出也不因 `enter_plan_mode` 存在而逃过预算。
 
+### 3.6 Headless transport projection（#9012）
+
+#9012 已合入，把 Headless JSON、stream-json、SDK subagent、Dual Output 等非交互输出面的 `tool_result.content` 限制在 JSON 字符串序列化后 65,536 UTF-8 bytes。裁剪只发生在 transport-display projection：输出 deterministic 20/80 head-tail preview 与 marker，保留工具 call id、状态、producer artifact、canonical transcript 和 model-facing finalizer 的既有语义；Dual Output protocol 升到 v2，旧消费者仍可按缺失字段降级。
+
+### 3.7 Privacy-safe boundary diagnostics（#9039 open）
+
+#9039 当前 open diff 解决的是“无法定位 tool result 在 producer、finalizer、recording、ACP/Headless projection、writer frame 之间何处首次变化”的排障缺口。实现只在 file debug logging 启用时记录 eligible 边界的 byte/character size、process-local HMAC-SHA-256、mutation state、closed artifact state/kind summary 和 writer frame size；不写 result text、prompt、session/prompt/tool-call raw id、tool name、artifact path/title/url 或文件路径。该能力是诊断面，不改变预算、裁剪、录制或发送逻辑。
+
 ---
 
 ## 4. 设计边界
@@ -141,14 +149,15 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 | [#7323](https://github.com/QwenLM/qwen-code/pull/7323) | merged | final tool response budget | 增加结构化 persisted-output metadata、共享 finalizer、runtime aggregation boundaries、send-boundary guard 和 Plan mode policy exception。 |
 | [#7470](https://github.com/QwenLM/qwen-code/pull/7470) | merged | Shell truncation without artifact regression | 为 Shell producer 没有 artifact 但已有短 preview 的路径补测试，固定 `persistedOutputFiles: []` sentinel 和三态语义。 |
 | [#8450](https://github.com/QwenLM/qwen-code/pull/8450) | merged | ACP textual tool-result projection | 在 ACP live/history/subagent replay transport 上对 canonical text blocks 和 string `rawOutput` 做 65,536 byte JSON budget；不改变 model-facing finalizer、canonical transcript 或 offline export。 |
-| [#9012](https://github.com/QwenLM/qwen-code/pull/9012) | open | Headless tool_result content projection | 当前 open diff 在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界把文本 `tool_result.content` 投影为 65,536 byte JSON 字符串预览，并把 Dual Output protocol 提升到 v2。 |
+| [#9012](https://github.com/QwenLM/qwen-code/pull/9012) | merged | Headless tool_result content projection | 在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界把文本 `tool_result.content` 投影为 65,536 byte JSON 字符串预览，并把 Dual Output protocol 提升到 v2。 |
+| [#9039](https://github.com/QwenLM/qwen-code/pull/9039) | open | privacy-safe boundary diagnostics | 当前 open diff 增加 opt-in boundary observation，用 size、HMAC、mutation state 与 closed artifact summary 诊断 producer/finalizer/transport/writer 差异；不记录正文、raw id、tool name 或 artifact path。 |
 
 ---
 
 ## 7. 已知限制 / 后续
 
 - #7323/#7470 已合入；文档记录当前 main 的最终实现方案。
-- #8450 已合入，且它是 ACP transport-display projection，不是模型上下文预算；#9012 当前 open diff 是 Headless transport-display projection，同样不改变模型上下文 finalizer。后续如字段集合、预算或 marker 调整，需要按新 diff 再更新。
+- #8450/#9012 已合入，且二者都是 transport-display projection，不是模型上下文预算；#9039 当前 open diff 是诊断面，同样不改变模型上下文 finalizer。后续如字段集合、预算、marker 或 diagnostics schema 调整，需要按新 diff 再更新。
 - 不提供精确 token 预算，不改变 provider context window 估算与自动压缩策略。
 - 不保证 artifact path 在远端 UI 中可直接读取；这里只保证模型响应里有可诊断的 path reference。
 - 后续如要在 Ctrl+O transcript 中读取完整 artifact，需要独立设计权限、路径暴露、大小限制和 UI streaming。

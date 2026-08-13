@@ -47,6 +47,7 @@ session(合成根 context，非真实 span)
 | [#4212](https://github.com/QwenLM/qwen-code/issues/4212) | （issue） | deferred-status 一致性 | stream span idle 超时后不得再发 success/api_response，避免自相矛盾记录 |
 | [#4058](https://github.com/QwenLM/qwen-code/pull/4058) | MERGED | trace 关联跟进 | parent-resolution follow-up |
 | [#4693](https://github.com/QwenLM/qwen-code/pull/4693) | MERGED | response metadata & error enrichment | `endLLMRequestSpan` 新增 6 属性：`response_id`/`finish_reason`/`thoughts_token_count`/`subagent_name`/`error_type`/`error_status_code`（含 GenAI semconv 双发） |
+| [#9107](https://github.com/QwenLM/qwen-code/pull/9107) | draft open | main agent invocation tracing | 当前 draft 将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离 |
 
 > Phase 4a（TTFT + GenAI 双发，#4417）与 retry 字段（Phase 4b，#4432，已合入）也落在 `endLLMRequestSpan`，但属于「llm_request 计时分解」专题，本文只在「状态语义」与时序图中带过，详见同目录其它子文档。
 
@@ -595,3 +596,8 @@ sequenceDiagram
 - `session-tracing.ts:LLMRequestMetadata` — 新增 6 字段：`responseId`/`finishReason`/`thoughtsTokenCount`/`subagentName`/`errorType`/`errorStatusCode`
 - `session-tracing.ts:endLLMRequestSpan` — 双发 GenAI semconv（`gen_ai.response.id`/`gen_ai.response.finish_reasons[]`/`gen_ai.usage.reasoning_tokens`/`error.type`）
 - `loggingContentGenerator.ts` — 流式与非流式路径透传新字段（含 idle-timeout 路径的 `responseId`/`subagentName`）
+
+### #9107 — main agent invocation tracing（当前 draft open）
+- `session-tracing.ts`：当前 draft 将 interaction span 语义提升为 main agent invocation，operation=`invoke_agent`，并写 `gen_ai.agent.name=qwen-code`、conversation/session identity 与 prompt-scoped owner。
+- `client.ts` / tool continuation paths：interaction 不再在第一次 LLM response 后过早结束，而是覆盖 tool approval、tool execution 与 continuation LLM 请求，失败写 `ERROR` + low-cardinality `error.type`，成功/取消保持 UNSET/ok 语义。
+- sensitive opt-in 仍只控制原始用户 prompt 与最终可见 assistant response，不能把中间 tool result 或 raw model chunks 扩大到默认 span 属性。

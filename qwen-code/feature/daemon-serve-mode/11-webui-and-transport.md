@@ -36,7 +36,7 @@
 | #8450 | @doudouOUC | merged | ACP transport textual tool-result projection：对 live/replay/subagent replay 的 canonical text payload 做 65,536 byte JSON 预算，不改 canonical transcript。 |
 | #8572 | @doudouOUC | merged | WebUI SSE reconnect reason：只在 prompt restart、normal stream end、transport error、state resync 可判定时向 TS SDK 传 `sseConnectReason`。 |
 | #8691 | @doudouOUC | merged | WebUI restore timeout budget：load/resume 使用 server restore budget 派生 request timeout 与 watchdog，并把 retryable 504 作为可恢复 restore failure。 |
-| #8743 | @doudouOUC | draft open | selective session restore design：当前不改 WebUI runtime；设计要求 recent replay 仍通过有界 replay page/anchor 表达，并与 transactional WebUI switching 分开推进。 |
+| #8743 | @doudouOUC | closed by #9055 | selective session restore design：docs-only 设计已由 #9055 runtime PR 承接；recent replay page 与 transactional WebUI switching 仍是分离边界。 |
 | #8824 | @doudouOUC | closed draft | transactional WebUI restore 完整草案；未合入，后续拆分为 #8833 same-id attachment fencing 与 #8882 cross-session switching。 |
 | #8833 | @doudouOUC | merged | same-id attachment stale-work fencing：metadata、SSE、heartbeat、`session_closed` 和 cleanup 按精确 attachment object 归属。 |
 | #8882 | @doudouOUC | merged | transactional cross-session switching：source 在 target restore/staging 成功 commit 前保持 visible owner，legacy daemon 仍走 detach-first。 |
@@ -47,6 +47,8 @@
 | #8955 | @doudouOUC | merged | prompt admission ownership hardening：async host admission/lazy preparation 后重校 owner/generation，并用 stable transcript identity 恢复 source-owned retry。 |
 | #8990 | @doudouOUC | merged | same-session refresh race closeout：补 event epoch、candidate cleanup、turn+shell settle、controlled target 与 committed client identity recovery。 |
 | #9007 | @doudouOUC | open | ACP HTTP pre-attach byte bounds：当前 open diff 限制 pre-attach buffered replies 的 frame/byte budget，并把 ownership grant 绑定到 local delivery。 |
+| #9048 | @doudouOUC | open | transactional resync / live-journal repair：当前 open diff 让 authoritative resync 与 repair 走 source-retained、candidate-staged、atomic-commit 流程。 |
+| #9055 | @doudouOUC | merged | selective session restore runtime：cold load/resume 在 daemon 内按请求 replay projection 读取 bounded page，WebUI recent page 不再要求 full transcript materialization 后裁剪。 |
 
 ---
 
@@ -333,7 +335,7 @@ capability tag 是 `workspace_qualified_acp`，只有 ACP HTTP enabled 且 multi
 
 #8691 已合入，让 WebUI restore 与 attach 使用不同时间预算。load/resume restore 先读取 `/capabilities.limits.sessionRestoreTimeoutMs`，request timeout 使用 server budget + 10s，外层 watchdog 使用 server budget + 15s；attach 仍保持 30s。REST 504 `restore_timeout` 被识别为 retryable restore failure，UI 不把它误归类为普通 transport error，也不会把过大 timer 交给 Node/browser 定时器导致 overflow。
 
-#8743 当前 draft open 只补 selective session restore 设计/计划，不改 WebUI 代码。后续 runtime 实现需要保持两个边界：recent replay page 是 UI 可见恢复页，不等于模型 runtime history；transactional WebUI switching 仍是独立工作，不能把 selective restore 的 bounded replay 当作 UI 原子切换保障。
+#8743 的 docs-only design 已由 #9055 runtime PR 承接。落地后仍保持两个边界：recent replay page 是 UI 可见恢复页，不等于模型 runtime history；transactional WebUI switching 仍是独立工作，不能把 selective restore 的 bounded replay 当作 UI 原子切换保障。
 
 ## 2026-08-10 follow-up：same-id attachment fencing 与 transactional switching
 
@@ -364,6 +366,12 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 #8990 已合入 same-session refresh race closeout。它补齐 #8939 后的 refresh/reload/rebind 边界：late restore、late metadata、stream restart、candidate retirement 和 replay suffix 写入都按 current candidate/attachment gate 检查，防止 same logical session refresh 失败后污染 source visible owner。
 
 #9007 当前 open diff 只覆盖 ACP HTTP pre-attach buffer byte bounds：buffered JSON-RPC reply 按 serialized bytes 获取 lease，per-stream、per-connection 和 process-global budget 超限时关闭精确 logical connection，并把 session/new/load/resume/fork ownership 改成 delivery 成功后才 commit 的 provisional receipt。该能力未合入 `main`，不能写成生产能力。
+
+## 2026-08-13 follow-up：transactional resync/repair 与 selective restore runtime
+
+#9048 当前 open diff 把 authoritative resync 与 live-journal repair 也纳入 provider-local restore coordinator。发生 gap 时，source 以 read-only recovery state 保持可见，candidate 在离屏 store 中恢复 replacement snapshot，并在 commit 前校验 session/workspace ownership、replay completeness、epoch/watermark、prompt terminal consistency 和 lifecycle freshness；repair 以 repaired suffix + bounded source tail 替换 marker，失败时不清空健康 source。
+
+#9055 已合入 selective restore runtime。WebUI 仍通过既有 load/resume contract 请求 recent page，但 daemon 在 payload read 前决定 `historyPageSize`，只读取 runtime state 与 UI replay page 的 union records，并返回 pagination metadata。它降低大型 persisted session 的 cold restore latency/内存峰值，但不替代 #8882/#8939/#9048 的事务提交、owner fencing 或 stale candidate cleanup。
 
 ---
 
@@ -412,4 +420,4 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-13_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-14_
