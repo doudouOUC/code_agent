@@ -33,7 +33,7 @@
 | #7003 | MERGED | legacy session workspace telemetry | 48 条 legacy session/permission route catalog、handler-resolved workspace hash late bind、SSE request metrics 隔离 | main |
 | #7145 | MERGED | ACP initialize startup profile | opt-in initialize `_meta` handshake、bounded child startup phase/config timings、parent `channel.initialize` span attributes 和 fail-open validation | main |
 | #9077 | MERGED | daemon request-scoped OTel session ownership | 每次模型请求冻结 immutable session owner，使 native LLM span、HTTP child spans、API logs 与 callback context 归属一致 | main |
-| #9084 | OPEN | daemon log trace/span correlation | 当前 open diff 让 daemon `info`/`warn`/`error` 捕获 sampled recording active span，并向 stderr/file 增加 `trace_id`/`span_id` | main |
+| #9084 | MERGED | daemon log trace/span correlation | daemon `info`/`warn`/`error` 捕获 sampled recording active span，并向 stderr/file 增加 `trace_id`/`span_id` | main |
 
 ---
 
@@ -377,7 +377,7 @@ sequenceDiagram
 ### #9077 / #9084 — request owner 与 daemon log correlation
 
 - #9077 已合入 request-scoped OTel session ownership。daemon/ACP child 多会话同进程时，模型请求不再依赖 bootstrap/global session；native LLM span、undici/http child span、API logs 和 daemon callback context 使用同一 immutable owner，async stream iteration 期间不漂移。
-- #9084 当前 open diff 让 daemon caller logs 在 `info`/`warn`/`error` 调用点捕获一次 active span；仅当 span recording、context valid 且 sampled 时，stderr 与 daemon file log 增加 `trace_id`/`span_id`。caller-supplied correlation keys 不能覆盖保留字段，raw child output、boot、file-drop summary 和 access suppression summary 不继承 ambient context。
+- #9084 已合入，让 daemon caller logs 在 `info`/`warn`/`error` 调用点捕获一次 active span；仅当 span recording、context valid 且 sampled 时，stderr 与 daemon file log 增加 `trace_id`/`span_id`。caller-supplied correlation keys 不能覆盖保留字段，raw child output、boot、file-drop summary 和 access suppression summary 不继承 ambient context。
 
 ### #4682 — expand route coverage
 

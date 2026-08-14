@@ -523,7 +523,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#8691/#9055 已合入，#9042 仍是 open diff**。restore timeout limit、`restore_timeout` error、quarantine error 与 selective restore pagination/replay metadata 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。#9042 的 `shell` activeWork 类别仍只记录当前 open diff，不能视为 `main` 已落地能力。#8572/#8588 已按 merged diff 更新。
+8. **#8691/#9042/#9055 已合入，#9134 仍是 open draft**。restore timeout limit、`restore_timeout` error、quarantine error、`shell` activeWork category 与 selective restore pagination/replay metadata 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。#9134 的 active-work close authorization follow-up 仍只记录当前 draft open diff，不能视为 `main` 已落地能力。#8572/#8588 已按 merged diff 更新。
 
 ---
 

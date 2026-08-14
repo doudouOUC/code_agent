@@ -47,7 +47,7 @@
 | #8955 | @doudouOUC | merged | prompt admission ownership hardening：async host admission/lazy preparation 后重校 owner/generation，并用 stable transcript identity 恢复 source-owned retry。 |
 | #8990 | @doudouOUC | merged | same-session refresh race closeout：补 event epoch、candidate cleanup、turn+shell settle、controlled target 与 committed client identity recovery。 |
 | #9007 | @doudouOUC | open | ACP HTTP pre-attach byte bounds：当前 open diff 限制 pre-attach buffered replies 的 frame/byte budget，并把 ownership grant 绑定到 local delivery。 |
-| #9048 | @doudouOUC | open | transactional resync / live-journal repair：当前 open diff 让 authoritative resync 与 repair 走 source-retained、candidate-staged、atomic-commit 流程。 |
+| #9048 | @doudouOUC | closed | transactional resync / live-journal repair：closed diff 只作为未合入观察，不能写成 main 已落地能力。 |
 | #9055 | @doudouOUC | merged | selective session restore runtime：cold load/resume 在 daemon 内按请求 replay projection 读取 bounded page，WebUI recent page 不再要求 full transcript materialization 后裁剪。 |
 
 ---
@@ -369,7 +369,7 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 
 ## 2026-08-13 follow-up：transactional resync/repair 与 selective restore runtime
 
-#9048 当前 open diff 把 authoritative resync 与 live-journal repair 也纳入 provider-local restore coordinator。发生 gap 时，source 以 read-only recovery state 保持可见，candidate 在离屏 store 中恢复 replacement snapshot，并在 commit 前校验 session/workspace ownership、replay completeness、epoch/watermark、prompt terminal consistency 和 lifecycle freshness；repair 以 repaired suffix + bounded source tail 替换 marker，失败时不清空健康 source。
+#9048 closed diff 曾把 authoritative resync 与 live-journal repair 也纳入 provider-local restore coordinator。发生 gap 时，source 以 read-only recovery state 保持可见，candidate 在离屏 store 中恢复 replacement snapshot，并在 commit 前校验 session/workspace ownership、replay completeness、epoch/watermark、prompt terminal consistency 和 lifecycle freshness；repair 以 repaired suffix + bounded source tail 替换 marker，失败时不清空健康 source。该 PR 未合入，不能写成 main 已落地能力。
 
 #9055 已合入 selective restore runtime。WebUI 仍通过既有 load/resume contract 请求 recent page，但 daemon 在 payload read 前决定 `historyPageSize`，只读取 runtime state 与 UI replay page 的 union records，并返回 pagination metadata。它降低大型 persisted session 的 cold restore latency/内存峰值，但不替代 #8882/#8939/#9048 的事务提交、owner fencing 或 stale candidate cleanup。
 
@@ -420,4 +420,4 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-14_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-15_

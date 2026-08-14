@@ -41,7 +41,8 @@
 | #7667 | MERGED（2026-07-24） | GenAI content telemetry fields | 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，并移除等价私有字段。 |
 | #7921 | MERGED（2026-07-28） | ARMS session user ID | 新增 `telemetry.userId` / `QWEN_TELEMETRY_USER_ID`，在 interaction 创建时写 `gen_ai.user.id` 并传播到 LLM、Tool、Agent spans。 |
 | #8150 | MERGED（2026-07-31） | GenAI time-to-first-chunk tracing | 流式 span 写 `gen_ai.request.stream=true` 与 `gen_ai.response.time_to_first_chunk`；非流式保留 `llm_request.stream=false` 且不写 first-chunk；移除 span-level 私有 `ttft_ms`。 |
-| #9107 | OPEN draft（2026-08-13） | main agent invocation tracing | 当前 draft 将 interaction span 对齐 GenAI Agent `invoke_agent`，写 `gen_ai.agent.name=qwen-code`、prompt-scoped owner、conversation/session identity 与低基数 `error.type`。 |
+| #9107 | MERGED（2026-08-14） | main agent invocation tracing | 将 interaction span 对齐 GenAI Agent `invoke_agent`，写 `gen_ai.agent.name=qwen-code`、prompt-scoped owner、conversation/session identity 与低基数 `error.type`。 |
+| #9121 | OPEN（2026-08-14） | main agent tracing edge cases | 当前 open diff 修正 budget/swallowed abort 状态、TUI deferred tool batch owner、headless JSON Schema owner、Goal/headless bounded diagnostic message。 |
 | #8176 | MERGED（2026-07-31） | tool-call terminal telemetry | 统一 tool-call terminal normalization boundary，归一化 `status`、兼容 `success`、error fields、低基数 metric 维度和 QwenLogger 低敏字段。 |
 | #8180 | OPEN（2026-07-31） | tool execution outcome | 当前 open diff 在 terminal status 旁边新增 execution status、execution child span 和低基数 execution-outcome counter。 |
 
@@ -762,11 +763,18 @@ flowchart TB
 - `session-tracing.ts:startLLMRequestSpan` / `endLLMRequestSpan`：GenAI 语义双发——`gen_ai.request.model` / `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.server.time_to_first_token`（秒，`/1000`）写入 span attribute。
 - `session-tracing.ts:endLLMRequestSpan`：派生 `sampling_ms = max(0, duration - ttft)` 与 `output_tokens_per_second`（除零守卫）。
 
-### #9107 — main agent invocation tracing（当前 draft open）
+### #9107 — main agent invocation tracing（merged）
 
 - interaction span 作为 GenAI Agent invocation：operation=`invoke_agent`，`gen_ai.agent.name=qwen-code`，并带 conversation/session identity 与 prompt-scoped owner。
 - invocation 覆盖从用户 prompt 到最终可见 assistant response 的完整主 Agent 生命周期，包括 tool approval、tool execution 和 continuation LLM request；失败写 `ERROR` + low-cardinality `error.type`，取消与成功不引入额外错误状态。
 - sensitive opt-in 下只记录 raw user prompt 与最终可见 assistant response，继续避免默认写入 tool result、intermediate model chunks 或 artifact path。
+
+### #9121 — main agent tracing edge-case follow-up（当前 open）
+
+- budget-triggered abort 在 headless runner 中优先写 `run_budget_exceeded`，避免后续 cancellation finalizer 覆盖；non-stream 与 idle stream 在 provider 吞掉 abort 时保持 cancelled，而 provider 完成后的 abort 不改写 success。
+- TUI deferred completed-tool batch 按 live interaction owner 选择 main continuation；mixed legacy `?btw` secondary tools 只完成本地 side effects 并以 cancelled 结束 secondary interaction，不能泄漏到 main prompt。
+- headless JSON Schema verdict 只绑定 UserQuery/Retry owner 并跨 tool continuation 继承；Cron、Notification、Teammate 和 runtime Goal drain 的纯文本输出不再误报 `structured_output_missing`。
+- Goal finalization 与 headless terminal failure 保留真实 bounded error message，而不是泛化为 hook/phase label。
 
 ### #4432 — Phase 4b retry 可见性
 

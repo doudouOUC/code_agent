@@ -9,7 +9,7 @@
 | [#8852](https://github.com/QwenLM/qwen-code/pull/8852) | ✅ merged | fix(serve): Allow approved external built-in text writes | [pr-8852.md](pr-8852.md) |
 | [#8862](https://github.com/QwenLM/qwen-code/pull/8862) | ✅ merged | feat(cli): add background cleanup for OpenAI API logs | [pr-8862.md](pr-8862.md) |
 | [#8882](https://github.com/QwenLM/qwen-code/pull/8882) | ✅ merged | fix(webui): Make cross-session switching transactional | [pr-8882.md](pr-8882.md) |
-| [#8890](https://github.com/QwenLM/qwen-code/pull/8890) | 🟡 open | refactor(cli): Generalize the Conversations runtime foundation | [pr-8890.md](pr-8890.md) |
+| [#8890](https://github.com/QwenLM/qwen-code/pull/8890) | ✅ merged | refactor(cli): Generalize the Conversations runtime foundation | [pr-8890.md](pr-8890.md) |
 | [#8891](https://github.com/QwenLM/qwen-code/pull/8891) | ✅ merged | feat(web-shell): Share session catalog scheduling | [pr-8891.md](pr-8891.md) |
 | [#8892](https://github.com/QwenLM/qwen-code/pull/8892) | ✅ merged | perf(cli): Cache persisted session catalogs | [pr-8892.md](pr-8892.md) |
 | [#8893](https://github.com/QwenLM/qwen-code/pull/8893) | ✅ merged | feat(cli): clean up OpenAI logs in non-interactive sessions | [pr-8893.md](pr-8893.md) |
@@ -25,12 +25,14 @@
 | [#9007](https://github.com/QwenLM/qwen-code/pull/9007) | 🟡 open | fix(serve): Bound ACP HTTP pre-attach buffers by bytes | [pr-9007.md](pr-9007.md) |
 | [#9012](https://github.com/QwenLM/qwen-code/pull/9012) | ✅ merged | fix(cli): Bound headless tool result content | [pr-9012.md](pr-9012.md) |
 | [#9039](https://github.com/QwenLM/qwen-code/pull/9039) | 🟡 open | feat(core): Add privacy-safe tool-result boundary diagnostics | [pr-9039.md](pr-9039.md) |
-| [#9042](https://github.com/QwenLM/qwen-code/pull/9042) | 🟡 open | feat(daemon): Track background shells in activeWork | [pr-9042.md](pr-9042.md) |
-| [#9048](https://github.com/QwenLM/qwen-code/pull/9048) | 🟡 open | fix(webui): Make resync and repair transactional | [pr-9048.md](pr-9048.md) |
+| [#9042](https://github.com/QwenLM/qwen-code/pull/9042) | ✅ merged | feat(daemon): Track background shells in activeWork | [pr-9042.md](pr-9042.md) |
+| [#9048](https://github.com/QwenLM/qwen-code/pull/9048) | ❌ closed | fix(webui): Make resync and repair transactional | [pr-9048.md](pr-9048.md) |
 | [#9055](https://github.com/QwenLM/qwen-code/pull/9055) | ✅ merged | perf(serve): Restore large sessions selectively | [pr-9055.md](pr-9055.md) |
-| [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | 🟡 open draft | feat(external-context): Add provider extension profile | [pr-9068.md](pr-9068.md) |
+| [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | 🟡 open | feat(external-context): Add provider extension profile | [pr-9068.md](pr-9068.md) |
 | [#9077](https://github.com/QwenLM/qwen-code/pull/9077) | ✅ merged | fix(core): Preserve OTel session ownership in daemons | [pr-9077.md](pr-9077.md) |
-| [#9084](https://github.com/QwenLM/qwen-code/pull/9084) | 🟡 open | feat(cli): Correlate daemon logs with OpenTelemetry spans | [pr-9084.md](pr-9084.md) |
-| [#9107](https://github.com/QwenLM/qwen-code/pull/9107) | 🟡 open draft | feat(telemetry): Trace main agent invocations | [pr-9107.md](pr-9107.md) |
+| [#9084](https://github.com/QwenLM/qwen-code/pull/9084) | ✅ merged | feat(cli): Correlate daemon logs with OpenTelemetry spans | [pr-9084.md](pr-9084.md) |
+| [#9107](https://github.com/QwenLM/qwen-code/pull/9107) | ✅ merged | feat(telemetry): Trace main agent invocations | [pr-9107.md](pr-9107.md) |
+| [#9121](https://github.com/QwenLM/qwen-code/pull/9121) | 🟡 open | fix(telemetry): Address main agent tracing edge cases | [pr-9121.md](pr-9121.md) |
+| [#9134](https://github.com/QwenLM/qwen-code/pull/9134) | 🟡 open draft | fix(daemon): Preserve sessions when active-work close is refused | [pr-9134.md](pr-9134.md) |
 
-_按个人 PR 口径更新于 2026-08-14_
+_按个人 PR 口径更新于 2026-08-15_

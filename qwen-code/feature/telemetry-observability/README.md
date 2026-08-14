@@ -43,14 +43,14 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **GenAI 语义双发 + TTFT + retry 可见性 + LLM request phase breakdown（#5904）**，见 `session-tracing.ts:endLLMRequestSpan` 与 `core/loggingContentGenerator/loggingContentGenerator.ts`。
 - **telemetry docs/schema refresh（#5960）**：上游 developer telemetry docs 补齐事件/指标/span 覆盖，并把硬编码 `tool_output_truncated` 事件名统一为 `qwen-code.tool_output_truncated`；下游按旧未加前缀事件名过滤的消费者需要迁移。
 - **daemon pipe pressure observability（#6263/#6335）**：daemon/ACP event-loop lag gauge、daemon pipe message byte histogram、`/daemon/status.runtime.perf` pipe stats，以及大 ACP pipe frame 的低敏 source-class 日志/telemetry 归因。
-- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes；#8572 已合入后给 REST SSE stream 增加 stream id、connect reason、previous stream lineage、slow-client/resync/eviction/close lifecycle telemetry；#8691 已合入，补 restore public timeout、late result、cleanup/quarantine outcome 与 child restore stage timing；#9055 已合入 selective restore runtime telemetry，阶段只记录 bounded counts/bytes/durations/cache state，不记录 transcript 内容、record id、path 或 cursor；#9077 已合入 request-scoped OTel session ownership，#9084 当前 open diff 补 daemon log trace/span correlation。相关路径见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup/session restore helpers。
+- **daemon 遥测**：route span + W3C traceparent 经 `_meta` 透传；#7003 进一步给 legacy session/permission route 建 workspace ownership catalog，并在 handler 解析 owner runtime 后 late-bind workspace hash；#7145 给 ACP `channel.initialize` 增加 opt-in child startup profile attributes；#8572 已合入后给 REST SSE stream 增加 stream id、connect reason、previous stream lineage、slow-client/resync/eviction/close lifecycle telemetry；#8691 已合入，补 restore public timeout、late result、cleanup/quarantine outcome 与 child restore stage timing；#9055 已合入 selective restore runtime telemetry，阶段只记录 bounded counts/bytes/durations/cache state，不记录 transcript 内容、record id、path 或 cursor；#9077 已合入 request-scoped OTel session ownership，#9084 已合入 daemon log trace/span correlation。相关路径见 `telemetry/daemon-tracing.ts`、serve telemetry middleware 与 acp-bridge startup/session restore helpers。
 - **telemetry SDK lazy loading（#7276/#7456/#7558）**：最终实现把 `telemetry/sdk.ts` 拆成轻量 facade 与 heavy `sdk-impl.ts`，关闭 telemetry 时不静态加载 NodeSDK/exporters/instrumentation，开启时再按 HTTP/gRPC/file protocol 动态加载对应 exporter chain；daemon metrics 初始化前会显式 await，#7456 用测试锁定该 ordering，并补充 `metricReader` 单数契约注释，普通 Config/startup 路径使用 fire-and-forget prefetch。#7558 进一步让 ACP child 在成功写出 protocol initialize response 后再启动 telemetry init。
 - **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921/#8150）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis，#8150 在流式 span 上写标准 `gen_ai.response.time_to_first_chunk` 秒级属性并移除 span-level 私有 `ttft_ms` 双发。
 - **Tool-call outcome 口径（#8176/#8180）**：#8176 已合入统一 terminal normalization boundary，所有 tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前先归一化 `status`、兼容 `success` 和 error fields；#8180 当前 open diff 继续把 terminal status 与 execution outcome 拆开，区分未进入 `invocation.execute()` 的 synthetic failure 和真正工具执行后的 success/failure/cancel。
 - **OpenAI API 本地日志保留（#8862/#8893）**：interactive 与 non-interactive best-effort housekeeping 现在按 `model.openAILogRetentionDays` 清理 `OpenAILogger` 写出的本地 request/response JSON 文件，默认 7 天，`0` 约等于 1 小时；只删除真实 writer 文件名，不触碰用户自有 `openai-*.json`，自定义目录要求 user/system 级单一策略。非交互进程退出时会 abort/drain 当前扫描，但不在写入路径同步删除。
 - **session continuation admission log（#8932）**：daemon 接受 continuation 后输出低敏 `continuation enqueued` 结构化日志，只含 `sessionId`、生成的 `promptId` 和可选 `clientId`，不记录 prompt 内容。
 - **tool-result boundary diagnostics（#9039 open）**：仅在 file debug logging 启用时记录 tool-result 边界 size、process-local HMAC、mutation state 和 closed artifact summary，串起 ACP/Headless projection 与 writer frame；不写正文、prompt、raw id、tool name 或 artifact path。
-- **main agent invocation tracing（#9107 draft open）**：当前 draft 将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离，并在 sensitive opt-in 时只记录原始用户 prompt 与最终可见 assistant response。
+- **main agent invocation tracing（#9107 merged / #9121 open follow-up）**：#9107 已合入，将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离，并在 sensitive opt-in 时只记录原始用户 prompt 与最终可见 assistant response；#9121 当前 open diff 继续修正 budget/swallowed abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message。
 
 ---
 
@@ -456,7 +456,8 @@ sequenceDiagram
 | #4661 | per-prompt traceId | interaction 改为 trace root（`ROOT_CONTEXT`）；`SessionIdSpanProcessor` 全 span 附加 `session.id`；移除 session 根回落 | 1.5 |
 | #4321 | blocked + hook span | `tool.blocked_on_user` + `hook` span + TTL 哨兵属性 | 2 |
 | #4410 | subagent span | `qwen-code.subagent` + 并发隔离 + fork/Link + 4h TTL（**MERGED**） | 3 |
-| #9107 | main agent invocation tracing（draft open） | 当前 draft 将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开并按 prompt owner 隔离 | Agent |
+| #9107 | main agent invocation tracing（merged） | 将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开并按 prompt owner 隔离 | Agent |
+| #9121 | main agent tracing edge cases（open） | 当前 open diff 修正 budget abort、provider 吞 abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message | Agent |
 
 ### 6.3 敏感属性 / GenAI / retry
 
@@ -467,7 +468,8 @@ sequenceDiagram
 | #4432 | retry 可见性 | `requestSetupMs`/`attempt`/`retryTotalDelayMs`（**MERGED**） | 4b |
 | #7921 | ARMS session user ID | `telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 写入 span-level `gen_ai.user.id`，不写 Resource/log/metric/Baggage | ARMS |
 | #9039 | tool-result boundary diagnostics（open） | 当前 open diff 用 size、process-local HMAC、mutation state 和 closed artifact summary 诊断 tool-result 边界差异，不记录正文/raw id/path | Diagnostics |
-| #9107 | GenAI Agent invoke_agent（draft open） | 当前 draft 写 `gen_ai.agent.name=qwen-code`、operation=`invoke_agent`、prompt-scoped owner 与失败 `error.type`，并将 sensitive prompt/response 采集限制在 opt-in | Agent |
+| #9107 | GenAI Agent invoke_agent（merged） | 写 `gen_ai.agent.name=qwen-code`、operation=`invoke_agent`、prompt-scoped owner 与失败 `error.type`，并将 sensitive prompt/response 采集限制在 opt-in | Agent |
+| #9121 | invocation edge-case follow-up（open） | 当前 open diff 让 abort/cancel/error 状态、JSON Schema ownership 和 bounded diagnostic message 在 continuation 与自动 invocation 中保持精确 | Agent |
 
 ### 6.4 出站关联（#4384）
 
@@ -492,7 +494,7 @@ sequenceDiagram
 | #8691 | session restore timeout telemetry（merged） | 记录 restore public result、late ACP result、cleanup/quarantine outcome、session/action/channel/timeout 与 child stage timing；不采集 transcript、prompt payload、auth token 或文件内容。 | Daemon restore |
 | #9055 | selective session restore telemetry（merged） | runtime selective restore stage telemetry 记录 transcript index、resume state selection、selected record read、history replay、runtime initialize 与 post-replay services 的 bounded counts/bytes/booleans/durations/cache state。 | Daemon restore |
 | #9077 | request-scoped OTel session ownership（merged） | native LLM span、instrumented HTTP child spans、API request/response/error logs 与 daemon callback context 共享 immutable request owner，process-global session 只作 fallback。 | Daemon ownership |
-| #9084 | daemon log trace/span correlation（open） | 当前 open diff 让 daemon `info`/`warn`/`error` 在调用时捕获 sampled recording active span，并向 stderr/file 增加 `trace_id`/`span_id`；raw/boot/file-drop 等长期日志不继承 ambient context。 | Daemon logs |
+| #9084 | daemon log trace/span correlation（merged） | 让 daemon `info`/`warn`/`error` 在调用时捕获 sampled recording active span，并向 stderr/file 增加 `trace_id`/`span_id`；raw/boot/file-drop 等长期日志不继承 ambient context。 | Daemon logs |
 
 ### 6.6 文档/schema 对齐与事件名规范化
 
@@ -581,6 +583,6 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 12. **#7921 只适合一进程一用户部署**：`telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 是进程级配置。shared daemon、shared ACP channel 或任何一个进程服务多个 end user 的部署，如果直接配置该字段，会把不同用户归并成同一个 ARMS user id；这类场景需要后续增加 per-session/per-request identity surface。
 
-13. **#9039/#9084/#9107 仍是 open/draft diff**：#8469 repeated tool execution failure guard telemetry、#8691 session restore timeout telemetry、#9055 selective restore telemetry 与 #9077 request-scoped session ownership 已按 merged diff 更新；#9039 tool-result boundary diagnostics、#9084 daemon log trace/span correlation、#9107 main agent invocation tracing 只记录当前 diff。若 diagnostics schema、daemon log correlation 条件或 Agent span convention 调整，本文需要按最终 runtime diff 再同步。#8572 的 `qwen-code.daemon.sse.*` 已按 merged diff 更新。
+13. **#9039/#9121 仍是 open diff**：#8469 repeated tool execution failure guard telemetry、#8691 session restore timeout telemetry、#9055 selective restore telemetry、#9077 request-scoped session ownership、#9084 daemon log trace/span correlation 与 #9107 main agent invocation tracing 已按 merged diff 更新；#9039 tool-result boundary diagnostics 与 #9121 main-agent tracing edge-case follow-up 只记录当前 diff。若 diagnostics schema、abort/cancel classification、deferred tool owner 规则或 Agent span convention 调整，本文需要按最终 runtime diff 再同步。#8572 的 `qwen-code.daemon.sse.*` 已按 merged diff 更新。
 
 14. **#8862/#8893 OpenAI API 日志保留仍是 best-effort**：interactive 与 non-interactive 流程都会尝试清理，但短进程退出时只等待有限 drain，且写入路径不会同步删除刚产生的日志。自定义共享目录仍只按 user/system 级单一策略处理，不承担目录内其它调试产物管理。
