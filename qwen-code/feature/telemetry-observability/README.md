@@ -50,7 +50,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **OpenAI API 本地日志保留（#8862/#8893）**：interactive 与 non-interactive best-effort housekeeping 现在按 `model.openAILogRetentionDays` 清理 `OpenAILogger` 写出的本地 request/response JSON 文件，默认 7 天，`0` 约等于 1 小时；只删除真实 writer 文件名，不触碰用户自有 `openai-*.json`，自定义目录要求 user/system 级单一策略。非交互进程退出时会 abort/drain 当前扫描，但不在写入路径同步删除。
 - **session continuation admission log（#8932）**：daemon 接受 continuation 后输出低敏 `continuation enqueued` 结构化日志，只含 `sessionId`、生成的 `promptId` 和可选 `clientId`，不记录 prompt 内容。
 - **tool-result boundary diagnostics（#9039 open）**：仅在 file debug logging 启用时记录 tool-result 边界 size、process-local HMAC、mutation state 和 closed artifact summary，串起 ACP/Headless projection 与 writer frame；不写正文、prompt、raw id、tool name 或 artifact path。
-- **main agent invocation tracing（#9107 merged / #9121 open follow-up）**：#9107 已合入，将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离，并在 sensitive opt-in 时只记录原始用户 prompt 与最终可见 assistant response；#9121 当前 open diff 继续修正 budget/swallowed abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message。
+- **main agent invocation tracing（#9107 / #9121 merged）**：#9107 已合入，将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离，并在 sensitive opt-in 时只记录原始用户 prompt 与最终可见 assistant response；#9121 已合入继续修正 budget/swallowed abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message。
 
 ---
 
@@ -457,7 +457,7 @@ sequenceDiagram
 | #4321 | blocked + hook span | `tool.blocked_on_user` + `hook` span + TTL 哨兵属性 | 2 |
 | #4410 | subagent span | `qwen-code.subagent` + 并发隔离 + fork/Link + 4h TTL（**MERGED**） | 3 |
 | #9107 | main agent invocation tracing（merged） | 将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开并按 prompt owner 隔离 | Agent |
-| #9121 | main agent tracing edge cases（open） | 当前 open diff 修正 budget abort、provider 吞 abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message | Agent |
+| #9121 | main agent tracing edge cases | 已合入，修正 budget abort、provider 吞 abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message | Agent |
 
 ### 6.3 敏感属性 / GenAI / retry
 
@@ -469,7 +469,7 @@ sequenceDiagram
 | #7921 | ARMS session user ID | `telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 写入 span-level `gen_ai.user.id`，不写 Resource/log/metric/Baggage | ARMS |
 | #9039 | tool-result boundary diagnostics（open） | 当前 open diff 用 size、process-local HMAC、mutation state 和 closed artifact summary 诊断 tool-result 边界差异，不记录正文/raw id/path | Diagnostics |
 | #9107 | GenAI Agent invoke_agent（merged） | 写 `gen_ai.agent.name=qwen-code`、operation=`invoke_agent`、prompt-scoped owner 与失败 `error.type`，并将 sensitive prompt/response 采集限制在 opt-in | Agent |
-| #9121 | invocation edge-case follow-up（open） | 当前 open diff 让 abort/cancel/error 状态、JSON Schema ownership 和 bounded diagnostic message 在 continuation 与自动 invocation 中保持精确 | Agent |
+| #9121 | invocation edge-case follow-up | 已合入，让 abort/cancel/error 状态、JSON Schema ownership 和 bounded diagnostic message 在 continuation 与自动 invocation 中保持精确 | Agent |
 
 ### 6.4 出站关联（#4384）
 
@@ -583,6 +583,6 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 12. **#7921 只适合一进程一用户部署**：`telemetry.userId` / `QWEN_TELEMETRY_USER_ID` 是进程级配置。shared daemon、shared ACP channel 或任何一个进程服务多个 end user 的部署，如果直接配置该字段，会把不同用户归并成同一个 ARMS user id；这类场景需要后续增加 per-session/per-request identity surface。
 
-13. **#9039/#9121 仍是 open diff**：#8469 repeated tool execution failure guard telemetry、#8691 session restore timeout telemetry、#9055 selective restore telemetry、#9077 request-scoped session ownership、#9084 daemon log trace/span correlation 与 #9107 main agent invocation tracing 已按 merged diff 更新；#9039 tool-result boundary diagnostics 与 #9121 main-agent tracing edge-case follow-up 只记录当前 diff。若 diagnostics schema、abort/cancel classification、deferred tool owner 规则或 Agent span convention 调整，本文需要按最终 runtime diff 再同步。#8572 的 `qwen-code.daemon.sse.*` 已按 merged diff 更新。
+13. **#9039 仍是 open diff，#9121 已合入**：#8469 repeated tool execution failure guard telemetry、#8691 session restore timeout telemetry、#9055 selective restore telemetry、#9077 request-scoped session ownership、#9084 daemon log trace/span correlation、#9107 main agent invocation tracing 与 #9121 main-agent tracing edge-case follow-up 已按 merged diff 更新；#9039 tool-result boundary diagnostics 只记录当前 diff。若 diagnostics schema、abort/cancel classification、deferred tool owner 规则或 Agent span convention 调整，本文需要按最终 runtime diff 再同步。#8572 的 `qwen-code.daemon.sse.*` 已按 merged diff 更新。
 
 14. **#8862/#8893 OpenAI API 日志保留仍是 best-effort**：interactive 与 non-interactive 流程都会尝试清理，但短进程退出时只等待有限 drain，且写入路径不会同步删除刚产生的日志。自定义共享目录仍只按 user/system 级单一策略处理，不承担目录内其它调试产物管理。

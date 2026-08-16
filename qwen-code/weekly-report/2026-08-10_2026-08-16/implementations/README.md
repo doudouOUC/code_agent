@@ -22,19 +22,20 @@
 | [#8954](https://github.com/QwenLM/qwen-code/pull/8954) | ✅ merged | feat(serve): Propagate session list cancellation | [pr-8954.md](pr-8954.md) |
 | [#8955](https://github.com/QwenLM/qwen-code/pull/8955) | ✅ merged | fix(web-shell): Harden prompt admission ownership | [pr-8955.md](pr-8955.md) |
 | [#8990](https://github.com/QwenLM/qwen-code/pull/8990) | ✅ merged | fix(webui): Close same-session refresh race gaps | [pr-8990.md](pr-8990.md) |
-| [#9007](https://github.com/QwenLM/qwen-code/pull/9007) | 🟡 open | fix(serve): Bound ACP HTTP pre-attach buffers by bytes | [pr-9007.md](pr-9007.md) |
+| [#9007](https://github.com/QwenLM/qwen-code/pull/9007) | ✅ merged | fix(serve): Bound ACP HTTP pre-attach buffers by bytes | [pr-9007.md](pr-9007.md) |
 | [#9012](https://github.com/QwenLM/qwen-code/pull/9012) | ✅ merged | fix(cli): Bound headless tool result content | [pr-9012.md](pr-9012.md) |
 | [#9039](https://github.com/QwenLM/qwen-code/pull/9039) | 🟡 open | feat(core): Add privacy-safe tool-result boundary diagnostics | [pr-9039.md](pr-9039.md) |
 | [#9042](https://github.com/QwenLM/qwen-code/pull/9042) | ✅ merged | feat(daemon): Track background shells in activeWork | [pr-9042.md](pr-9042.md) |
 | [#9048](https://github.com/QwenLM/qwen-code/pull/9048) | ❌ closed | fix(webui): Make resync and repair transactional | [pr-9048.md](pr-9048.md) |
 | [#9055](https://github.com/QwenLM/qwen-code/pull/9055) | ✅ merged | perf(serve): Restore large sessions selectively | [pr-9055.md](pr-9055.md) |
-| [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | 🟡 open | feat(external-context): Add provider extension profile | [pr-9068.md](pr-9068.md) |
+| [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | ✅ merged | feat(external-context): Add provider extension profile | [pr-9068.md](pr-9068.md) |
 | [#9077](https://github.com/QwenLM/qwen-code/pull/9077) | ✅ merged | fix(core): Preserve OTel session ownership in daemons | [pr-9077.md](pr-9077.md) |
 | [#9084](https://github.com/QwenLM/qwen-code/pull/9084) | ✅ merged | feat(cli): Correlate daemon logs with OpenTelemetry spans | [pr-9084.md](pr-9084.md) |
 | [#9107](https://github.com/QwenLM/qwen-code/pull/9107) | ✅ merged | feat(telemetry): Trace main agent invocations | [pr-9107.md](pr-9107.md) |
-| [#9121](https://github.com/QwenLM/qwen-code/pull/9121) | 🟡 open | fix(telemetry): Address main agent tracing edge cases | [pr-9121.md](pr-9121.md) |
+| [#9121](https://github.com/QwenLM/qwen-code/pull/9121) | ✅ merged | fix(telemetry): Address main agent tracing edge cases | [pr-9121.md](pr-9121.md) |
 | [#9134](https://github.com/QwenLM/qwen-code/pull/9134) | 🟡 open | fix(daemon): Preserve sessions when active-work close is refused | [pr-9134.md](pr-9134.md) |
-| [#9180](https://github.com/QwenLM/qwen-code/pull/9180) | 🟡 open | feat(web-shell): support text file attachments in the composer | [pr-9180.md](pr-9180.md) |
+| [#9180](https://github.com/QwenLM/qwen-code/pull/9180) | ✅ merged | feat(web-shell): support text file attachments in the composer | [pr-9180.md](pr-9180.md) |
 | [#9181](https://github.com/QwenLM/qwen-code/pull/9181) | 🟡 open | feat(daemon): Isolate the Conversations runtime boundary | [pr-9181.md](pr-9181.md) |
+| [#9261](https://github.com/QwenLM/qwen-code/pull/9261) | 🟡 open draft | docs(serve): Design workspace session live-state protocol | [pr-9261.md](pr-9261.md) |
 
-_按个人 PR 口径更新于 2026-08-16_
+_按个人 PR 口径更新于 2026-08-17_

@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 当前 open diff 的 ACP HTTP pre-attach buffer byte budget，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134 当前 open diff 的 active-work close refusal / deferred kill guard，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -52,7 +52,8 @@
 | #8852 | approved external built-in text writes | FS seam follow-up | 最终实现用 versioned `tool-write-origin` provenance 让已批准的内置 text write 在 daemon-owned same-host adapter 上进入受控 host writer；HTTP/通用 ACP 不放宽。 |
 | #8911 | bound daemon ACP NDJSON buffers | transport resource guard | 已合入，daemon-owned ACP child 的 NDJSON frame 与 decoded inbound queue 使用固定 bounds，超限低敏记录并终止精确 child。 |
 | #8947 | close daemon ACP resource guard gaps | transport resource guard | 已合入，在 #8911 raw stream bounds 之外补 handler、prepared response、outbound op 与 outstanding request 的 count/byte guard。 |
-| #9007 | bound ACP HTTP pre-attach buffers by bytes | ACP HTTP transport resource guard | 当前 open diff 为 pre-attach buffered replies 增加 stream/connection/global frame 与 byte budget，并把 ownership grant 绑定到 local delivery。 |
+| #9007 | bound ACP HTTP pre-attach buffers by bytes | ACP HTTP transport resource guard | 已合入，为 pre-attach buffered replies 增加 stream/connection/global frame 与 byte budget，并把 ownership grant 绑定到 local delivery。 |
+| #9134 | preserve sessions when active-work close is refused | active-work close lifecycle | 当前 open diff；`onlyIfUnheld` close 拒绝前不破坏 session，deferred spawn-owner kill 避开 close/probe in-flight，definitive child close refusal 不升级为 channel kill。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -554,8 +555,14 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - fatal protocol、serialization、EOF 或 admission failure 会立即标记精确 workspace channel generation unavailable，终止 tracked child，并阻止 initialize/create/restore/attach/prompt/status 复用该 channel。
 - 该 PR 已合入 `main`，补齐 #8911 raw stream bounds 之外的 handler/outbound/request queue guard。
 
-### #9007 — ACP HTTP pre-attach byte budgets（当前 open）
+### #9007 — ACP HTTP pre-attach byte budgets（已合入）
 
-- 当前 open diff 给 ACP HTTP pre-attach buffered JSON-RPC reply 增加 serialized byte budget；per-stream、per-connection 和 process-global lease 会按本地 delivery callback/close/failure 释放。
+- 最终实现给 ACP HTTP pre-attach buffered JSON-RPC reply 增加 serialized byte budget；per-stream、per-connection 和 process-global lease 会按本地 delivery callback/close/failure 释放。
 - `session/new`、`session/load`、`session/resume`、`session/fork` 的 ownership grant 变成 provisional receipt，只有 reply 本地 delivery 成功才 commit；overflow、serialization failure 或 delivery failure 会 rollback fresh session、persisted fork 和新增 attachment。
-- 该 PR 未合入 `main`；本文只记录当前实现观察，不能把 pre-attach byte budgets 写成已落地能力。
+- 该 PR 已合入 `main`；普通 live SSE/WS 新帧队列、单帧 `JSON.stringify` 瞬时放大、远端 exactly-once receipt 和完整 frame/session backpressure 不在本 PR 内。
+
+### #9134 — active-work close refusal and deferred kill guard（当前 open）
+
+- `acpAgent.ts`：`onlyIfUnheld` close 改为非破坏性授权。existing hold 直接返回 `closed:false`；initial holds 为空时在 close gate 下等待 running turn settle 并复查，二次仍为空才 cancel pending prompt、flush recorder、dispose Session。
+- `bridgeTypes.ts` / `bridge.ts`：child `drainTimeoutMs` 由 `sessionCloseDrainBudgetMs()` 从实际 outer wait 推导；conditional close 的 natural settle、destructive drain 与 history mutation wait 共享预算。
+- `bridge.ts`：deferred spawn-owner kill 只在 entry 当前且没有 close/authorization in-flight 时触发；child 对 forced close 返回 definitive RequestError 时复位 `entry.closing` 并返回 `false`，保留 session 等下一轮 settle/retry，不 SIGTERM 同 channel sibling sessions。

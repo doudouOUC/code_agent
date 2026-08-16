@@ -59,9 +59,10 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #8691 | @doudouOUC | merged | restore timeout derivation：TS SDK 从 capabilities 学习 server restore budget，为 load/resume 派生 request timeout，并保留 per-request override。 |
 | #8743 | @doudouOUC | closed by #9055 | selective session restore design：docs-only 设计已由 #9055 runtime PR 承接；SDK 对外字段仍保持 additive。 |
 | #8939 | @doudouOUC | merged | same-session refresh diagnostics：TS daemon SDK/types 暴露 restore epoch 与 partial replay diagnostics，供 WebUI candidate staging fail-closed 校验。 |
-| #9007 | @doudouOUC | open | ACP HTTP pre-attach diagnostics：当前 open diff 在 daemon status / TS SDK types 上暴露 pre-attach limit、usage、pending delivery 和 guard failure counters。 |
+| #9007 | @doudouOUC | merged | ACP HTTP pre-attach diagnostics：在 daemon status / TS SDK types 上暴露 pre-attach limit、usage、pending delivery 和 guard failure counters。 |
 | #9055 | @doudouOUC | merged | selective session restore compatibility：load/resume 兼容既有 API，pagination/partial/projection 字段保持 optional/additive。 |
-| #9180 | @doudouOUC | open | Web Shell file metadata：当前 open diff 在 SDK UI transcript local metadata 中增加 files，用于乐观 user bubble file chip 展示；daemon replay 仍降级为 token 文本。 |
+| #9180 | @doudouOUC | merged | Web Shell file metadata：在 SDK UI transcript local metadata 中增加 files，用于乐观 user bubble file chip 展示；daemon replay 仍降级为 token 文本。 |
+| #9261 | @doudouOUC | open draft | workspace session live-state SDK design：规划 `getWorkspaceSessionLiveState()` / `getSessionLiveState()` 与 catalog version 类型，尚未实现 public SDK surface。 |
 
 ---
 
@@ -382,6 +383,6 @@ sequenceDiagram
 3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
 4. **#8002 是 additive TS SDK surface**：客户端必须 gate `workspace_file_read_cursor` 并兼容旧 daemon 缺字段。
 5. **#8572 是诊断 surface**：`sseConnectReason`、previous stream lineage 和 accepted stream id 不参与业务正确性；调用方不能用它们替代 event cursor、client id 或 session id。
-6. **#8691 restore timeout 与 #9055 selective restore 已合入，#9007/#9180 仍是 open diff**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。#9055 的 selective restore 对既有 load/resume API 保持 additive，SDK-visible replay anchor、pagination/partial/error 字段必须兼容旧 daemon；#9007 的 ACP HTTP pre-attach counters 与 #9180 的 local file metadata 仍只记录当前 open diff。
+6. **#8691 restore timeout、#9055 selective restore、#9007 pre-attach counters 与 #9180 local file metadata 已合入，#9261 仍是 open draft**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。#9055 的 selective restore 对既有 load/resume API 保持 additive，SDK-visible replay anchor、pagination/partial/error 字段必须兼容旧 daemon；#9261 的 workspace session live-state SDK methods/type 仍只是设计规划，不能视为已落地 public SDK 能力。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-16_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-17_

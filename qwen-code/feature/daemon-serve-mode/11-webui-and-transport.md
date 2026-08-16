@@ -46,11 +46,12 @@
 | #8939 | @doudouOUC | merged | transactional same-session refresh：same logical session refresh/rebind 使用 candidate staging，commit 前 source attachment/transcript/event stream 保持活动。 |
 | #8955 | @doudouOUC | merged | prompt admission ownership hardening：async host admission/lazy preparation 后重校 owner/generation，并用 stable transcript identity 恢复 source-owned retry。 |
 | #8990 | @doudouOUC | merged | same-session refresh race closeout：补 event epoch、candidate cleanup、turn+shell settle、controlled target 与 committed client identity recovery。 |
-| #9007 | @doudouOUC | open | ACP HTTP pre-attach byte bounds：当前 open diff 限制 pre-attach buffered replies 的 frame/byte budget，并把 ownership grant 绑定到 local delivery。 |
+| #9007 | @doudouOUC | merged | ACP HTTP pre-attach byte bounds：限制 pre-attach buffered replies 的 frame/byte budget，并把 ownership grant 绑定到 local delivery。 |
 | #9048 | @doudouOUC | closed | transactional resync / live-journal repair：closed diff 只作为未合入观察，不能写成 main 已落地能力。 |
 | #9055 | @doudouOUC | merged | selective session restore runtime：cold load/resume 在 daemon 内按请求 replay projection 读取 bounded page，WebUI recent page 不再要求 full transcript materialization 后裁剪。 |
-| #9180 | @doudouOUC | open | Web Shell text file attachments：当前 open diff 支持 paste/drop 文本文件、file chips、queue/retry/restore 与 daemon prompt `resource` block 投递。 |
+| #9180 | @doudouOUC | merged | Web Shell text file attachments：支持 paste/drop 文本文件、file chips、queue/retry/restore 与 daemon prompt `resource` block 投递。 |
 | #9181 | @doudouOUC | open | Conversations runtime visibility：当前 open diff 隐藏 internal `live-conversation` runtime，不让普通 workspace picker、Voice、scratch、ACP 和 workspace management target 选中。 |
+| #9261 | @doudouOUC | open draft | workspace session live-state handshake：docs-only 设计，规划 Web Shell 先 poll live-state，再在 catalog version 变化时刷新完整 persisted catalog。 |
 
 ---
 
@@ -367,7 +368,7 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 
 #8990 已合入 same-session refresh race closeout。它补齐 #8939 后的 refresh/reload/rebind 边界：late restore、late metadata、stream restart、candidate retirement 和 replay suffix 写入都按 current candidate/attachment gate 检查，防止 same logical session refresh 失败后污染 source visible owner。
 
-#9007 当前 open diff 只覆盖 ACP HTTP pre-attach buffer byte bounds：buffered JSON-RPC reply 按 serialized bytes 获取 lease，per-stream、per-connection 和 process-global budget 超限时关闭精确 logical connection，并把 session/new/load/resume/fork ownership 改成 delivery 成功后才 commit 的 provisional receipt。该能力未合入 `main`，不能写成生产能力。
+#9007 已合入 ACP HTTP pre-attach buffer byte bounds：buffered JSON-RPC reply 按 serialized bytes 获取 lease，per-stream、per-connection 和 process-global budget 超限时关闭精确 logical connection，并把 session/new/load/resume/fork ownership 改成 delivery 成功后才 commit 的 provisional receipt。该能力保护 ACP HTTP attach 前 reply/ownership，不替代普通 live SSE/WS 新帧队列或完整 frame/session backpressure。
 
 ## 2026-08-13 follow-up：transactional resync/repair 与 selective restore runtime
 
@@ -377,11 +378,17 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 
 ## 2026-08-15 follow-up：text file attachments 与 internal runtime visibility
 
-#9180 当前 open diff 把 composer paste/drop 从 image-only 扩展为 file ingestion。`extractFileTransfer` 将文本 MIME、受控 `application/*`、扩展名和常见文件名识别为 `PromptFile`，使用独立 512 KiB 文本预算、UTF-8 读取、NUL binary 检测和安全去重命名。`ChatEditor` 展示文件 chip，`useComposerCore` 维护 remove/restore/clear/retry 生命周期，`useQueuedPrompts` 与 `midTurnDedup` 将带文件 prompt 按 attachment prompt 处理，禁止 mid-turn 注入。
+#9180 已合入，把 composer paste/drop 从 image-only 扩展为 file ingestion。`extractFileTransfer` 将文本 MIME、受控 `application/*`、扩展名和常见文件名识别为 `PromptFile`，使用独立 512 KiB 文本预算、UTF-8 读取、NUL binary 检测和安全去重命名。`ChatEditor` 展示文件 chip，`useComposerCore` 维护 remove/restore/clear/retry 生命周期，`useQueuedPrompts` 与 `midTurnDedup` 将带文件 prompt 按 attachment prompt 处理，禁止 mid-turn 注入。
 
 WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blocks，并在普通文本末尾追加 `@attachment:///<name>` token；slash/shell command path 丢弃附件 block 和 token，避免悬空引用。SDK UI transcript 只保存本地 `files` metadata 以支持乐观 user bubble；session reload 或 peer client 没有本地 metadata 时，只显示 transcript 里的 token 文本。
 
 #9181 当前 open diff 补 Web Shell/daemon workspace presentation 的 internal runtime guard。ordinary workspace resolver 与 Web Shell target 过滤 `provenance === "live-conversation"` 的 runtime；workspace picker、Voice target、scratch/new-session、workspace management、extension routes 与 ACP mount 查不到该 internal runtime 时 fail closed，不 fallback primary。既有 Live catalog/owner-routed compatibility path 继续通过专门 resolver 工作。
+
+## 2026-08-16 follow-up：workspace session live-state handshake design
+
+#9261 当前 open draft 规划 Web Shell 从高频 session catalog polling 切到 cheap live-state polling。客户端先读 `live-state A`，再加载完整 sessions catalog 和必要的 session groups，随后读 `live-state B`；只有 A/B 的 `generation+revision` 完全相等，且 catalog/group 请求在 A 之后启动并成功，才接受同一 bundle。版本变化触发 reload 需要 coalesce 与 cooldown/backoff，避免 tight loop。
+
+该 PR 尚未改变 Web Shell 行为。设计明确 absent live session 只能清理已知 catalog row 的 volatile state，不能当作 persisted session deletion；untrusted workspace 不读 live bridge，且 selected-runtime route 不 fallback primary。
 
 ---
 
@@ -430,4 +437,4 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-16_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-17_

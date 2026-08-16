@@ -1,13 +1,13 @@
 # Direct External Context Search / Auto Recall / Mem0 Write 技术方案
 
-> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening draft；#8352 Auto Recall proxy lifecycle；#8507 optional Mem0 write；#9068 provider extension profile draft）。
-> 当前记录：#7586/#7877/#8352/#8507 已按 merged diff、changed files、测试路径与 examples 记录最终实现；#8206 仍为 draft open，#9068 为 open，只记录当前 diff 方案。
+> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening draft；#8352 Auto Recall proxy lifecycle；#8507 optional Mem0 write；#9068 provider extension profile）。
+> 当前记录：#7586/#7877/#8352/#8507/#9068 已按 merged diff、changed files、测试路径与 examples 记录最终实现；#8206 仍为 draft open。
 
 ---
 
 ## 1. 背景与动机
 
-PR #7586 面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。#8352 修复 Auto Recall Hook 的一次性 proxy dispatcher 生命周期，避免 provider timeout 后 CONNECT socket 留住 child process，并把 v1/v2 entrypoint 与 timeout ownership 文档纠正到实际实现。#8206 draft open 继续收敛 direct external-context MCP profile 的 MCP SDK / Hono / parser dependency path，但不扩大业务 surface，也不迁移 mobile-mcp；mobile-mcp 的 Node.js 22 / Hono 2 方案另由 #8311 记录。#8507 在严格 v1 Mem0 config 上增加可选 `context_remember({content})` 写入变体，用 Mem0 V3 Direct Import 保存一条由用户确认过的仓库记忆；它不把 Generic HTTP、v2 Auto Recall 或默认 manifest 扩展成写入面。#9068 当前 open diff 在此之上定义 provider-owned Extension Profile v1，让 provider 通过现有 Qwen Extension + MCP 边界交付固定 `context_search` schema、test vectors、参考输出和本地/远端示例，而不是把 Generic HTTP adapter 当作长期 provider API。这些 PR 都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
+PR #7586 面向一个窄部署 profile：管理员已经把外部上下文 provider 的 credential、project/index/corpus 限定到正确语料，Qwen 只需要在模型显式请求时做一次只读检索。#7877 在此基础上增加另一个 mutually-exclusive profile：管理员把同一只读 provider 安装成 `UserPromptSubmit` command hook，使每次 fresh user submission 都可以基于 `submitted_prompt` 做一次确定性 auto recall。#8352 修复 Auto Recall Hook 的一次性 proxy dispatcher 生命周期，避免 provider timeout 后 CONNECT socket 留住 child process，并把 v1/v2 entrypoint 与 timeout ownership 文档纠正到实际实现。#8206 draft open 继续收敛 direct external-context MCP profile 的 MCP SDK / Hono / parser dependency path，但不扩大业务 surface，也不迁移 mobile-mcp；mobile-mcp 的 Node.js 22 / Hono 2 方案另由 #8311 记录。#8507 在严格 v1 Mem0 config 上增加可选 `context_remember({content})` 写入变体，用 Mem0 V3 Direct Import 保存一条由用户确认过的仓库记忆；它不把 Generic HTTP、v2 Auto Recall 或默认 manifest 扩展成写入面。#9068 已合入，在此之上定义 provider-owned Extension Profile v1，让 provider 通过现有 Qwen Extension + MCP 边界交付固定 `context_search` schema、test vectors、参考输出和本地/远端示例，而不是把 Generic HTTP adapter 当作长期 provider API。这些 PR 都不是 Enterprise Memory Gateway 的替代品，不处理 tenant policy、review queue、跨仓库共享、删除一致性、DLP、身份/文档 ACL、不可绕过确认或合规审计。
 
 核心风险是把 provider 直接暴露给模型或 hook：模型不应知道 credential env 名称，不应选择 provider/corpus，不应看到 provider 内部错误，也不能把 provider 输出当作可信系统指令。因此方案把能力拆成三个入口：retrieval-only MCP server 默认只暴露 `context_search({query})`；auto recall hook 只消费 `submitted_prompt` 并返回 bounded user-layer `additionalContext`；可选 Mem0 write variant 只在管理员启用严格 v1 write block 后暴露 `context_remember({content})`，并把写入前内容确认、非幂等和不确定结果禁止自动重试作为契约。三者都不提供 provider selector、delete、approve、policy 或 management API。
 
@@ -42,7 +42,7 @@ flowchart TB
 5. HTTP client bounded、可取消、拒绝 redirects，除 loopback 外要求 HTTPS。
 6. provider 输出是非可信检索结果，不作为系统指令拼接。
 7. direct profile 信任本地 repo env 和同 UID 进程；需要企业隔离和治理时应使用 governed / enterprise profile。
-8. provider extension profile v1（#9068 draft）只允许 manifest allowlist 的 `context_search`，input/output schema language-neutral，且不引入 provider selector、tenant selector、credential override、filter/metadata 隧道或管理面。
+8. provider extension profile v1（#9068）只允许 manifest allowlist 的 `context_search`，input/output schema language-neutral，且不引入 provider selector、tenant selector、credential override、filter/metadata 隧道或管理面。
 
 ---
 
@@ -114,9 +114,9 @@ direct retrieval、auto recall 和 optional Mem0 write 都不提供企业级隔�
 
 关键约束是 scoped override：#8206 自身不负责 mobile MCP package 的 runtime 迁移，避免把 external-context 的安全升级扩散成另一个 package 的 breaking change。后续 #8311 已单独提出 mobile-mcp Node.js 22 / MCP SDK 1.30.0 / Hono 2 迁移，见 [mobile-mcp.md](mobile-mcp.md)。
 
-### 3.9 Provider Extension Profile v1（#9068 open）
+### 3.9 Provider Extension Profile v1（#9068 merged）
 
-#9068 当前 open diff 定义 External Context Provider Extension Profile v1。provider 团队不再复制 Generic HTTP adapter shape，而是发布一个 Qwen Extension + MCP profile：manifest 只 allowlist `context_search`，input 只有严格 `query` 字段，undeclared selector、tenant、filter、credential、metadata 等字段在调用 provider 前拒绝。
+#9068 最终实现定义 External Context Provider Extension Profile v1。provider 团队不再复制 Generic HTTP adapter shape，而是发布一个 Qwen Extension + MCP profile：manifest 只 allowlist `context_search`，input 只有严格 `query` 字段，undeclared selector、tenant、filter、credential、metadata 等字段在调用 provider 前拒绝。
 
 profile 同时提供 language-neutral JSON schema、test vectors、MCP text/structured output reference、remote OAuth 示例与 self-contained local REST adapter 示例。输出保持 bounded untrusted context item，不把 provider detail、credential env name、内部错误或管理状态暴露给模型；远端 OAuth 仅是 provider-owned transport 示例，不改变 Qwen 侧 direct/governed 边界。
 
@@ -135,7 +135,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 ## 5. 已知限制 / 后续
 
 - #8206 仍为 draft open；dependency hardening 只记录当前 diff，不能视为 main 已落地。
-- #9068 仍为 open；provider extension profile 只记录当前 diff，不能视为 main 已落地，也不能替代企业级 governance profile。
+- #9068 已合入；provider extension profile 是 query-only 接入面，不能替代企业级 governance profile。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -153,6 +153,6 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 | [#8206](https://github.com/QwenLM/qwen-code/pull/8206) | OPEN draft | dependency hardening | 当前 draft 将 direct external-context integration 升到 MCP SDK 1.30.0 / patched Hono 2 line；mobile-mcp 迁移不属于 #8206，另见 #8311 / [mobile-mcp.md](mobile-mcp.md)。 |
 | [#8352](https://github.com/QwenLM/qwen-code/pull/8352) | MERGED | Auto Recall proxy lifecycle | 一次性 Hook 在检索尝试后销毁自己的 environment-aware proxy dispatcher，修复 provider timeout 后 child process 被 CONNECT socket 留住的问题，并修正文档中的 v1/v2 entrypoint 与 timeout 归属。 |
 | [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | MERGED | optional Mem0 write | 在严格 v1 Mem0 config 上增加 `context_remember({content})`，通过内容可见确认后把原文作为一条 Direct Import user message 写入固定 `app_id`，并把不确定结果映射为禁止自动 retry 的 `unknown`。 |
-| [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | OPEN | Provider Extension Profile v1 | 当前 open diff 定义 provider-owned Qwen Extension + MCP profile：严格 `context_search` schema、test vectors、MCP output reference、remote OAuth 示例与 local REST adapter 示例；不引入 selector、credential override 或管理面。 |
+| [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | MERGED | Provider Extension Profile v1 | 定义 provider-owned Qwen Extension + MCP profile：严格 `context_search` schema、test vectors、MCP output reference、remote OAuth 示例与 local REST adapter 示例；不引入 selector、credential override 或管理面。 |
 
-_按个人 PR 口径更新于 2026-08-15_
+_按个人 PR 口径更新于 2026-08-17_
