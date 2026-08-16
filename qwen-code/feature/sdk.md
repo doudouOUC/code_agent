@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 当前 open diff 增加 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 当前 open diff 增加 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 当前 open diff 增加 Web Shell file chip 所需的本地 UI transcript metadata），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -376,9 +376,11 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #8415 | MERGED | caller-supplied session ID override | TS/Java/daemon MCP surface 暴露 session id override，必须 gate `session_id_override` capability 并验证 daemon 返回 id 是否 honor 请求。 |
 | #8572 | MERGED | REST SSE stream observability | TS daemon SDK / WebUI 传递 connect reason、previous stream lineage，并从 `X-Qwen-SSE-Stream-Id` 学习 accepted stream id；字段仅用于诊断，兼容旧 daemon。 |
 | #8691 | MERGED | restore timeout derivation | TS daemon SDK 从 capabilities 学习 `limits.sessionRestoreTimeoutMs`，按 per-request/global/server/default 顺序派生 load/resume request timeout，不把 `timeoutMs` 写入 body。 |
-| #8743 | DRAFT OPEN | selective session restore design | 当前不改 public SDK；如后续暴露 replay anchor、partial 或 bounded replay error，必须作为 additive surface 单独审计。 |
+| #8743 | CLOSED BY #9055 | selective session restore design | docs-only 设计已由 #9055 runtime PR 承接；public SDK 仍按 additive compatibility 处理。 |
 | #8939 | MERGED | same-session refresh diagnostics | 在 TS daemon SDK 上暴露 restore epoch / partial replay diagnostics，用于 WebUI same-session refresh 事务候选 fail-closed 校验。 |
 | #9007 | OPEN | ACP HTTP pre-attach diagnostics | 当前 open diff 在 daemon status / TS SDK types 上暴露 ACP HTTP pre-attach limits、frames/bytes、pending delivery 与 guard failures。 |
+| #9055 | MERGED | selective session restore compatibility | load/resume API 兼容旧客户端，pagination/partial/projection 信息保持 optional/additive。 |
+| #9180 | OPEN | Web Shell file metadata | 当前 open diff 在 SDK daemon UI local transcript block 上增加 files metadata，仅用于本地乐观 user bubble file chip；daemon replay 仍降级为 token 文本。 |
 
 ---
 
@@ -404,7 +406,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 9. **restore timeout derivation 已合入**。#8691 的 server restore budget 只是 client timer hint；旧 daemon 缺 `limits.sessionRestoreTimeoutMs` 时必须回落默认 70s，`restore_timeout` 后仍要按 retryable error 和后续 session 状态处理。
 
-10. **selective session restore 已由 #9055 合入，#9007 仍是 open diff**。#9055 对 SDK contract 保持 additive：旧 daemon 缺 replay pagination/partial/projection-specific fields 时仍按既有 load/resume 语义降级；#9007 的 ACP HTTP pre-attach status/counters 仍不能视为已落地 public SDK 能力。
+10. **selective session restore 已由 #9055 合入，#9007/#9180 仍是 open diff**。#9055 对 SDK contract 保持 additive：旧 daemon 缺 replay pagination/partial/projection-specific fields 时仍按既有 load/resume 语义降级；#9007 的 ACP HTTP pre-attach status/counters 和 #9180 的 UI-local file metadata 仍不能视为已落地 public SDK 能力。
 
 11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 
@@ -465,9 +467,9 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - request serialization：`timeoutMs` 是 SDK-side 计时参数，不进入 daemon request body，避免旧 daemon 将未知 body 字段当协议输入。
 - WebUI restore action：复用同一 SDK timeout 口径，并把 retryable `restore_timeout` 与普通 attach/transport error 区分。
 
-### #8743 — selective session restore design（当前 draft open）
+### #8743 / #9055 — selective session restore（design → runtime merged）
 
-- 当前 docs-only draft 不新增 SDK request/response 字段，不改变 `loadSession()` / `resumeSession()` 的 public signature。
+- #8743 docs-only draft 不新增 SDK request/response 字段，不改变 `loadSession()` / `resumeSession()` 的 public signature；runtime 实现已由 #9055 承接。
 - 后续若 daemon 暴露 replay anchor、partial replay 或 bounded replay error，必须保持 optional/additive；旧 daemon 和旧 SDK 仍按现有 full/recent replay 行为工作。
 
 ### #8939 — same-session refresh diagnostics（已合入）
@@ -478,3 +480,10 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 - 当前 open diff 在 daemon status 与 TS SDK types 上增加 ACP HTTP pre-attach limit、current/high-water frame/byte usage、pending delivery ownership、guard failure、mount attribution 与 per-connection owned frames/bytes；未合入前不能作为 SDK 稳定面承诺。
 - 该能力未合入 `main`；字段必须保持 optional/additive，旧 daemon/旧 SDK 仍按现有 restore result 行为工作。
+
+### #9180 — Web Shell file metadata（当前 open）
+
+- 当前 open diff 在 `packages/sdk-typescript/src/daemon/ui/types.ts`、`transcript.ts` 和 `store.ts` 上增加 local-only `files` metadata，用于 Web Shell optimistic user message 展示 filename/size/mime。
+- metadata 不进入 daemon persisted transcript，也不改变 public wire event；reload 或 peer client 只能看到 `@attachment:///name` token 文本。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-16_

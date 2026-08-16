@@ -33,6 +33,8 @@
 | [#9084](https://github.com/QwenLM/qwen-code/pull/9084) | ✅ merged | feat(cli): Correlate daemon logs with OpenTelemetry spans | [pr-9084.md](pr-9084.md) |
 | [#9107](https://github.com/QwenLM/qwen-code/pull/9107) | ✅ merged | feat(telemetry): Trace main agent invocations | [pr-9107.md](pr-9107.md) |
 | [#9121](https://github.com/QwenLM/qwen-code/pull/9121) | 🟡 open | fix(telemetry): Address main agent tracing edge cases | [pr-9121.md](pr-9121.md) |
-| [#9134](https://github.com/QwenLM/qwen-code/pull/9134) | 🟡 open draft | fix(daemon): Preserve sessions when active-work close is refused | [pr-9134.md](pr-9134.md) |
+| [#9134](https://github.com/QwenLM/qwen-code/pull/9134) | 🟡 open | fix(daemon): Preserve sessions when active-work close is refused | [pr-9134.md](pr-9134.md) |
+| [#9180](https://github.com/QwenLM/qwen-code/pull/9180) | 🟡 open | feat(web-shell): support text file attachments in the composer | [pr-9180.md](pr-9180.md) |
+| [#9181](https://github.com/QwenLM/qwen-code/pull/9181) | 🟡 open | feat(daemon): Isolate the Conversations runtime boundary | [pr-9181.md](pr-9181.md) |
 
-_按个人 PR 口径更新于 2026-08-15_
+_按个人 PR 口径更新于 2026-08-16_

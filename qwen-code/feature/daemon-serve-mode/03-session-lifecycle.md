@@ -22,10 +22,11 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **permission prompt cancellation preservation**：ACP permission prompt、Plan unknown shell approval、Stop hook permission 与 background notification 等等待点若被父级 abort，session 终态保持 `cancelled`，并保留已 recovered 的 mid-turn message（#7295）。
 - **prompt terminal exactly-once**：每个已返回 202 的 prompt 在 agent settle、queued removal、deadline、close/kill/crash/shutdown 等路径上恰好收到一个 `turn_complete` 或 `turn_error`；deadline 由 bridge admission/dispatch race 拥有（#7400）。
 - **prompt terminal follow-up hardening**：running prompt 从 UI-visible list 移除时不立刻丢 pending entry，queued terminal 不污染 session-level turn error/retry 状态，queued deadline 保留 typed `PromptDeadlineExceededError`（#7453）。
-- **activeWork idle/restart guard**：#8588 已合入，把 close-on-last-detach、attach rollback、idle reaper 等自动清理门控从仅看 `pendingPromptCount` 扩展到 `entryHasActiveWork()`，覆盖 accepted prompt、background Agent 和 Agent terminal notification；#9042 已合入，继续把 Session-managed background shell running、terminal notification queued 与 parent continuation processing 纳入 bounded `shell` hold；#9134 当前 draft open 让 automatic close 授权拒绝前不破坏 queued work，并优先兑现 deferred spawn-owner kill；显式 close/kill/shutdown 仍强制。
+- **activeWork idle/restart guard**：#8588 已合入，把 close-on-last-detach、attach rollback、idle reaper 等自动清理门控从仅看 `pendingPromptCount` 扩展到 `entryHasActiveWork()`，覆盖 accepted prompt、background Agent 和 Agent terminal notification；#9042 已合入，继续把 Session-managed background shell running、terminal notification queued 与 parent continuation processing 纳入 bounded `shell` hold；#9134 当前 open diff 让 automatic close 授权拒绝前不破坏 queued work，并优先兑现 deferred spawn-owner kill；显式 close/kill/shutdown 仍强制。
 - **safe session restore timeout**：#8691 已合入，将 load/resume restore 从 initialize timeout 中拆出专用 deadline；public caller 超时后保留真实 ACP settle/cleanup，不误杀 sibling session，cleanup/settlement 不确定时 quarantine channel 或返回 `acp_channel_unavailable` 并阻止新 session 操作。
 - **selective / shape-aware session restore**：#8743 的 docs-only design 已由 #9055 merged runtime PR 承接；cold load/resume 先构建 transcript index，只读取 runtime resume state 与目标 replay projection 所需 records，`historyPageSize` 在 payload read 前决定 recent page；#8933 已合入，要求 restore coalescing 按 `resume/none`、`load/all`、`load/recent(N)` 区分，避免不同 replay 语义互相满足。
 - **Conversations runtime foundation**：#8890 已合入，把 Conversations workspace/source helper 从 Live 命名空间迁到 shared `serve/conversations`，用 `ConversationRuntimeManager` one-flight 创建或采用唯一 Conversations runtime；仍不新增 standalone route、capability、SDK/UI 或每会话 ACP child。
+- **Conversations runtime boundary**：#9181 当前 open diff 在 #8890 基础上补跨 daemon owner record、ServeAppLifecycle release proof、shutdown activity gate 和 ordinary runtime visibility guard；internal `live-conversation` runtime 只允许既有 Live/owner-routed compatibility path 使用，普通 workspace selector 不 fallback primary。
 - **persisted session catalog cache + cancellation**：#8892 已合入 2 秒 process-local single-flight cache；#8954 再把 REST/ACP waiter cancellation 传播到 JSONL、runtime-status、worktree sidecar、project membership 与分页读取，最后一个 waiter 取消才 abort physical scan。
 - **continuation admission logs**：#8932 已合入，在 daemon 接受 session continuation 后写低敏 `continuation enqueued` 结构化日志，记录 `sessionId`、生成的 `promptId` 和可选 `clientId`。
 - **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458）。
@@ -94,8 +95,9 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#8932](https://github.com/QwenLM/qwen-code/pull/8932) | merged | continuation admission logs | accepted continuation 写低敏 `continuation enqueued` 结构化日志，只含 `sessionId`、`promptId` 和可选 `clientId` |
 | [#8933](https://github.com/QwenLM/qwen-code/pull/8933) | merged | restore request shape-aware coalescing | 按 target + `resume/none` / `load/all` / `load/recent(N)` 区分 coalescing，避免不同 replay 语义互相复用 |
 | [#9042](https://github.com/QwenLM/qwen-code/pull/9042) | merged | background shell activeWork hold | 将 Session-managed background shell running、terminal notification queued 和 parent continuation processing 纳入 bounded `shell` activeWork hold |
-| [#9134](https://github.com/QwenLM/qwen-code/pull/9134) | draft open | active-work close authorization | 当前 draft open 让 `onlyIfUnheld` close 先做非破坏性授权，拒绝时不取消 queued work，并让 deferred spawn-owner kill 在 final detach 后保持强制语义 |
+| [#9134](https://github.com/QwenLM/qwen-code/pull/9134) | open | active-work close authorization | 当前 open diff 让 `onlyIfUnheld` close 先做非破坏性授权，拒绝时不取消 queued work，并让 deferred spawn-owner kill 在 final detach 后保持强制语义 |
 | [#9055](https://github.com/QwenLM/qwen-code/pull/9055) | merged | selective session restore runtime | cold restore 构建一次 transcript index，只读取 runtime state 与请求 replay projection 所需 records，并在发布前检查 32 MiB/10,000 updates replay 上限 |
+| [#9181](https://github.com/QwenLM/qwen-code/pull/9181) | open | Conversations runtime boundary | 当前 open diff 增加 owner record、lifecycle release proof、activity gate、ordinary resolver hiding 和 Live compatibility path 精确分流 |
 
 ---
 
@@ -113,9 +115,17 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 
 #9042 已合入，在 #8588 activeWork 基础上增加 `shell` 类别。Session 本地 collector 发现任意已登记 background shell 仍 running、shell terminal notification 已排队，或 notification 正在驱动父 continuation 时返回 bounded hold；wire 仍只暴露聚合类别，详细 shell 状态保留在 task/status surface。coverage partial 的 session 不参与普通 automatic cleanup，避免在子进程尚不支持 shell hold 时误判为空闲。
 
-#9134 当前 draft open 继续修复 #9042 后的 close authorization。`onlyIfUnheld` close 会先非破坏性检查已有 hold；没有 hold 时在 close gate 下等待 running turn 自然 settle 后再复查，只有仍无 hold 才取消 pending prompt 和 teardown。daemon 传入 8s child drain budget，并在 final attacher detach 后先执行 deferred spawn-owner kill，再走 ordinary cleanup candidate 判定。
+#9134 当前 open diff 继续修复 #9042 后的 close authorization。`onlyIfUnheld` close 会先非破坏性检查已有 hold；没有 hold 时在 close gate 下等待 running turn 自然 settle 后再复查，只有仍无 hold 才取消 pending prompt 和 teardown。daemon 传入 8s child drain budget，并在 final attacher detach 后先执行 deferred spawn-owner kill，再走 ordinary cleanup candidate 判定。
 
 #9055 已合入 #8743 的 runtime 实现。cold restore 先用 single pass 构建 transcript index，再按 `SessionRuntimeResumeState` 与 `SessionRestoreReplayPage` 的 union 读取 records；explicit `historyPageSize` 在 payload read 前选 recent page，返回 pagination metadata。实现保留 compressed/legacy model history、record ancestry、interrupted turns、FileHistory、artifacts、Goals/checkpoint evidence、attribution、telemetry、usage、source metadata 和 background notification active-chain 语义，并在发布前检查 replay 32 MiB / 10,000 updates 上限。
+
+## 2026-08-15 follow-up：Conversations hidden runtime boundary
+
+#9181 当前 open diff 在 #8890 foundation 上补足 runtime boundary。`ConversationRuntimeOwnership` 以 real home 下的 owner record、lock、O_NOFOLLOW、single-link regular file、owner-only permission、schema 和 nonce 校验保证同一 OS user 只有一个 Conversations runtime owner；dead-owner reclaim 需要 handoff grace，malformed/unsafe record 映射为 compromised 而不是覆盖。
+
+Serve 侧通过 `ServeAppLifecycle` 把 ownership 绑定到实际 listener/app/host 生命周期：listener 绑定与 startup ready 之前不开放 boot admission，shutdown 后 seal admission、等待 listener close、app/host/bridge/child drain，再释放 exact owner record。`ConversationRuntimeActivityGate` 让 shutdown 期间的内部 operation 参与 drain 证明，并对新 operation 返回 `daemon_draining`。
+
+普通 workspace runtime resolver 默认过滤 `provenance === "live-conversation"`，只有既有 Live catalog、owner-routed session 与少量 compatibility path 使用专门 resolver；查找失败、歧义或未持有 owner 时 fail closed，不 fallback primary。
 
 ## 数据结构
 
@@ -595,7 +605,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#7967/#9134 仍为 open diff，#9055 已合入 selective restore runtime，#9042 已合入 background shell activeWork hold**。handle-bound range refactor 与 active-work close authorization follow-up 只记录当前方案，不能视为 `main` 已落地能力；#8588/#8691/#9042/#9055/#7886/#7975/#7976 已按 merged diff 更新。若后续 PR 调整 projection/replay/failure contract 或 close authorization 顺序，需要按最终 diff 再同步。
+6. **#7967/#9134/#9181 仍为 open diff，#9055 已合入 selective restore runtime，#9042 已合入 background shell activeWork hold**。handle-bound range refactor、active-work close authorization follow-up 与 Conversations runtime boundary 只记录当前方案，不能视为 `main` 已落地能力；#8588/#8691/#9042/#9055/#7886/#7975/#7976 已按 merged diff 更新。若后续 PR 调整 projection/replay/failure contract、close authorization 顺序或 runtime ownership/release proof，需要按最终 diff 再同步。
 
 ---
 
@@ -610,7 +620,7 @@ sequenceDiagram
 - **heartbeat**：`describe('recordHeartbeat')`（`:680`）。
 - **close/kill/detach/metadata**：`describe('closeSession')`（`:7813`）、`describe('updateSessionMetadata')`（`:8010`）、`describe('listWorkspaceSessions')`（`:4709`/ enriched `:8076`）、`publishWorkspaceEvent + knownClientIds`（`:8100`）。
 - **prompt terminal exactly-once**：`describe('prompt terminal exactly-once (DAEMON-002/003/004/005)')` 覆盖 queued removal terminal、wedged deadline、queued deadline、close/kill terminal-before-bus-close、last detach draining、cancel/remove/deadline race、channel crash exactly-once（#7400）。
-- **activeWork lifecycle gate（#8588 / #9042 / #9134 open）**：#8588 PR diff 覆盖 child active/idle transition、heartbeat timeout、non-owning session/channel/old seq 忽略、last-client-detach 延迟 close、prompt settle cleanup 与 deep-health aggregation；#9042 覆盖 background shell running/terminal notification/parent continuation hold 与 partial coverage cleanup gate；#9134 当前 draft open 继续覆盖 conditional close 不破坏 queued work、共享 drain budget、legacy category child 的 deferred spawn-owner kill 与 quarantine reap。
+- **activeWork lifecycle gate（#8588 / #9042 / #9134 open）**：#8588 PR diff 覆盖 child active/idle transition、heartbeat timeout、non-owning session/channel/old seq 忽略、last-client-detach 延迟 close、prompt settle cleanup 与 deep-health aggregation；#9042 覆盖 background shell running/terminal notification/parent continuation hold 与 partial coverage cleanup gate；#9134 当前 open diff 继续覆盖 conditional close 不破坏 queued work、共享 drain budget、legacy category child 的 deferred spawn-owner kill 与 quarantine reap。
 - **safe restore timeout（#8691 merged）**：PR diff 覆盖空 channel timeout/reap、sibling session survival、same-id fencing/coalescing、late close exactly-once、cleanup quarantine/recovery、capacity retention、transport close 与 hanging request shutdown。
 - **selective restore runtime（#9055）**：PR diff 覆盖 full/recent/resume parity fixtures、single index construction、paging/limit、oversized replay bounds、413 sibling survival、pagination metadata、background notification active-chain 和 replay publication cap。
 - **managed writer shutdown**：#7812 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
@@ -869,7 +879,7 @@ sequenceDiagram
 - active-work private meta 从单一 active bit 扩展为 v1 category negotiation，当前可报告 `agent`、`notification`、`shell`；不支持完整 coverage 的 session 不参与普通 automatic cleanup。
 - wire/status 只暴露聚合类别，不泄漏 command、output、path 或 shell 细节；详细状态仍由 task/status surface 承担。
 
-### #9134 — active-work close authorization（当前 draft open）
+### #9134 — active-work close authorization（当前 open）
 
 - `acpAgent.ts:closeSession`：`onlyIfUnheld` close 先读取 existing holds，若已有 hold 立即返回 `closed:false`，不取消 pending work、不 dispose Session。
 - initial holds 为空时，child 在 close gate 下等待 running turn 自然 settle 并复查 holds；只有二次检查仍为空，才进入 pending prompt cancel、recorder flush、Session teardown。
