@@ -27,6 +27,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **selective / shape-aware session restore**：#8743 的 docs-only design 已由 #9055 merged runtime PR 承接；cold load/resume 先构建 transcript index，只读取 runtime resume state 与目标 replay projection 所需 records，`historyPageSize` 在 payload read 前决定 recent page；#8933 已合入，要求 restore coalescing 按 `resume/none`、`load/all`、`load/recent(N)` 区分，避免不同 replay 语义互相满足。
 - **Conversations runtime foundation**：#8890 已合入，把 Conversations workspace/source helper 从 Live 命名空间迁到 shared `serve/conversations`，用 `ConversationRuntimeManager` one-flight 创建或采用唯一 Conversations runtime；仍不新增 standalone route、capability、SDK/UI 或每会话 ACP child。
 - **Conversations runtime boundary**：#9181 已合入，在 #8890 基础上补跨 daemon owner record、ServeAppLifecycle release proof、shutdown activity gate 和 ordinary runtime visibility guard；internal `live-conversation` runtime 只允许既有 Live/owner-routed compatibility path 使用，普通 workspace selector 不 fallback primary。
+- **standalone source / identity primitives**：#9341 当前 open diff 在 #9181 边界后补 explicit standalone source classification、case-insensitive session id conflict detection、JSONL integrity-aware metadata read 和 standalone directory identity guard；仍保留为内部 primitive，不新增 public standalone route/capability/SDK/UI。
+- **runtime record I/O retryability**：#9362 当前 open diff 把 Conversations runtime owner/discovery record 的 transient `open`/`readFile` 错误保留为 retryable runtime unavailable，只把 `ELOOP`、malformed 或 unsafe record 映射为 compromised，避免一次 EMFILE/EIO 永久锁死 runtime。
 - **persisted session catalog cache + cancellation / live-state design**：#8892 已合入 2 秒 process-local single-flight cache；#8954 再把 REST/ACP waiter cancellation 传播到 JSONL、runtime-status、worktree sidecar、project membership 与分页读取，最后一个 waiter 取消才 abort physical scan；#9261 open draft 规划 daemon-local `generation+revision` catalog version 和纯内存 live-state 探针，尚未实现路由。
 - **continuation admission logs**：#8932 已合入，在 daemon 接受 session continuation 后写低敏 `continuation enqueued` 结构化日志，记录 `sessionId`、生成的 `promptId` 和可选 `clientId`。
 - **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458）。
@@ -99,6 +101,8 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#9055](https://github.com/QwenLM/qwen-code/pull/9055) | merged | selective session restore runtime | cold restore 构建一次 transcript index，只读取 runtime state 与请求 replay projection 所需 records，并在发布前检查 32 MiB/10,000 updates replay 上限 |
 | [#9181](https://github.com/QwenLM/qwen-code/pull/9181) | merged | Conversations runtime boundary | 增加 owner record、lifecycle release proof、activity gate、ordinary resolver hiding 和 Live compatibility path 精确分流 |
 | [#9261](https://github.com/QwenLM/qwen-code/pull/9261) | open draft | workspace session live-state protocol | docs-only 设计，规划 live session volatile snapshot、daemon-local catalog version、cache invalidation 顺序与客户端双读握手；尚未实现生产路由 |
+| [#9341](https://github.com/QwenLM/qwen-code/pull/9341) | open | standalone conversation isolation primitives | 预留 explicit standalone source、loadable metadata reader、session id case conflict、JSONL integrity 与 standalone directory identity guard；不开放 standalone API |
+| [#9362](https://github.com/QwenLM/qwen-code/pull/9362) | open | transient runtime record I/O retryability | Conversations runtime owner/discovery record 的 transient `open`/`readFile` 错误保持 retryable，只有 symlink/malformed/unsafe state 才永久 compromised |
 
 ---
 
@@ -133,6 +137,12 @@ Serve 侧通过 `ServeAppLifecycle` 把 ownership 绑定到实际 listener/app/h
 #9261 是 docs-only open draft，目标是把高频 volatile status polling 从 persisted session catalog 路径中拆出来。设计新增 selected-runtime/trusted-only `GET /workspaces/:workspace/sessions/live-state`，只从 bridge 内存返回 live sessions 的 `clientCount`、`hasActivePrompt`、permission/user-question wait flags，并附带 daemon-local catalog version；不读取 JSONL、organization、worktree sidecar、settings、commands 或 ACP child。
 
 catalog version 由 `generation` 与 `revision` 组成，只支持整对 equality compare。revision 覆盖 live entry 注册/移除、display name、worktree summary、persisted branch/fork commit、archive/delete/organization/group 等 membership/static metadata mutation；普通 prompt/transcript activity 不递增。route 在首次或变更后暴露新 version 前必须先失效 active/archived persisted catalog cache，客户端通过 `live A -> full catalog -> live B` 验证 bundle 没被 mutation race 污染。
+
+## 2026-08-17 follow-up：standalone source/identity primitives 与 runtime record I/O retryability
+
+#9341 当前 open diff 是 standalone 会话隔离的 PR2A primitives。`serve/conversations/session-source.ts` 增加 reserved `sourceType: "standalone"`、`readLoadableConversationSession()`、`readLoadableLiveConversationMetadata()` 与 explicit standalone / legacy projectless / Live source 分类；REST `/session` 与 ACP `session/new` 仍拒绝外部传入 reserved standalone source，load/resume 只通过 persisted spelling 和内部 runtime filter 读取，普通入口不能把 explicit standalone 当 legacy session 恢复。`SessionService` 同步增加 case-insensitive id conflict、active/archive location proof 和 integrity-aware metadata read；`jsonl-utils.ts` 区分 complete records 与 truncated/garbage/incomplete lines；`conversation-directory-identity.ts` 与 `conversation-workspace.ts` 校验 standalone directory 是 owner-only、非 symlink、direct child 且 device/inode/realpath 符合预期。
+
+#9362 当前 open diff 修复 #9181 owner/discovery record 的故障分类：`conversation-runtime-ownership.ts` 与 `live/discovery.ts` 只把 `ELOOP` open、schema parse/malformed 和 unsafe identity/permission/link state 转成 terminal compromised；普通 `open`/`readFile` I/O 错误（例如 EMFILE/EIO）原样抛出，让上层 acquisition 映射为 retryable `conversation_runtime_unavailable`。回归用例先注入一次 transient fault，再确认下一次 acquire 能 reclaim；`ELOOP` 仍保持 `conversation_runtime_ownership_compromised` 且不可重试。
 
 ## 数据结构
 
@@ -612,7 +622,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#7967 仍为 open diff，#9261 为 open draft，#9055/#9134/#9181 已合入**。handle-bound range refactor 与 workspace session live-state protocol 只记录当前方案，不能视为 `main` 已落地能力；active-work close authorization follow-up、Conversations runtime boundary、selective restore runtime、background shell activeWork hold 已按 merged diff 更新。若后续 PR 调整 projection/replay/failure contract、close authorization 顺序、runtime ownership/release proof 或 live-state version/cache contract，需要按最终 diff 再同步。
+6. **#7967/#9341/#9362 仍为 open diff，#9261 为 open draft，#9055/#9134/#9181 已合入**。handle-bound range refactor、standalone source/identity primitives、runtime record I/O retryability 与 workspace session live-state protocol 只记录当前方案，不能视为 `main` 已落地能力；active-work close authorization follow-up、Conversations runtime boundary、selective restore runtime、background shell activeWork hold 已按 merged diff 更新。若后续 PR 调整 projection/replay/failure contract、close authorization 顺序、runtime ownership/release proof、standalone source admission 或 live-state version/cache contract，需要按最终 diff 再同步。
 
 ---
 
@@ -630,6 +640,7 @@ sequenceDiagram
 - **activeWork lifecycle gate（#8588 / #9042 / #9134）**：#8588 PR diff 覆盖 child active/idle transition、heartbeat timeout、non-owning session/channel/old seq 忽略、last-client-detach 延迟 close、prompt settle cleanup 与 deep-health aggregation；#9042 覆盖 background shell running/terminal notification/parent continuation hold 与 partial coverage cleanup gate；#9134 覆盖 conditional close 不破坏 queued work、共享 drain budget、legacy category child 的 deferred spawn-owner kill、close/probe in-flight guard、definitive close refusal retry 与 quarantine reap。
 - **safe restore timeout（#8691 merged）**：PR diff 覆盖空 channel timeout/reap、sibling session survival、same-id fencing/coalescing、late close exactly-once、cleanup quarantine/recovery、capacity retention、transport close 与 hanging request shutdown。
 - **selective restore runtime（#9055）**：PR diff 覆盖 full/recent/resume parity fixtures、single index construction、paging/limit、oversized replay bounds、413 sibling survival、pagination metadata、background notification active-chain 和 replay publication cap。
+- **Conversations standalone primitives / runtime record retryability（#9341 / #9362 open）**：#9341 当前 open diff 覆盖 source classification、standalone directory identity、session id admission、JSONL integrity 和 REST/ACP load/resume reserved-source 拒绝；#9362 覆盖 owner record 与 Live discovery record 的 transient open/read retry、二次 acquire recovery，以及 ELOOP unsafe state 不可重试。
 - **managed writer shutdown**：#7812 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
 - **Todo Stop Guard continuation hardening**：#7821 覆盖 owner claim/release、失败恢复、Stop hook 重跑、workspace relocation、session disposal、overlapping prompt 与 cron queue cap。
 - **session writer lease opt-in / timestamp drift / maintenance / handoff**：#7894 覆盖 restart-required opt-in 与 ACP bootstrap gate；#7886 覆盖 timestamp-only drift reconciliation、digest baseline 和 release-aware baseline read；#7975 覆盖 selected runtime maintenance storage、daemon writer lease 与 shutdown draining；#7976 覆盖 sealed lock proof、fixed claim、certified takeover 与 failure-closed races。

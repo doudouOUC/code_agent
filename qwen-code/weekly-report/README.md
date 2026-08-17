@@ -2,9 +2,9 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文最终实现文档放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-**时间范围**: 2026-04-06 ~ 2026-08-16（持续更新）
-**总计**: 408 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33 见对应周目录（W33 最终版个人增量 +83,242 / -12,297，591 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-08-17（持续更新）
+**总计**: 410 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34 见对应周目录（W34 周内累计个人增量 +3,489 / -382，29 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -29,10 +29,11 @@
 | [2026-07-27 ~ 2026-08-02](2026-07-27_2026-08-02/) (W31 周内累计) | 27 | 20/7/0 | +41,296/-5,001 | daemon first-output latency benchmark、submitted prompt provenance、ACP provider preload、managed writer shutdown、benchmark validity/schema hardening、Todo Guard continuation、external-context auto recall、transcript timestamp drift、writer lease opt-in、ARMS user id、large text bounded reads、handle-bound text range reader、maintenance writer isolation、certified writer handoff、immediate dispatch metrics、byte-cursor paging、workspace skill status read model、resource budgeting foundation、GenAI first-chunk tracing、tool-call terminal telemetry、tool execution outcome、external-context dependency hardening、daemon memory budget reporting、mobile-mcp dependency hardening、Auto Recall proxy lifecycle、lineEnding metadata consistency |
 | [2026-08-03 ~ 2026-08-09](2026-08-03_2026-08-09/) (W32 最终版) | 18 | 17/1/0 | +29,637/-2,289 | MCP unsafe replay guard、WebUI live journal truncation recovery、caller-supplied session id admission、daemon memory pressure observation、write_file prior-read guidance、ACP tool-result text projection、active ACP child RSS aggregation、tool-result low watermark microcompaction、ACP repeated tool execution failure guard、Direct External Context Mem0 writes、daemon child heap partition modeling、REST SSE stream/client observability、activeWork deep health、same-host daemon text read delegation、read permission symlink canonicalization、safe session restore timeout observability、integration-tests typecheckability、selective session restore design |
 | [2026-08-10 ~ 2026-08-16](2026-08-10_2026-08-16/) (W33 最终版) | 33 | 29/2/2 | +83,242/-12,297 | WebUI/WebShell transactional switching/resync/repair、text file attachments、selective session restore、workspace session live-state protocol design、Conversations runtime foundation/runtime boundary、session catalog cache/cancellation、activeWork shell retention/close authorization、OpenAI log retention、ACP NDJSON/resource/pre-attach guards、Headless/tool-result diagnostics、external-context provider profile、daemon/agent telemetry ownership and tracing |
+| [2026-08-17 ~ 2026-08-23](2026-08-17_2026-08-23/) (W34 周内累计) | 2 | 0/2/0 | +3,489/-382 | standalone conversation source/identity/admission primitives、Conversations runtime owner/discovery transient I/O retryability |
 
 ## 类型分布
 
-feat ×195, fix ×143, refactor ×16, other ×13, docs ×11, chore ×7, perf ×16, test ×6, merge ×1
+feat ×196, fix ×144, refactor ×16, other ×13, docs ×11, chore ×7, perf ×16, test ×6, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

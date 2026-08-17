@@ -65,6 +65,8 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #8691 | fix(serve): Make session restore timeouts safe and observable | merged | 不新增 feature tag；`GET /capabilities` 在 `limits.sessionRestoreTimeoutMs` additive 公告 restore deadline，REST/ACP 错误面新增 retryable `restore_timeout` 与 cleanup/settlement quarantine 的 `acp_channel_unavailable`。 |
 | #8743 | docs(design): Plan selective session restore | closed by #9055 | docs-only 设计；不新增 public capability、REST/SDK 字段或 event type，runtime 实现由 #9055 承接。 |
 | #9181 | feat(daemon): Isolate the Conversations runtime boundary | merged | 不新增 standalone capability；ordinary runtime selector 隐藏 internal `live-conversation` runtime，既有 Live compatibility path 走专门 resolver。 |
+| #9341 | feat(cli): Add standalone conversation isolation primitives | open | 不新增 public standalone capability、route 或 SDK surface；只预留 reserved `sourceType: "standalone"`、内部 source/loadable metadata 分类和 admission/identity guard。 |
+| #9362 | fix(cli): Keep transient runtime record I/O retryable | open | 不新增 capability 或 wire 字段；只调整 Conversations owner/discovery record 内部错误分类，让 transient I/O 继续走 retryable unavailable。 |
 | #9261 | docs(serve): Design workspace session live-state protocol | open draft | docs-only 设计；规划 `workspace_session_live_state` capability、`GET /workspaces/:workspace/sessions/live-state` 与 TS SDK surface，但尚未实现生产 route。 |
 | #6716 | feat(serve): persist dynamic workspace registrations | 2026-07-11 | 新增条件能力 `persistent_workspace_registration`；只有 workspace registration store 可用时广告，客户端才应发送 `POST /workspaces {persist:true}`。 |
 | #6740 | feat(serve): add workspace persisted transcript reader | 2026-07-12 | 新增 `workspace_persisted_transcript`：workspace-qualified persisted-only transcript pager，不启动 ACP、不加载 settings。 |
@@ -525,7 +527,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#8691/#9042/#9055/#9134/#9181 已合入，#9261 是 open draft**。restore timeout limit、`restore_timeout` error、quarantine error、`shell` activeWork category、selective restore pagination/replay metadata、active-work close authorization follow-up 与 Conversations runtime boundary 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。#9261 的 workspace session live-state protocol 仍只记录当前方案，不能视为 `main` 已落地能力。#8572/#8588 已按 merged diff 更新。
+8. **#8691/#9042/#9055/#9134/#9181 已合入，#9341/#9362 是 open diff，#9261 是 open draft**。restore timeout limit、`restore_timeout` error、quarantine error、`shell` activeWork category、selective restore pagination/replay metadata、active-work close authorization follow-up 与 Conversations runtime boundary 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。#9341/#9362 的 standalone/runtime safety primitives 与 #9261 的 workspace session live-state protocol 仍只记录当前方案，不能视为 `main` 已落地能力。#8572/#8588 已按 merged diff 更新。
 
 ---
 
@@ -603,6 +605,12 @@ sequenceDiagram
 - #9181 不新增 standalone route、public capability、SDK surface 或 event type；能力面仍通过现有 Live/owner-routed compatibility path 暴露。
 - ordinary workspace resolver 默认过滤 `provenance === "live-conversation"` 的 internal runtime；workspace-qualified REST/ACP/Voice、scratch/session creation、extension/workspace management 等普通 selector 查不到内部 runtime 时 fail closed，不 fallback primary。
 - `ServeAppLifecycle` 与 Conversations owner record 的状态只作为 daemon 内部 release proof；后续若需要对外诊断字段，应保持 optional/additive，并避免让客户端把 internal runtime 当作普通 workspace target。
+
+### #9341 / #9362 — standalone/runtime safety primitives（open）
+
+- #9341 当前 open diff 只在 daemon 内部引入 reserved `sourceType: "standalone"`、loadable metadata reader、explicit standalone / legacy projectless / Live source classification、case-insensitive session id conflict 和 standalone directory identity proof；REST `/session` 与 ACP `session/new` 继续拒绝外部 reserved standalone source。
+- #9341 不新增 `workspace_session_live_state`、standalone route、capability registry entry、SDK method、event type 或 WebUI surface；普通 load/resume 只能通过 existing persisted spelling 与 internal runtime filter 处理，不让 explicit standalone 从 legacy route 泄漏。
+- #9362 当前 open diff 不改变 protocol shape，只把 owner/discovery record 的 transient `open`/`readFile` I/O error 保留为 retryable `conversation_runtime_unavailable` 上层语义；`ELOOP`、malformed JSON、schema mismatch 和 unsafe permission/link state 仍是 terminal compromised。
 
 ### #9261 — workspace session live-state protocol（open draft）
 
