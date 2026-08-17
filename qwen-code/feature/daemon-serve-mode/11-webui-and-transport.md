@@ -50,7 +50,7 @@
 | #9048 | @doudouOUC | closed | transactional resync / live-journal repair：closed diff 只作为未合入观察，不能写成 main 已落地能力。 |
 | #9055 | @doudouOUC | merged | selective session restore runtime：cold load/resume 在 daemon 内按请求 replay projection 读取 bounded page，WebUI recent page 不再要求 full transcript materialization 后裁剪。 |
 | #9180 | @doudouOUC | merged | Web Shell text file attachments：支持 paste/drop 文本文件、file chips、queue/retry/restore 与 daemon prompt `resource` block 投递。 |
-| #9181 | @doudouOUC | open | Conversations runtime visibility：当前 open diff 隐藏 internal `live-conversation` runtime，不让普通 workspace picker、Voice、scratch、ACP 和 workspace management target 选中。 |
+| #9181 | @doudouOUC | merged | Conversations runtime visibility：已合入 internal `live-conversation` runtime guard，不让普通 workspace picker、Voice、scratch、ACP 和 workspace management target 选中。 |
 | #9261 | @doudouOUC | open draft | workspace session live-state handshake：docs-only 设计，规划 Web Shell 先 poll live-state，再在 catalog version 变化时刷新完整 persisted catalog。 |
 
 ---
@@ -382,7 +382,7 @@ WebShell 侧 `WorkspaceSessionProvider` 保持现代 provider mounted，区分 d
 
 WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blocks，并在普通文本末尾追加 `@attachment:///<name>` token；slash/shell command path 丢弃附件 block 和 token，避免悬空引用。SDK UI transcript 只保存本地 `files` metadata 以支持乐观 user bubble；session reload 或 peer client 没有本地 metadata 时，只显示 transcript 里的 token 文本。
 
-#9181 当前 open diff 补 Web Shell/daemon workspace presentation 的 internal runtime guard。ordinary workspace resolver 与 Web Shell target 过滤 `provenance === "live-conversation"` 的 runtime；workspace picker、Voice target、scratch/new-session、workspace management、extension routes 与 ACP mount 查不到该 internal runtime 时 fail closed，不 fallback primary。既有 Live catalog/owner-routed compatibility path 继续通过专门 resolver 工作。
+#9181 已合入 Web Shell/daemon workspace presentation 的 internal runtime guard。ordinary workspace resolver 与 Web Shell target 过滤 `provenance === "live-conversation"` 的 runtime；workspace picker、Voice target、scratch/new-session、workspace management、extension routes 与 ACP mount 查不到该 internal runtime 时 fail closed，不 fallback primary。既有 Live catalog/owner-routed compatibility path 继续通过专门 resolver 工作。
 
 ## 2026-08-16 follow-up：workspace session live-state handshake design
 
