@@ -66,8 +66,11 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #8743 | docs(design): Plan selective session restore | closed by #9055 | docs-only 设计；不新增 public capability、REST/SDK 字段或 event type，runtime 实现由 #9055 承接。 |
 | #9181 | feat(daemon): Isolate the Conversations runtime boundary | merged | 不新增 standalone capability；ordinary runtime selector 隐藏 internal `live-conversation` runtime，既有 Live compatibility path 走专门 resolver。 |
 | #9341 | feat(cli): Add standalone conversation isolation primitives | open | 不新增 public standalone capability、route 或 SDK surface；只预留 reserved `sourceType: "standalone"`、内部 source/loadable metadata 分类和 admission/identity guard。 |
-| #9362 | fix(cli): Keep transient runtime record I/O retryable | open | 不新增 capability 或 wire 字段；只调整 Conversations owner/discovery record 内部错误分类，让 transient I/O 继续走 retryable unavailable。 |
-| #9261 | docs(serve): Design workspace session live-state protocol | open draft | docs-only 设计；规划 `workspace_session_live_state` capability、`GET /workspaces/:workspace/sessions/live-state` 与 TS SDK surface，但尚未实现生产 route。 |
+| #9362 | fix(cli): Keep transient runtime record I/O retryable | merged | 不新增 capability 或 wire 字段；只调整 Conversations owner/discovery record 内部错误分类，让 transient I/O 继续走 retryable unavailable。 |
+| #9261 | feat(serve): Add workspace session live-state endpoint and catalog version | merged | 新增 `workspace_session_live_state` capability、trusted-only memory-only `GET /workspaces/:workspace/sessions/live-state`、catalog version 与 TS SDK surface。 |
+| #9366 | feat(web-shell): Consume workspace session live-state | merged | 不新增 protocol；WebShell 消费 #9261 的 capability/route，用 version-fenced handshake 减少 full catalog polling。 |
+| #9380 | feat(serve): measure ACP child peak old-generation heap | merged | `/daemon/status` additive 暴露 ACP child old-generation peak heap measurement；observe-only，不改 child argv/enforcement。 |
+| #9396 | feat(serve): Add live-state session activity watermark | merged | 在现有 live-state response v1 下新增 optional `updatedAt`；普通 turn activity 不推进 catalog version。 |
 | #6716 | feat(serve): persist dynamic workspace registrations | 2026-07-11 | 新增条件能力 `persistent_workspace_registration`；只有 workspace registration store 可用时广告，客户端才应发送 `POST /workspaces {persist:true}`。 |
 | #6740 | feat(serve): add workspace persisted transcript reader | 2026-07-12 | 新增 `workspace_persisted_transcript`：workspace-qualified persisted-only transcript pager，不启动 ACP、不加载 settings。 |
 | #6741 | feat(cli): Add runtime daemon channel control | 2026-07-13 | 新增条件能力 `channel_control`：daemon runtime channel selection 查询/设置/停止。 |
@@ -527,7 +530,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#8691/#9042/#9055/#9134/#9181 已合入，#9341/#9362 是 open diff，#9261 是 open draft**。restore timeout limit、`restore_timeout` error、quarantine error、`shell` activeWork category、selective restore pagination/replay metadata、active-work close authorization follow-up 与 Conversations runtime boundary 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。#9341/#9362 的 standalone/runtime safety primitives 与 #9261 的 workspace session live-state protocol 仍只记录当前方案，不能视为 `main` 已落地能力。#8572/#8588 已按 merged diff 更新。
+8. **#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已合入，#9341 是 open diff**。restore timeout limit、`restore_timeout` error、quarantine error、`shell` activeWork category、selective restore pagination/replay metadata、active-work close authorization follow-up、Conversations runtime boundary、workspace session live-state route/catalog version、runtime record retryability、ACP child heap measurement 与 live-state activity watermark 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。#9341 的 standalone safety primitives 仍只记录当前方案，不能视为 `main` 已落地能力。#8572/#8588 已按 merged diff 更新。
 
 ---
 
@@ -606,14 +609,19 @@ sequenceDiagram
 - ordinary workspace resolver 默认过滤 `provenance === "live-conversation"` 的 internal runtime；workspace-qualified REST/ACP/Voice、scratch/session creation、extension/workspace management 等普通 selector 查不到内部 runtime 时 fail closed，不 fallback primary。
 - `ServeAppLifecycle` 与 Conversations owner record 的状态只作为 daemon 内部 release proof；后续若需要对外诊断字段，应保持 optional/additive，并避免让客户端把 internal runtime 当作普通 workspace target。
 
-### #9341 / #9362 — standalone/runtime safety primitives（open）
+### #9341 / #9362 — standalone/runtime safety primitives
 
 - #9341 当前 open diff 只在 daemon 内部引入 reserved `sourceType: "standalone"`、loadable metadata reader、explicit standalone / legacy projectless / Live source classification、case-insensitive session id conflict 和 standalone directory identity proof；REST `/session` 与 ACP `session/new` 继续拒绝外部 reserved standalone source。
 - #9341 不新增 `workspace_session_live_state`、standalone route、capability registry entry、SDK method、event type 或 WebUI surface；普通 load/resume 只能通过 existing persisted spelling 与 internal runtime filter 处理，不让 explicit standalone 从 legacy route 泄漏。
-- #9362 当前 open diff 不改变 protocol shape，只把 owner/discovery record 的 transient `open`/`readFile` I/O error 保留为 retryable `conversation_runtime_unavailable` 上层语义；`ELOOP`、malformed JSON、schema mismatch 和 unsafe permission/link state 仍是 terminal compromised。
+- #9362 已合入，不改变 protocol shape，只把 owner/discovery record 的 transient `open`/`readFile` I/O error 保留为 retryable `conversation_runtime_unavailable` 上层语义；`ELOOP`、malformed JSON、schema mismatch 和 unsafe permission/link state 仍是 terminal compromised。
 
-### #9261 — workspace session live-state protocol（open draft）
+### #9261 / #9366 / #9396 — workspace session live-state protocol
 
-- #9261 规划 additive `workspace_session_live_state` capability 与 selected-runtime/trusted-only `GET /workspaces/:workspace/sessions/live-state`。response 为 `v:1`、`catalogVersion:{generation,revision}` 和完整 live session volatile snapshot，并显式 `Cache-Control: no-store`。
+- #9261 已合入 additive `workspace_session_live_state` capability 与 selected-runtime/trusted-only `GET /workspaces/:workspace/sessions/live-state`。response 为 `v:1`、`catalogVersion:{generation,revision}` 和完整 live session volatile snapshot，并显式 `Cache-Control: no-store`。
 - `catalogVersion` 只支持 equality compare；`generation` 随 bridge 重建变化，`revision` 覆盖 daemon-observed catalog membership/static metadata mutation。普通 prompt/transcript activity、attach/detach 和 wait-state 不递增 version。
-- 该 PR 尚未实现 route、capability registry、bridge clock 或 SDK 方法；未来落地必须保持 wire-additive，并在暴露新 version 前同步失效 active/archived persisted catalog cache。
+- route、capability registry、bridge clock、cache invalidation 和 TS SDK methods 已随 #9261 落地；#9366 已合入 WebShell consumer，按 `live A -> catalog/groups -> live B` handshake 发布 full catalog bundle；#9396 已合入同一 response v1 下的 optional `updatedAt` activity watermark，且普通 turn activity 不 bump version。
+
+### #9380 — ACP child peak old-generation heap（merged）
+
+- #9380 已合入，在 `/daemon/status` additive 暴露 `runtime.memory.children.heap`，包含 per-child old-generation committed peak、major-GC 后 live-set peak、total heap peak、major GC count/time、reported count 和 `unclassifiedSpaceNames`。
+- 该字段为 observe-only；未采样时返回 `null`，多个 child 取独立最大值而非求和，`limits.memory.enforced` 保持 `false`，child spawn argv、capability registry 和 admission 行为不变。

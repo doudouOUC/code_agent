@@ -51,7 +51,10 @@
 | #9055 | @doudouOUC | merged | selective session restore runtime：cold load/resume 在 daemon 内按请求 replay projection 读取 bounded page，WebUI recent page 不再要求 full transcript materialization 后裁剪。 |
 | #9180 | @doudouOUC | merged | Web Shell text file attachments：支持 paste/drop 文本文件、file chips、queue/retry/restore 与 daemon prompt `resource` block 投递。 |
 | #9181 | @doudouOUC | merged | Conversations runtime visibility：已合入 internal `live-conversation` runtime guard，不让普通 workspace picker、Voice、scratch、ACP 和 workspace management target 选中。 |
-| #9261 | @doudouOUC | open draft | workspace session live-state handshake：docs-only 设计，规划 Web Shell 先 poll live-state，再在 catalog version 变化时刷新完整 persisted catalog。 |
+| #9261 | @doudouOUC | merged | workspace session live-state route/handshake：已合入 route/capability/SDK，Web Shell 可先 poll live-state，再在 catalog version 变化时刷新完整 persisted catalog。 |
+| #9366 | @doudouOUC | merged | WebShell live-state consumer：启用 capability 后用 `live A -> catalog/groups -> live B` fencing 完整 catalog，并在稳态只 poll live-state。 |
+| #9396 | @doudouOUC | merged | live-state activity watermark：服务端在 live-state response 中补 optional `updatedAt`，普通 turn activity 不 bump catalog version。 |
+| #9476 | @doudouOUC | merged | WebShell live-state activity consumer：turn completion 通过 post-completion live-state response settle，并用可吸收 `updatedAt` 重排当前 active page。 |
 
 ---
 
@@ -384,11 +387,15 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 #9181 已合入 Web Shell/daemon workspace presentation 的 internal runtime guard。ordinary workspace resolver 与 Web Shell target 过滤 `provenance === "live-conversation"` 的 runtime；workspace picker、Voice target、scratch/new-session、workspace management、extension routes 与 ACP mount 查不到该 internal runtime 时 fail closed，不 fallback primary。既有 Live catalog/owner-routed compatibility path 继续通过专门 resolver 工作。
 
-## 2026-08-16 follow-up：workspace session live-state handshake design
+## 2026-08-16 follow-up：workspace session live-state route and handshake
 
-#9261 当前 open draft 规划 Web Shell 从高频 session catalog polling 切到 cheap live-state polling。客户端先读 `live-state A`，再加载完整 sessions catalog 和必要的 session groups，随后读 `live-state B`；只有 A/B 的 `generation+revision` 完全相等，且 catalog/group 请求在 A 之后启动并成功，才接受同一 bundle。版本变化触发 reload 需要 coalesce 与 cooldown/backoff，避免 tight loop。
+#9261 已合入 Web Shell 所需的 daemon route/capability/SDK surface：Web Shell 可以从高频 session catalog polling 切到 cheap live-state polling。客户端先读 `live-state A`，再加载完整 sessions catalog 和必要的 session groups，随后读 `live-state B`；只有 A/B 的 `generation+revision` 完全相等，且 catalog/group 请求在 A 之后启动并成功，才接受同一 bundle。版本变化触发 reload 需要 coalesce 与 cooldown/backoff，避免 tight loop。
 
-该 PR 尚未改变 Web Shell 行为。设计明确 absent live session 只能清理已知 catalog row 的 volatile state，不能当作 persisted session deletion；untrusted workspace 不读 live bridge，且 selected-runtime route 不 fallback primary。
+#9366 已合入 WebShell consumer。`SessionCatalogStore` 在 capability-enabled workspace 上接管 catalog scheduling，完整 catalog/group 请求先 staged 再 commit；稳态两秒 poll 只调用 live-state，source change、local invalidation 或 catalog version 变化才触发 full refresh。legacy daemon 或不支持 capability 的 workspace 继续使用原 catalog path。absent live session 只能清理已知 catalog row 的 volatile state，不能当作 persisted session deletion；untrusted workspace 不读 live bridge，且 selected-runtime route 不 fallback primary。
+
+#9396 已合入服务端 `updatedAt` activity watermark。WebShell 可以用 live-state 的 volatile recency 更新 row 排序，而不用在每个 turn terminal 后安排 catalog reconciliation；普通 turn activity 不推进 catalog version，因此不会打破 #9366 的 version-fenced full catalog 策略。
+
+#9476 已合入 WebShell consumer。`workspace-session-live-state.ts` 在 turn completion 时 snapshot per-session sequence，只让 completion 之后启动的 live-state response settle；`SessionCatalogStore.applyLiveState()` 只把有效 `updatedAt` 吸收到已加载、cursor-less、active、非 archived 且无 source/group 过滤的既有 row，并按 server comparator 重排。缺少 watermark、旧 daemon、filter 外 row 或请求失败时，仍回落到 10 秒合并的 full catalog refresh。
 
 ---
 
@@ -437,4 +444,4 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-17_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-20_

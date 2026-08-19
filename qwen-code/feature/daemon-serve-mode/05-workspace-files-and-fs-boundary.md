@@ -2,7 +2,7 @@
 
 > 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.6、§4.3）。本文在 file/symbol/line 级别**取代**总览的 §3.6 段落，深入到 `resolveWithinWorkspace` 的逐分支防穿越/防符号链接逃逸算法、CAS+原子写链路的每一步守卫、读路由的 fail-closed 参数校验，以及 `FileSystemService` / `BridgeFileSystem` 注入 seam。
 >
-> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads）、#7967（handle-bound text range refactor 当前 open diff）、#8002（byte-cursor paging 已合入）、#8383（lineEnding metadata consistency 当前 open diff）、#8620（same-host daemon text read delegation 已合入）、#8852（approved external built-in text writes 已合入）。
+> 代码锚点除特别说明外均以当前 `main` 为准；早期 Wave/F1 表格仍保留 `daemon_mode_b_main` 作为历史落地语境。关联 PR：#4250（FileSystemService 边界 / Wave 4 PR 18）、#4269（安全读路由 / PR 19）、#4280（write/edit 路由 / PR 20）、#4279、#4319（acp-bridge F1 + `BridgeFileSystem` seam）、#4334（F1 follow-up：adapter wiring）、#7947（Serve large text bounded reads）、#7967（handle-bound text range refactor 已合入）、#8002（byte-cursor paging 已合入）、#8383（lineEnding metadata consistency 已合入）、#8620（same-host daemon text read delegation 已合入）、#8852（approved external built-in text writes 已合入）。
 
 ---
 
@@ -41,9 +41,9 @@ Mode B 的文件子系统要解决一个本质上敌对的问题：**一个 HTTP
 | #4319 | acp-bridge F1（`BridgeFileSystem` seam） | 把 `BridgeFileSystem` 接口（`packages/acp-bridge/src/bridgeFileSystem.ts`）抬到 bridge 包，给 ACP 子进程侧 fs 调用留注入点。 |
 | #4334 | acp-bridge F1 follow-up（adapter wiring） | `bridgeFileSystemAdapter.ts` 把 ACP `readTextFile`/`writeTextFile` 路由到**同一** `WorkspaceFileSystemFactory`，统一审计 + 信任门 + 路径约束。 |
 | #7947 | Serve large text bounded reads | 允许 Serve `/file` 对超过 256 KiB 的 UTF-8 文本返回 bounded line window，同时保留 full snapshot/edit/hash 的旧大小门。 |
-| #7967 | handle-bound text range refactor（open） | 当前 open diff 将 Core path reader 与 caller-owned handle reader 拆开，Serve large-window 复用 borrowed fd，避免混合 flag/死字段继续扩散。 |
+| #7967 | handle-bound text range refactor（merged） | 已合入，将 Core path reader 与 caller-owned handle reader 拆开，Serve large-window 复用 borrowed fd，避免混合 flag/死字段继续扩散。 |
 | #8002 | byte-cursor paging（merged） | 为 Serve `/file` 增加 `hasMore`/`nextCursor`/`cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
-| #8383 | lineEnding metadata consistency（open） | 当前 open diff 让 Serve text `meta.lineEnding` 从完整 decoded file 检测一次，避免 CRLF cursor paging 前后页报告不同 line ending。 |
+| #8383 | lineEnding metadata consistency（merged） | 已合入，让 Serve text `meta.lineEnding` 从完整 decoded file 检测一次，避免 CRLF cursor paging 前后页报告不同 line ending。 |
 | #8620 | same-host daemon text read delegation（merged） | 最终实现让 daemon-owned same-host bridge 关闭 delegated text read、保留 delegated text write，direct read/pre-read 回到子进程本地 CLI 权限，最终写入仍走 WorkspaceFileSystem。 |
 | #8852 | approved external built-in text writes（merged） | 最终实现让已授权的内置 `write_file`/edit/notebook/sed 对 workspace 外文本的最终写入，经严格 `tool-write-origin` 元数据进入 same-host host writer；HTTP/通用 ACP 边界不放宽。 |
 
@@ -216,7 +216,7 @@ return n;
 
 ### 各路由要点
 
-- **`handleGetFile`（L200）**：`resolve(queryPath, 'read')` → `readText(resolved, {maxBytes, line, limit})`。响应 path 用 `workspaceRelative`（绝不回显绝对路径）。`readText` 底层（`workspaceFileSystem.ts:370`）在读前还有一道 `opts.line` 校验：`!Number.isSafeInteger(line) || line < 1` → `parse_error`，挡住 `Infinity`/浮点透传到 `readFileWithLineAndLimit` 导致诡异截断。#7947 在显式 bounded line-window 且文件为 UTF-8 文本时，允许超过 256 KiB 的文件走 streaming read；输出仍受 256 KiB cap，full snapshot/edit/hash 不放开。#8002 进一步允许响应返回 `hasMore`/`nextCursor`，后续请求用 `cursor` 从下一行 byte offset 继续，且 `cursor` 与 `line` 互斥。#8383 当前 open diff 将 `lineEnding` 改为完整 decoded file 级检测，truncation/slice 不再重算，避免 CRLF 单行分页页间 metadata 漂移。
+- **`handleGetFile`（L200）**：`resolve(queryPath, 'read')` → `readText(resolved, {maxBytes, line, limit})`。响应 path 用 `workspaceRelative`（绝不回显绝对路径）。`readText` 底层（`workspaceFileSystem.ts:370`）在读前还有一道 `opts.line` 校验：`!Number.isSafeInteger(line) || line < 1` → `parse_error`，挡住 `Infinity`/浮点透传到 `readFileWithLineAndLimit` 导致诡异截断。#7947 在显式 bounded line-window 且文件为 UTF-8 文本时，允许超过 256 KiB 的文件走 streaming read；输出仍受 256 KiB cap，full snapshot/edit/hash 不放开。#8002 进一步允许响应返回 `hasMore`/`nextCursor`，后续请求用 `cursor` 从下一行 byte offset 继续，且 `cursor` 与 `line` 互斥。#8383 已合入，将 `lineEnding` 改为完整 decoded file 级检测，truncation/slice 不再重算，避免 CRLF 单行分页页间 metadata 漂移。
 - **`handleGetFileBytes`（L270）**：`readBytesWindow`（`workspaceFileSystem.ts:425`）。这条路给二进制/大文件做字节窗口；返回 `contentBase64`。**仅当窗口覆盖整文件**（`offset===0 && buf.length===st.size`）才附 `hash`（全窗 sha256 当乐观并发 token）。读中做了 open-fd 双 stat + `assertSameFile`（dev/ino）+ "size/mtime 变了就 `hash_mismatch`"，把返回字节绑定到稳定快照。
 - **`handleGetStat`（L332）**：`resolve(queryPath, 'stat')`（容忍不存在）→ `stat`（底层 `fsp.lstat`，**不**跟随符号链接，故能如实报 `kind: 'symlink'`）。
 - **`handleGetList`（L364）**：探测用 `maxEntries: MAX_LIST_ENTRIES + 1 = 2001`，超 2000 则 slice 回 2000 且置 `truncated: true`——让 SDK 知道还有更多而不是静默假设全集。`list`（`workspaceFileSystem.ts:510`）把符号链接 dirent 标 `kind:'symlink'` 而非自动跟随（"Treating each child as implicitly-resolved here would be a brand-cast bypass"）。
@@ -447,7 +447,7 @@ sequenceDiagram
 
 3. **ACP 子进程侧 `params.path` 约束的渐进对齐**。#4334 adapter 已把 delegated ACP fs 路由到同一 `WorkspaceFileSystem`，但 ACP `readTextFile` 的 `line`/`limit` 窗口在 adapter 里做**兼容性丢弃**（`bridgeFileSystemAdapter.ts:136-143`：null / 非正值回落 `undefined`），以贴近 pre-PR 内联 proxy 对 `limit<=0` 返回空内容的姿态，而非透传 `parse_error` 给老 agent。#8620 已合入后 same-host daemon-owned bridge 正常不再 delegated read；该 adapter read 路径主要是异常/capability-violating fallback。
 
-4. **#7967/#8383 仍为 open**。handle-bound range refactor、lineEnding metadata consistency 只记录当前 open diff；尚不能视为 `main` 已落地能力。#7947/#8002/#8620/#8852 已合入，但仍只放行 UTF-8 bounded line-window / cursor paging，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。#8852 只放行 daemon-owned same-host built-in 工具在用户已授权后的 final text write；未带合法 provenance 的 HTTP/通用 ACP external write 仍被 workspace boundary 拒绝。
+4. **#7967/#8383 已合入**。handle-bound range refactor、lineEnding metadata consistency 已按 merged diff 更新；#7947/#8002/#8620/#8852 也已合入，但仍只放行 UTF-8 bounded line-window / cursor paging，full snapshot、edit、hash 和 optimistic locking 继续保留 256 KiB 门。#8852 只放行 daemon-owned same-host built-in 工具在用户已授权后的 final text write；未带合法 provenance 的 HTTP/通用 ACP external write 仍被 workspace boundary 拒绝。
 
 5. **`io_error` 的 503 不可区分根因**。聚合的 `io_error`（ENOSPC/EIO/EBUSY/ENAMETOOLONG/EMFILE）都映射 503，监控只能知道"环境性故障"，需读 `message`/`hint` 才能分 `df -h`（满盘）vs fd 耗尽。
 
@@ -465,9 +465,9 @@ sequenceDiagram
 | `packages/cli/src/serve/routes/workspaceFileWrite.test.ts` | 10 | 写/编辑路由：`mutate({strict:true})` 401、body 校验、`invalid_client_id`、`expectedHash` 必填、201/200 created。 |
 | `packages/cli/src/serve/bridgeFileSystemAdapter.test.ts` | 18 | ACP write/read 命中工作区内磁盘（happy path）+ 信任门（`trusted:false` factory 使 ACP 写以与 HTTP `POST /file` 同姿态 reject）+ line/limit null 丢弃。 |
 | #7947 merged focused suites | 158 | Serve workspace/ACP adapter/HTTP route 对 large UTF-8 text line-window、binary/unsupported encoding rejection、post-read identity check 和 metadata 的覆盖。 |
-| #7967 current open focused suites | 291 | Core/Serve range reader、handle-bound fd、path replacement 与 bridge fast path 回归。 |
+| #7967 merged focused suites | 291 | Core/Serve range reader、handle-bound fd、path replacement 与 bridge fast path 回归。 |
 | #8002 merged focused suites | 177 CLI + 95 Core + 405 TS SDK | Cursor parse/encode、append-only continuation、replace/truncate mismatch、BOM/CRLF metadata、long-line cap、SDK/MCP additive fields。 |
-| #8383 current open focused suite | 119 CLI | CRLF 文件用 `limit:1` 读取第一页并沿 `nextCursor` 读取第二页，两页都报告 `crlf`。 |
+| #8383 merged focused suite | 119 CLI | CRLF 文件用 `limit:1` 读取第一页并沿 `nextCursor` 读取第二页，两页都报告 `crlf`。 |
 | #8620 focused suites | 255 targeted | same-host daemon-owned bridge capability、默认/primary/static/dynamic runtime 接线、批准后 direct external text read、最终 delegated write 仍拒绝 workspace 外路径。 |
 | #8852 focused suites | 564 Core + 336 CLI + integration | `tool-write-origin` metadata、adapter fail-closed、host writer symlink/regular-file/generation/encoding/5MiB/audit 守卫，以及 approve/reject/YOLO external built-in write 无 shell fallback。 |
 

@@ -1,7 +1,7 @@
 # Mobile MCP 技术方案
 
 > 适用范围：`QwenLM/qwen-code` 中独立发布的 `@qwen-code/mobile-mcp` package。
-> 当前记录：#8311 仍为 open PR，只记录当前 diff 方案，不能视为 `main` 已落地能力。
+> 当前记录：#8311 已关闭未合入；本文只保留关闭前 diff 观察，不能视为 `main` 已落地能力。
 
 ---
 
@@ -15,7 +15,7 @@ PR #8311 处理的是 mobile-mcp 自身的运行时和依赖安全边界。此�
 
 ---
 
-## 2. 当前实现
+## 2. 关闭前实现
 
 ```mermaid
 flowchart LR
@@ -31,7 +31,7 @@ flowchart LR
 
 ### 2.1 Runtime baseline
 
-#8311 将 `packages/mobile-mcp/package.json` 的 engine 提升到 `>=22.0.0`。这是一个明确的 breaking change：Node.js 18/20 consumer 需要在下一次 mobile-mcp release 前升级 runtime。当前 diff 记录 `engines` 对 npm 来说仍是 advisory，因此安全结果不能只依赖 engine 字段，还必须依赖实际 dependency resolution。
+#8311 将 `packages/mobile-mcp/package.json` 的 engine 提升到 `>=22.0.0`。这是一个明确的 breaking change：Node.js 18/20 consumer 需要在下一次 mobile-mcp release 前升级 runtime。关闭前 diff 记录 `engines` 对 npm 来说仍是 advisory，因此安全结果不能只依赖 engine 字段，还必须依赖实际 dependency resolution。
 
 ### 2.2 Dependency hardening
 
@@ -43,7 +43,7 @@ mobile-mcp 升级到 `@modelcontextprotocol/sdk` 1.30.0，并直接依赖 `@hono
 
 工作区安装时，根依赖和 `packages/mobile-mcp` 可能解析到不同的受支持 Zod 副本。SDK 1.30.0 runtime 可以处理 Zod 3/4 schema，但 TypeScript 会把跨安装位置的 schema 类型视为不兼容。#8311 在 `packages/mobile-mcp/src/server.ts` 增加 `sdkInputSchema()`，把 mobile-mcp 本地 Zod shape 通过 type-only boundary 传给 SDK。
 
-该函数不 transform schema，也不改变 validation 行为；它只集中处理 TypeScript 类型不兼容。当前 diff 中 `inputSchema` 只有两个注册点：通用 `tool()` helper 和直接注册的 screenshot tool，二者都经过 `sdkInputSchema()`。
+该函数不 transform schema，也不改变 validation 行为；它只集中处理 TypeScript 类型不兼容。关闭前 diff 中 `inputSchema` 只有两个注册点：通用 `tool()` helper 和直接注册的 screenshot tool，二者都经过 `sdkInputSchema()`。
 
 ### 2.4 Vendored fork 记录
 
@@ -80,13 +80,13 @@ PR 中登记的验证证据包括：
 - lockfile resolution 检查，确认 mobile-mcp 不再通过 MCP SDK/Hono 报告 Hono 1.x advisory path。
 - production dependency audit；mobilewright 独立依赖树里的无关 findings 不在 #8311 范围内。
 
-本文档没有在 code_agent 仓库复跑这些验证，只登记 PR 当前 diff、changed files、review 记录和 PR 已声明的验证结果。
+本文档没有在 code_agent 仓库复跑这些验证，只登记 PR 关闭前 diff、changed files、review 记录和 PR 已声明的验证结果。
 
 ---
 
 ## 5. 已知限制 / 后续
 
-- #8311 仍为 open，合入前文档只能作为当前 diff 记录。
+- #8311 已关闭未合入，文档只能作为关闭前 diff 观察。
 - 设备相关 Playwright coverage 需要 ADB、mobilecli 或真机/模拟器环境，不在当前非设备验证内。
 - Windows/Linux 本地执行未验证。
 - `sdkInputSchema()` 仍是对 split-Zod 工作区布局的 type-only bridge；更长期方案是收敛 monorepo Zod 解析，或把 mobile-mcp build/test 纳入持续 CI。
@@ -99,6 +99,6 @@ PR 中登记的验证证据包括：
 
 | PR | 状态 | 子主题 | 作用 |
 |---|---|---|---|
-| [#8311](https://github.com/QwenLM/qwen-code/pull/8311) | OPEN | Node.js 22 / MCP SDK 1.30 / Hono 2 | 当前 open diff 提升 mobile-mcp runtime baseline，移除旧 MCP SDK/Hono 1.x dependency path，并记录 split-Zod type bridge 与发布/CI follow-up。 |
+| [#8311](https://github.com/QwenLM/qwen-code/pull/8311) | CLOSED | Node.js 22 / MCP SDK 1.30 / Hono 2 | 关闭前 diff 提升 mobile-mcp runtime baseline，移除旧 MCP SDK/Hono 1.x dependency path，并记录 split-Zod type bridge 与发布/CI follow-up。 |
 
-_按个人 PR 口径更新于 2026-08-01_
+_按个人 PR 口径更新于 2026-08-20_

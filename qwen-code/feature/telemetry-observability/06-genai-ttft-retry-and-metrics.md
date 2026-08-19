@@ -3,7 +3,7 @@
 > 子文档；总览见 README.md
 > 本文 **取代并细化** 总览 `telemetry-observability.md` 的 §3.7（GenAI 语义双发 / TTFT / retry）与 §3.8（资源属性与基数控制），下沉到 function/line 级。
 > 代码均基于 `QwenLM/qwen-code@main`（除显式标注分支/PR 外）。引用格式 `file:symbol`（+行号），行号以阅读时的 `main` 为准。
-> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667/#8150/#8176 已按 merged diff 更新。#8180 仍为 open，本文只记录当前 tool execution outcome diff 方案。
+> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667/#8150/#8176/#8180 已按 merged diff 更新。
 
 ---
 
@@ -17,7 +17,7 @@
 4. **LLM request phase breakdown（#5904 / Phase 4c）**：把已有但未接线的 `recordApiRequestBreakdown` histogram 接到 `endLLMRequestSpan`，每个 LLM request 最多记录 REQUEST_PREPARATION、NETWORK_LATENCY、RESPONSE_PROCESSING 三段耗时，便于判断延迟花在 retry/setup、TTFT 还是输出 streaming。
 5. **ARMS session user ID（#7921）**：operator 可通过 `telemetry.userId` 或 `QWEN_TELEMETRY_USER_ID` 提供稳定 pseudonymous user id，写入 span-level `gen_ai.user.id`，并传播到 interaction/LLM/tool/agent spans。
 6. **Tool-call terminal status（#8176）**：tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前统一归一化 terminal `status`、兼容 `success` 与 error fields，避免同一次工具调用在不同 consumer 中被解释成不同结果。
-7. **Tool execution outcome（#8180 open）**：当前 open diff 在 terminal status 之外记录 execution-specific outcome，区分未进入 `invocation.execute()` 的 synthetic failure 与真正执行后的 success/failure/cancel。
+7. **Tool execution outcome（#8180 merged）**：最终实现是在 terminal status 之外记录 execution-specific outcome，区分未进入 `invocation.execute()` 的 synthetic failure 与真正执行后的 success/failure/cancel。
 8. **指标与资源属性基数控制（#4367）**：`session.id` **默认移出 metrics**（每 session 一个新值→时序无限 fan-out），但 **span/log 永远带**；自定义 resource attributes 解析对 key/value **都 percent-decode**（防 `service%2Eversion` 绕过保留字过滤），保留字 `service.version` / `session.id` 任何用户源都不能覆盖。
 
 一句话串起来：**一次 LLM 请求 = 一个 `llm_request` span**；TTFT/token/gen_ai.\* 都是这个 span 的**属性**；retry 在这个 span 之**上**（每次重试是一个**全新**的 span），靠 ALS 把上下文灌进每个 per-attempt span；只有 token 用量和 retry 次数会另外落 **metric counter**（受基数开关约束）。
@@ -44,7 +44,7 @@
 | #9107 | MERGED（2026-08-14） | main agent invocation tracing | 将 interaction span 对齐 GenAI Agent `invoke_agent`，写 `gen_ai.agent.name=qwen-code`、prompt-scoped owner、conversation/session identity 与低基数 `error.type`。 |
 | #9121 | MERGED（2026-08-14） | main agent tracing edge cases | 已合入，修正 budget/swallowed abort 状态、TUI deferred tool batch owner、headless JSON Schema owner、Goal/headless bounded diagnostic message。 |
 | #8176 | MERGED（2026-07-31） | tool-call terminal telemetry | 统一 tool-call terminal normalization boundary，归一化 `status`、兼容 `success`、error fields、低基数 metric 维度和 QwenLogger 低敏字段。 |
-| #8180 | OPEN（2026-07-31） | tool execution outcome | 当前 open diff 在 terminal status 旁边新增 execution status、execution child span 和低基数 execution-outcome counter。 |
+| #8180 | MERGED（2026-08-03） | tool execution outcome | 最终实现是在 terminal status 旁边新增 execution status、execution child span 和低基数 execution-outcome counter。 |
 
 ---
 
@@ -249,9 +249,9 @@ PR #8176 把 tool-call terminal event 的最终状态统一到一个 normalizati
 
 metrics 侧 tool-call counter 增加低基数 `status` 维度；QwenLogger 增加 `status` 与 `tool_type`，但继续不记录 tool arguments、results、stack trace 或 MCP server name。这个边界解决的是“同一次工具调用在日志、指标、recording、UI 里结果不一致”的问题。
 
-### 9. Tool execution outcome（#8180 当前 open）
+### 9. Tool execution outcome（#8180 已合入）
 
-PR #8180 当前 open diff 在 terminal status 之外新增 execution-specific outcome。terminal `status` 仍描述整个 tool call 的最终结果；`executionStatus` 只描述是否真正进入 `invocation.execute()` 以及执行后的成功、失败或取消。
+PR #8180 最终实现是在 terminal status 之外新增 execution-specific outcome。terminal `status` 仍描述整个 tool call 的最终结果；`executionStatus` 只描述是否真正进入 `invocation.execute()` 以及执行后的成功、失败或取消。
 
 validation、permission deny、PreToolUse blocking、host invocation guard、duplicate call 等 synthetic pre-execution 响应标记为 not started。真正进入工具实现后，execution outcome 会冻结并穿过 hooks、result persistence、recording、image bridging 与 batch post-processing。telemetry 侧只为 attempted execution 创建 execution child span，同时新增低基数 execution-outcome counter，避免把未开始的工具调用伪装成工具执行耗时。
 

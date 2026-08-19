@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 open draft 规划 workspace session live-state SDK surface），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 已合入 workspace session live-state SDK surface，#9380 已合入 daemon status child heap measurement types，#9396 已合入 live-state `updatedAt` optional field），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -381,7 +381,9 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #9007 | MERGED | ACP HTTP pre-attach diagnostics | 在 daemon status / TS SDK types 上暴露 ACP HTTP pre-attach limits、frames/bytes、pending delivery 与 guard failures。 |
 | #9055 | MERGED | selective session restore compatibility | load/resume API 兼容旧客户端，pagination/partial/projection 信息保持 optional/additive。 |
 | #9180 | MERGED | Web Shell file metadata | 在 SDK daemon UI local transcript block 上增加 files metadata，仅用于本地乐观 user bubble file chip；daemon replay 仍降级为 token 文本。 |
-| #9261 | OPEN DRAFT | workspace session live-state SDK design | 规划 `DaemonSessionCatalogVersion`、`DaemonWorkspaceSessionLiveState`、`getWorkspaceSessionLiveState()` 与 `getSessionLiveState()`，尚未实现 public SDK surface。 |
+| #9261 | MERGED | workspace session live-state SDK surface | 新增 `DaemonSessionCatalogVersion`、`DaemonWorkspaceSessionLiveState`、`getWorkspaceSessionLiveState()` 与 `getSessionLiveState()`，调用方仍需 gate `workspace_session_live_state`。 |
+| #9380 | MERGED | daemon status child heap measurement types | 追加 ACP child old-generation peak heap status optional fields，未采样时 `heap:null`。 |
+| #9396 | MERGED | live-state activity watermark | 在 `DaemonSessionLiveState` 上追加 optional `updatedAt`，不改变 response v1 或 capability。 |
 
 ---
 
@@ -407,7 +409,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 9. **restore timeout derivation 已合入**。#8691 的 server restore budget 只是 client timer hint；旧 daemon 缺 `limits.sessionRestoreTimeoutMs` 时必须回落默认 70s，`restore_timeout` 后仍要按 retryable error 和后续 session 状态处理。
 
-10. **selective session restore、ACP HTTP pre-attach counters 与 Web Shell file metadata 已分别由 #9055/#9007/#9180 合入，#9261 仍是 open draft**。#9055 对 SDK contract 保持 additive：旧 daemon 缺 replay pagination/partial/projection-specific fields 时仍按既有 load/resume 语义降级；#9261 的 live-state methods/types 仍不能视为已落地 public SDK 能力。
+10. **selective session restore、ACP HTTP pre-attach counters、Web Shell file metadata、live-state SDK surface、child heap status block 与 live-state `updatedAt` 已分别由 #9055/#9007/#9180/#9261/#9380/#9396 合入**。#9055 对 SDK contract 保持 additive：旧 daemon 缺 replay pagination/partial/projection-specific fields 时仍按既有 load/resume 语义降级；#9261 的 live-state methods/types 已落地但调用方仍需 gate `workspace_session_live_state`。#9380 的 child heap status block 与 #9396 的 live-state `updatedAt` 都按 optional/additive 字段处理，旧 daemon 缺席时客户端保持兼容。
 
 11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 
@@ -487,9 +489,14 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 已合入，在 `packages/sdk-typescript/src/daemon/ui/types.ts`、`transcript.ts` 和 `store.ts` 上增加 local-only `files` metadata，用于 Web Shell optimistic user message 展示 filename/size/mime。
 - metadata 不进入 daemon persisted transcript，也不改变 public wire event；reload 或 peer client 只能看到 `@attachment:///name` token 文本。
 
-### #9261 — workspace session live-state SDK design（open draft）
+### #9261 — workspace session live-state SDK surface（已合入）
 
-- 当前 docs-only 设计规划 `DaemonClient.getWorkspaceSessionLiveState(workspaceCwd)` 与 `WorkspaceDaemonClient.getSessionLiveState()`，返回 workspace-scoped live session volatile snapshot 和 daemon-local `catalogVersion`。
-- 类型规划为 additive：`DaemonSessionCatalogVersion`、`DaemonSessionLiveState`、`DaemonWorkspaceSessionLiveState`。该 PR 尚未实现 SDK 方法或能力 gate，调用方不能依赖这些字段已存在。
+- 已合入 `DaemonClient.getWorkspaceSessionLiveState(workspaceCwd)` 与 `WorkspaceDaemonClient.getSessionLiveState()`，返回 workspace-scoped live session volatile snapshot 和 daemon-local `catalogVersion`。
+- 类型为 additive：`DaemonSessionCatalogVersion`、`DaemonSessionLiveState`、`DaemonWorkspaceSessionLiveState`。SDK helper 走 native REST 并正确编码 workspace selector；调用方仍需要先检查 daemon 是否广告 `workspace_session_live_state`，旧 daemon 不支持时回退 full catalog path。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-17_
+### #9380 / #9396 — child heap status and live-state watermark（已合入）
+
+- #9380 已合入，在 daemon status SDK types 中增加 `runtime.memory.children.heap`，表示 ACP child old-generation peak measurement。缺席或 `null` 代表未采样，不能解释为零需求；多个 child 的 heap peak 是 per-child maxima，不与 RSS 一样求和。
+- #9396 已合入，在 `DaemonSessionLiveState.updatedAt` 上补 optional activity watermark。该字段是 volatile recency signal，不替代 `catalogVersion`，旧 daemon/旧 SDK 可按缺失字段兼容。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-20_

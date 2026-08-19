@@ -1,12 +1,12 @@
 # daemon 资源预算、容量模型与公平调度
 
-> 口径：本文记录 #8093 当前 draft/open diff 的 resource foundation、#8245 当前 open diff 的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers，以及 #8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget。open/draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
+> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget，以及 #9380 已合入的 ACP child peak old-generation measurement。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
 
 ## 背景
 
 multi-workspace daemon 已经把 workspace runtime、session ownership、EventBus replay、file/transcript paging 等边界拆开，但资源保护仍主要停留在 workspace/session 数量、MCP client budget 和各 route 的局部 byte cap。缺口在于：bulk 操作、spawn/process work、buffered process output、fanout/replay/export 等路径可能共享同一 Node 进程内存与队列；单个 workspace 的重活如果没有全局和 per-workspace 公平 admission，会挤占其它 workspace 的 prompt completion、错误响应、cleanup 和 shutdown 空间。
 
-#8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型，但仍不应用、不拒绝 spawn。#8911 是第一段已接入生产 daemon-owned ACP child 的 buffer bound：它限制 NDJSON frame 与 decoded inbound queue；#8947 已合入覆盖 ACP SDK dispatch 后的 handler/outbound/request 队列；#9007 已合入继续覆盖 ACP HTTP pre-attach buffered replies 和 delivery-owned leases。
+#8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型，但仍不应用、不拒绝 spawn。#9380 已合入 enforcement 前需要的真实 old-generation peak measurement。#8911 是第一段已接入生产 daemon-owned ACP child 的 buffer bound：它限制 NDJSON frame 与 decoded inbound queue；#8947 已合入覆盖 ACP SDK dispatch 后的 handler/outbound/request 队列；#9007 已合入继续覆盖 ACP HTTP pre-attach buffered replies 和 delivery-owned leases。
 
 ## ResourceBudget
 
@@ -35,9 +35,9 @@ scheduler 按 workspace round-robin drain，避免单 workspace 队列占满 glo
 
 `packages/cli/src/serve/buffered-process-budget.ts` 将预算和 scheduler 组合起来：调用方传入 `maximumBufferedBytes`，runner 先在 `process` category 预留 buffer 容量，再进入 daemon_process lane 执行任务。无论任务成功、失败、abort 或 timeout，finally 都释放 lease。这个顺序保证“排队/执行 process 工作”之前，最坏输出 buffer 已经被预算覆盖。
 
-## Daemon Memory Budget Reporting（#8245 当前 open）
+## Daemon Memory Budget Reporting（#8245 已合入）
 
-#8245 当前 open diff 在 daemon boot 时解析 memory budget figures，并通过 `/daemon/status`、wire protocol、SDK types 和 docs 报告。核心字段分三层：
+#8245 最终实现是在 daemon boot 时解析 memory budget figures，并通过 `/daemon/status`、wire protocol、SDK types 和 docs 报告。核心字段分三层：
 
 - `configured`: 用户显式配置或默认预算，表达“想给 daemon 多少内存”。
 - `effective`: configured 预算被 cgroup 或 host memory cap 截断后的实际可用预算。
@@ -80,6 +80,14 @@ pressure response 包含 `mode`、`level`、`ratio`、`rssBytes`、`rssRatio`、
 
 `refusals` 只代表 admission pressure，不代表 partition 可以安全 enforce。是否能 enforce 还需要每个 child 的 peak old-space measurement，而不是现有 RSS 或 `heapUsed`；这条测量链不在 #8508 范围内。
 
+## ACP Child Peak Old-Generation Measurement（#9380 已合入）
+
+#9380 已在 #8508 的 observe-only child heap partition model 之后补测量链。测量放在 daemon-spawned ACP child 内，而不是 daemon sampler；child 进程安装 `ChildHeapProbe`，通过既有 resource poll 每 5 秒上报 lifetime high-water。没有活跃 resource poll/streaming observer 时不采样，daemon status 返回 `runtime.memory.children.heap: null`，避免把未观测误读为零需求。
+
+测量对象是整个 V8 old generation，而不是 `old_space` 单独一项。probe 汇总 old-generation heap spaces，记录 `peakOldGenerationBytes`、major GC 后仍存活的 `peakLiveSetBytes`、`peakTotalHeapBytes`、`majorGcCount`、`majorGcMs` 与 `unclassifiedSpaceNames`。未归类 heap space 非空时，其它 byte figures 可能低估，调用方必须把它当成 measurement completeness warning。
+
+daemon status 对多个 child 的处理与 RSS 不同：RSS 是 aggregate sum，heap peak 是 per-child ceiling 语义下的 independent max，`reported` 表示贡献样本的 child 数。#9380 不改变 child spawn argv、不拒绝 spawn、不新增 enforce mode，`limits.memory.enforced:false` 保持不变；interactive CLI、IDE companion、direct embed 和 standalone ACP 不安装 probe。
+
 ## Daemon ACP NDJSON Buffer Bounds（#8911 已合入）
 
 #8911 将 resource budgeting 从 observe-only 状态推进到一条具体生产通路：`qwen serve` 创建的 daemon-owned ACP child 会启用 bounded `ndJsonStream`。入站/出站 NDJSON frame limit 固定为 64 MiB；decoded inbound queue 同时限制 256 条消息和 64 MiB retained wire bytes，并使用 conservative charge 防止大量小消息绕过 byte cap。
@@ -112,6 +120,7 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 - #8423 只观察 daemon root RSS/heap pressure，不做 admission、throttle、kill 或 child aggregate pressure。
 - #8462 已合入的 active child RSS aggregate，但该 aggregate 仍是 status 观测字段，不代表完整进程树，也不参与 enforcement。
 - #8508 已合入的 child heap partition status model，但不应用 per-child ceiling、不拒绝 spawn、不提供 enforce 模式，也不声称 `refusals:0` 可作为强制启用信号。
+- #9380 已合入，只观测 daemon-owned ACP child 的 old-generation peak，不观测 channel worker、MCP descendant 或完整 process tree；`peakLiveSetBytes` 是上界，不是 exact live set。
 - #8911 已对 daemon-owned ACP child 的 raw NDJSON 与 decoded inbound queue 接入固定 bounds，但不覆盖 ACP SDK handler/outbound/pending-response/outstanding request 队列。
 - #8947 已补 handler/outbound/request 队列 guard；#9007 已补 ACP HTTP pre-attach buffered reply byte budget 和 delivery-owned lease，但普通 live SSE/WS 新帧队列、单帧 stringify 瞬时放大、远端 exactly-once receipt 和完整 frame/session backpressure 不在本 PR 内。
 
@@ -124,10 +133,11 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 - `resource-budget.test.ts`: atomic composite reservation、normal/completion reserve、emergency pool、lease split/grow/shrink/transfer/release、invalid config 和 overflow。
 - `fair-daemon-bulk-scheduler.test.ts`: global/per-workspace limit、公平轮转、queue overflow、abort、timeout、seal、nested same-lane/cross-lane rejection。
 - `buffered-process-budget.test.ts`: 先预留 process bytes、完成路径释放、admission failure 不进入 lane。
-- #8245 当前 diff 另覆盖 daemon memory budget unit tests、serve status wiring tests、protocol/SDK type tests 和 docs 更新；重点确认 configured/effective budget 分离、cgroup/host cap 截断、低于 minimum 时报告 `insufficientMemory`、wire 上 `enforced:false`，以及 ACP child argv/spawn 行为不变。
+- #8245 merged diff 另覆盖 daemon memory budget unit tests、serve status wiring tests、protocol/SDK type tests 和 docs 更新；重点确认 configured/effective budget 分离、cgroup/host cap 截断、低于 minimum 时报告 `insufficientMemory`、wire 上 `enforced:false`，以及 ACP child argv/spawn 行为不变。
 - #8423 当前 diff 覆盖 memory pressure unit/status/SDK tests，验证 rss/heap winner、unknown denominator、off/observe issue behavior 与 status shape。
 - #8462 已合入的 focused status tests，覆盖 sampled gaps、pre-age bridge、dormant exclusion 与 active child aggregate response。
 - #8508 已合入的 child heap policy / daemon status / serve flag tests，覆盖 2/8/32/256GB host 下的 partition invariant、零池 `null` ceiling、observe/off child argv 不变、`enforce` 被 yargs 与 fast path 拒绝，以及 `limits.memory.enforced:false` 的协议兼容。
+- #9380 覆盖 child-heap-probe 11 条、daemon-status 54 条、ACP bridge/spawn/child-heap-policy 771 条和 SDK public surface 15 条，并在 Node 22.19.0、22.22.3、24.12.0 上检查 V8 heap space classifier。
 - #8911 已合入的 ACP bridge / daemon runtime focused tests，覆盖 frame limit、decoded queue count/bytes、unterminated EOF、metadata-only parse failure 和 exact child termination。
 - #8947 已合入并声明覆盖 ACP bridge guard、daemon runtime、build/typecheck/lint、Prettier 与 SDK backpressure probes；#9007 已合入并声明覆盖 ACP bridge/CLI/SDK focused tests、build/typecheck/lint 与 diff check。
 
@@ -135,11 +145,12 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 
 | PR | 状态 | 贡献 |
 |---|---|---|
-| [#8093](https://github.com/QwenLM/qwen-code/pull/8093) | open draft | 新增 daemon resource budget foundation、fair schedulers、buffered process runner 和 Phase 1 设计文档。 |
-| [#8245](https://github.com/QwenLM/qwen-code/pull/8245) | open | 解析并报告 daemon memory budget figures，给 `/daemon/status`、协议与 SDK 增加 configured/effective/modeled budget 和 non-enforcement 口径。 |
+| [#8093](https://github.com/QwenLM/qwen-code/pull/8093) | closed draft | 关闭前新增 daemon resource budget foundation、fair schedulers、buffered process runner 和 Phase 1 设计文档；未接生产 route。 |
+| [#8245](https://github.com/QwenLM/qwen-code/pull/8245) | merged | 解析并报告 daemon memory budget figures，给 `/daemon/status`、协议与 SDK 增加 configured/effective/modeled budget 和 non-enforcement 口径。 |
 | [#8423](https://github.com/QwenLM/qwen-code/pull/8423) | merged | 在真实 cgroup/host/heap denominator 上观察 daemon root memory pressure，默认 observe-only 并通过 status issue 报告 warning。 |
 | [#8462](https://github.com/QwenLM/qwen-code/pull/8462) | merged | 汇总所有 live managed ACP child 的 cached RSS，报告 aggregate bytes、sampled count 和 oldest reading age。 |
 | [#8508](https://github.com/QwenLM/qwen-code/pull/8508) | merged | 发布 observe-only child heap partition model，报告 `limits.memory.childHeap`，保持 child argv 与 `limits.memory.enforced:false` 不变，并移除不安全的 enforce 路径。 |
+| [#9380](https://github.com/QwenLM/qwen-code/pull/9380) | merged | 在 daemon-spawned ACP child 内测量 V8 old-generation lifetime high-water，通过 daemon status 暴露 per-child heap peak/max aggregation；observe-only，不改 spawn/enforcement。 |
 | [#8911](https://github.com/QwenLM/qwen-code/pull/8911) | merged | 为 daemon-owned ACP child 启用 bounded NDJSON frame 与 decoded queue，超限时低敏记录并终止精确 child。 |
 | [#8947](https://github.com/QwenLM/qwen-code/pull/8947) | merged | 补 ACP SDK handler/outbound/prepared response/outstanding request guard 与 fatal channel generation isolation。 |
 | [#9007](https://github.com/QwenLM/qwen-code/pull/9007) | merged | 为 ACP HTTP pre-attach buffered replies 增加 stream/connection/global frame 与 byte budget、delivery lease、transactional ownership receipt 和 status/SDK counters。 |

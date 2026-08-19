@@ -62,7 +62,9 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #9007 | @doudouOUC | merged | ACP HTTP pre-attach diagnostics：在 daemon status / TS SDK types 上暴露 pre-attach limit、usage、pending delivery 和 guard failure counters。 |
 | #9055 | @doudouOUC | merged | selective session restore compatibility：load/resume 兼容既有 API，pagination/partial/projection 字段保持 optional/additive。 |
 | #9180 | @doudouOUC | merged | Web Shell file metadata：在 SDK UI transcript local metadata 中增加 files，用于乐观 user bubble file chip 展示；daemon replay 仍降级为 token 文本。 |
-| #9261 | @doudouOUC | open draft | workspace session live-state SDK design：规划 `getWorkspaceSessionLiveState()` / `getSessionLiveState()` 与 catalog version 类型，尚未实现 public SDK surface。 |
+| #9261 | @doudouOUC | merged | workspace session live-state SDK surface：新增 `getWorkspaceSessionLiveState()` / `getSessionLiveState()` 与 catalog version/live-state 类型，配合 `workspace_session_live_state` capability。 |
+| #9380 | @doudouOUC | merged | daemon status child heap types：为 ACP child old-generation peak measurement 暴露 optional SDK status fields。 |
+| #9396 | @doudouOUC | merged | live-state activity watermark：在 `DaemonSessionLiveState` 上新增 optional `updatedAt`，不改变 response v1/capability。 |
 
 ---
 
@@ -383,6 +385,14 @@ sequenceDiagram
 3. **typed event schema 仅覆盖当前 daemon emission**：未来 daemon 新增的事件类型经 `asKnownDaemonEvent` 返回 `undefined` 走 raw event path，直到获得显式 schema coverage。
 4. **#8002 是 additive TS SDK surface**：客户端必须 gate `workspace_file_read_cursor` 并兼容旧 daemon 缺字段。
 5. **#8572 是诊断 surface**：`sseConnectReason`、previous stream lineage 和 accepted stream id 不参与业务正确性；调用方不能用它们替代 event cursor、client id 或 session id。
-6. **#8691 restore timeout、#9055 selective restore、#9007 pre-attach counters 与 #9180 local file metadata 已合入，#9261 仍是 open draft**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。#9055 的 selective restore 对既有 load/resume API 保持 additive，SDK-visible replay anchor、pagination/partial/error 字段必须兼容旧 daemon；#9261 的 workspace session live-state SDK methods/type 仍只是设计规划，不能视为已落地 public SDK 能力。
+6. **#8691 restore timeout、#9055 selective restore、#9007 pre-attach counters、#9180 local file metadata、#9261 live-state SDK surface、#9380 child heap status block 与 #9396 live-state `updatedAt` 已合入**：server restore budget 是客户端计时 hint，不代表 restore 一定成功；`restore_timeout` 后调用方需要按 retryable error、channel quarantine 和后续 attach/load 结果判断。#9055 的 selective restore 对既有 load/resume API 保持 additive，SDK-visible replay anchor、pagination/partial/error 字段必须兼容旧 daemon；#9261 的 workspace session live-state SDK methods/types 已落地但仍需 gate `workspace_session_live_state`。#9380/#9396 字段都是 optional/additive，客户端仍需兼容旧 daemon 缺席。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-17_
+## 2026-08-18 follow-up：live-state SDK 与 resource status types
+
+#9261 已把 live-state SDK surface 落地到 `DaemonClient` 与 `WorkspaceDaemonClient`：`getWorkspaceSessionLiveState()` 走 native REST，编码 workspace selector，不对每次 poll 做 capability preflight；调用方仍应先按 `/capabilities.features` 中的 `workspace_session_live_state` gate support。对应 wire types 包括 `DaemonSessionCatalogVersion`、`DaemonSessionLiveState` 和 `DaemonWorkspaceSessionLiveState`。
+
+#9380 已合入，在 SDK daemon status types 中增加 ACP child peak old-generation heap measurement。字段是 optional/additive，未采样 daemon 应返回 `runtime.memory.children.heap: null`，不能把缺席解释为零需求；多 child 聚合是 per-child maxima，不是 sum。
+
+#9396 已合入，在 `DaemonSessionLiveState` 上补 optional `updatedAt` activity watermark。客户端应把它当 volatile recency signal，不能用它替代 catalog version；普通 turn activity 不改变 `generation+revision`。
+
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-20_

@@ -1,7 +1,7 @@
 # 文件读取 / 大文本范围 / PDF 预算技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback、#7947 Serve large text bounded reads、#7967 handle-bound range reader refactor 当前 open diff、#8002 Serve byte-cursor paging 已合入最终实现、#8383 lineEnding metadata consistency 当前 open diff。
+> 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback、#7947 Serve large text bounded reads、#7967 handle-bound range reader refactor 已合入、#8002 Serve byte-cursor paging 已合入最终实现、#8383 lineEnding metadata consistency 已合入。
 
 ---
 
@@ -13,7 +13,7 @@ qwen-code 的 `read_file`、`@file` 和多文件读取路径长期用大小上�
 - 纯文本模型读取大型 PDF 时，旧 fallback 可能把整本 PDF 的 `pdftotext` 结果注入 prompt，100 页级文档会造成上下文溢出。
 - dense/scanned PDF 在 `pdftotext` 失败或超过 token guard 后，旧链路只能报错；即使配置了 vision model，也需要一个 bounded、text-first、带 disclosure 的 PDF vision bridge fallback。
 
-PR #6404 解决“大文本应该能按范围有界读取”；#6409 解决“大 PDF 全文 fallback 不应进入上下文，但显式页码读取仍应可用”；#6585 解决“vision-capable 主模型可消费 bounded PDF page image”；#6846 则补上“纯文本主模型 + configured vision bridge 时，PDF 读取失败/单页超预算可被安全转录”的路径。#7947 把 #6404 的大文本行窗口能力补到 Serve workspace filesystem，避免 HTTP/ACP `/file?line=&limit=` 在切片前被 256 KiB 文件大小门拦下。#7967 当前 open diff 把 borrowed fd range read 从 path reader 中拆出来；#8002 已合入，在此基础上增加 byte-cursor paging，避免大日志翻页每次从文件开头扫描。#8383 当前 open diff 修复 Serve text paging 中 `meta.lineEnding` 对 slice 而非文件检测导致的 CRLF metadata 漂移。
+PR #6404 解决“大文本应该能按范围有界读取”；#6409 解决“大 PDF 全文 fallback 不应进入上下文，但显式页码读取仍应可用”；#6585 解决“vision-capable 主模型可消费 bounded PDF page image”；#6846 则补上“纯文本主模型 + configured vision bridge 时，PDF 读取失败/单页超预算可被安全转录”的路径。#7947 把 #6404 的大文本行窗口能力补到 Serve workspace filesystem，避免 HTTP/ACP `/file?line=&limit=` 在切片前被 256 KiB 文件大小门拦下。#7967 已合入，把 borrowed fd range read 从 path reader 中拆出来；#8002 已合入，在此基础上增加 byte-cursor paging，避免大日志翻页每次从文件开头扫描。#8383 已合入，修复 Serve text paging 中 `meta.lineEnding` 对 slice 而非文件检测导致的 CRLF metadata 漂移。
 
 ---
 
@@ -73,11 +73,11 @@ PR #7947 解决的是 Serve workspace filesystem 与 Core 能力之间的 gap。
 
 实现上，large-window path 从 validation、binary probe 到 streaming read 复用 caller-owned file descriptor，并在读后重新检查 path 和 inode，防止检查后 symlink swap 或文件替换。响应会报告完整 file size 与 `truncated: true`，但不返回 full-file hash；只有读到 EOF 时才返回 original line count。full snapshot、edit、hash 和 optimistic locking 继续保留旧大小门，因此该 PR 不是“Serve 可完整读取任意大文件”，而是“Serve 可读取大文本的小窗口”。
 
-### 3.1.2 Borrowed handle text range reader（#7967 当前 open）
+### 3.1.2 Borrowed handle text range reader（#7967 已合入）
 
 #7967 清理 #7947 之后暴露出来的 Core helper 分层问题。最终目标是让 path-based reader 和 caller-owned handle reader 在类型上分离，而不是通过 `fileHandle`、`forceStreaming`、`maxScanBytes` 这类可选参数在一个函数里切换模式。
 
-当前 open diff 保留 `readTextRange()` 作为 path 入口，并新增 `readTextRangeFromHandle()` 作为 borrowed descriptor 入口。handle 入口要求调用方提供 byte bounds，用 explicit-position reads，不关闭传入 handle；Serve 仍在外层负责 path/inode/snapshot 校验。encoding detection 可以接收 path 或 handle，unsupported large non-UTF-8 统一映射到 `LargeNonUtf8TextError(detected)`。
+最终实现保留 `readTextRange()` 作为 path 入口，并新增 `readTextRangeFromHandle()` 作为 borrowed descriptor 入口。handle 入口要求调用方提供 byte bounds，用 explicit-position reads，不关闭传入 handle；Serve 仍在外层负责 path/inode/snapshot 校验。encoding detection 可以接收 path 或 handle，unsupported large non-UTF-8 统一映射到 `LargeNonUtf8TextError(detected)`。
 
 `readFileWithLineAndLimit()` 因此回到更窄的 path-oriented surface；`CoreReadTextFileHandleRequest` 不再继承 path/stats 等 dead fields。这个 refactor 本身不扩展用户可见能力，但为 #8002 在同一 fd 上继续读下一页提供了更干净的复用点。
 
@@ -89,11 +89,11 @@ cursor 绑定 path、snapshot 与 descriptor 信息。append-only log 可以继�
 
 该协议是 additive：`workspace_file_read_cursor` capability 表示服务端支持；TS daemon client 和 daemon MCP workspace read 同步暴露 request `cursor` 与 response `hasMore`/`nextCursor` 字段，旧客户端不传 cursor 时仍保持原 line-window 行为。
 
-### 3.1.4 Serve lineEnding metadata consistency（#8383 当前 open）
+### 3.1.4 Serve lineEnding metadata consistency（#8383 已合入）
 
 #8383 修正 `TextSnapshot.meta.lineEnding` 的语义漂移。该字段与 `encoding`、`bom`、`sizeBytes` 并列，描述的是文件级 metadata；但 Serve `readTextSnapshotFromResolvedFile()` 曾对返回 slice 调 `detectLineEnding(content)`，byte truncation 分支还会对截断 slice 重新检测。
 
-CRLF 文件按 cursor 翻页时，第一页若只返回一行，slice 的 `\n` 已作为行终止符被消费，content 只以 `\r` 结尾。对这个 slice 检测会得到 `lf`，下一页又可能得到 `crlf`，同一文件的分页 metadata 因此不一致。当前 open diff 改为对完整 `decoded.content` 检测一次 line ending，并删除 truncation 分支的重新检测；content、cursor、hash、encoding/BOM、sizeBytes、line/limit 和 truncation 行为不变。
+CRLF 文件按 cursor 翻页时，第一页若只返回一行，slice 的 `\n` 已作为行终止符被消费，content 只以 `\r` 结尾。对这个 slice 检测会得到 `lf`，下一页又可能得到 `crlf`，同一文件的分页 metadata 因此不一致。最终实现改为对完整 `decoded.content` 检测一次 line ending，并删除 truncation 分支的重新检测；content、cursor、hash、encoding/BOM、sizeBytes、line/limit 和 truncation 行为不变。
 
 ### 3.2 PDF full-text gate（#6409）
 
@@ -166,7 +166,7 @@ PR #6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用
 - **大文本仍可能扫描到 EOF**：为了给出准确 total line count，streaming path 可能继续扫描文件尾；它避免 OOM，但不保证超大日志即时完成。
 - **Serve large-window 与 full snapshot 分离**：#7947 只放行 UTF-8 大文本 bounded line-window read；full snapshot、edit、hash 和 optimistic locking 仍保留 256 KiB 门。
 - **byte cursor 不是永久书签**：#8002 的 cursor 绑定同一文件 snapshot/descriptor，替换、截断或 snapshot mismatch 会 fail closed；它适合连续翻页，不适合长期保存后跨版本恢复。
-- **lineEnding 是文件级 metadata**：#8383 当前 open diff 明确 `lineEnding` 从完整 decoded file 检测，而不是从返回 slice 或 byte-truncated slice 重新推断，避免 CRLF 分页前后矛盾。
+- **lineEnding 是文件级 metadata**：#8383 已合入，明确 `lineEnding` 从完整 decoded file 检测，而不是从返回 slice 或 byte-truncated slice 重新推断，避免 CRLF 分页前后矛盾。
 - **ACP 远端兼容**：core-only 字段不直接发给 ACP 远端，line number 在边界处转换。
 - **PDF token guard 是估算**：它以 tokenizer 估算输出预算，不是模型服务端真实 tokenization；目标是防止明显超大结果进入 prompt。
 
@@ -201,9 +201,9 @@ PR #6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用
 | [#6585](https://github.com/QwenLM/qwen-code/pull/6585) | merged | PDF page image fallback | `pdftotext` 失败或超预算时，vision-capable 路径用 `pdftoppm` 生成 bounded JPEG page image parts，并提示被 page/byte cap 省略的页。 |
 | [#6846](https://github.com/QwenLM/qwen-code/pull/6846) | merged | PDF vision bridge fallback | 纯文本主模型配置 vision bridge 时，PDF 抽取失败或单页超预算可转为最多 4 页的有损、不可信视觉转录；失败恢复原 PDF error 并保留 disclosure。 |
 | [#7947](https://github.com/QwenLM/qwen-code/pull/7947) | merged | Serve large text bounded reads | 允许 Serve workspace `/file` 对超过 256 KiB 的 UTF-8 文本返回 bounded line window，并保留 full snapshot/edit/hash 的旧大小门。 |
-| [#7967](https://github.com/QwenLM/qwen-code/pull/7967) | open | handle-bound text range refactor | 当前 open diff 将 path reader 与 caller-owned handle reader 分离，删除混合 flag 和 dead fields，供 Serve large-window 与后续 cursor paging 复用。 |
+| [#7967](https://github.com/QwenLM/qwen-code/pull/7967) | merged | handle-bound text range refactor | 最终实现将 path reader 与 caller-owned handle reader 分离，删除混合 flag 和 dead fields，供 Serve large-window 与后续 cursor paging 复用。 |
 | [#8002](https://github.com/QwenLM/qwen-code/pull/8002) | merged | Serve byte-cursor paging | 为 workspace text read 增加 `hasMore` / `nextCursor` / `cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
-| [#8383](https://github.com/QwenLM/qwen-code/pull/8383) | open | Serve lineEnding metadata consistency | 当前 open diff 让 `meta.lineEnding` 从完整 decoded file 检测一次，避免 CRLF 文件分页时第一页和后续页报告不同 line ending。 |
+| [#8383](https://github.com/QwenLM/qwen-code/pull/8383) | merged | Serve lineEnding metadata consistency | 最终实现让 `meta.lineEnding` 从完整 decoded file 检测一次，避免 CRLF 文件分页时第一页和后续页报告不同 line ending。 |
 
 ---
 
@@ -214,4 +214,4 @@ PR #6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用
 - PDF text extraction 依赖本机 `pdftotext`，image fallback 依赖 `pdftoppm`；二者都来自 poppler-utils，缺失时 direct read 会提示安装依赖。
 - PDF 输出 token guard 只能控制提取文本进入 tool result 的上限，不改变自动压缩阈值或 native PDF-capable model 的行为。
 - #6846 已合入；后续可继续补 token-aware 大文本输出预算和 PDF bridge E2E 覆盖。
-- #7967/#8383 仍为 open；当前只记录代码 diff 与 PR 验证中体现的方案，不能视为 `main` 已落地能力。#8002 已按 merged diff 更新。
+- #7967/#8383 已合入；handle-bound reader 分层、byte-cursor paging 和 lineEnding 文件级 metadata 已按 merged diff 更新。

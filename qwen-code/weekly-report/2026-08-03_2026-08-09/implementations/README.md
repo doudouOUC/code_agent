@@ -21,6 +21,6 @@
 | [#8636](https://github.com/QwenLM/qwen-code/pull/8636) | ✅ merged | fix(core): Resolve symlinks before granting read permission | [pr-8636.md](pr-8636.md) |
 | [#8691](https://github.com/QwenLM/qwen-code/pull/8691) | ✅ merged | fix(serve): Make session restore timeouts safe and observable | [pr-8691.md](pr-8691.md) |
 | [#8693](https://github.com/QwenLM/qwen-code/pull/8693) | ✅ merged | fix(integration-tests): make the project typecheckable and fix what that found | [pr-8693.md](pr-8693.md) |
-| [#8743](https://github.com/QwenLM/qwen-code/pull/8743) | 🟡 open draft | docs(design): Plan selective session restore | [pr-8743.md](pr-8743.md) |
+| [#8743](https://github.com/QwenLM/qwen-code/pull/8743) | ✅ merged | docs(design): Define selective session restore | [pr-8743.md](pr-8743.md) |
 
-_按个人 PR 口径更新于 2026-08-10_
+_按个人 PR 口径更新于 2026-08-20_
