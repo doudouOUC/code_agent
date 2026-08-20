@@ -44,7 +44,7 @@
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [daemon-serve-mode/](../../feature/daemon-serve-mode/) | #9261(merged status refresh) / #9341(open) / #9362 / #9366 / #9380 / #9396 / #9476 | 补 standalone PR2A source/classification、runtime record I/O retryability、workspace live-state endpoint/WebShell consumer/activity watermark，以及 ACP child old-generation heap observation。 |
+| [daemon-serve-mode/](../../feature/daemon-serve-mode/README.md) | #9261(merged status refresh) / #9341(open) / #9362 / #9366 / #9380 / #9396 / #9476 | 补 standalone PR2A source/classification、runtime record I/O retryability、workspace live-state endpoint/WebShell consumer/activity watermark，以及 ACP child old-generation heap observation。 |
 | [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #9261(merged status refresh) / #9341(open) / #9362 / #9396 / #9476 | 新增 standalone conversation isolation primitives、#9181 runtime record I/O retry follow-up、live-state endpoint/version、activity watermark 与 WebShell completion-sequence 消费口径。 |
 | [daemon-serve-mode/04-capabilities-and-protocol.md](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) | #9261(merged status refresh) / #9341(open) / #9362 / #9366 / #9380 / #9396 | 登记 #9341/#9362 不改变公开 API；#9261 已发布 `workspace_session_live_state` route/capability/SDK；#9380/#9396 是 additive status/live-state optional fields 且已合入。 |
 | [daemon-serve-mode/10-client-adapters-and-sdk.md](../../feature/daemon-serve-mode/10-client-adapters-and-sdk.md) | #9261(merged status refresh) / #9380 / #9396 | 把 live-state SDK surface 改为已合入，并补 child heap status types 与 `updatedAt` optional live-state 字段。 |

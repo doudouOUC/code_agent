@@ -14,11 +14,11 @@
 
 | 北京时间窗口 | 周目录 | PRs | merged/open/closed | 代码量 | 说明 |
 |---|---|---:|---:|---:|---|
-| 2026-07-01 ~ 2026-07-05 | [2026-06-29_2026-07-05](2026-06-29_2026-07-05/) | 21 | 19/0/2 | +22,898/-1,361，268 files | 本月只取该周的 7 月部分；周目录 README 仍按全周口径展示。 |
-| 2026-07-06 ~ 2026-07-12 | [2026-07-06_2026-07-12](2026-07-06_2026-07-12/) | 30 | 29/0/1 | +70,513/-6,343，742 files | multi-workspace runtime/REST/ACP、extension management、workspace transcript 与 recording failure visibility 密集推进。 |
-| 2026-07-13 ~ 2026-07-19 | [2026-07-13_2026-07-19](2026-07-13_2026-07-19/) | 29 | 28/0/1 | +74,566/-11,383，698 files | owner-routed session mutations、workspace Voice/export、telemetry/status hardening、Plan/shell safety 与 ACP reliability。 |
-| 2026-07-20 ~ 2026-07-26 | [2026-07-20_2026-07-26](2026-07-20_2026-07-26/) | 36 | 29/5/2 | +74,992/-6,440，712 files | trust hot reload、daemon replay/epoch/compaction、Java SDK、enterprise memory stack、GenAI telemetry、external-context、first-use lazy loading。 |
-| 2026-07-27 ~ 2026-07-31 | [2026-07-27_2026-08-02](2026-07-27_2026-08-02/) | 24 | 23/0/1 | +40,923/-4,803，360 files | 本月只取 W31 的 7 月部分；新增 workspace skill read model、resource budget、tool-call telemetry、external-context dependency hardening、daemon memory budget。 |
+| 2026-07-01 ~ 2026-07-05 | [2026-06-29_2026-07-05](2026-06-29_2026-07-05/README.md) | 21 | 19/0/2 | +22,898/-1,361，268 files | 本月只取该周的 7 月部分；周目录 README 仍按全周口径展示。 |
+| 2026-07-06 ~ 2026-07-12 | [2026-07-06_2026-07-12](2026-07-06_2026-07-12/README.md) | 30 | 29/0/1 | +70,513/-6,343，742 files | multi-workspace runtime/REST/ACP、extension management、workspace transcript 与 recording failure visibility 密集推进。 |
+| 2026-07-13 ~ 2026-07-19 | [2026-07-13_2026-07-19](2026-07-13_2026-07-19/README.md) | 29 | 28/0/1 | +74,566/-11,383，698 files | owner-routed session mutations、workspace Voice/export、telemetry/status hardening、Plan/shell safety 与 ACP reliability。 |
+| 2026-07-20 ~ 2026-07-26 | [2026-07-20_2026-07-26](2026-07-20_2026-07-26/README.md) | 36 | 29/5/2 | +74,992/-6,440，712 files | trust hot reload、daemon replay/epoch/compaction、Java SDK、enterprise memory stack、GenAI telemetry、external-context、first-use lazy loading。 |
+| 2026-07-27 ~ 2026-07-31 | [2026-07-27_2026-08-02](2026-07-27_2026-08-02/README.md) | 24 | 23/0/1 | +40,923/-4,803，360 files | 本月只取 W31 的 7 月部分；新增 workspace skill read model、resource budget、tool-call telemetry、external-context dependency hardening、daemon memory budget。 |
 
 ## 主题审计
 

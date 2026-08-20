@@ -164,5 +164,5 @@ NODE_OPTIONS="--max-old-space-size=8192 --require $HOME/oom-diag/monitor.cjs" qw
 ## 链接
 
 - 完整 OOM 调研：[`docs/investigation-oom-series.md`](../../docs/investigation-oom-series.md)
-- 假设验证 repro（开发者侧）：[`../oom-streaming-leak/`](../oom-streaming-leak/)
+- 假设验证 repro（开发者侧）：[`../oom-streaming-leak/`](../oom-streaming-leak/README.md)
 - 相关 issue：[#4116](https://github.com/QwenLM/qwen-code/issues/4116)、[#4167](https://github.com/QwenLM/qwen-code/issues/4167)、[#4315](https://github.com/QwenLM/qwen-code/issues/4315)、[#4322](https://github.com/QwenLM/qwen-code/issues/4322)、[#2868](https://github.com/QwenLM/qwen-code/issues/2868)

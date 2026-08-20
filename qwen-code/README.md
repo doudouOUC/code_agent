@@ -4,20 +4,20 @@
 
 ## 当前口径
 
-- 每周 PR 汇总入口在 [`weekly-report/`](weekly-report/)。
+- 每周 PR 汇总入口在 [`weekly-report/`](weekly-report/README.md)。
 - 每个周目录的 `README.md` 记录逐 PR 的“解决了什么问题 / 怎么做的”摘要。
 - 已深读并整理的 PR，完整中文最终实现文档放在对应周目录的 `implementations/` 下。
-- 跨 PR 的能力沉淀在 [`feature/`](feature/)；每篇 feature 文档以 merged diff、changed files、patch、测试/配置路径和关闭状态为准。
-- Agent 生成或更新文档时遵循 [`templates/`](templates/) 中的结构契约和状态措辞。
+- 跨 PR 的能力沉淀在 [`feature/`](feature/README.md)；每篇 feature 文档以 merged diff、changed files、patch、测试/配置路径和关闭状态为准。
+- Agent 生成或更新文档时遵循 [`templates/`](templates/README.md) 中的结构契约和状态措辞。
 - PR body 只作为目标线索；如果 body 与代码不一致，以最终合入代码和周报实现文档为准。
 
 ## 当前入口
 
 | 入口 | 内容 | 使用场景 |
 |---|---|---|
-| [`weekly-report/`](weekly-report/) | 按周整理的 PR 明细、逐 PR 问题与实现摘要、每周 `implementations/pr-*.md` 最终实现文档 | 查某个 PR 最终做了什么、怎么做的 |
-| [`feature/`](feature/) | 按 feature topic 汇总的技术方案和跨 PR 能力演进 | 查某个能力的整体架构、关键流程、涉及 PR |
-| [`templates/`](templates/) | Agent 周报、单 PR 实现文档的强模板及 Feature 增量更新检查清单 | 约束自动生成结构、状态措辞和审计口径 |
+| [`weekly-report/`](weekly-report/README.md) | 按周整理的 PR 明细、逐 PR 问题与实现摘要、每周 `implementations/pr-*.md` 最终实现文档 | 查某个 PR 最终做了什么、怎么做的 |
+| [`feature/`](feature/README.md) | 按 feature topic 汇总的技术方案和跨 PR 能力演进 | 查某个能力的整体架构、关键流程、涉及 PR |
+| [`templates/`](templates/README.md) | Agent 周报、单 PR 实现文档的强模板及 Feature 增量更新检查清单 | 约束自动生成结构、状态措辞和审计口径 |
 | [`description-accuracy.md`](description-accuracy.md) | PR 标题/body 与实际实现不一致的清单 | 修正 PR 描述、核对历史审查发现 |
 
 ## 当前结构
