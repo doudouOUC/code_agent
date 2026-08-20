@@ -34,6 +34,7 @@
 {{tests_build_lint_and_independent_verification}}
 
 ## feature 文档处理
+<!-- 每个实际更新或引用的 Feature 文档都必须使用 [[库内相对路径|显示名称]]；不得只写普通文字。多个专题逐行列出；无关联时说明原因。 -->
 
 {{feature_files_updated_and_status_wording}}
 
@@ -50,3 +51,4 @@
 - 验证部分区分“PR 声明通过”和“本次独立执行通过”。
 - open/closed 文档显式声明不能作为 `main` 能力承诺。
 - Feature 处理说明具体更新了哪些专题，以及为何更新或不更新。
+- Feature 处理中实际更新或引用的每个专题都使用 `[[库内相对路径|显示名称]]` 内部链接，不得只写普通文字。
