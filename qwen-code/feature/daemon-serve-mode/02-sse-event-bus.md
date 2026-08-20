@@ -471,6 +471,8 @@ sequenceDiagram
 
 ### ③ 环淘汰 → resync（见上文 state_resync 小节时序图）
 
+该路径复用上文 `state_resync` 小节的时序图，此处不重复展开。
+
 ---
 
 ## 边界与错误处理

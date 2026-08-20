@@ -1,9 +1,11 @@
 # qwen-code PR 记录
 
-我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文最终实现文档放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
+我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文实现或方案观察放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
+
+> 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
 **时间范围**: 2026-04-06 ~ 2026-08-19（持续更新）
-**总计**: 416 PRs（按当前保留的 @doudouOUC 个人 PR 最终实现文档计）
+**总计**: 416 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
 **代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34 见对应周目录（W34 周内累计个人增量 +13,402 / -766，105 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 

@@ -1,10 +1,10 @@
-# 2026-05-25_2026-05-31 PR 最终实现文档索引
+# 2026-05-25_2026-05-31 PR 实现与方案记录
 
-仅保留 @doudouOUC 个人 PR 的最终实现文档。
+收录 @doudouOUC 个人 PR 的最终实现，以及 open/closed PR 的当前或历史方案观察。
 
 | PR | 状态 | 标题 | 文档 |
 |---|---|---|---|
-| [#4490](https://github.com/QwenLM/qwen-code/pull/4490) | 🟡 open | chore(integration): merge daemon_mode_b_main into main — F1/F2/F3/F4-prereq + F5 alpha docs batch (#4175) | [pr-4490.md](pr-4490.md) |
+| [#4490](https://github.com/QwenLM/qwen-code/pull/4490) | ✅ merged | feat(daemon): merge daemon-mode feature batch into main | [pr-4490.md](pr-4490.md) |
 | [#4499](https://github.com/QwenLM/qwen-code/pull/4499) | ✅ merged | fix(telemetry): attach interaction span to session root context | [pr-4499.md](pr-4499.md) |
 | [#4500](https://github.com/QwenLM/qwen-code/pull/4500) | 已合入 | chore(integration): sync main into daemon_mode_b_main (2026-05-25) | [pr-4500.md](pr-4500.md) |
 | [#4504](https://github.com/QwenLM/qwen-code/pull/4504) | 已合入 | feat(serve): add POST /session/:id/recap | [pr-4504.md](pr-4504.md) |

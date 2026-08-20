@@ -131,8 +131,6 @@
 1. **#3893**（telemetry 隐私）：把 `loggingContentGenerator.ts:extractResponseText` 的 response_text 采集挂到 `logPrompts`（或新 opt-in）下，否则配置 logs exporter 时会默认外泄模型回复——这是本周唯一与隐私相关的项，建议优先。
 2. **#3847**：删除/更新 "Stable fallback spanId" 这条与最终门控不符的设计注释。
 
-### Closed（记录）
-
 ---
 
 ## 深挖补充（2026-05-31，来自 feature 深度文档）

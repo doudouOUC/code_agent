@@ -504,9 +504,6 @@ Copilot review 指出：当 `fileDiff <= 50_000` 且两份内容各 `<= 16_000` 
 
 #8464 已合入；low watermark 只影响 size-triggered active tool result history microcompaction，不改变 full chat compression、final tool response batch budget、provider context window 估算或 `-1` disable 语义。由于近期保护项可能过多，实际清理后仍可能 soft-exceeded。
 
-### 7.7 自定义 auto threshold 在大窗口模型上可能无感
-
-
 ---
 
 ## 8. 各 PR 代码贡献
