@@ -55,6 +55,7 @@
 | #9366 | @doudouOUC | merged | WebShell live-state consumer：启用 capability 后用 `live A -> catalog/groups -> live B` fencing 完整 catalog，并在稳态只 poll live-state。 |
 | #9396 | @doudouOUC | merged | live-state activity watermark：服务端在 live-state response 中补 optional `updatedAt`，普通 turn activity 不 bump catalog version。 |
 | #9476 | @doudouOUC | merged | WebShell live-state activity consumer：turn completion 通过 post-completion live-state response settle，并用可吸收 `updatedAt` 重排当前 active page。 |
+| #9563 | @doudouOUC | merged | WebShell session title refresh guard：effective title 已由 connection metadata 或 persisted catalog fallback 解析后，不再每 turn 重复刷新完整 catalog。 |
 
 ---
 
@@ -397,6 +398,8 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 #9476 已合入 WebShell consumer。`workspace-session-live-state.ts` 在 turn completion 时 snapshot per-session sequence，只让 completion 之后启动的 live-state response settle；`SessionCatalogStore.applyLiveState()` 只把有效 `updatedAt` 吸收到已加载、cursor-less、active、非 archived 且无 source/group 过滤的既有 row，并按 server comparator 重排。缺少 watermark、旧 daemon、filter 外 row 或请求失败时，仍回落到 10 秒合并的 full catalog refresh。
 
+#9563 已合入 session title catalog refresh guard。`App.tsx` 的 title recovery gate 改为检查 effective display title：连接 metadata 或 persisted catalog fallback 任一标题已可见，就不再在后续 turn 安排 immediate + trailing `sessions?size=200` fresh refresh；标题仍不可用时保留首轮两次恢复查询，live metadata title 仍可覆盖 fallback，daemon route/capability/live-state wire 不变。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -444,4 +447,4 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-20_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-22_

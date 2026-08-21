@@ -48,6 +48,7 @@
 | #5174 | daemon status API | 诊断面 | 通过 bridge / ACP registry snapshot helper 暴露 `GET /daemon/status`，让权限压力、SSE/ACP 连接和 capability 状态进入统一 JSON 诊断面。 |
 | #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
+| #9665 | restore `ask_user_question` on load/resume | open restore follow-up | 默认关闭的 serve flag 只对尾部纯 AUQ batch 跳过 orphan finalize，并通过 trusted tracked prompt 生成新 request id、复用既有投票与 cancel 语义。 |
 | #8620 | same-host daemon text read delegation | FS seam follow-up | 最终实现用 `delegateReadTextFileToClient:false` 让 daemon-owned same-host bridge 广告 read local / write delegated，避免批准后的 direct read 被 WorkspaceFileSystem workspace 边界拒绝。 |
 | #8852 | approved external built-in text writes | FS seam follow-up | 最终实现用 versioned `tool-write-origin` provenance 让已批准的内置 text write 在 daemon-owned same-host adapter 上进入受控 host writer；HTTP/通用 ACP 不放宽。 |
 | #8911 | bound daemon ACP NDJSON buffers | transport resource guard | 已合入，daemon-owned ACP child 的 NDJSON frame 与 decoded inbound queue 使用固定 bounds，超限低敏记录并终止精确 child。 |
@@ -236,6 +237,12 @@ timer 回调里也有对称的身份检查（L512）：`if (this.pending.get(rec
 F3 只定义了"权限请求如何结算"；#5218/#5258 把 `{kind:'cancelled'}` 的后果扩展到 ACP session turn loop。#5218 先修 `ask_user_question`：问题被取消或超时后，不再把它作为普通工具错误继续喂给模型，而是记录 skipped follow-up tool responses、等待 pending message rewrite、向当前 Agent 与同批 sibling Agent 传播取消，然后结束当前 turn。#5258 再把同样的 fail-closed 语义推广到所有权限化工具：普通权限 vote cancelled、reject option 映射到 `Cancel`、权限请求通道失败、嵌套 subagent 权限取消，都会让同一模型响应里的后续工具被跳过。
 
 这组变更没有新增 HTTP/SSE schema，也没有新增 capability tag。客户端仍看到既有的 `permission_request` / `permission_resolved` / tool result / `turn_complete` 帧，但语义从"取消是一次工具错误，turn 可继续"变成"取消代表缺少用户输入或用户拒绝，当前 turn 以 `end_turn` 收束"。这也是 #5260 timeout flag 的安全前提：deadline 到期后的自动 cancelled 不会再允许模型继续执行后续工具。
+
+#### W34：load/resume 重新挂起 `ask_user_question`（#9665 open）
+
+#9665 当前 open diff 新增默认关闭的 `qwen serve --restore-ask-user-question`。Core 只把 transcript 尾部全部由合法 AUQ calls 组成的 batch 判为可恢复；混有其它 dangling tool、参数非法或非尾部问题继续走既有 orphan repair。load/resume replay 会跳过这些 call id 的 finalize，并把 private restore hint 从 ACP Agent 响应交给 bridge；hint 在 entry 注册后被剥离，外部 prompt meta 也不能自行触发。
+
+bridge 通过已跟踪的 prompt admission 重新执行原 AUQ calls，产生新的 permission request id；客户端仍使用既有 permission vote route。真实 function response 继续原 turn，cancel/timeout/channel failure 继续沿用 #5218/#5258 stop-after-cancel，conversation-finished telemetry 也在 terminal path 发出。restore 空 prompt 不重复 user echo、hook、system reminder，也不消费一次性 worktree notice。该 PR 尚未合入，且 v1 不新增 capability tag；daemon boot 不扫描或自动恢复等待会话。
 
 #### Agent 工具权限提示（#5085/#5105）
 
@@ -426,6 +433,8 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 6. **审计环无查询路由**。`PermissionAuditRing` 活在 daemon 生命周期内，但 `GET /workspace/permission/audit` 查询路由是 out-of-scope follow-up（F3 只 stage 环）。同样 out-of-scope 的还有：consensus 投票者鉴权的 **pair-token + 撤销 API**、`POST /workspace/policy` live-reload（今天靠 daemon 重启）、决策持久化（"always allow" 规则）、hook 层（PreToolUse-style 外部仲裁器）。
 
 7. **`README.md` 描述陈旧**。`packages/acp-bridge/README.md` 仍把 mediator 描述为 "type-only stub / No implementation yet / F3 PR 24 will move that"——那是 F1 抬包时点的快照，F3（#4335）已落地实现。读 README 时需注意这层时间差。
+
+8. **#9665 仍是 open 且默认关闭**。不能把 AUQ re-hang 写成 `main` 默认 load/resume 行为；v1 无 capability tag，客户端无法仅靠 `/capabilities` 区分 operator 是否启用 flag。boot-time auto-resume、其它 permission tool、旧 request id/audit 持久化和 mixed dangling batch 都不在当前方案内。
 
 ---
 

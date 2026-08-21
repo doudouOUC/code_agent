@@ -2,7 +2,7 @@
 
 | PR | 状态 | 标题 | 实现文档 |
 |---|---|---|---|
-| [#9341](https://github.com/QwenLM/qwen-code/pull/9341) | 🟡 open | feat(cli): Add standalone conversation isolation primitives | [pr-9341.md](pr-9341.md) |
+| [#9341](https://github.com/QwenLM/qwen-code/pull/9341) | ✅ merged | feat(cli): Add standalone conversation isolation primitives | [pr-9341.md](pr-9341.md) |
 | [#9362](https://github.com/QwenLM/qwen-code/pull/9362) | ✅ merged | fix(cli): Keep transient runtime record I/O retryable | [pr-9362.md](pr-9362.md) |
 | [#9366](https://github.com/QwenLM/qwen-code/pull/9366) | ✅ merged | feat(web-shell): Consume workspace session live-state | [pr-9366.md](pr-9366.md) |
 | [#9380](https://github.com/QwenLM/qwen-code/pull/9380) | ✅ merged | feat(serve): measure ACP child peak old-generation heap | [pr-9380.md](pr-9380.md) |
@@ -10,5 +10,10 @@
 | [#9435](https://github.com/QwenLM/qwen-code/pull/9435) | ✅ merged | fix(cli): surface the daemon duplicate tool-call breaker as a visible loop-detected stop | [pr-9435.md](pr-9435.md) |
 | [#9436](https://github.com/QwenLM/qwen-code/pull/9436) | ✅ merged | fix(core): treat duplicate provider tool-call ids as replays only when arguments match | [pr-9436.md](pr-9436.md) |
 | [#9476](https://github.com/QwenLM/qwen-code/pull/9476) | ✅ merged | feat(web-shell): Consume live-state session activity timestamps | [pr-9476.md](pr-9476.md) |
+| [#9512](https://github.com/QwenLM/qwen-code/pull/9512) | ✅ merged | fix(serve): Harden standalone conversation primitives | [pr-9512.md](pr-9512.md) |
+| [#9513](https://github.com/QwenLM/qwen-code/pull/9513) | 🟡 open | fix(cli): Restore PR2A session behaviors | [pr-9513.md](pr-9513.md) |
+| [#9563](https://github.com/QwenLM/qwen-code/pull/9563) | ✅ merged | fix(web-shell): Stop repeated session title catalog refreshes | [pr-9563.md](pr-9563.md) |
+| [#9626](https://github.com/QwenLM/qwen-code/pull/9626) | 🟡 open draft | fix(serve): unify persisted session storage lifecycle | [pr-9626.md](pr-9626.md) |
+| [#9665](https://github.com/QwenLM/qwen-code/pull/9665) | 🟡 open | feat(serve): restore ask_user_question HITL on session load/resume | [pr-9665.md](pr-9665.md) |
 
-_按个人 PR 口径更新于 2026-08-20_
+_按个人 PR 口径更新于 2026-08-22_
