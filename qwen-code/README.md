@@ -44,4 +44,4 @@ qwen-code/
 3. 查描述是否准确：看 `description-accuracy.md`，必要时回到周报实现文档交叉验证。
 4. 生成或审计文档：先看 `templates/README.md`，再按目标文档选择强模板或 Feature 检查清单。
 
-_更新于 2026-08-22_
+_更新于 2026-08-23_

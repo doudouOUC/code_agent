@@ -4,9 +4,9 @@
 
 > 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
-**时间范围**: 2026-04-06 ~ 2026-08-21（持续更新）
-**总计**: 421 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34 见对应周目录（W34 周内累计个人增量 +29,371 / -3,112，244 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-08-22（持续更新）
+**总计**: 423 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34 见对应周目录（W34 周内累计个人增量 +21,671 / -1,507，220 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -33,11 +33,11 @@
 | 2026-07-27 ~ 2026-08-02 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-07-27_2026-08-02) · [Obsidian](2026-07-27_2026-08-02/README.md)) (W31 最终版) | 27 | 25/0/2 | +43,179/-5,171 | daemon first-output latency benchmark、submitted prompt provenance、ACP provider preload、managed writer shutdown、benchmark validity/schema hardening、Todo Guard continuation、external-context auto recall、transcript timestamp drift、writer lease opt-in、ARMS user id、large text bounded reads、handle-bound text range reader、maintenance writer isolation、certified writer handoff、immediate dispatch metrics、byte-cursor paging、workspace skill status read model、resource budgeting foundation、GenAI first-chunk tracing、tool-call terminal telemetry、tool execution outcome、external-context dependency hardening、daemon memory budget reporting、mobile-mcp dependency hardening、Auto Recall proxy lifecycle、lineEnding metadata consistency |
 | 2026-08-03 ~ 2026-08-09 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-03_2026-08-09) · [Obsidian](2026-08-03_2026-08-09/README.md)) (W32 最终版) | 18 | 18/0/0 | +30,039/-2,289 | MCP unsafe replay guard、WebUI live journal truncation recovery、caller-supplied session id admission、daemon memory pressure observation、write_file prior-read guidance、ACP tool-result text projection、active ACP child RSS aggregation、tool-result low watermark microcompaction、ACP repeated tool execution failure guard、Direct External Context Mem0 writes、daemon child heap partition modeling、REST SSE stream/client observability、activeWork deep health、same-host daemon text read delegation、read permission symlink canonicalization、safe session restore timeout observability、integration-tests typecheckability、selective session restore design |
 | 2026-08-10 ~ 2026-08-16 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-10_2026-08-16) · [Obsidian](2026-08-10_2026-08-16/README.md)) (W33 最终版) | 33 | 31/0/2 | +84,903/-12,324 | WebUI/WebShell transactional switching/resync/repair、text file attachments、selective session restore、workspace session live-state endpoint/catalog version、Conversations runtime foundation/runtime boundary、session catalog cache/cancellation、activeWork shell retention/close authorization、OpenAI log retention、ACP NDJSON/resource/pre-attach guards、Headless/tool-result diagnostics、external-context provider profile、daemon/agent telemetry ownership and tracing |
-| 2026-08-17 ~ 2026-08-23 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-17_2026-08-23) · [Obsidian](2026-08-17_2026-08-23/README.md)) (W34 周内累计) | 13 | 10/3/0 | +29,371/-3,112 | standalone conversation primitives/hardening、PR2A restore regressions 与 persisted storage lifecycle、load/resume AUQ HITL restore、workspace live-state WebShell consumer/activity/title guard、ACP child heap measurement、duplicate provider tool-call guard |
+| 2026-08-17 ~ 2026-08-23 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-17_2026-08-23) · [Obsidian](2026-08-17_2026-08-23/README.md)) (W34 周内累计) | 15 | 13/2/0 | +21,671/-1,507 | standalone conversation primitives/hardening、session archive race 与 persisted maintenance、AUQ HITL restore、per-session model restore、`serve --open` ephemeral auth 设计、workspace live-state WebShell consumer/activity/title guard、ACP child heap measurement、duplicate provider tool-call guard |
 
 ## 类型分布
 
-feat ×202, fix ×150, refactor ×16, other ×13, docs ×10, chore ×7, perf ×16, test ×6, merge ×1
+feat ×203, fix ×150, refactor ×16, other ×13, docs ×11, chore ×7, perf ×16, test ×6, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

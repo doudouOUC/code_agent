@@ -56,6 +56,7 @@
 | #9396 | @doudouOUC | merged | live-state activity watermark：服务端在 live-state response 中补 optional `updatedAt`，普通 turn activity 不 bump catalog version。 |
 | #9476 | @doudouOUC | merged | WebShell live-state activity consumer：turn completion 通过 post-completion live-state response settle，并用可吸收 `updatedAt` 重排当前 active page。 |
 | #9563 | @doudouOUC | merged | WebShell session title refresh guard：effective title 已由 connection metadata 或 persisted catalog fallback 解析后，不再每 turn 重复刷新完整 catalog。 |
+| #9738 | @doudouOUC | open docs-only | `serve --open` ephemeral auth：设计 URL fragment 到 tab-local `sessionStorage` 的 bearer handoff；runtime 尚未实现。 |
 
 ---
 
@@ -400,6 +401,12 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 #9563 已合入 session title catalog refresh guard。`App.tsx` 的 title recovery gate 改为检查 effective display title：连接 metadata 或 persisted catalog fallback 任一标题已可见，就不再在后续 turn 安排 immediate + trailing `sessions?size=200` fresh refresh；标题仍不可用时保留首轮两次恢复查询，live metadata title 仍可覆盖 fallback，daemon route/capability/live-state wire 不变。
 
+## 2026-08-22 follow-up：`serve --open` ephemeral auth design
+
+#9738 当前是 open docs-only design，没有 Web Shell runtime 改动。方案要求 loopback interactive `--open` 在没有显式 bearer 时生成进程级临时 token，并通过 URL fragment 交给 Web Shell；client 读取后写入当前 tab 的 `sessionStorage`、清理地址栏，再由既有 fetch/SSE transport 发送 `Authorization: Bearer`。fragment 不进入 HTTP request 或 server access log，新 tab 不自动共享。
+
+显式 CLI/env token 优先；browser launch 失败时 CLI 应输出可恢复 URL。plain serve、headless/direct API 与 non-loopback 保持原行为，多客户端需显式共享 token。当前没有 token generation、fragment scrub、sessionStorage 或 launch recovery 代码与 E2E，因此不能写成已发布安全能力。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -447,4 +454,4 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-22_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-23_

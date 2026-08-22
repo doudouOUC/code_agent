@@ -582,3 +582,10 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - `server/error-response.ts` / `routes/session.ts`：`SessionRestoreTimeoutError` 映射为 retryable 504 JSON，带 `restore_timeout`、`Retry-After: 5`、`sessionId`、`action` 和 `timeoutMs`。
 - `serve/acp-http/dispatch.ts`：ACP HTTP/WS 把同一 restore timeout 映射为 JSON-RPC `-32603` data，保留 `httpStatus:504` 和 retryable 标志。
 - `bridge.ts`：cleanup/settlement 不确定时 quarantine channel 或保留 abandoned restore fence，后续新 session 操作 fail-closed 为 `acp_channel_unavailable` / 503；reason 区分 `restore_cleanup_failed`、`awaiting_abandoned_cleanup` 和 `restore_settlement_overdue`，不影响已有 sibling session 继续运行。
+
+### #9738 — `serve --open` ephemeral auth（open docs-only design）
+
+- 当前 PR 只提出契约，没有 runtime 改动：仅 loopback、interactive `--open`、Web Shell 可用且无显式 CLI/env bearer 时，CLI 才生成进程生命周期 256-bit token；显式 token 优先。
+- generated token 复用既有 `bearerAuth`，不新增认证协议。browser URL 通过 fragment 交付，Web Shell 计划写入 tab-local `sessionStorage` 后清理地址；HTTP/server access log 看不到 fragment。
+- bare `--open` 下其他无 token curl/SDK 将收到 401；多客户端需显式共享 `QWEN_SERVER_TOKEN`。plain serve、headless/direct API 与 non-loopback 不自动生成 credential。
+- `/health` 与 static shell bootstrap 的 pre-auth 资格需按既有 loopback/auth posture 保留，其余 API 继续由 bearer 拦截。token generation、launch failure recovery 与跨平台 E2E 尚未实现。

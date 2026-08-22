@@ -384,7 +384,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #9261 | MERGED | workspace session live-state SDK surface | 新增 `DaemonSessionCatalogVersion`、`DaemonWorkspaceSessionLiveState`、`getWorkspaceSessionLiveState()` 与 `getSessionLiveState()`，调用方仍需 gate `workspace_session_live_state`。 |
 | #9380 | MERGED | daemon status child heap measurement types | 追加 ACP child old-generation peak heap status optional fields，未采样时 `heap:null`。 |
 | #9396 | MERGED | live-state activity watermark | 在 `DaemonSessionLiveState` 上追加 optional `updatedAt`，不改变 response v1 或 capability。 |
-| #9626 | OPEN DRAFT | session storage conflict repair | 当前 draft 在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`。 |
+| #9626 | OPEN | session storage conflict repair | 当前 diff 在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`。 |
 
 ---
 
@@ -414,7 +414,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 
-12. **#9626 仍是 open draft**。`resolveConflicts` / `resolvedConflicts` 和 `session_storage_conflict_repair` 只能作为当前 additive SDK 方案记录；未广告 capability 的 daemon 必须保持默认 conflict 行为，客户端不能试探性发送 repair option。
+12. **#9626 仍是 open**。`resolveConflicts` / `resolvedConflicts` 和 `session_storage_conflict_repair` 只能作为当前 additive SDK 方案记录；未广告 capability 的 daemon 必须保持默认 conflict 行为，客户端不能试探性发送 repair option。
 
 ---
 
@@ -502,10 +502,10 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - #9380 已合入，在 daemon status SDK types 中增加 `runtime.memory.children.heap`，表示 ACP child old-generation peak measurement。缺席或 `null` 代表未采样，不能解释为零需求；多个 child 的 heap peak 是 per-child maxima，不与 RSS 一样求和。
 - #9396 已合入，在 `DaemonSessionLiveState.updatedAt` 上补 optional activity watermark。该字段是 volatile recency signal，不替代 `catalogVersion`，旧 daemon/旧 SDK 可按缺失字段兼容。
 
-### #9626 — session storage conflict repair（open draft）
+### #9626 — session storage conflict repair（open）
 
-- 当前 draft 为 `archiveSessions` / `unarchiveSessions` 增加 options overload：只有客户端确认 `session_storage_conflict_repair` 后才发送 `resolveConflicts:true`。
+- 当前 open diff 为 `archiveSessions` / `unarchiveSessions` 增加 options overload：只有客户端确认 `session_storage_conflict_repair` 后才发送 `resolveConflicts:true`。
 - response 中的 `resolvedConflicts` 是 optional/additive，表示 keep-destination repair 实际丢弃了另一状态副本；它不表示 transcript merge，也不改变 delete 的 delete-both 语义。
 - PR 尚未合入；旧 SDK、旧 daemon 和未广告 capability 的 daemon 都应保持默认 fail-closed conflict。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-22_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-23_
