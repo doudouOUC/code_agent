@@ -583,9 +583,9 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - `serve/acp-http/dispatch.ts`：ACP HTTP/WS 把同一 restore timeout 映射为 JSON-RPC `-32603` data，保留 `httpStatus:504` 和 retryable 标志。
 - `bridge.ts`：cleanup/settlement 不确定时 quarantine channel 或保留 abandoned restore fence，后续新 session 操作 fail-closed 为 `acp_channel_unavailable` / 503；reason 区分 `restore_cleanup_failed`、`awaiting_abandoned_cleanup` 和 `restore_settlement_overdue`，不影响已有 sibling session 继续运行。
 
-### #9738 — `serve --open` ephemeral auth（open docs-only design）
+### #9738 — `serve --open-with-auth`（open）
 
-- 当前 PR 只提出契约，没有 runtime 改动：仅 loopback、interactive `--open`、Web Shell 可用且无显式 CLI/env bearer 时，CLI 才生成进程生命周期 256-bit token；显式 token 优先。
-- generated token 复用既有 `bearerAuth`，不新增认证协议。browser URL 通过 fragment 交付，Web Shell 计划写入 tab-local `sessionStorage` 后清理地址；HTTP/server access log 看不到 fragment。
-- bare `--open` 下其他无 token curl/SDK 将收到 401；多客户端需显式共享 `QWEN_SERVER_TOKEN`。plain serve、headless/direct API 与 non-loopback 不自动生成 credential。
-- `/health` 与 static shell bootstrap 的 pre-auth 资格需按既有 loopback/auth posture 保留，其余 API 继续由 bearer 拦截。token generation、launch failure recovery 与跨平台 E2E 尚未实现。
+- 当前 runtime diff 新增独立、默认关闭的 `--open-with-auth`；该 flag 自带 browser open intent，冗余 `--open`/`--no-open` 不会关闭它。bare `--open`、embedded `runQwenServe()`、Chrome extension 与未传新 flag 的路径保持既有 token-less 兼容行为。
+- yargs 与 fast path 都在 listen 前调用 `applyOpenWithAuth()`：只接受 loopback，要求 Web Shell 未被 `--no-web` 禁用且 built assets 存在；任一条件不满足都 boot-loud 失败。配置 token 时复用 `--token` 优先于 `QWEN_SERVER_TOKEN` 的 trimmed 值，否则生成 32-byte base64url bearer。
+- selected token 进入既有 `runQwenServe()` / `bearerAuth` / WebSocket / strict mutation / worker handoff，不新增认证协议或持久 credential。browser eligible 时通过既有 `#token=` fragment 交付；headless 时 daemon 仍启动并打印手动 secret-bearing URL。
+- loopback `/health` 与 static assets 继续按既有 exemption 工作，`--require-auth` 仍 gate `/health`；Local Control 使用独立 pairing token。当前 PR 未合入，Windows/Linux runtime E2E、持久 token、client identity/revoke 与 SDK/extension discovery 不在范围。

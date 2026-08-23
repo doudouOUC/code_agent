@@ -69,9 +69,10 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #9362 | fix(cli): Keep transient runtime record I/O retryable | merged | 不新增 capability 或 wire 字段；只调整 Conversations owner/discovery record 内部错误分类，让 transient I/O 继续走 retryable unavailable。 |
 | #9512 | fix(serve): Harden standalone conversation primitives | merged | 不新增 capability 或 wire 字段；收紧 directory ensure、JSONL integrity budget 与 identity error cause。 |
 | #9513 | fix(cli): Recover sessions across archive races | merged | 不新增 capability；exact-spelling active/archive recovery、transcript/export/delete 与 metadata/parent/directory race 都是既有 route 兼容修复。 |
-| #9626 | fix(serve): Repair persisted session lifecycle | open | 当前 diff 新增 `session_storage_conflict_repair`，客户端 gate 后才可发送 `resolveConflicts`，响应 additive 返回 `resolvedConflicts`。 |
+| #9626 | fix(serve): Repair persisted session lifecycle | open | 当前 diff 新增 `session_storage_conflict_repair`，客户端 gate 后才可发送 `resolveConflicts`，响应 additive 返回 `resolvedConflicts`；默认 conflict 进入 HTTP 200 batch `errors`。 |
 | #9665 | feat(serve): restore ask_user_question HITL | merged | 默认关闭的 CLI flag；v1 不新增 capability tag、settings key、route 或 SDK method，客户端只能带外确认 operator 启动参数。 |
 | #9687 | feat(cli): restore each daemon session onto its last selected model | merged | 新增 transcript-internal `system/session_model` projection，不新增 public route/capability；仅 daemon ACP cold load/resume 消费。 |
+| #9763 | fix(daemon): keep restored ask_user_question valid after load | merged | 不新增 public capability；daemon 通过 private suppress meta 让 replay finalize 与 re-hang 决策锁步，并保持 restore flag default-off。 |
 | #9261 | feat(serve): Add workspace session live-state endpoint and catalog version | merged | 新增 `workspace_session_live_state` capability、trusted-only memory-only `GET /workspaces/:workspace/sessions/live-state`、catalog version 与 TS SDK surface。 |
 | #9366 | feat(web-shell): Consume workspace session live-state | merged | 不新增 protocol；WebShell 消费 #9261 的 capability/route，用 version-fenced handshake 减少 full catalog polling。 |
 | #9380 | feat(serve): measure ACP child peak old-generation heap | merged | `/daemon/status` additive 暴露 ACP child old-generation peak heap measurement；observe-only，不改 child argv/enforcement。 |
@@ -535,7 +536,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#9513/#9665/#9687 已合入；#9626 是 open**。standalone safety primitives/hardening、archive race recovery、default-off AUQ restore 与 per-session model projection 已按 merged diff 更新；storage conflict repair capability 只能记录当前方案，不能视为 `main` 已落地能力。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。
+8. **#9513/#9665/#9687/#9763 已合入；#9626 是 open**。standalone safety primitives/hardening、archive race recovery、default-off AUQ restore/hardening 与 per-session model projection 已按 merged diff 更新；storage conflict repair capability 只能记录当前方案，不能视为 `main` 已落地能力。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。
 
 ---
 
@@ -614,14 +615,15 @@ sequenceDiagram
 - ordinary workspace resolver 默认过滤 `provenance === "live-conversation"` 的 internal runtime；workspace-qualified REST/ACP/Voice、scratch/session creation、extension/workspace management 等普通 selector 查不到内部 runtime 时 fail closed，不 fallback primary。
 - `ServeAppLifecycle` 与 Conversations owner record 的状态只作为 daemon 内部 release proof；后续若需要对外诊断字段，应保持 optional/additive，并避免让客户端把 internal runtime 当作普通 workspace target。
 
-### #9341 / #9362 / #9512 / #9513 / #9626 / #9665 / #9687 — standalone/runtime safety primitives
+### #9341 / #9362 / #9512 / #9513 / #9626 / #9665 / #9687 / #9763 — standalone/runtime safety primitives
 
 - #9341 已合入，只在 daemon 内部引入 reserved `sourceType: "standalone"`、loadable metadata reader、explicit standalone / legacy projectless / Live source classification、case-insensitive session id conflict 和 standalone directory identity proof；REST `/session` 与 ACP `session/new` 继续拒绝外部 reserved standalone source。
 - #9512 已合入，不新增 protocol shape；只收紧 directory ensure race、JSONL integrity budget 与 Error cause 语义。
 - #9513 已合入且不新增 capability；exact-spelling 双副本的 active-first load/resume/transcript/export、delete-both 与 metadata/parent/directory race 都沿用既有 wire shape。
-- #9626 当前 open diff 新增 additive `session_storage_conflict_repair`。客户端必须 feature-detect 后才能发送 `resolveConflicts:true`；archive/unarchive response 只在实际修复时追加 `resolvedConflicts`，旧默认 conflict 不变。
+- #9626 当前 open diff 新增 additive `session_storage_conflict_repair`。客户端必须 feature-detect 后才能发送 `resolveConflicts:true`；archive/unarchive response 只在实际修复时追加 `resolvedConflicts`，默认 conflict 保持非变更但统一进入 HTTP 200 batch `errors`。
 - #9665 已合入，通过默认关闭的 `--restore-ask-user-question` 控制 load/resume AUQ re-hang；v1 有意不加 settings key 或 capability tag，因此不能从 `/capabilities` 推断可用性。
 - #9687 已合入 transcript-internal `system/session_model` record/projection，不新增 route、capability 或 SDK method；旧 transcript 与旧 daemon 按 assistant model/settings fallback 兼容。
+- #9763 已合入，不新增 public wire；private suppress meta 只在 daemon 明确不 re-hang 时关闭 replay skip/Core preservation，`qwen/session/loadUpdates`、fork/no-client 与普通 send 因此不会留下悬空协议状态。
 - #9362 已合入，不改变 protocol shape，只把 owner/discovery record 的 transient `open`/`readFile` I/O error 保留为 retryable `conversation_runtime_unavailable` 上层语义；`ELOOP`、malformed JSON、schema mismatch 和 unsafe permission/link state 仍是 terminal compromised。
 
 ### #9261 / #9366 / #9396 — workspace session live-state protocol

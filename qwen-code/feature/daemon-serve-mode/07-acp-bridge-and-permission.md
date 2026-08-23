@@ -49,6 +49,7 @@
 | #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
 | #9665 | restore `ask_user_question` on load/resume | merged restore follow-up | 默认关闭的 serve flag 只对尾部纯 AUQ batch 跳过 orphan finalize，并通过 trusted tracked prompt 生成新 request id、复用既有投票与 cancel 语义。 |
+| #9763 | restored `ask_user_question` hardening | merged restore follow-up | 普通发送先闭合 dangling call，replay/re-hang suppress 锁步，post-answer notice 与整批 unattended persistence 保持可再次恢复。 |
 | #8620 | same-host daemon text read delegation | FS seam follow-up | 最终实现用 `delegateReadTextFileToClient:false` 让 daemon-owned same-host bridge 广告 read local / write delegated，避免批准后的 direct read 被 WorkspaceFileSystem workspace 边界拒绝。 |
 | #8852 | approved external built-in text writes | FS seam follow-up | 最终实现用 versioned `tool-write-origin` provenance 让已批准的内置 text write 在 daemon-owned same-host adapter 上进入受控 host writer；HTTP/通用 ACP 不放宽。 |
 | #8911 | bound daemon ACP NDJSON buffers | transport resource guard | 已合入，daemon-owned ACP child 的 NDJSON frame 与 decoded inbound queue 使用固定 bounds，超限低敏记录并终止精确 child。 |
@@ -244,7 +245,11 @@ F3 只定义了"权限请求如何结算"；#5218/#5258 把 `{kind:'cancelled'}`
 
 最终 bridge 统一用 tracked prompt helper 发起 re-hang，并要求无 attached client、无 pending prompt/goal turn、非 fork；sync throw 也转换为受控失败。timeout 不合成 decline，而是保留 dangling transcript 供后续恢复；`continueLastTurn` 会先拒绝可恢复问题。daemon-known decline 携带 suppress meta，使 replay skip、re-hang 与后续 continuation 的语义一致。
 
-bridge 通过已跟踪的 prompt admission 重新执行原 AUQ calls，产生新的 permission request id；客户端仍使用既有 permission vote route。真实 function response 继续原 turn，cancel/timeout/channel failure 继续沿用 #5218/#5258 stop-after-cancel，conversation-finished telemetry 也在 terminal path 发出。restore 空 prompt 不重复 user echo、hook、system reminder，也不消费一次性 worktree notice。该 PR 尚未合入，且 v1 不新增 capability tag；daemon boot 不扫描或自动恢复等待会话。
+bridge 通过已跟踪的 prompt admission 重新执行原 AUQ calls，产生新的 permission request id；客户端仍使用既有 permission vote route。真实 function response 继续原 turn，cancel/timeout/channel failure 继续沿用 #5218/#5258 stop-after-cancel，conversation-finished telemetry 也在 terminal path 发出。restore 空 prompt 不重复 user echo、hook、system reminder，也不消费一次性 worktree notice。该 PR 已合入，且 v1 不新增 capability tag；daemon boot 不扫描或自动恢复等待会话。
+
+#9763 已继续修复恢复后的并发边界。普通文本发送会先合成 functionResponse 闭合 dangling call，避免 provider 接收非法 history；daemon decline re-hang 时用 private suppress meta 同时关闭 replay skip 与 Core preservation，read-only loadUpdates/fork/no-client 路径因此正常 finalize。restore turn 不插 file-history snapshot，worktree/background-agent notice 只在 post-answer message 成功落地后清空。
+
+unattended restored batch 现在按整批处理：任一 call 因 timeout、session close 或 permission wait abort 结束，已排队 sibling 和当前 call 的 durable tool result 都跳过，磁盘继续保留可恢复尾部；in-memory functionResponse 仍满足当前进程协议。用户主动 cancel 仍持久化。cold bulk replay 在 chat 未初始化时从 transcript tail 计算 skip ids，避免先 finalize 再重新提示。
 
 #### Agent 工具权限提示（#5085/#5105）
 
@@ -436,7 +441,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 7. **`README.md` 描述陈旧**。`packages/acp-bridge/README.md` 仍把 mediator 描述为 "type-only stub / No implementation yet / F3 PR 24 will move that"——那是 F1 抬包时点的快照，F3（#4335）已落地实现。读 README 时需注意这层时间差。
 
-8. **#9665 已合入但仍默认关闭**。不能把 AUQ re-hang 写成默认 load/resume 行为；v1 无 capability tag，客户端无法仅靠 `/capabilities` 区分 operator 是否启用 flag。boot-time auto-resume、其它 permission tool、旧 request id/audit 持久化和 mixed dangling batch 都不在当前方案内。
+8. **#9665/#9763 已合入但仍默认关闭**。不能把 AUQ re-hang 写成默认 load/resume 行为；v1 无 capability tag，客户端无法仅靠 `/capabilities` 区分 operator 是否启用 flag。boot-time auto-resume、其它 permission tool、旧 request id/audit 持久化和 mixed dangling batch 都不在当前方案内。
 
 ---
 

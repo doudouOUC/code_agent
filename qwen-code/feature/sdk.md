@@ -384,7 +384,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #9261 | MERGED | workspace session live-state SDK surface | 新增 `DaemonSessionCatalogVersion`、`DaemonWorkspaceSessionLiveState`、`getWorkspaceSessionLiveState()` 与 `getSessionLiveState()`，调用方仍需 gate `workspace_session_live_state`。 |
 | #9380 | MERGED | daemon status child heap measurement types | 追加 ACP child old-generation peak heap status optional fields，未采样时 `heap:null`。 |
 | #9396 | MERGED | live-state activity watermark | 在 `DaemonSessionLiveState` 上追加 optional `updatedAt`，不改变 response v1 或 capability。 |
-| #9626 | OPEN | session storage conflict repair | 当前 diff 在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`。 |
+| #9626 | OPEN | session storage conflict repair | 当前 diff 在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`，默认 conflict 从 HTTP 200 batch `errors` 读取。 |
 
 ---
 
@@ -506,6 +506,6 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 - 当前 open diff 为 `archiveSessions` / `unarchiveSessions` 增加 options overload：只有客户端确认 `session_storage_conflict_repair` 后才发送 `resolveConflicts:true`。
 - response 中的 `resolvedConflicts` 是 optional/additive，表示 keep-destination repair 实际丢弃了另一状态副本；它不表示 transcript merge，也不改变 delete 的 delete-both 语义。
-- PR 尚未合入；旧 SDK、旧 daemon 和未广告 capability 的 daemon 都应保持默认 fail-closed conflict。
+- 默认 archive/unarchive conflict 现在作为 HTTP 200 batch `errors` 返回；SDK 不能再只依赖 workspace-qualified HTTP 409 envelope。PR 尚未合入；旧 SDK、旧 daemon 和未广告 capability 的 daemon 都应保持默认 fail-closed conflict。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-23_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-24_

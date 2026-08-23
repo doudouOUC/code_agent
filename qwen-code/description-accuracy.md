@@ -42,7 +42,7 @@
 | [#3498](https://github.com/QwenLM/qwen-code/pull/3498) | merged | 漏报把文档里 `target:"qwen"`→`"gcp"` 的功能性修正（旧值被 `parseTelemetryTargetValue` 拒） | 补充：同时修正了文档示例 `target` 值 `qwen`→`gcp`（旧值无效）。 |
 | [#3779](https://github.com/QwenLM/qwen-code/pull/3779) | merged | 漏报移除 SIGTERM/SIGINT/exit handler、新增 `installInteractiveSignalHandlers`、幂等 shutdown、删 console exporter（#3734 明列范围外） | 补充：本 PR 同时重构了 shutdown/信号处理并移除 console exporter。 |
 | [#4096](https://github.com/QwenLM/qwen-code/pull/4096) | merged | 未明说 rename 路线会**丢 uid/gid**且**可覆盖只读(444)文件** | 补充：rename 换 inode → 不保留 uid/gid（后由 #4431 处理）、可改写只读文件（行为变更）。 |
-| [#4304](https://github.com/QwenLM/qwen-code/pull/4304) | merged | "design slice"夹带 `mapDomainErrorToErrorKind` 的 SkillError 放宽（#4298 fold-in），body 未提 | 补充：附带放宽了 SkillError 分类（instanceof || name 判定）。 |
+| [#4304](https://github.com/QwenLM/qwen-code/pull/4304) | merged | "design slice"夹带 `mapDomainErrorToErrorKind` 的 SkillError 放宽（#4298 fold-in），body 未提 | 补充：附带放宽了 SkillError 分类（`instanceof || name` 判定）。 |
 | [#4319](https://github.com/QwenLM/qwen-code/pull/4319) | merged | File-diff 表与 4682→97 LOC 数字陈旧；夹带 #4329 helper 抽取 + SDK 超时 300→330s | 更新文件清单/LOC；注明含 #4329 与 SDK 超时调整。 |
 | [#4552](https://github.com/QwenLM/qwen-code/pull/4552) | merged | 漏说服务端静默剥离 `trust/env/cwd/oauth/headers/...`（运行时加鉴权 MCP 不可用且无回传） | 补充：运行时 add 会剥离 env/headers/trust 等字段，需密钥/鉴权头的 MCP server 不可用；建议回传告警。 |
 | [#4297](https://github.com/QwenLM/qwen-code/pull/4297) | merged | 只覆盖初版 4 个 P2，未提 fold-in 1/2/3/5/7/9/10；P2-2"工具不回收"与 `discoverToolsForServer` 清除行为矛盾 | 补充 fold-in 清单；更正 P2-2（重启确实会清除被禁用工具）。 |
