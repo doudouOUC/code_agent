@@ -32,6 +32,8 @@
 | #4527 | `--allow-origin` CORS allowlist（T2.4） | `auth.ts:parseAllowOriginPatterns`(L80)、`allowOriginCors`(L132)；boot 校验 `runQwenServe.ts` L473-502 |
 | #4530 / #7400 | prompt 绝对 deadline + SSE writer idle timeout（T2.9） | `resolvePromptDeadlineMs` 解析 effective deadline；#7400 后 prompt route 透传 `context.deadlineMs` 给 bridge，bridge 发布 `turn_error{code:'prompt_deadline_exceeded'}` 并释放 FIFO；SSE idle timer 仍在写侧 |
 | #5260 | ACP 权限响应超时可配置 | `serve.ts` flag、`runQwenServe.ts` 启动校验、`server.ts` / `types.ts` 透传到 bridge、`bridge.ts` timer clamp |
+| #9838 | current-session scheduled task（open） | 完整 runtime 才安装 current-session host callback；selected runtime 做 owner/session/task binding 准入、generation fence 与 rollback |
+| #9933 | 默认关闭 ACP permission timeout | `DEFAULT_PERMISSION_TIMEOUT_MS=0`；省略或 0 不装 timer，正整数仍经启动校验和 clamp 透传到 bridge |
 | #4552 | 运行时 MCP server add/remove（T2.8） | `server.ts` `POST/DELETE /workspace/mcp/servers`(L2329/L2412) |
 | #4606 | request 级访问日志 | `server.ts` access-log middleware L875-920；`daemonLogger.ts` |
 | #4360 | errorKind / serverTimestamp（F4 prereq） | `formatSseFrame`(L3629)、`mapDomainErrorToErrorKind` 用于 SSE `stream_error`(L3010) |
@@ -358,7 +360,7 @@ stateDiagram-v2
 
 ### ACP permission response timeout（`--permission-response-timeout-ms`，#5260）
 
-#5260 暴露的是 bridge 层单个权限 / `ask_user_question` 请求的等待时间，而不是 HTTP prompt deadline。默认值仍是 5 分钟；`qwen serve --permission-response-timeout-ms 0` 表示无限等待；合法正整数从 CLI 进入 `ServeOptions.permissionResponseTimeoutMs`，再透传给 `createAcpSessionBridge`。`runQwenServe` 会在启动期拒绝非有限、负数、非整数，防止 `NaN` 被 bridge 当成 disabled sentinel；bridge 侧再把超大值 clamp 到 `2^31-1`，避免 Node 的 32-bit timer overflow 退化成 1ms 立即取消。
+#5260 暴露的是 bridge 层单个权限 / `ask_user_question` 请求的等待时间，而不是 HTTP prompt deadline。#9933 已把默认值改为 `0`：省略或显式 0 表示无限等待；合法正整数从 CLI 进入 `ServeOptions.permissionResponseTimeoutMs`，再透传给 `createAcpSessionBridge`。`runQwenServe` 会在启动期拒绝非有限、负数、非整数，防止 `NaN` 被 bridge 当成 disabled sentinel；bridge 侧再把超大正数 clamp 到 `2^31-1`，避免 Node 的 32-bit timer overflow 退化成 1ms 立即取消。需要保留旧 5 分钟行为的部署必须显式配置 `300000`。
 
 这个超时与 #5218/#5258 的取消停止语义配套：deadline 到期后权限 resolution 是 cancelled，ACP turn loop 会记录被取消/跳过的 tool responses 并结束当前 turn，而不是继续把后续工具结果交给模型。
 
@@ -541,12 +543,13 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - `server/prompt-deadline.ts`：`PromptDeadlineExceededError` 从 acp-bridge re-export，保持既有 import 兼容。
 - `server.ts` SSE handler：writer idle 守卫——轮询 `lastWriteAt`，超预算直写 `client_evicted{writer_idle_timeout}` 绕过卡死写链 + `res.end()`。
 
-### #5260 — permission response timeout flag
+### #5260 / #9933 — permission response timeout flag and default
 
 - `commands/serve.ts`：新增 `--permission-response-timeout-ms` CLI flag。
 - `serve/types.ts` / `serve/server.ts`：把 `permissionResponseTimeoutMs` 从 serve options 透传到 bridge 构造。
 - `runQwenServe.ts`：启动期校验非有限、负数、非整数，错误以 `qwen serve: Invalid permissionResponseTimeoutMs...` 暴露并非零退出。
-- `acp-bridge/src/bridge.ts`：默认 5 分钟，`0` 无限等待，超大值 clamp 到 `2^31-1`。
+- `acp-bridge/src/bridge.ts`：#9933 后默认 `0`，不安装 permission/AUQ timer；显式正数仍启用 deadline，超大值 clamp 到 `2^31-1`。
+- 兼容迁移：需要旧默认行为的 operator 显式设置 `--permission-response-timeout-ms 300000`；该值仍不进入 capability 或 status limits。
 
 ### #4606 — request logging
 
@@ -589,3 +592,10 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - yargs 与 fast path 都在 listen 前调用 `applyOpenWithAuth()`：只接受 loopback，要求 Web Shell 未被 `--no-web` 禁用且 built assets 存在；任一条件不满足都 boot-loud 失败。配置 token 时复用 `--token` 优先于 `QWEN_SERVER_TOKEN` 的 trimmed 值，否则生成 32-byte base64url bearer。
 - selected token 进入既有 `runQwenServe()` / `bearerAuth` / WebSocket / strict mutation / worker handoff，不新增认证协议或持久 credential。browser eligible 时通过既有 `#token=` fragment 交付；headless 时 daemon 仍启动并打印手动 secret-bearing URL。
 - loopback `/health` 与 static assets 继续按既有 exemption 工作，`--require-auth` 仍 gate `/health`；Local Control 使用独立 pairing token。当前 PR 未合入，Windows/Linux runtime E2E、持久 token、client identity/revoke 与 SDK/extension discovery 不在范围。
+
+### #9838 — current-session scheduled task runtime wiring（open）
+
+- 当前 diff 只在 scheduled-task store 与 current-session creator 完整可用、managed runtime 已挂载后条件广告 `scheduled_task_session_reuse`；fast-path bootstrap envelope 可暂时缺少该 tag，caller-injected/partial bridge 不广告。
+- `routes/scheduled-tasks.ts` 在 owning runtime 内验证 session/prompt/source/pending interaction/既有 task binding，持久化 existing-session task 时标记 `sessionOwnedByTask:false`。
+- primary、startup secondary 与动态 workspace runtime 使用同一 wiring；mutation 带 runtime generation assertion，commit 后 generation 关闭会回滚刚创建的 task。
+- 该 PR 尚未合入；省略 `sessionMode` 与 capability 缺失都保持 dedicated-session 行为。

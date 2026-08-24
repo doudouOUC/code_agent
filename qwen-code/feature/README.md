@@ -5,7 +5,7 @@
 > 配套：逐 PR 的描述↔实现一致性 + 正确性审查见 [`../weekly-report/`](../weekly-report/README.md)。
 > 口径：这里只保留 @doudouOUC 自己创建的 PR；其他作者 PR 不再作为本目录统计或专题入口。open/closed 未合入 PR 只作为方案记录，不能视为当前 `main` 已落地能力。
 
-## 22 篇技术方案
+## 23 篇技术方案
 
 > **daemon/serve** 与 **telemetry** 两块内容最多，已各自拆成文件夹（README 总览 + 多篇函数级深入子文档）；其余为单篇。
 
@@ -29,10 +29,13 @@
 | Diff 渲染与变更统计 | [diff-rendering.md](diff-rendering.md) | #6141 | edit/write/shell 等工具的 whitespace-only diff 不再显示为 “No changes detected”，diff stat 也按 smart fallback 统计。 |
 | 文件读取 / 大文本范围 / PDF 预算 | [file-reading.md](file-reading.md) | #6404 / #6409 / #6585 / #6846 / #7947 / #7967 / #8002 / #8383 | 大文本范围读取与 PDF 读取预算：Core 超过旧 10MB 文本 guard 时返回有界行范围，大型 PDF 不带 `pages` 时返回 guidance/reference；文本提取失败或单页超预算时可用 bounded PDF vision bridge fallback；#7947 让 Serve workspace `/file` 也能对超过 256 KiB 的 UTF-8 文本返回 bounded line window；#7967 已合入 handle-bound range reader 分层清理；#8002 增加 byte-cursor paging；#8383 已合入 CRLF cursor paging 的 lineEnding 文件级 metadata 修复。 |
 | Shell 工具执行语义 | [shell-tool.md](shell-tool.md) | #6864 / #6876 / #7053 / #7172 | 前台 shell timeout 归类为结构化工具错误，静默命令发不进模型上下文的 liveness heartbeat 给 ACP/stream-json；shell safety 拆成 read-only/write/unknown，Plan mode shell 按三态分流。 |
+| Scheduled Tasks | [scheduled-tasks.md](scheduled-tasks.md) | #9838(open) | 当前 open 方案允许 durable `cron_create` 显式复用当前 daemon 顶层普通会话，通过 Core prompt context、private ACP identity、Serve owner/lifecycle 准入、generation rollback、条件 capability 与 Web Shell selector 保持默认 dedicated 兼容。 |
 | 诊断 / creator skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 #6117 #6233(closed) | `/doctor` 代码命令、`/stuck` 诊断技能、`/batch` prompt 技能、ACP/non-interactive `/skills` 列表输出；disabled skill wire/filtering 仅为 #6233 closed 方案记录。 |
 | Hooks / submitted prompt provenance | [hooks.md](hooks.md) | #7762 / #7877 | `UserPromptSubmit` hook 新增 optional `submitted_prompt`，只在能证明 fresh 用户文本时提供提交原文投影，保持 model-bound `prompt`、hook order 与 additionalContext chaining 不变；#7877 以该字段作为 auto recall 的唯一 query 来源。 |
 | auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 #4291 #4305 #5179 #5638 #5769 #8862 #8893 | provider 配置、apiKey 保留、auth status 识别、device-flow、workspace provider defaults、重复 display name 消歧，以及 OpenAI-compatible API log retention 配置与非交互 best-effort 清理。 |
-| 权限系统 | [permission-system.md](permission-system.md) | #3467 #3726 #4335 #5085 #5105 #5218 #5258 #5260 #5743 #6026 #6087 #6138 #6967 #7053 #7172 #7248 #7295 #7744 #8636 | 规则解析与畸形规则守卫、多客户端权限协调、ACP 取消停止语义、workspace permissions API、subagent approval-mode override、subagent plan lifecycle tool 阻断、plan-required teammate leader approval、main-session `exit_plan_mode` 显式用户批准、shell 三态事实层、Plan mode shell routing、`enter_plan_mode` 执行边界、权限等待期间 abort-aware stopReason 保留、手动退出 Plan 后的 per-conversation one-shot notice delivery，以及 #8636 的 read-file 默认权限 symlink canonicalization。 |
+| 权限系统 | [permission-system.md](permission-system.md) | #3467 #3726 #4335 #5085 #5105 #5218 #5258 #5260 #5743 #6026 #6087 #6138 #6967 #7053 #7172 #7248 #7295 #7744 #8636 #9933 | 规则解析与畸形规则守卫、多客户端权限协调、ACP 取消停止语义、workspace permissions API、subagent approval-mode override、subagent plan lifecycle tool 阻断、plan-required teammate leader approval、main-session `exit_plan_mode` 显式用户批准、shell 三态事实层、Plan mode shell routing、`enter_plan_mode` 执行边界、权限等待期间 abort-aware stopReason 保留、手动退出 Plan 后的 per-conversation one-shot notice delivery、#8636 的 read-file 默认权限 symlink canonicalization，以及 #9933 将普通权限/AUQ 默认 timeout 改为 disabled、正数显式配置保持可用。 |
+
+> W35 daemon follow-up：#9819/#9820/#9933 已合入 Live task canonical bridge identity、conditional-close refusal hold 上限与默认关闭 permission timeout；#9838 仍为 open，只记录 current-session scheduled task 方案，不能视为 `main` 能力。
 
 ## 使用口径
 
@@ -46,4 +49,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/README.md)（见其 07 子文档）。
 - 每篇「已知限制」综合 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-23_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-25_

@@ -57,6 +57,7 @@
 | #9476 | @doudouOUC | merged | WebShell live-state activity consumer：turn completion 通过 post-completion live-state response settle，并用可吸收 `updatedAt` 重排当前 active page。 |
 | #9563 | @doudouOUC | merged | WebShell session title refresh guard：effective title 已由 connection metadata 或 persisted catalog fallback 解析后，不再每 turn 重复刷新完整 catalog。 |
 | #9738 | @doudouOUC | open | `serve --open-with-auth`：当前 runtime diff 复用 URL fragment 到 tab-local `sessionStorage` 的 bearer handoff；尚未合入。 |
+| #9838 | @doudouOUC | open | current-session scheduled task：capability-gated session mode selector，默认 dedicated；busy/pending/parented/sourced/cross-workspace/already-bound 时禁用复用。 |
 
 ---
 
@@ -404,6 +405,8 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 ## 2026-08-22 follow-up：`serve --open-with-auth`
 
 #9738 当前 open diff 新增独立 `--open-with-auth`，没有修改 Web Shell client 本身，而是复用已经落地的 browser credential handoff。CLI 选择或生成 bearer 后，把 `RunHandle.resolvedToken` 放入 `#token=`；client 读取 fragment、写入当前 tab 的 `sessionStorage`、清理地址栏，再由既有 fetch/SSE transport 发送 `Authorization: Bearer`。fragment 不进入 HTTP request 或 server access log，新 tab 不自动共享。
+
+#9838 当前 open diff 在 `ScheduledTasksDialog` 增加 session mode selector。只有 daemon 广告 `scheduled_task_session_reuse` 时才显示 current-session 选项，默认仍为 dedicated；当前 session 不存在、busy、等待 permission/AUQ、parented/sourced、跨 workspace 或已有 task binding 时禁用 current。只有用户明确选择后请求才携带复用 intent/session identity，UI 检查只用于反馈，Serve host 仍在提交边界独立重做全部准入。该 PR 尚未合入，不能把 selector 或 capability 写成当前 Web Shell 能力。
 
 该 flag 自带 open intent：browser eligible 时正常启动 tab，headless 时打印带 fragment 的手动 URL；bare `--open`、Chrome extension 和未传新 flag 的客户端保持现有行为。generated token 仍是完整 daemon runtime credential，不是 browser-scoped pairing token；opt-in daemon 上其它无 token local clients 会得到 401，多客户端/可重开浏览器需显式配置共享 `QWEN_SERVER_TOKEN`。persistent store、cross-tab、cookie、client identity/revoke 与 SDK discovery 不在范围；PR 未合入，不能写成 `main` 能力。
 

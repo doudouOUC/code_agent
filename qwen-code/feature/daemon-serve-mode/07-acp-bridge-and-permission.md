@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134 已合入的 active-work close refusal / deferred kill guard，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）在此基础上补齐 Agent 工具权限提示、取消后停止 turn、以及可配置权限响应超时。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134/#9820 已合入的 active-work close refusal 与 hold 上限、#9838 当前 open 的 private current-session scheduled-task creator，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）与 #9933 在此基础上补齐 Agent 工具权限提示、取消后停止 turn、可配置响应超时和默认无限等待。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -48,6 +48,7 @@
 | #5174 | daemon status API | 诊断面 | 通过 bridge / ACP registry snapshot helper 暴露 `GET /daemon/status`，让权限压力、SSE/ACP 连接和 capability 状态进入统一 JSON 诊断面。 |
 | #5218/#5258 | stop after cancelled permissions | ACP turn loop | cancelled `ask_user_question`、普通工具权限取消、reject→Cancel、权限请求通道失败都会停止当前 turn 并跳过后续工具。 |
 | #5260 | configurable permission timeout | 运行时配置 | `qwen serve --permission-response-timeout-ms` 把 bridge `permissionResponseTimeoutMs` 从硬编码 5 分钟变成 operator 可配置。 |
+| #9933 | disable permission timeout by default | merged 运行时默认 | 把 shared default 改为 0；省略/0 不安装普通权限或 AUQ timer，显式正数继续生效。 |
 | #9665 | restore `ask_user_question` on load/resume | merged restore follow-up | 默认关闭的 serve flag 只对尾部纯 AUQ batch 跳过 orphan finalize，并通过 trusted tracked prompt 生成新 request id、复用既有投票与 cancel 语义。 |
 | #9763 | restored `ask_user_question` hardening | merged restore follow-up | 普通发送先闭合 dangling call，replay/re-hang suppress 锁步，post-answer notice 与整批 unattended persistence 保持可再次恢复。 |
 | #8620 | same-host daemon text read delegation | FS seam follow-up | 最终实现用 `delegateReadTextFileToClient:false` 让 daemon-owned same-host bridge 广告 read local / write delegated，避免批准后的 direct read 被 WorkspaceFileSystem workspace 边界拒绝。 |
@@ -56,6 +57,8 @@
 | #8947 | close daemon ACP resource guard gaps | transport resource guard | 已合入，在 #8911 raw stream bounds 之外补 handler、prepared response、outbound op 与 outstanding request 的 count/byte guard。 |
 | #9007 | bound ACP HTTP pre-attach buffers by bytes | ACP HTTP transport resource guard | 已合入，为 pre-attach buffered replies 增加 stream/connection/global frame 与 byte budget，并把 ownership grant 绑定到 local delivery。 |
 | #9134 | preserve sessions when active-work close is refused | active-work close lifecycle | 已合入；`onlyIfUnheld` close 拒绝前不破坏 session，deferred spawn-owner kill 避开 close/probe in-flight，definitive child close refusal 不升级为 channel kill。 |
+| #9820 | bound conditional-close refusal holds | active-work close lifecycle | 已合入；拒绝仍保留 session，但只采纳最多 1024 条 holds，超限保留最后合法 cache。 |
+| #9838 | support current-session scheduled tasks | open private bridge extension | 当前 diff 用 connection/session/active prompt/source/bounds 校验 private creator，再交给 Serve host 做 runtime/session/task binding admission。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -76,11 +79,11 @@
 
 **`BridgeOptions`（`bridgeOptions.ts`）** 是工厂的构造契约，唯一硬必填是 `boundWorkspace`（且**必须**是 `canonicalizeWorkspace(path)` 的结果——构造器只 `path.isAbsolute` 校验，**不**重新 canonicalize，避免在 NFS-transient / mid-rename 文件系统上 bridge 与 `/capabilities` 各拿到一个 canonical 形）。其余字段分三类：
 
-- **旋钮**：`maxSessions`（默认 20）、`eventRingSize`（默认 8000，`0`/`NaN`/负值 boot 抛错——fail-CLOSED）、`permissionResponseTimeoutMs`（默认 5min）、`maxPendingPermissionsPerSession`（默认 64）。
+- **旋钮**：`maxSessions`（默认 20）、`eventRingSize`（默认 8000，`0`/`NaN`/负值 boot 抛错——fail-CLOSED）、`permissionResponseTimeoutMs`（#9933 后默认 0，即不安装 timer）、`maxPendingPermissionsPerSession`（默认 64）。
 - **注入回调**：`persistApprovalMode` / `persistDisabledTools`（写 settings）、`childEnvOverrides`（per-handle env 隔离——`defaultSpawnChannelFactory` 在 **spawn 时**快照 `process.env`，多个嵌入式 daemon 共享进程时靠它避免互相污染 MCP 预算 env）、`contextFilename`、`onDiagnosticLine`（tee 调试行到 daemon 日志）。
 - **seam 实现**：`channelFactory`、`statusProvider`、`fileSystem`、`telemetry`，外加 F3 的 `permissionPolicy` / `permissionConsensusQuorum` / `permissionAudit`。
 
-#5260 把原先只能由嵌入方传入的 `permissionResponseTimeoutMs` 暴露成 `qwen serve --permission-response-timeout-ms`。默认仍 5 分钟；`0` 表示无限等待；`runQwenServe` 在启动期拒绝非有限、负数、非整数；bridge 侧再把超大值 clamp 到 `2^31-1`，避免 Node timer overflow 把"很长超时"退化成 1ms 立即取消。
+#5260 把原先只能由嵌入方传入的 `permissionResponseTimeoutMs` 暴露成 `qwen serve --permission-response-timeout-ms`。#9933 已把默认改为 `0`：省略/0 表示无限等待，显式正数启用 deadline；`runQwenServe` 在启动期拒绝非有限、负数、非整数；bridge 侧再把超大正数 clamp 到 `2^31-1`，避免 Node timer overflow 把"很长超时"退化成 1ms 立即取消。需要旧 5 分钟行为时显式配置 `300000`。
 
 **`DaemonStatusProvider`（`bridgeOptions.ts:DaemonStatusProvider`）** 是 22b/2（#4304）新增的窄 seam，只有两个方法：`getEnvStatus(boundWorkspace, acpChannelLive)` 与 `getDaemonPreflightCells(boundWorkspace)`。它把 daemon-host 专属的状态格（`process.versions`、运行时/sandbox/proxy 状态、Node 版本、CLI entry path、ripgrep/git/npm 探测）从 bridge 里剥出去。生产实现 `daemonStatusProvider.ts:createDaemonStatusProvider` 包了 `buildEnvStatusFromProcess` + `buildDaemonPreflightCells`；**省略 provider 时** bridge 回落 idle 占位符（空 `cells: []`），让 Mode A in-process 消费者（不跑独立 daemon、host env 格无意义）也能照常查询那些诊断路由。seam scope 刻意收窄到「当前 bridge 委派的两个 host 格」，注释明说**不是**通用 logger/metrics seam。
 
@@ -421,7 +424,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 7. **runtime 活跃策略 vs build-supported 集**。`/capabilities.policy.permission` 暴露 runtime 活跃策略；能力 `permission_mediation.modes` 暴露 build 支持的四策略集。客户端 gate on features，再读 `policy.permission` 决定 UI。
 
-8. **timeout 是 operator 配置，不是协议能力**。`permissionResponseTimeoutMs` 决定 bridge 等人类响应多久，但客户端不需要按它 feature-detect；#5260 因此没有新增 capability tag。当前 #5174 的 `/daemon/status` 也尚未把它放进 `limits` snapshot，运维需要从启动参数或配置来源确认该值。
+8. **timeout 是 operator 配置，不是协议能力**。`permissionResponseTimeoutMs` 决定 bridge 等人类响应多久，但客户端不需要按它 feature-detect；#5260/#9933 因此没有新增 capability tag。默认已是 0（disabled），当前 #5174 的 `/daemon/status` 也尚未把它放进 `limits` snapshot，运维需要从启动参数或配置来源确认显式正数。
 
 ---
 
@@ -531,11 +534,12 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - 嵌套 Agent 权限取消改为 fail-closed：subagent 取消会中止父 Agent turn，后续 sibling/subsequent 工具被记录为 skipped。
 - 不新增 API/schema；改变的是既有权限取消的执行语义。
 
-### #5260 — configurable ACP permission timeout（@doudouOUC）
+### #5260 / #9933 — configurable ACP permission timeout and default（@doudouOUC）
 
 - `commands/serve.ts` / `serve/types.ts`：新增 `--permission-response-timeout-ms` 与 `ServeOptions.permissionResponseTimeoutMs`。
 - `runQwenServe.ts`：启动期拒绝非有限、负数、非整数，避免 `NaN` 静默关闭 deadline。
-- `bridge.ts`：超大 timeout clamp 到 `2^31-1`；默认仍 5 分钟，`0` 表示无限等待。
+- `bridge.ts`：超大正数 timeout clamp 到 `2^31-1`；#9933 后默认 `0`，不安装普通权限/AUQ timer，显式正数才启用 deadline。
+- `permissionMediator.ts`：empty-voter/split-vote breadcrumb 不再承诺默认 timeout，改为等待 cancellation 或 optional configured timeout。
 
 ### #8469 — repeated ACP tool execution failure guard（merged）
 
@@ -582,3 +586,15 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `acpAgent.ts`：`onlyIfUnheld` close 改为非破坏性授权。existing hold 直接返回 `closed:false`；initial holds 为空时在 close gate 下等待 running turn settle 并复查，二次仍为空才 cancel pending prompt、flush recorder、dispose Session。
 - `bridgeTypes.ts` / `bridge.ts`：child `drainTimeoutMs` 由 `sessionCloseDrainBudgetMs()` 从实际 outer wait 推导；conditional close 的 natural settle、destructive drain 与 history mutation wait 共享预算。
 - `bridge.ts`：deferred spawn-owner kill 只在 entry 当前且没有 close/authorization in-flight 时触发；child 对 forced close 返回 definitive RequestError 时复位 `entry.closing` 并返回 `false`，保留 session 等下一轮 settle/retry，不 SIGTERM 同 channel sibling sessions。
+
+### #9820 — bounded conditional-close refusal holds（已合入）
+
+- `bridge.ts`：conditional-close refusal 继续保留 session，但只在 hold 数组长度不超过 `ACTIVE_WORK_MAX_SESSION_HOLDS=1024` 时遍历并替换 cache。
+- 超限响应不采纳详细 holds，保留最后一次合法 cache；恰好 1024 条可采纳，1025 条不替换。
+- public protocol/capability/persisted format 不变，显式 close/kill/shutdown 仍维持强制语义。
+
+### #9838 — private current-session scheduled-task creator（open）
+
+- `bridgeClient.ts`：验证调用 connection 拥有 session、prompt id 与 active prompt 精确一致，并限制 cron/prompt 大小和 top-level ordinary source。
+- `bridgeOptions.ts` / Serve host callback：private creator 只在完整 runtime/store wiring 可用时安装，再由 host 复核 owner、pending interaction、parent/source 与 task binding。
+- 该能力通过条件 `scheduled_task_session_reuse` 广告；PR 仍为 open，private method 和 capability 不能视为当前 `main` 契约。

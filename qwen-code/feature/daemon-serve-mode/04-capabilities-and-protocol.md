@@ -73,6 +73,10 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #9665 | feat(serve): restore ask_user_question HITL | merged | 默认关闭的 CLI flag；v1 不新增 capability tag、settings key、route 或 SDK method，客户端只能带外确认 operator 启动参数。 |
 | #9687 | feat(cli): restore each daemon session onto its last selected model | merged | 新增 transcript-internal `system/session_model` projection，不新增 public route/capability；仅 daemon ACP cold load/resume 消费。 |
 | #9763 | fix(daemon): keep restored ask_user_question valid after load | merged | 不新增 public capability；daemon 通过 private suppress meta 让 replay finalize 与 re-hang 决策锁步，并保持 restore flag default-off。 |
+| #9819 | fix(serve): Canonicalize Live task bridge session IDs | merged | 不新增 public wire；只分离 persisted/caller-visible ID spelling 与 canonical bridge/runtime lookup key。 |
+| #9820 | fix(daemon): Bound conditional-close refusal holds | merged | 不新增 public wire；conditional-close refusal 只采纳最多 1024 条 active-work holds，超限仍保留 session。 |
+| #9838 | feat(daemon): Support current-session scheduled tasks | open | 当前 diff 新增条件能力 `scheduled_task_session_reuse`；只有完整 host/runtime wiring 可用时广告，旧 daemon/partial bridge 保持 dedicated task。 |
+| #9933 | fix(acp-bridge): Disable permission timeout by default | merged | 不新增 tag；operator-side `permissionResponseTimeoutMs` 默认改为 0，省略/0 不装 timer，显式正数仍有效。 |
 | #9261 | feat(serve): Add workspace session live-state endpoint and catalog version | merged | 新增 `workspace_session_live_state` capability、trusted-only memory-only `GET /workspaces/:workspace/sessions/live-state`、catalog version 与 TS SDK surface。 |
 | #9366 | feat(web-shell): Consume workspace session live-state | merged | 不新增 protocol；WebShell 消费 #9261 的 capability/route，用 version-fenced handshake 减少 full catalog polling。 |
 | #9380 | feat(serve): measure ACP child peak old-generation heap | merged | `/daemon/status` additive 暴露 ACP child old-generation peak heap measurement；observe-only，不改 child argv/enforcement。 |
@@ -268,7 +272,7 @@ flowchart LR
 
 #5218/#5258 没有新增能力 tag 或 SSE event type，而是收紧既有 `permission_request` / `permission_resolved` / `turn_complete` 组合的语义：权限解析为 cancelled 后，ACP turn loop 会记录被取消工具和 skipped follow-up tool responses，并以 `turn_complete.stopReason = 'end_turn'` 收束当前 turn。客户端无需 feature-detect 新协议字段，但如果 UI 依赖"取消只是一个工具错误"的旧假设，需要按当前语义渲染后续工具为 skipped。
 
-#5260 的 `--permission-response-timeout-ms` 也是 operator-side 启动配置，不在 `/capabilities.features` 里广告；默认 5 分钟、`0` 禁用、非法值启动失败、超大值在 bridge 内 clamp 到 Node timer 上限。该值目前也未出现在 #5174 的 daemon status `limits` snapshot 中。
+#5260 的 `--permission-response-timeout-ms` 也是 operator-side 启动配置，不在 `/capabilities.features` 里广告；#9933 后默认 `0`，省略/0 禁用 timer，显式正数启用 deadline，非法值启动失败、超大值在 bridge 内 clamp 到 Node timer 上限。该值目前也未出现在 #5174 的 daemon status `limits` snapshot 中；需要旧 5 分钟语义的部署显式设置 `300000`。
 
 
 ---
@@ -536,7 +540,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#9513/#9665/#9687/#9763 已合入；#9626 是 open**。standalone safety primitives/hardening、archive race recovery、default-off AUQ restore/hardening 与 per-session model projection 已按 merged diff 更新；storage conflict repair capability 只能记录当前方案，不能视为 `main` 已落地能力。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。
+8. **#9513/#9665/#9687/#9763/#9819/#9820/#9933 已合入；#9626/#9838 是 open**。standalone safety primitives/hardening、archive race recovery、default-off AUQ restore/hardening、per-session model projection、Live task ID canonicalization、bounded close-refusal holds 与 permission timeout 新默认已按 merged diff 更新；storage conflict repair 和 current-session scheduled task capability 只能记录当前方案，不能视为 `main` 已落地能力。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。
 
 ---
 
@@ -624,6 +628,13 @@ sequenceDiagram
 - #9665 已合入，通过默认关闭的 `--restore-ask-user-question` 控制 load/resume AUQ re-hang；v1 有意不加 settings key 或 capability tag，因此不能从 `/capabilities` 推断可用性。
 - #9687 已合入 transcript-internal `system/session_model` record/projection，不新增 route、capability 或 SDK method；旧 transcript 与旧 daemon 按 assistant model/settings fallback 兼容。
 - #9763 已合入，不新增 public wire；private suppress meta 只在 daemon 明确不 re-hang 时关闭 replay skip/Core preservation，`qwen/session/loadUpdates`、fork/no-client 与普通 send 因此不会留下悬空协议状态。
+
+### #9819 / #9820 / #9838 / #9933 — W35 identity、lifecycle、scheduled task 与 timeout
+
+- #9819 已合入，不新增 public wire；persisted/wire session ID 保留原 spelling，Live task 的 bridge summary、owner、resume、events 与 prompt dispatch 使用 canonical lookup key。
+- #9820 已合入，不新增 field/tag；conditional-close refusal 的 session 保留语义不变，只对详细 hold cache 应用 1024 条上限。
+- #9838 当前 open diff 新增条件能力 `scheduled_task_session_reuse`。只有 Core creator、private ACP bridge、Serve host callback 与 selected managed runtime store 完整接线后才广告；fast-path bootstrap envelope 可暂时缺少该 tag。客户端仍需实时检查 session 是否可复用，capability 不是 admission guarantee。
+- #9933 已合入，不新增 capability/status limit；permission/AUQ timeout 是 operator-side 配置，默认 0，显式正数才启用 deadline。
 - #9362 已合入，不改变 protocol shape，只把 owner/discovery record 的 transient `open`/`readFile` I/O error 保留为 retryable `conversation_runtime_unavailable` 上层语义；`ELOOP`、malformed JSON、schema mismatch 和 unsafe permission/link state 仍是 terminal compromised。
 
 ### #9261 / #9366 / #9396 — workspace session live-state protocol

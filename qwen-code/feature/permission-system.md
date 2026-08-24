@@ -1,7 +1,7 @@
 # 权限系统技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的工具调用权限子系统。
-> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）、plan-required teammate leader approval（#6138）、main-session `exit_plan_mode` 显式用户批准（#6967）、shell safety 三态事实层（#7053）、Plan-mode shell safety routing（#7172）、`enter_plan_mode` 执行边界（#7248）、ACP permission cancel stopReason 保留（#7295）、手动退出 Plan 后的 per-conversation notice delivery（#7744）与 read-file 默认权限 symlink canonicalization（#8636）已在 `main`。
+> 代码基线：规则解析器 / 权限管理器位于 `main`；多客户端权限协调器（mediator，PR #4335）早期位于 `daemon_mode_b_main`，已随 #4490 进入 `main`；subagent plan lifecycle 阻断（#6087）、plan-required teammate leader approval（#6138）、main-session `exit_plan_mode` 显式用户批准（#6967）、shell safety 三态事实层（#7053）、Plan-mode shell safety routing（#7172）、`enter_plan_mode` 执行边界（#7248）、ACP permission cancel stopReason 保留（#7295）、手动退出 Plan 后的 per-conversation notice delivery（#7744）、read-file 默认权限 symlink canonicalization（#8636）与 ACP permission/AUQ 默认 timeout disabled（#9933）已在 `main`。
 
 ---
 
@@ -14,7 +14,7 @@ qwen-code 在执行任何工具（读文件、写文件、跑 shell、抓网页�
 - `ask` —— 弹确认框，交给用户裁决；
 - （内部还有第四态 `default` —— "没有任何规则命中"，会进入默认裁决兜底，最终一定收敛成上面三者之一）。
 
-围绕这套三态决策，演进出十三个相互独立又彼此咬合的子问题，正是本方案要解决的：
+围绕这套三态决策，演进出十四个相互独立又彼此咬合的子问题，正是本方案要解决的：
 
 1. **规则模型与匹配**：用户/SDK/设置文件用 `Tool(specifier)` 这种 DSL 配置 allow/ask/deny 三张规则表（`permissions.allow` / `permissions.ask` / `permissions.deny`）。需要一套解析 + 匹配引擎，支持 shell 命令 glob、gitignore 风格路径、域名、MCP 通配等多种 specifier 语义。
 
@@ -42,7 +42,9 @@ qwen-code 在执行任何工具（读文件、写文件、跑 shell、抓网页�
 
 13. **read_file 默认权限必须先解析符号链接（#8636）**：always-allow roots 只能自动放行真实落在受管边界内的路径。若 agent 可写目录里存在 symlink 指向外部敏感文件，权限层必须在 allow 前看见真实目标，把旧的静默 allow 降级成 ask。
 
-前三点、第八点到第十点和第十三点是**单进程内**的规则/事实/Plan lifecycle/文件读取默认权限策略（`packages/core`），第四点是**跨进程多客户端**的协调层（`packages/acp-bridge`，早期落在 `daemon_mode_b_main`，现随 #4490 进入 `main`），第五点和第十一点把取消/超时结果接回 ACP turn loop，确保权限层的"取消"不会被后续工具继续执行或错误终态稀释，第六点限制 subagent/team agent 对主会话 plan lifecycle 的控制权，第七点把 main-session Plan mode 退出从自动权限放行面里拆出来，第十二点则把手动退出 Plan 的状态变化投递到后续 live conversation 的 model-bound history 边界。本方案逐层展开。
+14. **daemon 权限等待默认不应自行过期（#9933）**：operator 未显式配置时，普通权限与 `ask_user_question` 应等待真实投票/回答、取消或生命周期 teardown，而不是 5 分钟后自动停止 turn。默认 timeout 因此改为 0；正整数仍保留可配置 deadline。
+
+前三点、第八点到第十点和第十三点是**单进程内**的规则/事实/Plan lifecycle/文件读取默认权限策略（`packages/core`），第四点是**跨进程多客户端**的协调层（`packages/acp-bridge`，早期落在 `daemon_mode_b_main`，现随 #4490 进入 `main`），第五点和第十一点把取消/超时结果接回 ACP turn loop，确保权限层的"取消"不会被后续工具继续执行或错误终态稀释，第十四点定义 daemon 等待的默认 deadline，第六点限制 subagent/team agent 对主会话 plan lifecycle 的控制权，第七点把 main-session Plan mode 退出从自动权限放行面里拆出来，第十二点则把手动退出 Plan 的状态变化投递到后续 live conversation 的 model-bound history 边界。本方案逐层展开。
 
 ---
 
@@ -330,7 +332,7 @@ sequenceDiagram
     Timer-->>Med: （timeoutMs 后）身份校验 pending 未变 → resolveEntry(cancelled/timeout)
 ```
 
-PR #5260 把这里的 `timeoutMs` 从固定 5 分钟变成可配置入口：`qwen serve --permission-response-timeout-ms <ms>` 经 `ServeOptions` 传入 `createAcpSessionBridge`，默认仍为 5 分钟；`0` 表示无限等待；非有限、负数、非整数在 `runQwenServe` 启动阶段 fail-loud；超大值在 bridge 内 clamp 到 Node timer 上限，避免 `setTimeout` 溢出后退化成 1ms 立即取消。
+PR #5260 把这里的 `timeoutMs` 从固定 5 分钟变成可配置入口：`qwen serve --permission-response-timeout-ms <ms>` 经 `ServeOptions` 传入 `createAcpSessionBridge`。#9933 已把默认改为 `0`，省略/0 表示无限等待；显式正数启用 deadline；非有限、负数、非整数在 `runQwenServe` 启动阶段 fail-loud；超大正数在 bridge 内 clamp 到 Node timer 上限，避免 `setTimeout` 溢出后退化成 1ms 立即取消。
 
 #### double-resolve 守卫（一次性 settle）
 
@@ -510,6 +512,7 @@ stateDiagram-v2
 | **#5218** | `ask_user_question` 取消即停止 | cancelled `ask_user_question` 不再作为普通工具错误继续喂给模型，而是结束当前 ACP turn、记录 skipped follow-up tool responses，并把嵌套取消传播到当前 Agent 与 sibling Agent。 |
 | **#5258** | 普通权限取消即停止 | 将 #5218 的 stop-after-cancel 语义推广到所有工具权限：vote cancelled、reject option→Cancel、权限请求通道失败都会跳过同一 assistant step 的后续工具。 |
 | **#5260** | 权限响应超时可配置 | `qwen serve --permission-response-timeout-ms` 暴露 ACP 权限/`ask_user_question` 单次响应超时；`0` 无限等待，非法值启动失败，超大值 clamp 到 Node timer 上限。 |
+| **#9933** | 默认关闭权限响应超时 | shared 默认值改为 0；省略/0 不装普通权限或 AUQ timer，显式正数保留 deadline，取消/关闭/shutdown 仍可 settle。 |
 | **#5743** | workspace permissions API | `GET/POST /workspace/permissions` 管理 persistent allow/ask/deny rules；REST/ACP/SDK 共享校验和 schema，新增规则拒绝 malformed，存量 malformed 保留往返。 |
 | **#6026** | subagent approval-mode override | subagent approval-mode override 从静态初值改成可变状态，`exit_plan_mode` 成功后后续权限判断读取新 mode。 |
 | **#6087** | subagent plan lifecycle tool 阻断 | 从 subagent/team agent 的工具发现和 execute 层移除/拒绝 `enter_plan_mode` 与 `exit_plan_mode`，防止子 agent 控制主会话计划生命周期。 |
@@ -545,6 +548,8 @@ stateDiagram-v2
 9. **#7744 不做跨进程持久化。** manual Plan-exit notice event/cursor 是当前进程内 live conversation delivery state；进程重启后不会尝试补发历史手动退出提醒。这个限制与 PR 范围一致，避免把一次性 conversation 边界信号升级成持久 session migration 语义。
 
 10. **#8636 只收紧默认 allow，不扩大读取能力。** canonicalization 只影响 `read_file` 默认权限判定，把 symlink 逃逸从 allow 降级为 ask；它不替代实际读取阶段的路径/文件类型检查，也不把原本 ask 的路径变成 allow。Windows symlink/junction 测试受平台权限限制按能力跳过。
+
+11. **#9933 的无限等待是默认值，不是不可取消。** timeout disabled 时普通权限/AUQ 仍会因 voter/agent cancellation、session/channel teardown 或 daemon shutdown settle；需要旧 5 分钟行为的 operator 必须显式配置 `300000`。该值不在 capability/status limits 中，客户端不能远程推断。
 
 
 ---
@@ -599,11 +604,12 @@ stateDiagram-v2
 - `SubAgentTracker.ts`：subagent 内部权限取消 fail-closed，父 Agent turn 中止而不是继续执行 sibling 或后续工具。
 - tests / E2E：focused ACP session tests 覆盖取消、reject、请求失败和嵌套 subagent；daemon/WebShell HTTP/SSE 验证两个 shell sentinel 均不落盘。
 
-### #5260 — configurable ACP permission timeout
+### #5260 / #9933 — configurable ACP permission timeout and default
 
 - `serve.ts` / `types.ts`：新增 `--permission-response-timeout-ms` 与 `ServeOptions.permissionResponseTimeoutMs`。
 - `runQwenServe.ts`：启动期拒绝非有限、负数、非整数，避免非法配置被 bridge 当成 "关闭超时"。
-- `bridge.ts`：权限响应超时默认仍为 5 分钟；`0` 关闭 deadline；超大值 clamp 到 `2^31-1`，避免 Node timer overflow 变成 1ms。
+- `bridge.ts`：#9933 后权限响应超时默认 `0`，不安装 timer；显式正数启用 deadline，超大值 clamp 到 `2^31-1`，避免 Node timer overflow 变成 1ms。
+- `permissionMediator.ts`：empty-voter/split-vote breadcrumb 改为等待 cancellation 或 optional configured timeout，不再声称默认会自动超时。
 - tests：覆盖 CLI flag wiring、runQwenServe 校验、server 透传和 acp-bridge clamp。
 
 ### #5743 — workspace permissions rules API
