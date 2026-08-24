@@ -604,7 +604,7 @@ sequenceDiagram
 | #9512 | standalone primitive hardening | 已合入 directory ensure race re-inspection、JSONL physical-line integrity budget 与 native Error cause 语义。 |
 | #9513 | archive race recovery | 已合入 exact-spelling 双副本 active-first load/resume/transcript/export、delete-both、metadata/parent/directory race 与单次 lookup；异拼写 conflict 继续 fail-closed。 |
 | #9563 | WebShell title refresh guard | 已合入 effective title gate，catalog fallback title 可见后不再每 turn 重复刷新完整 session catalog。 |
-| #9626(open) | persisted maintenance | 当前 diff 只维护 empty/malformed/orphan owned regular transcript，并提供 identity-fenced、capability-gated archive conflict repair。 |
+| #9626(open) | persisted maintenance | 当前 diff 只维护 empty/malformed/orphan owned regular transcript，对 unknown/mixed ownership fail closed，并提供 identity/generation-fenced、capability-gated archive conflict repair 与跟随 sidecar cleanup。 |
 | #9665 | restore ask_user_question HITL | 已合入默认关闭的 serve flag，在 load/resume 后重新挂起尾部纯 AUQ batch；v1 不新增 capability tag。 |
 | #9687 | per-session model restore | 已合入 last-wins `system/session_model`，恢复 daemon ACP session 的模型 binding，并保留 registry/runtime/fallback 边界。 |
 | #9738(open) | `serve --open-with-auth` | 当前 diff 新增独立 opt-in flag，在 listen 前校验 loopback/Web Shell/assets，复用或生成 bearer，并走既有 URL fragment→tab sessionStorage 交付。 |
@@ -864,7 +864,7 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #9512 | standalone primitive hardening | 已合入 ensure-race identity reinspection、JSONL integrity budget 与 native Error cause 语义。 |
 | #9513 | archive race recovery | 已合入 exact-spelling 双副本 active-first load/resume/transcript/export、delete-both 与 metadata/parent/directory race hardening。 |
 | #9563 | WebShell title refresh guard | 已合入 effective title gate，避免 persisted fallback 已显示后重复刷新 catalog。 |
-| #9626(open) | persisted maintenance | 当前 diff 只维护 owned regular transcript，并以 identity fencing 与 capability-gated option 修复 archive conflict。 |
+| #9626(open) | persisted maintenance | 当前 diff 只维护 owned regular transcript，并以 identity/generation fencing、retained PR-binding merge 与 capability-gated option 修复 archive conflict。 |
 | #9665 | restore ask_user_question HITL | 已合入默认关闭的 restore flag；仅恢复尾部纯 AUQ batch，且不广告 capability。 |
 | #9687 | per-session model restore | 已合入 last-wins model binding，cold daemon ACP load/resume 在认证前恢复。 |
 | #9738(open) | `serve --open-with-auth` | 当前 diff 新增独立 opt-in flag，复用既有 bearer 与 fragment/sessionStorage handoff；尚未合入。 |
