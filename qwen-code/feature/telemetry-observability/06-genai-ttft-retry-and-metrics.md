@@ -3,7 +3,7 @@
 > 子文档；总览见 README.md
 > 本文 **取代并细化** 总览 `telemetry-observability.md` 的 §3.7（GenAI 语义双发 / TTFT / retry）与 §3.8（资源属性与基数控制），下沉到 function/line 级。
 > 代码均基于 `QwenLM/qwen-code@main`（除显式标注分支/PR 外）。引用格式 `file:symbol`（+行号），行号以阅读时的 `main` 为准。
-> **OPEN PR 标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667/#8150/#8176/#8180 已按 merged diff 更新。
+> **状态标注**：本文凡涉及 **#4432（Phase 4b retry，MERGED）** 的符号均显式标注 `【#4432 已合入】`；#7667/#8150/#8176/#8180 已按 merged diff 更新；#10016 仍为 open，只记录当前 diff。
 
 ---
 
@@ -43,6 +43,7 @@
 | #8150 | MERGED（2026-07-31） | GenAI time-to-first-chunk tracing | 流式 span 写 `gen_ai.request.stream=true` 与 `gen_ai.response.time_to_first_chunk`；非流式保留 `llm_request.stream=false` 且不写 first-chunk；移除 span-level 私有 `ttft_ms`。 |
 | #9107 | MERGED（2026-08-14） | main agent invocation tracing | 将 interaction span 对齐 GenAI Agent `invoke_agent`，写 `gen_ai.agent.name=qwen-code`、prompt-scoped owner、conversation/session identity 与低基数 `error.type`。 |
 | #9121 | MERGED（2026-08-14） | main agent tracing edge cases | 已合入，修正 budget/swallowed abort 状态、TUI deferred tool batch owner、headless JSON Schema owner、Goal/headless bounded diagnostic message。 |
+| #10016 | OPEN（2026-08-25 快照） | private LLM context usage attribute | 当前 diff 给用户可见 `qwen-code.llm_request` 增加 bounded/versioned JSON 分类，并用 provider input total 归一化；不能视为 `main` schema。 |
 | #8176 | MERGED（2026-07-31） | tool-call terminal telemetry | 统一 tool-call terminal normalization boundary，归一化 `status`、兼容 `success`、error fields、低基数 metric 维度和 QwenLogger 低敏字段。 |
 | #8180 | MERGED（2026-08-03） | tool execution outcome | 最终实现是在 terminal status 旁边新增 execution status、execution child span 和低基数 execution-outcome counter。 |
 
@@ -725,6 +726,14 @@ flowchart TB
 
 ---
 
+## `qwen-code.context.usage`（#10016 open）
+
+当前 open diff 在每个用户可见 LLM request 的同步 start prelude 中构造 request-local `ContextUsageV1`。分类来源是已经交给 `LoggingContentGenerator` 的 provider-neutral logical request：effective system instruction、实际发送的 tool declarations、memory、已加载 skill body 和 structured messages。它只读 committed in-memory cache，不调用 `SkillManager.listSkills()`，telemetry disabled 或 internal prompt 时不做 snapshot。
+
+Start span 先写本地估算；end span 收到合法 `gen_ai.usage.input_tokens` 后重新序列化 normalized value。fixed categories 不超过 total 时，messages 取 residual；超过时按 largest-remainder 比例分配 provider total，messages 为 0。因此成功 span 满足 `sum(breakdown.*_tokens) == gen_ai.usage.input_tokens`，并用 window、auto-compaction reserve 与 total 计算 `available_before_compaction_tokens`。缓存读取仍属于原分类，只通过既有 `gen_ai.usage.cache_read.input_tokens` 表示 billing/cache 维度。
+
+属性是最长 1024 字符的 private JSON string，只含 version、数字 aggregate 和 `estimated:true`；不记录内容、路径、工具名、模型/session/user id，也不新增 metric/log/session attribute。snapshot、validation 或 serialization 失败均 best-effort 省略。#10016 仍为 open，真实 OTLP backend 与生产开销尚未验证。
+
 ## 已知限制 / 后续
 
 1. **#4432 已合入**：`requestSetupMs` / `attempt` / `retryTotalDelayMs` 在 `main` 上**前向声明但恒 `undefined``（`session-tracing.ts:LLMRequestMetadata` L72–88）。当前 `main` 的 trace 无法体现「一次逻辑请求内部重试了几次、退避总耗时多少」，也没有 `api.retry.count` / `ApiRetryEvent`。注意 `main` 上 `sampling_ms` 仍是含 `- (requestSetupMs ?? 0)` 的旧公式（L448）——因 `requestSetupMs` 恒 undefined 而**暂未暴露**，#4432 合入并填充该字段后若没有同时合入公式修复，会对每个被重试请求把 `sampling_ms` clamp 到 0。两者必须同 PR 合入（#4432 diff 确实把二者放在一起）。
@@ -792,3 +801,10 @@ flowchart TB
 - `sdk.ts:initializeTelemetry`：纵深防御——构造 Resource 时再 destructure 剥离 `service.name` / `service.version` / `session.id`，用 runtime 值重注入。
 
 > 【#4432 已合入】标注的测试均来自 PR diff，尚未进入 `main`。
+
+### #10016 — LLM context usage span attribute（open）
+
+- `context-usage-snapshot.test.ts`：覆盖 effective request 分类、memory exact match、loaded skill output attribution、deferred tool visibility 与 invalid window fail-open。
+- `context-usage.test.ts`：覆盖 v1 validation、provider-total residual/largest-remainder normalization、available-before-compaction 计算和 1024 字符 serialization guard。
+- `loggingContentGenerator.test.ts` / `session-tracing.test.ts`：覆盖 internal prompt omission、disabled telemetry fast path、stream/non-stream request-local ownership、start estimate 与 end overwrite。
+- PR 声明聚焦 Core 286 项和 CLI `/context` 18 项通过；本篇未独立复跑。

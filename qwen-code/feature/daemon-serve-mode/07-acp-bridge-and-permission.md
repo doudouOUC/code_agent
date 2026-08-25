@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134/#9820 已合入的 active-work close refusal 与 hold 上限、#9838 当前 open 的 private current-session scheduled-task creator，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）与 #9933 在此基础上补齐 Agent 工具权限提示、取消后停止 turn、可配置响应超时和默认无限等待。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134/#9820 已合入的 active-work close refusal 与 hold 上限、#9976 已合入的 channel transport liveness、#9978 当前 open 的 standalone private service/guard、#9838 当前 open 的 private current-session scheduled-task creator，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）与 #9933 在此基础上补齐 Agent 工具权限提示、取消后停止 turn、可配置响应超时和默认无限等待。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -59,6 +59,8 @@
 | #9134 | preserve sessions when active-work close is refused | active-work close lifecycle | 已合入；`onlyIfUnheld` close 拒绝前不破坏 session，deferred spawn-owner kill 避开 close/probe in-flight，definitive child close refusal 不升级为 channel kill。 |
 | #9820 | bound conditional-close refusal holds | active-work close lifecycle | 已合入；拒绝仍保留 session，但只采纳最多 1024 条 holds，超限保留最后合法 cache。 |
 | #9838 | support current-session scheduled tasks | open private bridge extension | 当前 diff 用 connection/session/active prompt/source/bounds 校验 private creator，再交给 Serve host 做 runtime/session/task binding admission。 |
+| #9976 | add ACP channel transport liveness | merged transport lifecycle | private initialize 协商后按 shared channel 运行 nonce probe；双按时 timeout 或无效响应进入既有 transport-failure teardown。 |
+| #9978 | add standalone sessions for projectless tasks | open private service integration | 当前 diff 增加 daemon-owned standalone creation/source contract、service owner routing、deferred cwd activation 与 source-aware guards；无 public standalone API。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -446,6 +448,8 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 8. **#9665/#9763 已合入但仍默认关闭**。不能把 AUQ re-hang 写成默认 load/resume 行为；v1 无 capability tag，客户端无法仅靠 `/capabilities` 区分 operator 是否启用 flag。boot-time auto-resume、其它 permission tool、旧 request id/audit 持久化和 mixed dangling batch 都不在当前方案内。
 
+9. **#9978 仍为 open internal integration**。standalone source/service method 不是 public ACP 或 Serve 契约；`/standalone/*`、`standalone_sessions_v1`、SDK/UI 均不存在。directory compromise、unknown spawn outcome 或 close refusal 会 terminal-quarantine Conversations runtime，而不是 fallback primary；最终 diff 变化后必须重新核对这一 fail-closed 边界。
+
 ---
 
 ## 测试覆盖
@@ -598,3 +602,16 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `bridgeClient.ts`：验证调用 connection 拥有 session、prompt id 与 active prompt 精确一致，并限制 cron/prompt 大小和 top-level ordinary source。
 - `bridgeOptions.ts` / Serve host callback：private creator 只在完整 runtime/store wiring 可用时安装，再由 host 复核 owner、pending interaction、parent/source 与 task binding。
 - 该能力通过条件 `scheduled_task_session_reuse` 广告；PR 仍为 open，private method 和 capability 不能视为当前 `main` 契约。
+
+### #9976 — ACP channel transport liveness（已合入）
+
+- `channel-liveness.ts`：健康响应后 15 秒再 probe，单次 10 秒 timeout；连续两次按时 timeout 才失败，`performance.now()` 识别 parent timer 晚到并清空 streak。
+- `bridge.ts`：只在 child private initialize 确认 v1 后启动 monitor；无效 version/nonce、request rejection 或双 timeout 复用 transport-failure path，统一终止 channel 及其共享 session。
+- `acpAgent.ts`：实现无 session/workspace 状态的 nonce echo；未协商 child 保持 legacy 行为，public Serve capability 不变。
+
+### #9978 — standalone private service and guard（open）
+
+- `standalone-session-service.ts`：在 Conversations runtime activity gate 内提供 create/get/list/load/resume/prompt/continue，绑定 canonical persisted ID 与确定性 owner-only private directory。
+- `bridge.ts` / `acpAgent.ts` / `Session.ts`：daemon-owned creation key、reserved standalone source 与 deferred workspace activation 共同保证普通 ACP caller 不能伪造 standalone provenance。
+- `routes/session.ts` / Core Config、permission、cron guards：已知 standalone owner 路由到同一 runtime，并在副作用前拒绝 workspace/project-scoped 操作；containment 无法证明时 quarantine，不 fallback primary。
+- PR 仍为 open，且没有 public route/capability/SDK/UI，不能写成当前 `main` 可调用能力。

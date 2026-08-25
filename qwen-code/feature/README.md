@@ -35,7 +35,9 @@
 | auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 #4291 #4305 #5179 #5638 #5769 #8862 #8893 | provider 配置、apiKey 保留、auth status 识别、device-flow、workspace provider defaults、重复 display name 消歧，以及 OpenAI-compatible API log retention 配置与非交互 best-effort 清理。 |
 | 权限系统 | [permission-system.md](permission-system.md) | #3467 #3726 #4335 #5085 #5105 #5218 #5258 #5260 #5743 #6026 #6087 #6138 #6967 #7053 #7172 #7248 #7295 #7744 #8636 #9933 | 规则解析与畸形规则守卫、多客户端权限协调、ACP 取消停止语义、workspace permissions API、subagent approval-mode override、subagent plan lifecycle tool 阻断、plan-required teammate leader approval、main-session `exit_plan_mode` 显式用户批准、shell 三态事实层、Plan mode shell routing、`enter_plan_mode` 执行边界、权限等待期间 abort-aware stopReason 保留、手动退出 Plan 后的 per-conversation one-shot notice delivery、#8636 的 read-file 默认权限 symlink canonicalization，以及 #9933 将普通权限/AUQ 默认 timeout 改为 disabled、正数显式配置保持可用。 |
 
-> W35 daemon follow-up：#9819/#9820/#9933 已合入 Live task canonical bridge identity、conditional-close refusal hold 上限与默认关闭 permission timeout；#9838 仍为 open，只记录 current-session scheduled task 方案，不能视为 `main` 能力。
+> W35 daemon follow-up：#9819/#9820/#9933/#9976 已合入 Live task canonical bridge identity、conditional-close refusal hold 上限、默认关闭 permission timeout 与 ACP channel transport liveness；#9838/#9978 仍为 open，只记录 current-session scheduled task 与 standalone PR2B internal core，不能视为 `main` 能力。
+>
+> W35 telemetry follow-up：#10016 为 open，当前 diff 设计并实现 `qwen-code.context.usage` 私有 LLM span JSON 属性；该字段尚未进入 `main`。
 
 ## 使用口径
 
@@ -49,4 +51,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/README.md)（见其 07 子文档）。
 - 每篇「已知限制」综合 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-25_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-26_

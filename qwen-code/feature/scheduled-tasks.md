@@ -1,6 +1,6 @@
 # Scheduled Tasks 技术方案
 
-> 当前实现来源：[#9838](https://github.com/QwenLM/qwen-code/pull/9838)（open）。本文只记录 2026-08-25 复核到的 current-session reuse 方案；该能力尚未合入 `main`，最终行为以合入后的 diff 为准。
+> 当前实现来源：[#9838](https://github.com/QwenLM/qwen-code/pull/9838)（open）。本文只记录 2026-08-26 复核到 head `cf63c6e82e` 的 current-session reuse 方案；该能力尚未合入 `main`，最终行为以合入后的 diff 为准。
 
 ## 背景与目标
 
@@ -118,4 +118,4 @@ PR 当前声明通过 Core cron-create、ACP bridge、Serve scheduled-task route
 |---|---|---|
 | [#9838](https://github.com/QwenLM/qwen-code/pull/9838) | open | current-session `cron_create`、private ACP creator、Serve admission/persistence/rollback、条件 capability 与 Web Shell selector。 |
 
-_按个人 PR 口径更新于 2026-08-25_
+_按个人 PR 口径更新于 2026-08-26_
