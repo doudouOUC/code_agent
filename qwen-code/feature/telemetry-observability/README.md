@@ -17,7 +17,7 @@
 | 03 | [上下文传播与并发隔离](03-context-propagation-and-concurrency.md) | ALS、resolveParentContext、subagent 并发隔离(#4410) |
 | 04 | [敏感属性 opt-in 与 PII](04-sensitive-attributes-and-pii.md) | 门控链、截断 / SHA-256 去重、response_text 未门控泄露面 |
 | 05 | [trace↔日志关联与 daemon 端遥测](05-correlation-and-daemon-telemetry.md) | getTraceContext、daemon route span、W3C 跨进程传播 |
-| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields、#7921 ARMS session user ID、#8150 first-chunk latency、#8176 tool-call terminal status、#8180 execution outcome，以及 #10016 open 的 private context usage span attribute |
+| 06 | [GenAI 语义双发 / TTFT / 重试 / 指标](06-genai-ttft-retry-and-metrics.md) | TTFT、dual-emit、retry 可见性(#4432)、LLM request breakdown(#5904)、资源属性与基数、#7536 GenAI/ARMS metadata 字段对齐、#7635 request 参数字段、#7650 OpenAI usage preservation、#7667 content/tool sensitive fields、#7921 ARMS session user ID、#8150 first-chunk latency、#8176 tool-call terminal status、#8180 execution outcome，以及 #10016 merged 的 private context usage span attribute |
 | 07 | [出站关联与 traceparent 传播](07-outbound-correlation.md) | 默认安全、OTLP 反馈环防护、opt-in 广播安全面 |
 
 ---
@@ -51,7 +51,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **session continuation admission log（#8932）**：daemon 接受 continuation 后输出低敏 `continuation enqueued` 结构化日志，只含 `sessionId`、生成的 `promptId` 和可选 `clientId`，不记录 prompt 内容。
 - **tool-result boundary diagnostics（#9039 merged）**：仅在 file debug logging 启用时记录 tool-result 边界 size、process-local HMAC、mutation state 和 closed artifact summary，串起 ACP/Headless projection 与 writer frame；不写正文、prompt、raw id、tool name 或 artifact path。
 - **main agent invocation tracing（#9107 / #9121 merged）**：#9107 已合入，将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离，并在 sensitive opt-in 时只记录原始用户 prompt 与最终可见 assistant response；#9121 已合入继续修正 budget/swallowed abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message。
-- **LLM context usage 分类（#10016 open）**：当前 diff 在用户可见 `qwen-code.llm_request` span 上增加最长 1024 字符的 `qwen-code.context.usage` v1 JSON；请求开始从 logical request 和 committed cache 估算六类上下文，结束时用 provider input total 归一化并计算自动压缩前余量。该 PR 未合入，不能作为 `main` schema。
+- **LLM context usage 分类（#10016 merged）**：在每个非 internal physical `qwen-code.llm_request` attempt span 上增加最长 1024 字符的 `qwen-code.context.usage` v1 JSON；请求开始从 logical request 和 committed cache 估算六类上下文，结束时用 provider input total 归一化并计算自动压缩前余量。没有 attribute-specific opt-in 或 sampling switch。
 
 ---
 
@@ -424,13 +424,13 @@ sequenceDiagram
 
 8. **TTL 安全网兜底而非依赖调用方**：30min（fork/background 在 #4410 中拟 4h）TTL 扫描强制结束遗漏的 span 并打哨兵属性。**取舍**：牺牲一点「准确的结束时间」换「绝不无限泄漏」，且哨兵属性让后端能识别这类 span。
 
-### 5.9 LLM context usage attribute（#10016 open）
+### 5.9 LLM context usage attribute（#10016 merged）
 
-#10016 当前 open diff 在 `LoggingContentGenerator.generateContent/generateContentStream` 的同步 prelude 中为每次非 internal、telemetry-enabled request 创建 `ContextUsageV1`。`context-usage-snapshot.ts` 从本次 provider-neutral request 和 committed in-memory cache 估算 `system_prompt`、built-in/MCP tools、memory、skills 与 messages；文本复用 `/context` 的 CJK-aware estimator，structured messages 继续使用 `estimateContentTokens()`，skill body 只按已加载 skill 的 exact output 匹配，不触发 filesystem discovery。
+#10016 最终实现在 `LoggingContentGenerator.generateContent/generateContentStream` 的同步 prelude 中为每次非 internal、tracing-enabled physical attempt 创建 `ContextUsageV1`。`context-usage-snapshot.ts` 从本次 provider-neutral request 和 committed in-memory cache 估算 `system_prompt`、built-in/MCP tools、memory、skills 与 messages；文本复用 `/context` 的 CJK-aware estimator，structured messages 继续使用 `estimateContentTokens()`，skill body 只按已加载 skill 的 exact output 匹配，不触发 filesystem discovery。
 
 `session-tracing.ts` 在 span start 写初始紧凑 JSON；end 收到合法 `gen_ai.usage.input_tokens` 后用 `normalizeContextUsage()` 覆盖同一属性。五类 fixed estimate 不超过 provider total 时，messages 取 residual；超出时按 largest-remainder 比例缩放 fixed classes 并把 messages 置零，保证六类和严格等于 provider total。`available_before_compaction_tokens` 使用 `max(0, window-reserve-total)`；cache-read usage 继续只写标准属性，不从分类中扣除。
 
-属性值最长 1024 字符，只含版本、数字 aggregate 和 `estimated:true`，不含 prompt、路径、工具/模型/session/user 标识。disabled telemetry、internal background prompt、snapshot 异常、invalid schema 或序列化超限都 best-effort 省略，不改变 request 执行。该 PR 仍为 open，且未新增 metric、log、session attribute 或标准 `gen_ai.*` 字段。
+属性值最长 1024 字符，只含版本、数字 aggregate 和 `estimated:true`，不含 prompt、路径、工具/模型/session/user 标识。disabled telemetry、internal background prompt、snapshot 异常、invalid schema 或序列化超限都 best-effort 省略，不改变 request 执行。该 PR 已合入，且未新增 metric、log、session attribute 或标准 `gen_ai.*` 字段。
 
 ---
 
@@ -479,7 +479,7 @@ sequenceDiagram
 | #9039 | tool-result boundary diagnostics（merged） | 用 size、process-local HMAC、mutation state 和 closed artifact summary 诊断 tool-result 边界差异，不记录正文/raw id/path | Diagnostics |
 | #9107 | GenAI Agent invoke_agent（merged） | 写 `gen_ai.agent.name=qwen-code`、operation=`invoke_agent`、prompt-scoped owner 与失败 `error.type`，并将 sensitive prompt/response 采集限制在 opt-in | Agent |
 | #9121 | invocation edge-case follow-up | 已合入，让 abort/cancel/error 状态、JSON Schema ownership 和 bounded diagnostic message 在 continuation 与自动 invocation 中保持精确 | Agent |
-| #10016 | private context usage span attribute | open；当前 diff 增加 bounded/versioned JSON 分类、provider-total normalization、internal-prompt omission 与共享 `/context` estimator | GenAI context |
+| #10016 | private context usage span attribute | merged；增加 bounded/versioned JSON 分类、provider-total normalization、internal-prompt omission 与共享 `/context` estimator | GenAI context |
 
 ### 6.4 出站关联（#4384）
 
@@ -597,4 +597,4 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 14. **#8862/#8893 OpenAI API 日志保留仍是 best-effort**：interactive 与 non-interactive 流程都会尝试清理，但短进程退出时只等待有限 drain，且写入路径不会同步删除刚产生的日志。自定义共享目录仍只按 user/system 级单一策略处理，不承担目录内其它调试产物管理。
 
-15. **#10016 仍为 open**。`qwen-code.context.usage`、v1 schema、1024 字符上限与 normalization 目前只存在于 PR diff，不能写成 `main` 已发布字段；Windows/Linux、真实 OTLP backend query 和生产规模开销未验证。
+15. **#10016 已合入**。`qwen-code.context.usage`、v1 schema、1024 字符上限与 normalization 已进入 `main`；Windows/Linux、真实 OTLP backend query 和生产规模开销仍未验证。

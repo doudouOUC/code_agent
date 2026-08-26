@@ -76,6 +76,12 @@ manager 串行化 lifecycle mutation，并复用 #6635 的 worker group reconcil
 
 failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optional adapter `code` 和 message；parent 再次校验、净化控制字符、redact daemon token/sensitive env/generic credentials，并按 Unicode code point 截断。单个 startup 最多保留 64 条，超过后设置 `startupFailuresTruncated`。partial connect 仍 ready，snapshot 暴露 failures；dynamic all-fail 返回 `502 channel_worker_start_failed`，body 带 workspace-annotated attempted failures 和 rollback 后 state，后续 GET 不保留失败 attempt。
 
+### 3.5 same-chat delivery ownership（#10145）
+
+#10145 已合入同一 chat 多 session 的异步投递修复。QQ 用 `QQReplyContext {chatId,msgId,timestamp}` 和 `AsyncLocalStorage` 把入站 message identity 绑定到完整 async call chain；stream segment、final response、延迟 flush 和 retry 都保留 segment-origin context，不再在发送时读取易漂移的 latest message。context/msgSeq 以 5 分钟 TTL 清理，persisted QQ schema 不变。
+
+微信 typing 状态从 chat-level set 改为 chat 下按 session 引用计数；一个 session 完成只释放自己的 owner，最后一个 owner 离开才取消 indicator。示例 adapter 同样使用 async-local context 与 `ChannelOutputSegmentContext.messageId`，覆盖重叠消息乱序完成。该机制保证进程内归属，不提供跨进程 exactly-once journal。
+
 ---
 
 ## 4. 涉及 PR
@@ -93,6 +99,7 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 | #6741 | merged | daemon 启动后无法启用、替换、查询或停止 channel worker selection。 | 新增 runtime `ChannelWorkerManager`、`channel_control` capability、HTTP/SDK/CLI selection control，并在替换失败时回滚旧 worker group/pidfile/webhook state。 |
 | #6950 | merged | adapter `connect()` 失败原因在 worker 启动边界丢失。 | 新增 startup failure IPC + ACK，snapshot/HTTP/SDK/CLI 暴露 bounded redacted failures；dynamic all-fail 返回 `channel_worker_start_failed` 和 attempted failures。 |
 | #7019 | merged | multi-workspace hardening 文档仍可能把 channel workers 写成 primary-only 或全 workspace 自动展开。 | 用户/开发文档明确 worker selection 按 owning trusted workspace 分组，`--channel all` 暂保持 primary-only v1，并把 channel worker 归入 workspace-qualified / legacy-primary ownership 边界。 |
+| #10145 | merged | 同一 chat 多 session 共享 latest reply/typing 状态，乱序异步完成会错投消息或提前取消 typing。 | QQ 用 async-local reply context 保留 segment origin；微信 typing 按 chat/session 引用计数；示例 adapter 同步采用 message-scoped context，公共接口和 persisted schema 不变。 |
 
 ---
 
@@ -101,3 +108,6 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 1. 多账号隔离、平台风控和长期 worker 调度仍需要后续 PR 单独落地。
 2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing、settings reload、workspace grouping、#6741 runtime selection control 和 #6950 startup failure diagnostics；多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
 3. 新插件应优先面向 `ChannelAgentBridge` 编程，只有 standalone ACP-backed 路径才需要知道 `AcpBridge`。
+4. #10145 只修复单进程内的 delivery ownership；跨进程重启、平台去重和 exactly-once 仍需要独立 journal/adapter 协议。
+
+_按个人 PR 口径更新于 2026-08-27_

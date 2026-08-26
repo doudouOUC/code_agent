@@ -32,7 +32,8 @@
 | #4527 | `--allow-origin` CORS allowlist（T2.4） | `auth.ts:parseAllowOriginPatterns`(L80)、`allowOriginCors`(L132)；boot 校验 `runQwenServe.ts` L473-502 |
 | #4530 / #7400 | prompt 绝对 deadline + SSE writer idle timeout（T2.9） | `resolvePromptDeadlineMs` 解析 effective deadline；#7400 后 prompt route 透传 `context.deadlineMs` 给 bridge，bridge 发布 `turn_error{code:'prompt_deadline_exceeded'}` 并释放 FIFO；SSE idle timer 仍在写侧 |
 | #5260 | ACP 权限响应超时可配置 | `serve.ts` flag、`runQwenServe.ts` 启动校验、`server.ts` / `types.ts` 透传到 bridge、`bridge.ts` timer clamp |
-| #9838 | current-session scheduled task（open） | 完整 runtime 才安装 current-session host callback；selected runtime 做 owner/session/task binding 准入、generation fence 与 rollback |
+| #9838 | current-session scheduled task（merged） | 完整 runtime 才安装 current-session host callback；selected runtime 做 owner/session/task binding 准入、generation fence 与 rollback |
+| #10179 | standalone daemon session API（open） | 完整 standalone service/runtime 才注册 public route 并广告 `standalone_sessions_v1`；所有 route 要求 exact standalone owner |
 | #9933 | 默认关闭 ACP permission timeout | `DEFAULT_PERMISSION_TIMEOUT_MS=0`；省略或 0 不装 timer，正整数仍经启动校验和 clamp 透传到 bridge |
 | #4552 | 运行时 MCP server add/remove（T2.8） | `server.ts` `POST/DELETE /workspace/mcp/servers`(L2329/L2412) |
 | #4606 | request 级访问日志 | `server.ts` access-log middleware L875-920；`daemonLogger.ts` |
@@ -593,9 +594,16 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - selected token 进入既有 `runQwenServe()` / `bearerAuth` / WebSocket / strict mutation / worker handoff，不新增认证协议或持久 credential。browser eligible 时通过既有 `#token=` fragment 交付；headless 时 daemon 仍启动并打印手动 secret-bearing URL。
 - loopback `/health` 与 static assets 继续按既有 exemption 工作，`--require-auth` 仍 gate `/health`；Local Control 使用独立 pairing token。当前 PR 未合入，Windows/Linux runtime E2E、持久 token、client identity/revoke 与 SDK/extension discovery 不在范围。
 
-### #9838 — current-session scheduled task runtime wiring（open）
+### #9838 — current-session scheduled task runtime wiring（merged）
 
-- 当前 diff 只在 scheduled-task store 与 current-session creator 完整可用、managed runtime 已挂载后条件广告 `scheduled_task_session_reuse`；fast-path bootstrap envelope 可暂时缺少该 tag，caller-injected/partial bridge 不广告。
+- 最终实现只在 scheduled-task store 与 current-session creator 完整可用、managed runtime 已挂载后条件广告 `scheduled_task_session_reuse`；fast-path bootstrap envelope 可暂时缺少该 tag，caller-injected/partial bridge 不广告。
 - `routes/scheduled-tasks.ts` 在 owning runtime 内验证 session/prompt/source/pending interaction/既有 task binding，持久化 existing-session task 时标记 `sessionOwnedByTask:false`。
 - primary、startup secondary 与动态 workspace runtime 使用同一 wiring；mutation 带 runtime generation assertion，commit 后 generation 关闭会回滚刚创建的 task。
-- 该 PR 尚未合入；省略 `sessionMode` 与 capability 缺失都保持 dedicated-session 行为。
+- 省略 `sessionMode` 与 capability 缺失都保持 dedicated-session 行为。
+
+### #10179 — standalone daemon session API（open）
+
+- 当前 diff 仅在完整 `StandaloneSessionService`、runtime owner 和 route dependency graph 安装时注册 `/standalone/sessions` family 并广告 `standalone_sessions_v1`；partial/embed runtime 不暴露半套 API。
+- public route 覆盖 create/list/get/load/resume、repair/rename/export、archive/unarchive/delete，mutation 走既有 auth 与严格 schema，不接受 workspace selector。
+- admission 只接受 top-level exact standalone owner；child、Live、project/worktree、ambiguous/unreadable/foreign/identity mismatch 均 fail closed，不回退 primary。
+- 该 PR 仍为 open，route 与 capability 不能视为 `main` 能力；SDK/WebUI/WebShell 不在当前范围。

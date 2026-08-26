@@ -1,6 +1,6 @@
 # Scheduled Tasks 技术方案
 
-> 当前实现来源：[#9838](https://github.com/QwenLM/qwen-code/pull/9838)（open）。本文只记录 2026-08-26 复核到 head `cf63c6e82e` 的 current-session reuse 方案；该能力尚未合入 `main`，最终行为以合入后的 diff 为准。
+> 当前实现来源：[#9838](https://github.com/QwenLM/qwen-code/pull/9838) 与 [#10144](https://github.com/QwenLM/qwen-code/pull/10144)，均已合入。本文按最终 diff 记录 current-session reuse 与 empty-session persistence。
 
 ## 背景与目标
 
@@ -71,6 +71,12 @@ Core 只表达意图，不持有 Serve runtime、workspace owner 或 automations
 
 mutation 绑定 runtime generation assertion。若持久化完成后 generation 已关闭，host 回滚刚创建的 task，避免 store 留下指向 retired runtime 的半提交 binding。
 
+### 空会话持久化（#10144 merged）
+
+REST existing-session path 可能绑定一个尚无 transcript entry 的 session。#10144 在 task commit 前通过 private `AcpSessionBridge.ensureDefaultSessionPersisted(sessionId)` 写入 `{sourceType:'default'}`，产生不可见的 `system/session_source` anchor；不会触发模型、hook 或用户消息。能力缺失返回 `409 session_binding_unavailable`，session 不存在返回 404，持久化失败返回 500，并在前后复核 selected runtime generation。
+
+trusted current-prompt `cron_create` 已位于持久化 prompt 内，不重复执行；unbound dedicated task 也不受影响。若 source anchor 成功但 task commit 后续失败，anchor 作为 caller-owned transcript 证据保留，不做可能破坏真实 session 的 rollback。
+
 ## 能力与 Runtime Wiring
 
 新增条件能力 `scheduled_task_session_reuse`。它只在完整 current-session callback、scheduled-task store 和 managed runtime wiring 可用后广告；primary、startup secondary 与动态 workspace runtime 都需要安装同一 host callback。fast-path bootstrap envelope 可以暂时缺少该 tag，runtime mount 后才进入 advertised set；caller-injected bridge、测试/嵌入式 partial bridge 或旧 daemon 不广告，客户端必须回落到 dedicated 模式。
@@ -94,7 +100,7 @@ mutation 绑定 runtime generation assertion。若持久化完成后 generation 
 
 ## 验证策略
 
-PR 当前声明通过 Core cron-create、ACP bridge、Serve scheduled-task routes、Web Shell dialog，以及 ACP Session、capability/server、runtime wiring 和 lazy tool generator 的聚焦测试。覆盖重点包括：
+PR #9838 声明通过 Core cron-create、ACP bridge、Serve scheduled-task routes、Web Shell dialog，以及 ACP Session、capability/server、runtime wiring 和 lazy tool generator 的聚焦测试。#10144 追加 109 项 route、798 项 bridge、36 项 bundled daemon integration 测试，以及真实 restart E2E。覆盖重点包括：
 
 - omitted/unbound 默认兼容与 durable/current schema；
 - exact active prompt 和 connection ownership；
@@ -103,11 +109,10 @@ PR 当前声明通过 Core cron-create、ACP bridge、Serve scheduled-task route
 - generation-close rollback；
 - capability-gated UI、默认 dedicated 与 request shaping。
 
-文档复核没有独立执行 qwen-code 测试。PR 合入前仍需重新核对最终 head、capability 名称、private method 和 store schema，并执行包级 build/typecheck/lint 与聚焦测试。
+文档复核没有独立执行 qwen-code 测试；已核对两个 PR 的最终 head、changed files 和 merged 状态。
 
 ## 已知限制
 
-- #9838 仍为 open，本文不能作为 `main` 能力说明。
 - v1 只支持当前 daemon 顶层 ordinary session；不覆盖 subagent、Live/standalone special source、跨 daemon handoff 或任意 session picker。
 - 一个 session 只允许一个 task binding，不设计多 task 共享同一 transcript 的公平调度。
 - 创建时的 UI 可用性是快照；最终安全性依赖 host 在提交边界重查 owner/generation/interaction/binding。
@@ -116,6 +121,7 @@ PR 当前声明通过 Core cron-create、ACP bridge、Serve scheduled-task route
 
 | PR | 状态 | 作用 |
 |---|---|---|
-| [#9838](https://github.com/QwenLM/qwen-code/pull/9838) | open | current-session `cron_create`、private ACP creator、Serve admission/persistence/rollback、条件 capability 与 Web Shell selector。 |
+| [#9838](https://github.com/QwenLM/qwen-code/pull/9838) | merged | current-session `cron_create`、private ACP creator、Serve admission/persistence/rollback、条件 capability 与 Web Shell selector。 |
+| [#10144](https://github.com/QwenLM/qwen-code/pull/10144) | merged | REST existing-session task binding 前持久化 empty default session，稳定映射能力/不存在/失败错误并保留 generation fence。 |
 
-_按个人 PR 口径更新于 2026-08-26_
+_按个人 PR 口径更新于 2026-08-27_

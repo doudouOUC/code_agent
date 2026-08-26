@@ -1,7 +1,7 @@
-# Hooks / submitted prompt provenance 技术方案
+# Hooks / submitted prompt provenance 与命令进程生命周期
 
-> 适用范围：`UserPromptSubmit` hook 的 submitted prompt provenance。
-> 关键 PR：[#7762](https://github.com/QwenLM/qwen-code/pull/7762)、[#7877](https://github.com/QwenLM/qwen-code/pull/7877)。
+> 适用范围：`UserPromptSubmit` hook 的 submitted prompt provenance，以及 command hook 的进程树回收。
+> 关键 PR：[#7762](https://github.com/QwenLM/qwen-code/pull/7762)、[#7877](https://github.com/QwenLM/qwen-code/pull/7877)、[#10100](https://github.com/QwenLM/qwen-code/pull/10100)（open）。
 > 说明：本文只按 @doudouOUC 个人 PR 记录已合入能力；字段是 optional additive surface，旧 hook consumer 不应假定它总存在。
 
 ---
@@ -71,6 +71,16 @@ External Context Auto Recall 是 `submitted_prompt` 的已合入消费者。hook
 
 ---
 
+### 3.6 command hook process lifecycle（#10100 open）
+
+#10100 当前 diff 把 command hook 的 ownership 从直接 child 提升为受控进程树。POSIX spawn 使用 detached process group；timeout/cancel 先向 group 发送 SIGTERM，最多等待 2 秒，再对仍存活 group 发送 SIGKILL。root child 先 close 不会取消 escalation，完成路径对 child close 与 stdout/stderr drain 最多再等待 1 秒，超时后主动 destroy stream，避免孙进程持 pipe 让 hook 无界悬挂。
+
+HookRunner 维护活跃 process-group registry，并在 SIGHUP、SIGINT、SIGQUIT、SIGTERM 与父进程退出时同步兜底清理。Windows 通过绝对 `%SystemRoot%\System32\taskkill.exe /f /t /pid` 回收 tree，taskkill 受 2 秒上限约束，失败时回退直接 child kill。清理幂等，且不使用 `ChildProcess.killed` 作为退出证明。
+
+该 PR 仍为 open；POSIX 主动逃逸进程组和 Windows/Linux 实机行为尚未验证，不能把这些时序和上限写成当前 `main` 保证。
+
+---
+
 ## 4. 关键代码路径
 
 | 路径 | 作用 |
@@ -83,6 +93,8 @@ External Context Auto Recall 是 `submitted_prompt` 的已合入消费者。hook
 | `docs/users/features/hooks.md` | 用户可见 hook 字段文档。 |
 | `docs/design/submitted-prompt-provenance.md` | 字段语义、兼容性与省略条件设计。 |
 | `integrations/external-context/src/auto-recall.ts` | #7877 的 Auto Recall hook consumer，使用 `submitted_prompt` 作为唯一 provider query 来源。 |
+| `packages/core/src/hooks/hookRunner.ts` | #10100(open) command hook process-group registry、TERM→KILL、bounded close/stdio drain 与 Windows taskkill。 |
+| `packages/core/src/hooks/hook-runner.process.test.ts` | #10100(open) 真实进程树、信号、root early-exit 与 orphan 回收测试。 |
 
 ---
 
@@ -92,6 +104,8 @@ PR #7762 覆盖 Core 测试、CLI 测试、build、bundle、typecheck、lint，�
 
 PR #7877 追加 external-context auto recall E2E，验证 `@file` expansion 不会送到 provider，但模型上下文仍能看到 expanded file 与 retrieved context；同时覆盖 missing/invalid `submitted_prompt` no-op、root containment、query bounds、timeout fail-open 与 context envelope budget。
 
+PR #10100 当前声明 49 项 hook 测试以及聚焦 build/typecheck/lint/format；仓库级 build 被无关的 CLI Ink selection 类型错误阻塞。真实进程 harness 在 macOS 验证孙进程、root early-exit、TERM 无响应和 stream drain，Windows/Linux 尚未验证。
+
 ---
 
 ## 6. 涉及 PR
@@ -100,6 +114,7 @@ PR #7877 追加 external-context auto recall E2E，验证 `@file` expansion 不�
 |---|---|---|---|
 | [#7762](https://github.com/QwenLM/qwen-code/pull/7762) | MERGED | submitted prompt provenance | 给 `UserPromptSubmit` 增加 optional `submitted_prompt`，TUI fresh `UserQuery` 捕获扩展前文本投影，恢复/取消路径保留可证明 provenance，不能证明的 producer 省略字段。 |
 | [#7877](https://github.com/QwenLM/qwen-code/pull/7877) | MERGED | external context auto recall | 用 `submitted_prompt` 作为 external-context auto recall 的唯一 query 来源，返回 user-layer untrusted `additionalContext`，并保持 `prompt` / hook order / chaining 兼容。 |
+| [#10100](https://github.com/QwenLM/qwen-code/pull/10100) | OPEN | command hook process lifecycle | 当前 diff 在 POSIX 管理独立 process group、TERM→KILL 与 bounded drain，在 Windows 使用有界 taskkill tree，并给父进程退出/信号增加幂等兜底清理。 |
 
 ---
 
@@ -109,5 +124,6 @@ PR #7877 追加 external-context auto recall E2E，验证 `@file` expansion 不�
 2. **image-only 与 machine-generated turn 不提供原文投影**。这些路径没有同样明确的 fresh text submission，当前选择省略而不是猜测。
 3. **large paste 是 compact projection**。hook 看到的是占位式投影，不是完整大段粘贴内容；这是为了与现有大粘贴处理和数据最小化保持一致。
 4. **`submitted_prompt` 不是安全认证**。#7877 证明它可作为 provider query 来源，但 hook 仍必须把字段视为用户可控文本，不能把它当权限证明。
+5. **#10100 仍为 open**。process-group ownership、2 秒 escalation 和 Windows taskkill 当前只存在于 PR diff；主动逃逸 group 的后代不在回收保证内。
 
-_按个人 PR 口径更新于 2026-07-29_
+_按个人 PR 口径更新于 2026-08-27_

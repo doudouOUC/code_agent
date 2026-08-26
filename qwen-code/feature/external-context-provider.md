@@ -120,6 +120,12 @@ direct retrieval、auto recall 和 optional Mem0 write 都不提供企业级隔�
 
 profile 同时提供 language-neutral JSON schema、test vectors、MCP text/structured output reference、remote OAuth 示例与 self-contained local REST adapter 示例。输出保持 bounded untrusted context item，不把 provider detail、credential env name、内部错误或管理状态暴露给模型；远端 OAuth 仅是 provider-owned transport 示例，不改变 Qwen 侧 direct/governed 边界。
 
+### 3.10 configurable Mem0 extension（#10113 / #10149 open）
+
+#10113 是 docs-only 设计：新的自包含 stdio extension 对 Qwen Code 仍只暴露 `context_search({query})` 和 External Context MCP Profile v1。管理员用绝对路径配置 immutable instance，实例只能引用 closed、versioned dialect preset；profile、instance schema、dialect 和 upstream version 分开演进。dialect grammar 只允许枚举 GET/POST、鉴权/字段位置和静态结果字段路径，禁止任意 header/template/JSONPath/code、env expansion、redirect、retry、probing、cache 与写入。默认 HTTPS，credential 只引用命名环境变量。
+
+#10149 在该设计上堆叠 open runtime skeleton：`integrations/external-context-mem0` 限制配置 64 KiB、response 1 MiB，并严格验证 preset/ID/path/endpoint；请求只走 allowlisted GET/POST，最多归一化 5 条 untrusted Profile v1 result，MCP 只注册 `context_search`。`builtInPresets` 当前故意为空，因此 package 虽可 build/test/pack，却不能连接任何真实 provider。这一 fail-closed 状态必须与“已支持 Mem0 服务”区分。
+
 ---
 
 ## 4. 验证方式
@@ -129,6 +135,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 - 单测覆盖 config strictness、provider binding、MCP tool registration、Generic HTTP/Mem0 adapter、timeout/cancel、redirect/HTTPS guard、invalid JSON/UTF-8、oversized response 和 provider failure redaction。
 - #7877 追加覆盖 config v1/v2、autoRecall root containment、submitted_prompt missing/invalid no-op、credential pattern、Unicode/query bounds、timeout cancellation、provider fail-open、context envelope budget，以及 interactive TUI → Hook → loopback Generic HTTP → model context E2E。
 - #8352 追加黑洞 CONNECT proxy 子进程回归，要求 stdout `{}`、stderr 为空、exit code 0、无 signal，并在 8000ms guard 前退出；同时覆盖 dispatcher mock cleanup、early no-op 不安装 proxy、proxy 返回值与 global dispatcher wiring。
+- #10113 为 docs-only contract review；#10149 声明 27 项 extension package 测试、package typecheck/lint/build/pack 与 root build/typecheck/lint，脚本套件的两项共享 timeout 单独重跑通过。真实 provider、Windows/Linux 和 TLS/proxy E2E 尚未验证。
 
 ---
 
@@ -136,6 +143,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 
 - #8206 已按 merged diff 记录最终实现；dependency hardening 只收敛 direct external-context 依赖路径，不改变检索、auto recall 或 Mem0 write 的业务契约。
 - #9068 已合入；provider extension profile 是 query-only 接入面，不能替代企业级 governance profile。
+- #10113/#10149 仍为 open，且 #10149 stacked on #10113；closed dialect 和 runtime skeleton 不能写成 `main` 能力。内置 preset 为空意味着当前没有可用的 configurable Mem0 provider。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -154,5 +162,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 | [#8352](https://github.com/QwenLM/qwen-code/pull/8352) | MERGED | Auto Recall proxy lifecycle | 一次性 Hook 在检索尝试后销毁自己的 environment-aware proxy dispatcher，修复 provider timeout 后 child process 被 CONNECT socket 留住的问题，并修正文档中的 v1/v2 entrypoint 与 timeout 归属。 |
 | [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | MERGED | optional Mem0 write | 在严格 v1 Mem0 config 上增加 `context_remember({content})`，通过内容可见确认后把原文作为一条 Direct Import user message 写入固定 `app_id`，并把不确定结果映射为禁止自动 retry 的 `unknown`。 |
 | [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | MERGED | Provider Extension Profile v1 | 定义 provider-owned Qwen Extension + MCP profile：严格 `context_search` schema、test vectors、MCP output reference、remote OAuth 示例与 local REST adapter 示例；不引入 selector、credential override 或管理面。 |
+| [#10113](https://github.com/QwenLM/qwen-code/pull/10113) | OPEN | configurable Mem0 design | docs-only 定义 self-contained extension、immutable instance、closed/versioned dialect、HTTPS/credential/response bounds 和 retrieval-only 范围。 |
+| [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | OPEN | configurable Mem0 skeleton | 当前 stacked diff 新增严格配置/request/MCP runtime 和测试；内置 preset 故意为空，尚不能连接真实 provider。 |
 
-_按个人 PR 口径更新于 2026-08-20_
+_按个人 PR 口径更新于 2026-08-27_

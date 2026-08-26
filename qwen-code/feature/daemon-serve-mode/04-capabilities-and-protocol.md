@@ -75,10 +75,11 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #9763 | fix(daemon): keep restored ask_user_question valid after load | merged | 不新增 public capability；daemon 通过 private suppress meta 让 replay finalize 与 re-hang 决策锁步，并保持 restore flag default-off。 |
 | #9819 | fix(serve): Canonicalize Live task bridge session IDs | merged | 不新增 public wire；只分离 persisted/caller-visible ID spelling 与 canonical bridge/runtime lookup key。 |
 | #9820 | fix(daemon): Bound conditional-close refusal holds | merged | 不新增 public wire；conditional-close refusal 只采纳最多 1024 条 active-work holds，超限仍保留 session。 |
-| #9838 | feat(daemon): Support current-session scheduled tasks | open | 当前 diff 新增条件能力 `scheduled_task_session_reuse`；只有完整 host/runtime wiring 可用时广告，旧 daemon/partial bridge 保持 dedicated task。 |
+| #9838 | feat(daemon): Support current-session scheduled tasks | merged | 新增条件能力 `scheduled_task_session_reuse`；只有完整 host/runtime wiring 可用时广告，旧 daemon/partial bridge 保持 dedicated task。 |
 | #9933 | fix(acp-bridge): Disable permission timeout by default | merged | 不新增 tag；operator-side `permissionResponseTimeoutMs` 默认改为 0，省略/0 不装 timer，显式正数仍有效。 |
 | #9976 | feat(daemon): Add ACP channel transport liveness | merged | 不新增 public Serve tag；daemon parent/ACP child 只通过 private initialize metadata 协商 liveness v1，并用 typed internal failure code 接入既有 transport teardown。 |
-| #9978 | feat(cli): Add standalone sessions for projectless tasks | open | 当前 diff 不注册 `/standalone/*`、不广告 `standalone_sessions_v1`、不新增 SDK/UI；只让内部 projectless Live path 和 existing generic owner routes 消费 standalone service/source guard。 |
+| #9978 | feat(cli): Add standalone sessions for projectless tasks | merged | 该 PR 不注册 `/standalone/*`、不广告 `standalone_sessions_v1`、不新增 SDK/UI；只让内部 projectless Live path 和 existing generic owner routes 消费 standalone service/source guard。 |
+| #10179 | feat(cli): Add standalone daemon session API | open | 当前 diff 仅在完整 standalone runtime 安装时广告 `standalone_sessions_v1` 并注册 public route family；SDK/UI 仍不在范围。 |
 | #9261 | feat(serve): Add workspace session live-state endpoint and catalog version | merged | 新增 `workspace_session_live_state` capability、trusted-only memory-only `GET /workspaces/:workspace/sessions/live-state`、catalog version 与 TS SDK surface。 |
 | #9366 | feat(web-shell): Consume workspace session live-state | merged | 不新增 protocol；WebShell 消费 #9261 的 capability/route，用 version-fenced handshake 减少 full catalog polling。 |
 | #9380 | feat(serve): measure ACP child peak old-generation heap | merged | `/daemon/status` additive 暴露 ACP child old-generation peak heap measurement；observe-only，不改 child argv/enforcement。 |
@@ -542,7 +543,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#9513/#9665/#9687/#9763/#9819/#9820/#9933/#9976 已合入；#9626/#9838/#9978 是 open**。standalone safety primitives/hardening、archive race recovery、default-off AUQ restore/hardening、per-session model projection、Live task ID canonicalization、bounded close-refusal holds、permission timeout 新默认与 private channel liveness 已按 merged diff 更新；storage conflict repair、current-session scheduled task capability 和 standalone PR2B internal core 只能记录当前方案，不能视为 `main` 已落地能力。#9978 当前明确没有 `standalone_sessions_v1`；#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新；#8743 docs-only design 已由 #9055 runtime PR 承接。
+8. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978 已合入；#9626/#10179 是 open**。standalone primitives/internal core、archive recovery、AUQ restore、per-session model、Live ID、close holds、scheduled-task capability、permission timeout 与 private channel liveness 已按 merged diff 更新；storage conflict repair 和 standalone public API 只能记录当前方案。#9978 本身明确没有 `standalone_sessions_v1`，#10179 当前 open diff 才新增该 capability；#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新。
 
 ---
 
@@ -635,7 +636,11 @@ sequenceDiagram
 
 - #9819 已合入，不新增 public wire；persisted/wire session ID 保留原 spelling，Live task 的 bridge summary、owner、resume、events 与 prompt dispatch 使用 canonical lookup key。
 - #9820 已合入，不新增 field/tag；conditional-close refusal 的 session 保留语义不变，只对详细 hold cache 应用 1024 条上限。
-- #9838 当前 open diff 新增条件能力 `scheduled_task_session_reuse`。只有 Core creator、private ACP bridge、Serve host callback 与 selected managed runtime store 完整接线后才广告；fast-path bootstrap envelope 可暂时缺少该 tag。客户端仍需实时检查 session 是否可复用，capability 不是 admission guarantee。
+- #9838 已合入条件能力 `scheduled_task_session_reuse`。只有 Core creator、private ACP bridge、Serve host callback 与 selected managed runtime store 完整接线后才广告；fast-path bootstrap envelope 可暂时缺少该 tag。客户端仍需实时检查 session 是否可复用，capability 不是 admission guarantee。
+
+### #9978 / #10179 — standalone internal core 与 public capability
+
+#9978 已合入 internal `StandaloneSessionService`，但刻意没有 public route、`standalone_sessions_v1`、SDK 或 UI。#10179 当前 open diff 才在完整 standalone service/runtime dependency graph 安装时条件广告 `standalone_sessions_v1`，并注册 `/standalone/sessions` lifecycle route；partial bridge、embedded runtime 或 service 缺失时不暴露半套能力。该 open capability 不能写成当前 `main` 协议。
 - #9933 已合入，不新增 capability/status limit；permission/AUQ timeout 是 operator-side 配置，默认 0，显式正数才启用 deadline。
 - #9362 已合入，不改变 protocol shape，只把 owner/discovery record 的 transient `open`/`readFile` I/O error 保留为 retryable `conversation_runtime_unavailable` 上层语义；`ELOOP`、malformed JSON、schema mismatch 和 unsafe permission/link state 仍是 terminal compromised。
 
