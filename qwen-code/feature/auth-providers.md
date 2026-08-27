@@ -339,6 +339,14 @@ if (entry.status === 'pending') {
 - #8862 先把任务挂在 interactive CLI housekeeping scheduler 上；#8893 再把同一 retention 逻辑接到 headless CLI、stream-json 与 ACP lifecycle 的 non-interactive queue。清理失败只记录告警，不阻断 CLI 启动、provider 初始化或正在进行的模型调用。
 - 非交互队列按 log dir 去重、FIFO 串行；退出时拒绝新任务、丢弃等待项、abort 当前扫描并最多等待 250ms，因此它是 best-effort retention，不是写入路径同步清理。
 
+### 3.7 model provider runtime sync（#10269 open）
+
+#10269 当前 open diff 修复“settings 已提交、provider 列表已刷新，但既有 ACP child 和 live Session registry 仍陈旧”的多副本问题。provider install 或 model delete 成功持久化后，daemon 通过专用链路依次重建未来 child 使用的 parent effective env、通知 active workspace child 重载 persisted settings/environment，再刷新 bootstrap、初始化中与 live Session 的 model registry，并清理 per-model generator cache。
+
+同步不隐式切换任何 Session 的当前模型，也不替换 active turn 已持有的 generator。mutation response 增加 optional `runtimeSync.status`：`applied` 表示父/子/session runtime 已同步，`deferred` 表示当前无 child、后续 child 从新状态启动，`failed` 表示 settings 已提交但 runtime 副本可能陈旧。失败不回滚 settings，也不改成 HTTP error；Web Shell 只对 `failed` 提示重试或重启。
+
+这不是通用 settings watcher，也不覆盖 arbitrary settings hot reload 或 qualified multi-workspace mutation。PR 合入前，`runtimeSync` 只能作为当前 additive 方案记录。
+
 ---
 
 ## 4. 关键流程（时序图 / 调用链）
@@ -472,6 +480,7 @@ sequenceDiagram
 | #5845 | merged | stream idle timeout env override | 新增 `QWEN_STREAM_IDLE_TIMEOUT_MS`，显式 config > env > 默认；非法 env 忽略并 debug warning |
 | #8862 | merged | OpenAI API log retention | 新增 `model.openAILogRetentionDays` 与 interactive housekeeping 清理，默认保留 7 天、`0` 约 1 小时，并按 writer-owned 文件名和 per-directory marker 限定删除范围 |
 | #8893 | merged | non-interactive OpenAI log retention | headless CLI、stream-json 与 ACP lifecycle 启动同一 retention queue，按目录去重/FIFO 串行，退出时 best-effort abort/drain |
+| #10269 | open | model provider runtime sync | 当前 diff 在 provider install/model delete 后同步 parent env、active ACP child 与所有 Session registry；响应以 optional applied/deferred/failed 表达运行时结果，不回滚已提交 settings。 |
 
 ---
 
@@ -506,6 +515,9 @@ sequenceDiagram
 
 11. **#8862/#8893：日志保留清理是 best-effort**
    - `model.openAILogRetentionDays` 会在 interactive 和 non-interactive 流程中触发后台清理，但写入路径不会同步删除日志；短进程退出时只等待有限 drain。自定义日志目录虽然会使用相同保留天数，但只清理 writer-owned OpenAI API 日志文件，不会替用户管理目录内其它调试产物。
+
+12. **#10269 仍为 open**
+   - `runtimeSync`、live registry refresh 与 Web Shell warning 尚不能视为 `main` 契约；该方案只由显式 provider mutation 触发，不会监控外部 settings 文件变化，也不会自动迁移当前模型。
 
 ---
 

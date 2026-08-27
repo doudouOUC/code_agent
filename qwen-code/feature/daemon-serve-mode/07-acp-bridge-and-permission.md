@@ -1,6 +1,6 @@
 # acp-bridge 抽包与多客户端权限协调（深入）
 
-> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134/#9820 已合入的 active-work close refusal 与 hold 上限、#9976 已合入的 channel transport liveness、#9978 已合入的 standalone private service/guard、#9838/#10144 已合入的 current-session scheduled-task creator 与 empty-session persistence、#10142 当前 open 的 process-tree ownership，以及 F3（#4335）多客户端权限仲裁的并发不变量（同步注册 N1、双解析守卫 N2、consensus 防灌票、cancel-sentinel 跨策略逃逸、loopback fail-closed、Promise 必 settle）。W25 follow-up（#5085/#5105/#5218/#5258/#5260）与 #9933 在此基础上补齐 Agent 工具权限提示、取消后停止 turn、可配置响应超时和默认无限等待。
+> 子文档；总览见 [README.md](README.md)（以及总览正文 `daemon-serve-mode.md` §3.8、§3.9、§5.5）。本文在 file/symbol/line 级别**取代**总览的 §3.8 与 §3.9，深入到包边界的三个注入 seam（`BridgeOptions` / `DaemonStatusProvider` / `BridgeFileSystem`）、分阶段 lift 的行为保持纪律、#8620 已合入的 same-host daemon read/write delegation 能力拆分、#8852 已合入的 approved external built-in text write provenance/host route、#8911 已合入的 daemon ACP NDJSON bounds、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#9134/#9820 已合入的 active-work close refusal 与 hold 上限、#9976 已合入的 channel transport liveness、#9978/#10179 已合入的 standalone private service/guard 与 public route、#9838/#10144 已合入的 current-session scheduled-task creator 与 empty-session persistence、#10142 已合入的 process-tree ownership、#10268 当前 open 的 new-session deadline/late cleanup，以及 F3（#4335）多客户端权限仲裁的并发不变量。W25 follow-up 与 #9933 在此基础上补齐 Agent 工具权限提示、取消后停止 turn、可配置响应超时和默认无限等待。
 >
 > 早期 file/symbol/line 锚点保留 `daemon_mode_b_main` 集成分支语境；daemon feature batch 已随 #4490 合入 `main`，W25 follow-up（#5085/#5105/#5174/#5218/#5258/#5260）与 #5955 bridge wrapper cleanup 以当前 `main` 实现为准。涉及文件主要位于 `packages/acp-bridge/src/`（抽出的包本体）与 `packages/cli/src/serve/`（daemon 装配 + 投票路由；F1 时保留过 re-export shim，#5955 后剩余 event-bus/status/in-memory-channel wrapper 已删除）。
 >
@@ -61,9 +61,10 @@
 | #9838 | support current-session scheduled tasks | merged private bridge extension | 用 connection/session/active prompt/source/bounds 校验 private creator，再交给 Serve host 做 runtime/session/task binding admission。 |
 | #9976 | add ACP channel transport liveness | merged transport lifecycle | private initialize 协商后按 shared channel 运行 nonce probe；双按时 timeout 或无效响应进入既有 transport-failure teardown。 |
 | #9978 | add standalone sessions for projectless tasks | merged private service integration | 增加 daemon-owned standalone creation/source contract、service owner routing、deferred cwd activation 与 source-aware guards；该 PR 无 public standalone API。 |
-| #10142 | reap ACP child process trees | open tree ownership | 当前 diff 给标准 ACP spawn 增加 bounded ancestry/PGID tracking、TERM→KILL、root-exit cleanup 和 SIGHUP lifecycle。 |
+| #10142 | reap ACP child process trees | merged tree ownership | 最终实现给标准 ACP spawn 增加 bounded ancestry/PGID tracking、TERM→KILL、root-exit cleanup 和 SIGHUP lifecycle。 |
 | #10144 | persist empty sessions before task binding | merged private persistence | existing-session task commit 前通过 bridge 写入 default source anchor，不触发模型/hook/可见消息。 |
-| #10179 | standalone daemon session API | open public lifecycle | 当前 diff 在 merged private service 上增加 exact-owner route family、conditional capability 与 journaled delete；SDK/UI 不在范围。 |
+| #10179 | standalone daemon session API | merged public lifecycle | 最终实现在 private service 上增加 exact-owner route family、conditional capability 与 journaled delete；SDK/UI 不在该 PR 范围。 |
+| #10268 | cancel timed-out session initialization | open initialization lifecycle | 当前 diff 传递 private absolute deadline，child 发布前取消；旧 child 由 bridge 做迟到 exact close、ID fence 与 fresh-admission quarantine。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -451,7 +452,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 8. **#9665/#9763 已合入但仍默认关闭**。不能把 AUQ re-hang 写成默认 load/resume 行为；v1 无 capability tag，客户端无法仅靠 `/capabilities` 区分 operator 是否启用 flag。boot-time auto-resume、其它 permission tool、旧 request id/audit 持久化和 mixed dangling batch 都不在当前方案内。
 
-9. **#9978 已合入 internal integration，#10179 public API 仍为 open**。standalone source/service method 本身不是 public ACP 契约；#10179 当前 diff 才新增 `/standalone/*` 与 `standalone_sessions_v1`，SDK/UI 仍不存在。directory compromise、unknown spawn outcome 或 close refusal 会 terminal-quarantine Conversations runtime，而不是 fallback primary。
+9. **#9978 internal integration 与 #10179 public API 均已合入**。standalone source/service method 本身不是 public ACP 契约；`/standalone/*` 与 `standalone_sessions_v1` 由 #10179 提供，SDK 由 #10294(open) 承接。directory compromise、unknown spawn outcome 或 close refusal 会 terminal-quarantine Conversations runtime，而不是 fallback primary。
 
 ---
 
@@ -617,16 +618,22 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `standalone-session-service.ts`：在 Conversations runtime activity gate 内提供 create/get/list/load/resume/prompt/continue，绑定 canonical persisted ID 与确定性 owner-only private directory。
 - `bridge.ts` / `acpAgent.ts` / `Session.ts`：daemon-owned creation key、reserved standalone source 与 deferred workspace activation 共同保证普通 ACP caller 不能伪造 standalone provenance。
 - `routes/session.ts` / Core Config、permission、cron guards：已知 standalone owner 路由到同一 runtime，并在副作用前拒绝 workspace/project-scoped 操作；containment 无法证明时 quarantine，不 fallback primary。
-- #9978 已合入，但该 PR 本身没有 public route/capability/SDK/UI；#10179 当前 open diff 才承接 public lifecycle。
+- #9978 已合入，但该 PR 本身没有 public route/capability/SDK/UI；#10179 已承接 public lifecycle，#10294(open) 再承接 TypeScript SDK。
 
-### #10142 — ACP process-tree ownership（open）
+### #10142 — ACP process-tree ownership（merged）
 
 - 标准 ACP spawn opt in `ownsProcessTree`。POSIX child 作为独立 group 启动，registry 用 2 秒/8 MiB、最多 256 process/8 depth 的 `/bin/ps` snapshot 发现后代 PGID。
 - graceful cleanup 先 TERM 后 KILL，root early-exit 也回收已知组；同步 shutdown 只 snapshot 一次并 KILL。Windows 使用 taskkill tree，legacy direct attach 保持 direct-child。
-- 当前 PR 仍为 open；PID/PGID reuse、主动逃逸 ancestry/group 和 Windows/Linux 实机行为是剩余边界。
+- PID/PGID reuse、主动逃逸 ancestry/group 和 Windows/Linux 实机行为是剩余边界。
 
-### #10179 — standalone public lifecycle（open）
+### #10179 — standalone public lifecycle（merged）
 
-- 当前 diff 在 merged private service 上注册 exact-owner `/standalone/sessions` route family，并只在完整 dependency graph 安装时广告 `standalone_sessions_v1`。
+- 最终实现在 merged private service 上注册 exact-owner `/standalone/sessions` route family，并只在完整 dependency graph 安装时广告 `standalone_sessions_v1`。
 - child、Live、project/worktree、ambiguous/foreign owner 全部 fail closed。delete journal 以 transcript unlink 为 commit point，commit 前恢复 staged directory，commit 后完成 sidecar/attachment/directory cleanup。
-- public route/capability 仍为 open；SDK/UI 和 scheduled-task/worktree integration 不在本阶段。
+- public route/capability 已进入 `main`；SDK 由 #10294(open) 承接，UI 和 scheduled-task/worktree integration 不在本阶段。
+
+### #10268 — new-session initialization deadline（open）
+
+- managed bridge 在 private `newSession` metadata 中发送绝对 deadline；child 把 cancellation 传播到配置、Gemini startup 与 `SessionStart` hook，并在 Session publication 前返回稳定 timeout。
+- 兼容旧 child 时，bridge 保留原始 request、requested-ID fence 与 settlement token；迟到成功只按精确 ID close，close/settlement 不确定则隔离该 shared channel 的 fresh admission，健康 sibling session 继续可用。
+- 当前 PR 仍为 open；load/resume/prompt deadline 和 OS cgroup/Job Object containment 不在范围内。

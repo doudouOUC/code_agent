@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 已合入 workspace session live-state SDK surface，#9380 已合入 daemon status child heap measurement types，#9396 已合入 live-state `updatedAt` optional field），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 已合入 workspace session live-state SDK surface，#9380 已合入 daemon status child heap measurement types，#9396 已合入 live-state `updatedAt` optional field；#10294 当前 open diff 在 #10179 merged daemon API 上增加 standalone lifecycle/recovery surface），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -220,6 +220,12 @@ CanUseTool = Callable[[str, dict, CanUseToolContext], Awaitable[PermissionResult
 - **prompt 关联**：当已有活跃订阅时，`prompt()` 走 `promptNonBlocking` 并把 `promptId` 登记到 `_pendingPrompts`，由订阅循环里的 `_dispatchTurnEvent` 用 `matchTurnEvent` 完成 resolve/reject（复用 `DaemonClient` 的同一匹配逻辑），从而**不额外开 SSE 连接**。`AbortSignal` 触发时会 `cancel()` 会话并 reject；daemon-side terminal latch 会把并发 cancel/remove/deadline/teardown 竞态折叠成一个 terminal。
 - 其余方法（`setModel`/`recap`/`shellCommand`/`context`/`contextUsage`/`supportedCommands`/`tasks`/`respondToPermission`/`heartbeat`/`updateMetadata`/`close`）都是绑定 `sessionId`+`clientId` 的转发。
 
+#### 4.3.1 standalone session lifecycle（#10179 merged / #10294 open）
+
+#10179 已在 daemon 合入 `standalone_sessions_v1` 与 `/standalone/sessions` lifecycle route。#10294 当前 open diff 才给 TypeScript SDK 增加 capability-gated create/list/page/get/load/resume/repair-directory/rename/export/archive/unarchive/delete，以及严格的 response runtime validators；SDK request 不接受 `cwd`/`workspaceCwd`，避免跨到普通 workspace restore。
+
+create 在 dispatch 前使用 caller UUID 或 `globalThis.crypto.randomUUID()`。outcome-unknown response、transport failure、timeout 或 malformed success 后只按该 UUID 做一次 exact lookup，返回 existing/creating/not-found/unavailable recovery context 并抛 `DaemonStandaloneCreationOutcomeUnknownError`，不自动重试 create。`DaemonSessionClient` 保存显式 `standalone` 或 `workspace` restore strategy，断线重附着不会 fallback primary。该 SDK surface 与 215 KiB browser bundle budget 在 PR 合入前都只能作为当前方案记录。
+
 ### 4.4 Java daemon transport alpha（#7463 / #7603）
 
 #7463 在 `packages/sdk-java/qwencode` 现有 Maven artifact 中新增 Java 11 daemon transport，而不是新建第二个 artifact。它的目标是把 HTTP admission、SSE reconnect、event cursor、terminal correlation、permission/cancel、lifecycle cleanup 和 failure taxonomy 做成可复用客户端，而不是让每个 JVM 应用手写 daemon protocol。
@@ -385,6 +391,8 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #9380 | MERGED | daemon status child heap measurement types | 追加 ACP child old-generation peak heap status optional fields，未采样时 `heap:null`。 |
 | #9396 | MERGED | live-state activity watermark | 在 `DaemonSessionLiveState` 上追加 optional `updatedAt`，不改变 response v1 或 capability。 |
 | #9626 | OPEN | session storage conflict repair | 当前 diff 在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`，默认 conflict 从 HTTP 200 batch `errors` 读取。 |
+| #10179 | MERGED | standalone daemon REST lifecycle | 条件广告 `standalone_sessions_v1` 并提供 exact-owner create/list/get/load/resume/repair/metadata/export/archive/unarchive/delete route；该 PR 本身不含 SDK。 |
+| #10294 | OPEN | standalone TypeScript SDK | 当前 diff 为完整 standalone lifecycle 增加 capability gate、strict validators、explicit restore strategy 与 outcome-unknown exact recovery，不自动重试 create。 |
 
 ---
 
@@ -415,6 +423,8 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 
 12. **#9626 仍是 open**。`resolveConflicts` / `resolvedConflicts` 和 `session_storage_conflict_repair` 只能作为当前 additive SDK 方案记录；未广告 capability 的 daemon 必须保持默认 conflict 行为，客户端不能试探性发送 repair option。
+
+13. **#10294 仍是 open**。#10179 的 daemon route 已合入，但 standalone TypeScript methods、runtime validators、recovery error 和 browser bundle budget 尚不是发布 SDK 契约；WebUI/WebShell 流程仍在范围外。
 
 ---
 

@@ -8,7 +8,7 @@
 
 Channel adapter 让 qwen-code 可以从本地 TUI 之外的消息通道接收用户输入。adapter 不应该依赖某个具体 bridge 实现，否则后续要切到 daemon-backed bridge、测试 fake bridge 或多 channel bridge 时，所有 adapter 都会被迫跟着底层类名和生命周期细节变化。
 
-#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档。
+#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录。
 
 ---
 
@@ -82,6 +82,14 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 
 微信 typing 状态从 chat-level set 改为 chat 下按 session 引用计数；一个 session 完成只释放自己的 owner，最后一个 owner 离开才取消 indicator。示例 adapter 同样使用 async-local context 与 `ChannelOutputSegmentContext.messageId`，覆盖重叠消息乱序完成。该机制保证进程内归属，不提供跨进程 exactly-once journal。
 
+### 3.6 owner-scoped named sessions（#10198）
+
+#10198 已合入 opt-in `multiSession:true`。启用时必须同时使用 `sessionScope:'user'` 和 daemon-managed worker；standalone channel、非 user scope、history backfill、webhook 与 persisted loop 等不兼容组合在启动期失败关闭。未启用时仍走旧 `SessionRouter` 单 selected-session 行为。
+
+`NamedSessionManager` 按 channel instance + chat/thread + sender 建 owner key，在 owner 私有的有界原子 JSON catalog 中维护最多 8 个命名任务。`/sessions`、`/session current|new|use|close` 只展示任务名、open/closed 和 shared isolation，不泄露 daemon session ID；inactive task 只按 catalog 中的精确 ID load，失败不创建 replacement。现有 route 继续作为当前选择兼容指针。
+
+入站 turn 在异步 media preparation 前绑定接收时的 session ID 与 generation，并用 queued-turn ownership 保持到 prompt 完成。queued/running turn、pending permission、cancel wind-down 或 bridge active prompt 都使 create/use/close fail closed，因此选择变化不会把已接收消息重路由。该阶段只支持 shared workspace；worktree、非选中任务 cancel、主动投递、webhook、loop 和跨 daemon exactly-once 仍在范围外。
+
 ---
 
 ## 4. 涉及 PR
@@ -100,6 +108,7 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 | #6950 | merged | adapter `connect()` 失败原因在 worker 启动边界丢失。 | 新增 startup failure IPC + ACK，snapshot/HTTP/SDK/CLI 暴露 bounded redacted failures；dynamic all-fail 返回 `channel_worker_start_failed` 和 attempted failures。 |
 | #7019 | merged | multi-workspace hardening 文档仍可能把 channel workers 写成 primary-only 或全 workspace 自动展开。 | 用户/开发文档明确 worker selection 按 owning trusted workspace 分组，`--channel all` 暂保持 primary-only v1，并把 channel worker 归入 workspace-qualified / legacy-primary ownership 边界。 |
 | #10145 | merged | 同一 chat 多 session 共享 latest reply/typing 状态，乱序异步完成会错投消息或提前取消 typing。 | QQ 用 async-local reply context 保留 segment origin；微信 typing 按 chat/session 引用计数；示例 adapter 同步采用 message-scoped context，公共接口和 persisted schema 不变。 |
+| #10198 | merged | 同一 owner 在一个 chat 中无法保留和切换多个隔离任务，异步入站又可能漂移到新的 selected session。 | daemon-only 命名任务 catalog 保存精确 session ID；命令面只暴露任务名，turn 在媒体准备前绑定 session/generation，busy 时拒绝任务变更，重启按原 ID 精确恢复。 |
 
 ---
 
@@ -109,5 +118,6 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing、settings reload、workspace grouping、#6741 runtime selection control 和 #6950 startup failure diagnostics；多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
 3. 新插件应优先面向 `ChannelAgentBridge` 编程，只有 standalone ACP-backed 路径才需要知道 `AcpBridge`。
 4. #10145 只修复单进程内的 delivery ownership；跨进程重启、平台去重和 exactly-once 仍需要独立 journal/adapter 协议。
+5. #10198 的 named sessions 当前只支持 shared workspace 与 selected-task 操作；worktree、非选中 task cancel、主动投递、webhook、loop 和 history backfill 尚未开放。
 
-_按个人 PR 口径更新于 2026-08-27_
+_按个人 PR 口径更新于 2026-08-28_
