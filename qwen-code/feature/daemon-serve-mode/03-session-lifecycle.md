@@ -216,7 +216,7 @@ catalog version 由 `generation` 与 `revision` 组成，只支持整对 equalit
 
 #10142 最终实现把标准 ACP child 注册为 process-tree owner。POSIX 用有界 `/bin/ps` snapshot 发现后代 PGID，graceful shutdown 先 TERM 后 KILL，root 退出也回收已知组；同步退出只做一次 snapshot。Windows 使用 taskkill tree，legacy direct `ProcessRegistry.attach(child)` 不自动升级。
 
-若 directory compromise、spawn outcome 不明或 close refusal 使 containment 无法证明，service 会冻结 creation entry 并 quarantine Conversations runtime；已知 standalone owner 继续暴露 unavailable，而不是 fallback primary。#9978 本身没有 `/standalone/*`、`standalone_sessions_v1` 或 SDK/WebUI；public route 已由 #10179 承接，SDK 仍由 #10294(open) 承接。
+若 directory compromise、spawn outcome 不明或 close refusal 使 containment 无法证明，service 会冻结 creation entry 并 quarantine Conversations runtime；已知 standalone owner 继续暴露 unavailable，而不是 fallback primary。#9978 本身没有 `/standalone/*`、`standalone_sessions_v1` 或 SDK/WebUI；public route 已由 #10179 承接，SDK 已由 #10294 承接。
 
 #10268 当前 open diff 进一步让 new-session timeout 约束底层工作，而不只拒绝 wrapper。managed parent 在 private metadata 中发送绝对 deadline，child 把 AbortSignal 传到 Config、Gemini startup 和 `SessionStart` hook，并在发布前拒绝过期 Session。旧 child 若迟到成功，bridge 按精确 ID close；settlement/cleanup 无法证明时只拒绝该 shared channel 的 fresh admission，健康 sibling 保持可用。
 
@@ -700,7 +700,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9976/#9978/#10142/#10144/#10179 已合入，#9626/#10268/#10300 仍为 open，#10286 已关闭**。ACP process-tree 与 standalone public API 已按 merged diff 记录；persisted maintenance、new-session deadline 与 post-commit cleanup ownership 只能记录当前方案。#9978 本身没有 public route/capability/SDK/UI，#10179 承接 route/capability，#10294(open) 再承接 SDK。
+6. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9976/#9978/#10142/#10144/#10179 已合入，#9626/#10268/#10300 仍为 open，#10286 已关闭**。ACP process-tree 与 standalone public API 已按 merged diff 记录；persisted maintenance、new-session deadline 与 post-commit cleanup ownership 只能记录当前方案。#9978 本身没有 public route/capability/SDK/UI，#10179 承接 route/capability，#10294 已承接 SDK。
 
 ---
 

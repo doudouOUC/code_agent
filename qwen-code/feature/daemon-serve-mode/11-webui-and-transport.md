@@ -410,6 +410,12 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 该 flag 自带 open intent：browser eligible 时正常启动 tab，headless 时打印带 fragment 的手动 URL；bare `--open`、Chrome extension 和未传新 flag 的客户端保持现有行为。generated token 仍是完整 daemon runtime credential，不是 browser-scoped pairing token；opt-in daemon 上其它无 token local clients 会得到 401，多客户端/可重开浏览器需显式配置共享 `QWEN_SERVER_TOKEN`。persistent store、cross-tab、cookie、client identity/revoke 与 SDK discovery 不在范围；PR 未合入，不能写成 `main` 能力。
 
+## 2026-08-29 follow-up：trusted-loopback Channel controls（#10403 open）
+
+#10403 当前 open diff 让无 token 的 primary loopback listener 获得完整 operator authority。Web Shell `ChannelsManagerPage` 在没有 bearer 时通过 `useStatusReport()` 读取 `security.loopbackBind`、`tokenConfigured` 与 `requireAuth`，只在 trusted-loopback 三条件成立时开放 Channel lifecycle controls；status 尚在加载或 authority 不成立时保持只读。该 UI 判定只负责展示和请求准入反馈，服务端 strict mutation gate 仍独立执行 authority、workspace trust 和 route schema 校验。
+
+Local Control 配对材料也改为按 operator authority 展示：trusted primary listener 可直接收到 URL/QR，LAN listener 仍需已有 pairing credential，否则继续 redacted；disable 仍可由已准入 listener 撤销。PR 不改变 Channel webhook auth、Host/Origin、WebSocket listener credential isolation 或 session ownership，且未合入前不能视为 `main` 行为。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -457,4 +463,4 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-27_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-29_

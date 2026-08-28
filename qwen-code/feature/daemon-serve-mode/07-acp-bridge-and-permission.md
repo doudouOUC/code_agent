@@ -452,7 +452,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 8. **#9665/#9763 已合入但仍默认关闭**。不能把 AUQ re-hang 写成默认 load/resume 行为；v1 无 capability tag，客户端无法仅靠 `/capabilities` 区分 operator 是否启用 flag。boot-time auto-resume、其它 permission tool、旧 request id/audit 持久化和 mixed dangling batch 都不在当前方案内。
 
-9. **#9978 internal integration 与 #10179 public API 均已合入**。standalone source/service method 本身不是 public ACP 契约；`/standalone/*` 与 `standalone_sessions_v1` 由 #10179 提供，SDK 由 #10294(open) 承接。directory compromise、unknown spawn outcome 或 close refusal 会 terminal-quarantine Conversations runtime，而不是 fallback primary。
+9. **#9978 internal integration 与 #10179 public API 均已合入**。standalone source/service method 本身不是 public ACP 契约；`/standalone/*` 与 `standalone_sessions_v1` 由 #10179 提供，SDK 已由 #10294 承接。directory compromise、unknown spawn outcome 或 close refusal 会 terminal-quarantine Conversations runtime，而不是 fallback primary。
 
 ---
 
@@ -618,7 +618,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `standalone-session-service.ts`：在 Conversations runtime activity gate 内提供 create/get/list/load/resume/prompt/continue，绑定 canonical persisted ID 与确定性 owner-only private directory。
 - `bridge.ts` / `acpAgent.ts` / `Session.ts`：daemon-owned creation key、reserved standalone source 与 deferred workspace activation 共同保证普通 ACP caller 不能伪造 standalone provenance。
 - `routes/session.ts` / Core Config、permission、cron guards：已知 standalone owner 路由到同一 runtime，并在副作用前拒绝 workspace/project-scoped 操作；containment 无法证明时 quarantine，不 fallback primary。
-- #9978 已合入，但该 PR 本身没有 public route/capability/SDK/UI；#10179 已承接 public lifecycle，#10294(open) 再承接 TypeScript SDK。
+- #9978 已合入，但该 PR 本身没有 public route/capability/SDK/UI；#10179 已承接 public lifecycle，#10294 已承接 TypeScript SDK。
 
 ### #10142 — ACP process-tree ownership（merged）
 
@@ -630,7 +630,7 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 
 - 最终实现在 merged private service 上注册 exact-owner `/standalone/sessions` route family，并只在完整 dependency graph 安装时广告 `standalone_sessions_v1`。
 - child、Live、project/worktree、ambiguous/foreign owner 全部 fail closed。delete journal 以 transcript unlink 为 commit point，commit 前恢复 staged directory，commit 后完成 sidecar/attachment/directory cleanup。
-- public route/capability 已进入 `main`；SDK 由 #10294(open) 承接，UI 和 scheduled-task/worktree integration 不在本阶段。
+- public route/capability 已进入 `main`；SDK 已由 #10294 承接，UI 和 scheduled-task/worktree integration 不在本阶段。
 
 ### #10268 — new-session initialization deadline（open）
 

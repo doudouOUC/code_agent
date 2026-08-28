@@ -120,11 +120,11 @@ direct retrieval、auto recall 和 optional Mem0 write 都不提供企业级隔�
 
 profile 同时提供 language-neutral JSON schema、test vectors、MCP text/structured output reference、remote OAuth 示例与 self-contained local REST adapter 示例。输出保持 bounded untrusted context item，不把 provider detail、credential env name、内部错误或管理状态暴露给模型；远端 OAuth 仅是 provider-owned transport 示例，不改变 Qwen 侧 direct/governed 边界。
 
-### 3.10 configurable Mem0 extension（#10113 merged / #10149 open）
+### 3.10 configurable Mem0 extension（#10113 merged / #10149 merged）
 
 #10113 已合入 docs-only 设计：新的自包含 stdio extension 对 Qwen Code 仍只暴露 `context_search({query})` 和 External Context MCP Profile v1。管理员用绝对路径配置 immutable instance，实例只能引用 closed、versioned dialect preset；profile、instance schema、dialect 和 upstream version 分开演进。dialect grammar 只允许枚举 GET/POST、鉴权/字段位置和静态结果字段路径，禁止任意 header/template/JSONPath/code、env expansion、redirect、retry、probing、cache 与写入。默认 HTTPS，credential 只引用命名环境变量。
 
-#10149 在该设计上堆叠 open runtime skeleton：`integrations/external-context-mem0` 限制配置 64 KiB、response 1 MiB，并严格验证 preset/ID/path/endpoint；请求只走 allowlisted GET/POST，最多归一化 5 条 untrusted Profile v1 result，MCP 只注册 `context_search`。`builtInPresets` 当前故意为空，因此 package 虽可 build/test/pack，却不能连接任何真实 provider。这一 fail-closed 状态必须与“已支持 Mem0 服务”区分。
+#10149 在该设计上合入 runtime skeleton：`integrations/external-context-mem0` 限制配置 64 KiB、response 1 MiB，并严格验证 preset/ID/path/endpoint；请求只走 allowlisted GET/POST，最多归一化 5 条 untrusted Profile v1 result，MCP 只注册 `context_search`。`builtInPresets` 当前故意为空，因此 package 虽可 build/test/pack，却不能连接任何真实 provider。这一 fail-closed 状态必须与“已支持 Mem0 服务”区分。
 
 ---
 
@@ -143,7 +143,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 
 - #8206 已按 merged diff 记录最终实现；dependency hardening 只收敛 direct external-context 依赖路径，不改变检索、auto recall 或 Mem0 write 的业务契约。
 - #9068 已合入；provider extension profile 是 query-only 接入面，不能替代企业级 governance profile。
-- #10113 的 docs-only contract 已合入，#10149 runtime skeleton 仍为 open；设计进入 `main` 不等于已有可用 runtime。内置 preset 为空意味着当前没有可用的 configurable Mem0 provider。
+- #10113 的 docs-only contract 已合入，#10149 runtime skeleton 已合入；设计进入 `main` 不等于已有可用 runtime。内置 preset 为空意味着当前没有可用的 configurable Mem0 provider。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -163,6 +163,6 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 | [#8507](https://github.com/QwenLM/qwen-code/pull/8507) | MERGED | optional Mem0 write | 在严格 v1 Mem0 config 上增加 `context_remember({content})`，通过内容可见确认后把原文作为一条 Direct Import user message 写入固定 `app_id`，并把不确定结果映射为禁止自动 retry 的 `unknown`。 |
 | [#9068](https://github.com/QwenLM/qwen-code/pull/9068) | MERGED | Provider Extension Profile v1 | 定义 provider-owned Qwen Extension + MCP profile：严格 `context_search` schema、test vectors、MCP output reference、remote OAuth 示例与 local REST adapter 示例；不引入 selector、credential override 或管理面。 |
 | [#10113](https://github.com/QwenLM/qwen-code/pull/10113) | MERGED | configurable Mem0 design | docs-only 定义 self-contained extension、immutable instance、closed/versioned dialect、HTTPS/credential/response bounds 和 retrieval-only 范围。 |
-| [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | OPEN | configurable Mem0 skeleton | 当前 diff 基于 #10113 merged 设计新增严格配置/request/MCP runtime 和测试；内置 preset 故意为空，尚不能连接真实 provider。 |
+| [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | MERGED | configurable Mem0 skeleton | 最终实现基于 #10113 merged 设计新增严格配置/request/MCP runtime 和测试；内置 preset 故意为空，尚不能连接真实 provider。 |
 
-_按个人 PR 口径更新于 2026-08-28_
+_按个人 PR 口径更新于 2026-08-29_

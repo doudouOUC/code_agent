@@ -34,6 +34,7 @@
 | #5260 | ACP 权限响应超时可配置 | `serve.ts` flag、`runQwenServe.ts` 启动校验、`server.ts` / `types.ts` 透传到 bridge、`bridge.ts` timer clamp |
 | #9838 | current-session scheduled task（merged） | 完整 runtime 才安装 current-session host callback；selected runtime 做 owner/session/task binding 准入、generation fence 与 rollback |
 | #10179 | standalone daemon session API（merged） | 完整 standalone service/runtime 才注册 public route 并广告 `standalone_sessions_v1`；所有 route 要求 exact standalone owner |
+| #10403 | trusted-loopback operator authority（open） | `auth.ts:isTrustedLoopbackMode` / `requestHasOperatorAuthority`；`run-qwen-serve.ts` 解析并复核实际 loopback bind；strict mutation/session shell/Local Control 共用 authority |
 | #9933 | 默认关闭 ACP permission timeout | `DEFAULT_PERMISSION_TIMEOUT_MS=0`；省略或 0 不装 timer，正整数仍经启动校验和 clamp 透传到 bridge |
 | #4552 | 运行时 MCP server add/remove（T2.8） | `server.ts` `POST/DELETE /workspace/mcp/servers`(L2329/L2412) |
 | #4606 | request 级访问日志 | `server.ts` access-log middleware L875-920；`daemonLogger.ts` |
@@ -606,4 +607,11 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - 最终实现仅在完整 `StandaloneSessionService`、runtime owner 和 route dependency graph 安装时注册 `/standalone/sessions` family 并广告 `standalone_sessions_v1`；partial/embed runtime 不暴露半套 API。
 - public route 覆盖 create/list/get/load/resume、repair/rename/export、archive/unarchive/delete，mutation 走既有 auth 与严格 schema，不接受 workspace selector。
 - admission 只接受 top-level exact standalone owner；child、Live、project/worktree、ambiguous/unreadable/foreign/identity mismatch 均 fail closed，不回退 primary。
-- route 与 capability 已进入 `main`；TypeScript SDK 由 #10294(open) 承接，WebUI/WebShell 仍不在当前范围。
+- route、capability 与 #10294 TypeScript SDK 已进入 `main`；WebUI/WebShell 仍不在当前范围。
+
+### #10403 — trusted-loopback operator authority（open）
+
+- 当前 diff 把 Bearer credential authentication 与 deployment-boundary authority 分离。只有主 listener 实际绑定 loopback、未配置 token 且未启用 `--require-auth` 时，primary-listener 请求才通过 `requestHasOperatorAuthority()`；该请求不会被伪装成 Bearer authenticated。
+- strict mutation、显式 `--enable-session-shell`、Local Control pairing material 与 Web Shell Channel controls 共用该 authority。workspace trust、session owner、`X-Qwen-Client-Id`、permission confirmation、feature flag、schema 和 resource limit 继续独立检查。
+- `localhost` 在 authority 派生前先经 DNS 解析，listen 后再核对 `server.address()`；若实际地址不是 loopback 则启动失败。非 loopback 无 token、`--require-auth` 无 token、wildcard CORS 无 token、LAN pairing、Host/Origin 与 WebSocket credential isolation 保持不变。
+- 风险边界是所有可访问本机 primary loopback listener 的进程都会获得完整 operator API。共享主机、CI runner、远程开发机或存在不可信本地进程时必须配置 `QWEN_SERVER_TOKEN` 并启用 `--require-auth`。PR 未合入，Windows/Linux runtime 也尚未验证。
