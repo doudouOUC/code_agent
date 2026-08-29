@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-08-24 ~ 2026-08-30 (W35 周内累计)
 
-> 本文件当前整理 2026-08-24 至 2026-08-28（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
+> 本文件当前整理 2026-08-24 至 2026-08-29（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: standalone session core/REST/SDK、trusted-loopback operator authority、Channel owner-scoped 命名任务、scheduled task 当前会话复用、command hook/ACP process tree、session 初始化取消、writer-lease cleanup、model provider runtime sync、Mem0 extension、OTel context usage
+**主题**: standalone session core/REST/SDK/WebUI context 与 WebShell UI 计划、trusted-loopback operator authority、Channel 命名任务与输出归因、scheduled task 当前会话复用、command hook/ACP process tree、session 初始化取消、writer-lease cleanup、model provider runtime sync、Mem0 extension、OTel context usage
 
-**PR 统计**: 22 PRs - 16 merged / 5 open / 1 closed
-**当前已合并 PR 代码量**: +39,583 / -2,162，296 个文件变更
-**全量代码量**: +47,223 / -3,029，421 个文件变更
-**类型分布**: fix ×12, feat ×9, docs ×1
-**范围 (scope)**: serve/daemon ×14, acp-bridge ×11, cli/acp-integration ×15, core ×10, channels ×3, sdk ×3, webui/web-shell ×4, telemetry ×1, external-context ×2, docs/design ×18
+**PR 统计**: 26 PRs - 19 merged / 5 open / 2 closed
+**当前已合并 PR 代码量**: +47,033 / -2,756，337 个文件变更
+**全量代码量**: +59,061 / -4,135，497 个文件变更
+**类型分布**: fix ×13, feat ×11, docs ×2
+**范围 (scope)**: serve/daemon ×14, acp-bridge ×11, cli/acp-integration ×15, core ×11, channels ×4, sdk ×3, webui/web-shell ×6, telemetry ×1, external-context ×2, docs/design ×22
 
 ---
 
@@ -31,13 +31,17 @@
 | [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | ✅ merged | @doudouOUC | feat(external-context): Add configurable Mem0 extension skeleton | +2626/-11 | 29 | 08-26 12:23 | 08-28 04:05 |
 | [#10179](https://github.com/QwenLM/qwen-code/pull/10179) | ✅ merged | @doudouOUC | feat(cli): Add standalone daemon session API | +8850/-379 | 33 | 08-26 15:59 | 08-27 12:55 |
 | [#10198](https://github.com/QwenLM/qwen-code/pull/10198) | ✅ merged | @doudouOUC | feat(channels): Add owner-scoped named sessions | +4921/-449 | 36 | 08-26 19:34 | 08-27 09:58 |
-| [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | 🟡 open | @doudouOUC | fix(daemon): Cancel timed-out session initialization | +1695/-139 | 20 | 08-27 09:43 | — |
-| [#10269](https://github.com/QwenLM/qwen-code/pull/10269) | 🟡 open | @doudouOUC | fix(serve): Hot-reload runtime model providers | +2179/-155 | 39 | 08-27 09:44 | — |
+| [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | ✅ merged | @doudouOUC | fix(daemon): Cancel timed-out session initialization | +1949/-242 | 22 | 08-27 09:43 | 08-29 14:03 |
+| [#10269](https://github.com/QwenLM/qwen-code/pull/10269) | 🟡 open | @doudouOUC | fix(serve): Hot-reload runtime model providers | +2862/-192 | 41 | 08-27 09:44 | — |
 | [#10286](https://github.com/QwenLM/qwen-code/pull/10286) | ⚫ closed | @doudouOUC | fix(core): Preserve ownership during session cleanup | +392/-43 | 8 | 08-27 12:24 | 08-27 13:52 |
-| [#10288](https://github.com/QwenLM/qwen-code/pull/10288) | 🟡 open | @doudouOUC | fix(core): Preserve fire-and-forget hooks after exit | +928/-54 | 5 | 08-27 12:30 | — |
+| [#10288](https://github.com/QwenLM/qwen-code/pull/10288) | ✅ merged | @doudouOUC | fix(core): Preserve fire-and-forget hooks after exit | +1170/-64 | 5 | 08-27 12:30 | 08-29 10:47 |
 | [#10294](https://github.com/QwenLM/qwen-code/pull/10294) | ✅ merged | @doudouOUC | feat(sdk): Add standalone session APIs | +1924/-10 | 10 | 08-27 13:03 | 08-28 00:44 |
-| [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | 🟡 open | @doudouOUC | fix(core): Preserve ownership during session cleanup | +905/-91 | 11 | 08-27 13:52 | — |
-| [#10403](https://github.com/QwenLM/qwen-code/pull/10403) | 🟡 open | @doudouOUC | feat(serve): Enable full API access on trusted loopback | +1541/-385 | 42 | 08-28 11:49 | — |
+| [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | 🟡 open | @doudouOUC | fix(core): Preserve ownership during session cleanup | +1485/-249 | 11 | 08-27 13:52 | — |
+| [#10403](https://github.com/QwenLM/qwen-code/pull/10403) | 🟡 open | @doudouOUC | feat(serve): Enable full API access on trusted loopback | +2050/-586 | 48 | 08-28 11:49 | — |
+| [#10418](https://github.com/QwenLM/qwen-code/pull/10418) | ✅ merged | @doudouOUC | feat(web-shell): Add explicit daemon session contexts | +4331/-288 | 14 | 08-28 16:12 | 08-29 14:40 |
+| [#10420](https://github.com/QwenLM/qwen-code/pull/10420) | 🟡 open | @doudouOUC | feat(channels): Attribute named task output | +4423/-253 | 47 | 08-28 16:39 | — |
+| [#10512](https://github.com/QwenLM/qwen-code/pull/10512) | ⚫ closed | @doudouOUC | fix(core): Harden surviving hook supervision | +482/-56 | 4 | 08-29 14:48 | 08-29 14:56 |
+| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | 🟡 open | @doudouOUC | docs(plans): Add standalone PR6 WebShell UI plan | +334/-0 | 1 | 08-29 15:49 | — |
 
 ---
 
@@ -60,32 +64,36 @@
 | [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | #10113 的受控 Mem0 provider 设计缺少可构建、可测试的 extension runtime 骨架。 | 最终新增独立 `external-context-mem0` package：严格加载绝对路径小型配置、验证 schema/preset/HTTPS/凭据 env，按白名单 GET/POST 发请求，禁止 redirect/retry，限制 1 MiB response 并最多归一化 5 条 Profile v1 结果；MCP 只暴露 `context_search`。内置 preset 列表故意为空，因此合入后仍不能连接真实 provider。 | 已在 [external-context-provider.md](../../feature/external-context-provider.md) 登记基于 #10113 设计的 merged runtime skeleton 及空 preset 边界。完整实现见 [implementations/pr-10149.md](implementations/pr-10149.md)。 |
 | [#10179](https://github.com/QwenLM/qwen-code/pull/10179) | #9978 只提供内部 standalone core，外部调用方仍没有公开的创建、查询、恢复、归档、导出、修复和删除 API。 | 最终条件广告 `standalone_sessions_v1` 并增加 `/standalone/sessions` 路由族；所有 public 操作要求精确顶层 standalone owner 并 fail closed。删除用私有 journal 将 transcript unlink 作为 commit point，崩溃恢复在 commit 前还原目录、commit 后完成 sidecar/attachment/目录清理并报告 pending cleanup。 | 已在 daemon HTTP、lifecycle、capabilities 与 ACP bridge 登记为 merged public API；SDK 已由 #10294 合入。完整实现见 [implementations/pr-10179.md](implementations/pr-10179.md)。 |
 | [#10198](https://github.com/QwenLM/qwen-code/pull/10198) | 同一 Channel 用户过去只能保留一个 selected session，多任务切换会丢失上下文隔离，异步媒体、排队 turn 或 pending permission 还可能把消息投递给错误任务。 | 最终增加 daemon-only `multiSession`：owner-scoped JSON catalog 保存最多 8 个命名任务，`/sessions` 与 `/session current/new/use/close` 只暴露任务名；入站消息在异步准备前绑定精确 session/generation，busy 状态拒绝切换，重启只按原 ID 恢复，旧模式保持兼容。 | 已更新 [channel-adapters.md](../../feature/channel-adapters.md) 的命名任务目录与 turn ownership。完整实现见 [implementations/pr-10198.md](implementations/pr-10198.md)。 |
-| [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | `newSession` timeout 只拒绝 wrapper，child 初始化与 `SessionStart` hook 可能继续并迟到发布未登记 session；杀共享 channel 又会误伤健康 sibling。 | 当前 open diff 传递私有绝对 deadline 并将 AbortSignal 贯穿配置/client/hook；旧 child 迟到成功按精确 ID close，settlement/cleanup 不确定时只隔离 fresh admission，保留健康 sibling 与 requested-ID fence。 | 已在 daemon lifecycle/ACP bridge 登记 open 初始化 deadline 与迟到清理方案。完整观察见 [implementations/pr-10268.md](implementations/pr-10268.md)。 |
+| [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | `newSession` timeout 只拒绝 wrapper，child 初始化与 `SessionStart` hook 可能继续并迟到发布未登记 session；杀共享 channel 又会误伤健康 sibling。 | 最终由受管 parent 传递私有绝对 deadline，child 将 AbortSignal 贯穿配置/client/hook 并在发布前拒绝过期 session；旧 child 迟到成功按精确 ID close，settlement/cleanup 不确定时只隔离 fresh admission，同时保留健康 sibling 与 requested-ID fence。 | 已在 daemon lifecycle/ACP bridge 更新为 merged 初始化 deadline 与迟到清理实现。完整实现见 [implementations/pr-10268.md](implementations/pr-10268.md)。 |
 | [#10269](https://github.com/QwenLM/qwen-code/pull/10269) | provider install/model delete 已持久化并显示后，既有 ACP child 与 live session registry 仍陈旧，新 route 要重启 daemon 才可用。 | 当前 open diff 在 mutation 后重建 parent effective env、通知 child 重载 settings/environment、刷新 bootstrap/initializing/live registry 并清 generator cache；不切当前模型或 active-turn generator，响应以 optional `runtimeSync` 区分 applied/deferred/failed。 | 已更新 [auth-providers.md](../../feature/auth-providers.md) 与 daemon 总览；当前仍为 open 观察。完整观察见 [implementations/pr-10269.md](implementations/pr-10269.md)。 |
 | [#10286](https://github.com/QwenLM/qwen-code/pull/10286) | transcript 主变更后 runtime generation 关闭会中断 sidecar cleanup，但无 fence 清理又可能删除 replacement writer 数据。 | 关闭前方案用 exact writer lease 作为 post-commit cleanup fence；该 head 未覆盖 #10179 standalone lifecycle，已关闭并由 #10300 取代，不能视为已落地。 | daemon lifecycle 仅记录 closed 前身与替代关系。完整观察见 [implementations/pr-10286.md](implementations/pr-10286.md)。 |
-| [#10288](https://github.com/QwenLM/qwen-code/pull/10288) | 允许父进程退出后继续的 fire-and-forget hook 仍继承 Qwen stdout/stderr，延迟写会 broken pipe；父进程退出还会丢失排队 stdin 和 timeout owner。 | 当前 open diff 为 `MessageDisplay`、`StopFailure`、`SessionDelete` 暂存 mode-0600 输入并启动 detached supervisor；supervisor 独立持有真实 hook、timeout 与 POSIX 进程组监督，普通 async hook 仍捕获输出并随父进程回收，显式 AbortSignal 仍终止完整进程树。 | 已更新 [hooks.md](../../feature/hooks.md) 登记 open fire-and-forget supervisor 边界。完整观察见 [implementations/pr-10288.md](implementations/pr-10288.md)。 |
+| [#10288](https://github.com/QwenLM/qwen-code/pull/10288) | 允许父进程退出后继续的 fire-and-forget hook 仍继承 Qwen stdout/stderr，延迟写会 broken pipe；父进程退出还会丢失排队 stdin 和 timeout owner。 | 最终为 `MessageDisplay`、`StopFailure`、`SessionDelete` 暂存 mode-0600 输入并启动 detached supervisor；supervisor 独立持有真实 hook、timeout 与 POSIX 进程组监督，普通 async hook 仍捕获输出并随父进程回收，显式 AbortSignal 仍终止完整进程树。 | 已更新 [hooks.md](../../feature/hooks.md) 登记 merged fire-and-forget supervisor 边界。完整实现见 [implementations/pr-10288.md](implementations/pr-10288.md)。 |
 | [#10294](https://github.com/QwenLM/qwen-code/pull/10294) | standalone REST 已合入，但 SDK caller 仍要手写 route/validator，并可能在 create outcome unknown 时盲重试。 | 最终提供 capability-gated standalone lifecycle API 与严格 runtime parser；create 预生成 UUID，失败后只做一次 exact lookup 并抛带 recovery 的 error，不自动 retry；session client 使用显式 standalone restore strategy。 | 已更新 [sdk.md](../../feature/sdk.md) 并登记为 merged standalone SDK surface。完整实现见 [implementations/pr-10294.md](implementations/pr-10294.md)。 |
 | [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | #10286 的 cleanup fence 没有接入已合入 standalone archive/delete/recovery，普通与 standalone 生命周期仍可能在 transcript commit 后留永久 sidecar。 | 当前 open diff 在主变更前保留 snapshot/generation fence，提交后逐步验证同一 writer lock 的 descriptor/path inode 与原始 owner record；standalone 再组合 selected-runtime guard，ownership 丢失时停止清理并返回 per-session error。 | daemon lifecycle 记录 #10286(closed)→#10300(open) 的替代方案。完整观察见 [implementations/pr-10300.md](implementations/pr-10300.md)。 |
 | [#10403](https://github.com/QwenLM/qwen-code/pull/10403) | 默认无 token loopback daemon 只开放 non-strict API，strict mutation、显式 session shell、Local Control 配对材料和 Web Shell Channel 管理仍要求 token，导致本地信任边界下功能不完整。 | 当前 open diff 将“Bearer 已认证”与“部署边界 operator authority”分离：仅当实际主监听为 loopback、无 token 且未启用 `--require-auth` 时，主监听请求获得完整 operator authority；strict mutation 和显式 shell 可用，Local Control 仍对 LAN 要求 pairing，所有 workspace/session/client/permission/feature/resource guard 保持不变。`localhost` 先解析并在 listen 后复核实际地址，避免错误授予 authority。 | 已在 daemon HTTP/中间件、capability/SDK 口径、Web Shell transport 与总览登记为 open trusted-loopback 方案。完整观察见 [implementations/pr-10403.md](implementations/pr-10403.md)。 |
+| [#10418](https://github.com/QwenLM/qwen-code/pull/10418) | WebUI provider 只靠 `workspaceCwd` 推断会话归属，无法安全表达 standalone/Live，会暴露内部 Conversations cwd、错误回退 primary 或初始化 workspace-only 状态。 | 最终引入显式 `workspace|standalone|live` product context：workspace 保持兼容，standalone 调 capability-gated SDK 并保留 working-directory/create-recovery 状态，Live 在请求前解析唯一 trusted non-primary runtime；context key 与 supersession guard 防止迟到切换发布，非 workspace 不初始化 provider/skills/preheat/Git/invalidation。 | 已在 daemon WebUI/transport 与总览登记 merged provider routing boundary；可见 WebShell 入口仍留后续。完整实现见 [implementations/pr-10418.md](implementations/pr-10418.md)。 |
+| [#10420](https://github.com/QwenLM/qwen-code/pull/10420) | owner-scoped 命名任务虽能保留多个 session，但延迟结果、分片、卡片、后台输出和权限提示无法说明来自哪个任务。 | 当前 open diff 为 exact session 建 O(1) task presentation index，在 turn/permission admission 时捕获独立 `sourceLabel`，由各 adapter 在每个可见发送边界渲染 `[task]` 或 `[sender · task]`；模型文本/transcript 不变，权限文本显示精确 request ID，busy/selection/concurrency 语义不扩大。 | 已在 [channel-adapters.md](../../feature/channel-adapters.md) 登记 open Part 3A delivery attribution。完整观察见 [implementations/pr-10420.md](implementations/pr-10420.md)。 |
+| [#10512](https://github.com/QwenLM/qwen-code/pull/10512) | #10288 supervisor 仍存在 timeout 非法值、argv 边界、loader env 注入、Windows fallback 漂移和 deadline 附近自然完成被误判等加固缺口。 | 关闭前方案校验正有限 timeout、增加 Node `--`、隔离并仅向真实 hook 恢复 loader env、对齐 Windows taskkill，并仅在实际发出终止动作时报告 timeout；未合入，只作为 #10288 后续观察。 | 已在 [hooks.md](../../feature/hooks.md) 记录 closed 未合入 hardening 边界。完整方案见 [implementations/pr-10512.md](implementations/pr-10512.md)。 |
+| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | standalone daemon/SDK/provider 底座已合入，但 WebShell 仍没有全局入口、Recents 生命周期、context-aware 深链和项目控件隔离。 | 当前 docs-only 计划把 Home/global New Chat 映射到 standalone、项目入口映射到 workspace，新增 standalone Recents 与完整生命周期；非 workspace 隐藏项目/Git/file/upload 控件，以 `?context=standalone` 深链和 typed recovery 呈现失败，只有 capability 缺失时才允许旧 primary fallback。 | 已在 daemon WebUI/transport 与总览登记 open PR6 UI 计划，不能视为已实现界面。完整观察见 [implementations/pr-10514.md](implementations/pr-10514.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [daemon-serve-mode/](../../feature/daemon-serve-mode/README.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268(open) / #10269(open) / #10286(closed) / #10300(open) / #10403(open) | 刷新 standalone、ACP process tree、session 初始化、provider sync、post-commit cleanup 与 trusted-loopback authority 阶段边界。 |
+| [daemon-serve-mode/](../../feature/daemon-serve-mode/README.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10269(open) / #10286(closed) / #10300(open) / #10403(open) / #10418 / #10514(open) | 刷新 standalone、ACP process tree、session 初始化、provider sync、post-commit cleanup、trusted-loopback authority 与 WebUI/WebShell context/UI 阶段边界。 |
 | [daemon-serve-mode/01-http-server-and-middleware.md](../../feature/daemon-serve-mode/01-http-server-and-middleware.md) | #9838 / #9933 / #10179 / #10403(open) | 记录 current-session runtime、permission timeout、standalone public route 与 trusted-loopback 鉴权矩阵。 |
-| [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #9819 / #9820 / #9838 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268(open) / #10286(closed) / #10300(open) | 补 standalone/process tree、新建 session deadline 与 writer-owned cleanup 生命周期。 |
+| [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #9819 / #9820 / #9838 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10286(closed) / #10300(open) | 补 standalone/process tree、已合入的新建 session deadline 与 writer-owned cleanup 生命周期。 |
 | [daemon-serve-mode/04-capabilities-and-protocol.md](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10179 / #10294 / #10403(open) | 记录 merged `standalone_sessions_v1` SDK consumer 与 open trusted-loopback shell/SDK 注释口径。 |
-| [daemon-serve-mode/07-acp-bridge-and-permission.md](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268(open) | 更新 standalone service/guard、ACP process-tree ownership 与初始化 deadline。 |
-| [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #9838 / #10403(open) | 记录 capability-gated session mode selector 与 trusted-loopback Channel 管理 authority 判定。 |
+| [daemon-serve-mode/07-acp-bridge-and-permission.md](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 | 更新 standalone service/guard、ACP process-tree ownership 与已合入的初始化 deadline。 |
+| [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #9838 / #10403(open) / #10418 / #10514(open) | 记录 session mode selector、trusted-loopback Channel authority、merged explicit product context 与 open standalone UI 计划。 |
 | [permission-system.md](../../feature/permission-system.md) | #9933 | 将普通权限/AUQ 默认 deadline 从 5 分钟改为 disabled，并记录显式 `300000` 的兼容迁移。 |
 | [scheduled-tasks.md](../../feature/scheduled-tasks.md) | #9838 / #10144 | 更新 current-session task 最终实现，并补 empty-session persistence 前置步骤。 |
-| [hooks.md](../../feature/hooks.md) | #10100 / #10288(open) | 将 command hook process-tree 更新为 merged，并增加 fire-and-forget output/lifecycle 例外。 |
-| [channel-adapters.md](../../feature/channel-adapters.md) | #10145 / #10198 | 增加 same-chat delivery ownership 与 owner-scoped 命名任务 catalog。 |
+| [hooks.md](../../feature/hooks.md) | #10100 / #10288 / #10512(closed) | 更新 merged fire-and-forget supervisor，并保留 closed hardening follow-up 观察。 |
+| [channel-adapters.md](../../feature/channel-adapters.md) | #10145 / #10198 / #10420(open) | 增加 same-chat delivery ownership、owner-scoped 命名任务 catalog 与 open 输出归因方案。 |
 | [auth-providers.md](../../feature/auth-providers.md) | #10269(open) | 记录 provider mutation 后父 env、ACP child 与 live registry 的 runtime sync。 |
 | [sdk.md](../../feature/sdk.md) | #10179 / #10294 | 记录已合入的 standalone REST 与 TypeScript SDK lifecycle/recovery 契约。 |
 | [external-context-provider.md](../../feature/external-context-provider.md) | #10113 / #10149 | 将 configurable Mem0 design/runtime 更新为 merged，并保留空 preset 不可用边界。 |
 | [telemetry-observability/](../../feature/telemetry-observability/README.md) | #10016 | 将 request-start context snapshot、provider-total normalization 和低敏边界更新为 merged。 |
 | [telemetry-observability/06-genai-ttft-retry-and-metrics.md](../../feature/telemetry-observability/06-genai-ttft-retry-and-metrics.md) | #10016 | 将 `qwen-code.context.usage` 的 span 生命周期与分类不变量更新为 merged。 |
 
-_按个人 PR 口径更新于 2026-08-29_
+_按个人 PR 口径更新于 2026-08-30_

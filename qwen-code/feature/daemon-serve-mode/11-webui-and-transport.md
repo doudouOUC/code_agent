@@ -416,6 +416,18 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 Local Control 配对材料也改为按 operator authority 展示：trusted primary listener 可直接收到 URL/QR，LAN listener 仍需已有 pairing credential，否则继续 redacted；disable 仍可由已准入 listener 撤销。PR 不改变 Channel webhook auth、Host/Origin、WebSocket listener credential isolation 或 session ownership，且未合入前不能视为 `main` 行为。
 
+## 2026-08-30 follow-up：显式产品会话 context（#10418 merged）
+
+#10418 已在 WebUI daemon provider 合入 `workspace|standalone|live` 显式产品 context，并保留 legacy `workspaceCwd` 兼容入口。显式 standalone/Live 与 legacy cwd 冲突会在请求前失败；workspace 继续走既有 route，standalone 使用 #10294 capability-gated SDK 且不自动重试 create，Live 只恢复 daemon capabilities 中唯一 trusted、non-primary、ID/cwd 均不重复的 runtime。
+
+Provider 用 context key、restore matching、generation 与 supersession guard 隔离 create/load/resume/reconnect 的迟到结果；standalone working-directory、directory error 与 outcome-unknown recovery 进入 typed connection state。Standalone/Live 不初始化 workspace providers、skills、ACP preheat、Git status 或 workspace invalidation。该 PR 只提供 routing/provider boundary，没有加入全局 New Chat、Recents 或生命周期 UI。
+
+## 2026-08-30 follow-up：standalone WebShell PR6 UI 计划（#10514 open）
+
+#10514 是 docs-only open 计划，不是运行时实现。计划让 capable daemon 上的 Home/global New Chat 使用 pending standalone context，项目/Goals/Git 入口保持 exact workspace；只有缺少 `standalone_sessions_v1` 时才允许 legacy primary fallback，capability 存在但创建失败时保留 standalone intent 并展示错误。
+
+计划还定义独立 standalone Recents lane、rename/export/archive/unarchive/delete、`?context=standalone` 深链、project/Git/file/upload 控件隔离，以及 recreated directory、repair、creation outcome unknown、`fileCleanupPending` 的 typed UI。Live 当前会话 New Chat 映射 standalone 仍是开放决策；入口、Recents、深链和 surface gating 在实现 PR 合入前都不能视为 `main` 行为。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -463,4 +475,4 @@ Local Control 配对材料也改为按 operator authority 展示：trusted prima
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-29_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-30_

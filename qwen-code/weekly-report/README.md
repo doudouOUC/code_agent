@@ -4,9 +4,9 @@
 
 > 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
-**时间范围**: 2026-04-06 ~ 2026-08-28（持续更新）
-**总计**: 446 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35 见对应周目录（W35 当前个人增量 +47,223 / -3,029，421 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-08-29（持续更新）
+**总计**: 450 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35 见对应周目录（W35 当前个人增量 +59,061 / -4,135，497 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -34,11 +34,11 @@
 | 2026-08-03 ~ 2026-08-09 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-03_2026-08-09) · [Obsidian](2026-08-03_2026-08-09/README.md)) (W32 最终版) | 18 | 18/0/0 | +30,039/-2,289 | MCP unsafe replay guard、WebUI live journal truncation recovery、caller-supplied session id admission、daemon memory pressure observation、write_file prior-read guidance、ACP tool-result text projection、active ACP child RSS aggregation、tool-result low watermark microcompaction、ACP repeated tool execution failure guard、Direct External Context Mem0 writes、daemon child heap partition modeling、REST SSE stream/client observability、activeWork deep health、same-host daemon text read delegation、read permission symlink canonicalization、safe session restore timeout observability、integration-tests typecheckability、selective session restore design |
 | 2026-08-10 ~ 2026-08-16 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-10_2026-08-16) · [Obsidian](2026-08-10_2026-08-16/README.md)) (W33 最终版) | 33 | 31/0/2 | +84,903/-12,324 | WebUI/WebShell transactional switching/resync/repair、text file attachments、selective session restore、workspace session live-state endpoint/catalog version、Conversations runtime foundation/runtime boundary、session catalog cache/cancellation、activeWork shell retention/close authorization、OpenAI log retention、ACP NDJSON/resource/pre-attach guards、Headless/tool-result diagnostics、external-context provider profile、daemon/agent telemetry ownership and tracing |
 | 2026-08-17 ~ 2026-08-23 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-17_2026-08-23) · [Obsidian](2026-08-17_2026-08-23/README.md)) (W34 最终版) | 16 | 14/2/0 | +24,650/-1,725 | standalone conversation primitives/hardening、session archive race 与 persisted maintenance、AUQ HITL restore/hardening、per-session model restore、`serve --open-with-auth`、workspace live-state WebShell consumer/activity/title guard、ACP child heap measurement、duplicate provider tool-call guard |
-| 2026-08-24 ~ 2026-08-30 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-24_2026-08-30) · [Obsidian](2026-08-24_2026-08-30/README.md)) (W35 周内累计) | 22 | 16/5/1 | +47,223/-3,029 | standalone core/REST/SDK、trusted-loopback authority、Channel 命名任务、session 初始化/cleanup、provider runtime sync、command hook/ACP process tree、Mem0 extension、OTel context usage |
+| 2026-08-24 ~ 2026-08-30 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-24_2026-08-30) · [Obsidian](2026-08-24_2026-08-30/README.md)) (W35 周内累计) | 26 | 19/5/2 | +59,061/-4,135 | standalone core/REST/SDK/WebUI context 与 UI 计划、trusted-loopback authority、Channel 命名任务/输出归因、session 初始化/cleanup、provider runtime sync、hook/ACP process tree、Mem0、OTel context usage |
 
 ## 类型分布
 
-feat ×213, fix ×163, refactor ×16, other ×13, docs ×11, chore ×7, perf ×16, test ×6, merge ×1
+feat ×215, fix ×164, refactor ×16, other ×13, docs ×12, chore ×7, perf ×16, test ×6, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

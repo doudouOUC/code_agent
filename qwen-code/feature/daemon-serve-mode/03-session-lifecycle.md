@@ -38,7 +38,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **ACP channel transport liveness**：#9976 已合入，在 child private initialize 协商后按 shared channel 做 nonce ping；15 秒健康间隔、10 秒单次 timeout、连续两次按时 timeout 才进入既有 transport-failure teardown，parent timer 延迟清空 streak。
 - **current-session scheduled task**：#9838 已合入 durable `cron_create` 对 daemon 顶层普通 session 的显式复用；#10144 已合入 REST binding 前的 empty-session default source persistence。Core prompt context、private ACP caller identity、Serve owner/lifecycle admission、generation rollback 与条件 capability 共同 gate，默认仍创建 dedicated session。
 - **ACP process-tree ownership**：#10142 已合入，让标准 ACP spawn 管理整个进程树，使用 bounded process snapshot、TERM→KILL 与 root-exit cleanup；legacy attach 保持 direct-child。
-- **new-session initialization deadline**：#10268 当前 open diff 把绝对 deadline 与 AbortSignal 贯穿 child 初始化；旧 child 迟到时由 bridge 做 exact close、requested-ID fencing 与 fresh-admission quarantine。
+- **new-session initialization deadline**：#10268 已合入，把绝对 deadline 与 AbortSignal 贯穿 child 初始化；旧 child 迟到时由 bridge 做 exact close、requested-ID fencing 与 fresh-admission quarantine。
 - **post-commit cleanup ownership**：#10286 已关闭并由 #10300(open) 取代；主 transcript mutation 前仍用 snapshot/generation fence，提交后以 exact writer lock ownership 约束 sidecar/organization cleanup。
 - **persisted session catalog cache + cancellation / live-state**：#8892 已合入 2 秒 process-local single-flight cache；#8954 再把 REST/ACP waiter cancellation 传播到 JSONL、runtime-status、worktree sidecar、project membership 与分页读取，最后一个 waiter 取消才 abort physical scan；#9261 已合入 daemon-local `generation+revision` catalog version 和纯内存 live-state 探针，#9396 已合入 bridge-local session activity `updatedAt` watermark，#9476 已合入 WebShell completion-sequence consumer。
 - **continuation admission logs**：#8932 已合入，在 daemon 接受 session continuation 后写低敏 `continuation enqueued` 结构化日志，记录 `sessionId`、生成的 `promptId` 和可选 `clientId`。
@@ -130,7 +130,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#10142](https://github.com/QwenLM/qwen-code/pull/10142) | merged | ACP process-tree reaping | 标准 ACP spawn 的 tree ownership、bounded snapshot、TERM→KILL、root-exit cleanup 与 SIGHUP lifecycle |
 | [#10144](https://github.com/QwenLM/qwen-code/pull/10144) | merged | empty-session persistence | existing-session task commit 前写入不可见 default source anchor，保证重启可恢复 |
 | [#10179](https://github.com/QwenLM/qwen-code/pull/10179) | merged | standalone public daemon API | 条件 capability、public route family、exact owner admission 与 journaled delete recovery |
-| [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | open | new-session initialization deadline | child-side cancellation、迟到 exact close、ID fence 与 channel-scoped fresh-admission quarantine |
+| [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | merged | new-session initialization deadline | child-side cancellation、迟到 exact close、ID fence 与 channel-scoped fresh-admission quarantine |
 | [#10286](https://github.com/QwenLM/qwen-code/pull/10286) | closed | cleanup ownership 前身 | 关闭前方案以 writer lease 保护 post-commit cleanup，未接入 merged standalone lifecycle，由 #10300 取代 |
 | [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | open | post-commit cleanup ownership | descriptor/path inode + raw lock owner 校验，并接入普通与 standalone lifecycle/recovery |
 
@@ -218,7 +218,7 @@ catalog version 由 `generation` 与 `revision` 组成，只支持整对 equalit
 
 若 directory compromise、spawn outcome 不明或 close refusal 使 containment 无法证明，service 会冻结 creation entry 并 quarantine Conversations runtime；已知 standalone owner 继续暴露 unavailable，而不是 fallback primary。#9978 本身没有 `/standalone/*`、`standalone_sessions_v1` 或 SDK/WebUI；public route 已由 #10179 承接，SDK 已由 #10294 承接。
 
-#10268 当前 open diff 进一步让 new-session timeout 约束底层工作，而不只拒绝 wrapper。managed parent 在 private metadata 中发送绝对 deadline，child 把 AbortSignal 传到 Config、Gemini startup 和 `SessionStart` hook，并在发布前拒绝过期 Session。旧 child 若迟到成功，bridge 按精确 ID close；settlement/cleanup 无法证明时只拒绝该 shared channel 的 fresh admission，健康 sibling 保持可用。
+#10268 已合入，最终让 new-session timeout 约束底层工作，而不只拒绝 wrapper。managed parent 在 private metadata 中发送绝对 deadline，child 把 AbortSignal 传到 Config、Gemini startup 和 `SessionStart` hook，并在发布前拒绝过期 Session。旧 child 若迟到成功，bridge 按精确 ID close；settlement/cleanup 无法证明时只拒绝该 shared channel 的 fresh admission，健康 sibling 保持可用。
 
 #10286 已关闭；替代的 #10300 当前 open diff 把生命周期 fence 分为两段。transcript mutation 前继续检查 snapshot、runtime generation 与 writer lease；commit 后通过 `assertCleanupOwned()` 逐步核对同一普通 lock 文件的 descriptor/path inode、active owner 和 raw record，再清理 worktree/PR/prompt-ledger/file-history/organization。standalone 路径额外叠加 selected-runtime assertion，ownership 丢失后保留残留并返回 per-session error，而不是跨 owner 清理。
 
@@ -700,7 +700,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9976/#9978/#10142/#10144/#10179 已合入，#9626/#10268/#10300 仍为 open，#10286 已关闭**。ACP process-tree 与 standalone public API 已按 merged diff 记录；persisted maintenance、new-session deadline 与 post-commit cleanup ownership 只能记录当前方案。#9978 本身没有 public route/capability/SDK/UI，#10179 承接 route/capability，#10294 已承接 SDK。
+6. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9976/#9978/#10142/#10144/#10179/#10268 已合入，#9626/#10300 仍为 open，#10286 已关闭**。ACP process-tree、standalone public API 与 new-session deadline 已按 merged diff 记录；persisted maintenance 与 post-commit cleanup ownership 只能记录当前方案。#9978 本身没有 public route/capability/SDK/UI，#10179 承接 route/capability，#10294 已承接 SDK。
 
 ---
 
