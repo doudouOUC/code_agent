@@ -426,6 +426,8 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 13. **#10294 已合入**。standalone TypeScript methods、runtime validators、recovery error 与 215 KiB browser bundle budget 已进入发布 SDK 契约；WebUI/WebShell 流程仍在范围外。
 
+14. **#10554 仍为 open**。`DaemonClient.setUserLanguage()` 与 `SetUserLanguageResult` 只能作为当前 additive 方案记录；consumer 必须先 gate `user_language_sync`，零 session 是成功，`refresh.failed` 表示持久化后仍有 runtime/session 未刷新。
+
 ---
 
 ## 9. 各 PR 代码贡献
@@ -518,4 +520,10 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - response 中的 `resolvedConflicts` 是 optional/additive，表示 keep-destination repair 实际丢弃了另一状态副本；它不表示 transcript merge，也不改变 delete 的 delete-both 语义。
 - 默认 archive/unarchive conflict 现在作为 HTTP 200 batch `errors` 返回；SDK 不能再只依赖 workspace-qualified HTTP 409 envelope。PR 尚未合入；旧 SDK、旧 daemon 和未广告 capability 的 daemon 都应保持默认 fail-closed conflict。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-29_
+### #10554 — sessionless user-language SDK（open）
+
+- `DaemonClient.setUserLanguage(language, opts)` 调用 process-global `POST /language`；`opts` 只包含 optional `syncOutputLanguage` 与 client ID，不接受 workspace/session selector。
+- `SetUserLanguageResult` additive 返回 resolved language、nullable output language，以及 `{runtimes,sessions,failed}` refresh summary；零 runtime/session 仍是成功。
+- SDK helper 不自动 capability preflight；调用方必须先检查 `user_language_sync`，旧 daemon 会 404。PR 未合入前不能作为发布 SDK 契约。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-31_

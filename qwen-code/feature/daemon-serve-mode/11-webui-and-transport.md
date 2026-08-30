@@ -410,11 +410,11 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 该 flag 自带 open intent：browser eligible 时正常启动 tab，headless 时打印带 fragment 的手动 URL；bare `--open`、Chrome extension 和未传新 flag 的客户端保持现有行为。generated token 仍是完整 daemon runtime credential，不是 browser-scoped pairing token；opt-in daemon 上其它无 token local clients 会得到 401，多客户端/可重开浏览器需显式配置共享 `QWEN_SERVER_TOKEN`。persistent store、cross-tab、cookie、client identity/revoke 与 SDK discovery 不在范围；PR 未合入，不能写成 `main` 能力。
 
-## 2026-08-29 follow-up：trusted-loopback Channel controls（#10403 open）
+## 2026-08-29 follow-up：trusted-loopback Channel controls（#10403 merged）
 
-#10403 当前 open diff 让无 token 的 primary loopback listener 获得完整 operator authority。Web Shell `ChannelsManagerPage` 在没有 bearer 时通过 `useStatusReport()` 读取 `security.loopbackBind`、`tokenConfigured` 与 `requireAuth`，只在 trusted-loopback 三条件成立时开放 Channel lifecycle controls；status 尚在加载或 authority 不成立时保持只读。该 UI 判定只负责展示和请求准入反馈，服务端 strict mutation gate 仍独立执行 authority、workspace trust 和 route schema 校验。
+#10403 已合入，让无 token 的 primary loopback listener 获得完整 operator authority。Web Shell `ChannelsManagerPage` 在没有 bearer 时通过 `useStatusReport()` 读取 `security.loopbackBind`、`tokenConfigured` 与 `requireAuth`，只在 trusted-loopback 三条件成立时开放 Channel lifecycle controls；status 尚在加载或 authority 不成立时保持只读。该 UI 判定只负责展示和请求准入反馈，服务端 strict mutation gate 仍独立执行 authority、workspace trust 和 route schema 校验。
 
-Local Control 配对材料也改为按 operator authority 展示：trusted primary listener 可直接收到 URL/QR，LAN listener 仍需已有 pairing credential，否则继续 redacted；disable 仍可由已准入 listener 撤销。PR 不改变 Channel webhook auth、Host/Origin、WebSocket listener credential isolation 或 session ownership，且未合入前不能视为 `main` 行为。
+Local Control 配对材料也改为按 operator authority 展示：trusted primary listener 可直接收到 URL/QR，LAN listener 仍需已有 pairing credential，否则继续 redacted；disable 仍可由已准入 listener 撤销。PR 不改变 Channel webhook auth、Host/Origin、WebSocket listener credential isolation 或 session ownership。
 
 ## 2026-08-30 follow-up：显式产品会话 context（#10418 merged）
 
@@ -424,9 +424,9 @@ Provider 用 context key、restore matching、generation 与 supersession guard 
 
 ## 2026-08-30 follow-up：standalone WebShell PR6 UI 计划（#10514 open）
 
-#10514 是 docs-only open 计划，不是运行时实现。计划让 capable daemon 上的 Home/global New Chat 使用 pending standalone context，项目/Goals/Git 入口保持 exact workspace；只有缺少 `standalone_sessions_v1` 时才允许 legacy primary fallback，capability 存在但创建失败时保留 standalone intent 并展示错误。
+#10514 是 docs-only open 计划，不是运行时实现。计划让 Home/global New Chat 使用 pending standalone context，项目/Goals/Git 入口保持 exact workspace，当前会话继承显式 context，Live 当前会话 New Chat 保持既有 `startLive('new')`。Scheduled Tasks 等 workspace-maintenance caller 必须显式解析并传递 workspace cwd；pending/attached standalone 同时阻断 Git status 和 workspace slash-command handler，且 standalone history 不读取 legacy 全局 fallback。capability loading 时等待、加载失败时 fail closed；只有加载完成且明确缺少 `standalone_sessions_v1` 时才允许 legacy primary fallback，capability 存在但创建失败时保留 standalone intent 并展示错误。
 
-计划还定义独立 standalone Recents lane、rename/export/archive/unarchive/delete、`?context=standalone` 深链、project/Git/file/upload 控件隔离，以及 recreated directory、repair、creation outcome unknown、`fileCleanupPending` 的 typed UI。Live 当前会话 New Chat 映射 standalone 仍是开放决策；入口、Recents、深链和 surface gating 在实现 PR 合入前都不能视为 `main` 行为。
+计划还定义顶层 standalone Recents 的 active/archived lanes、逐 ID lifecycle partial result、`?context=standalone` deep-link 的 pre-provider exact owner resolution，以及 URL/sessionStorage/controlled prop ingress 的 fail-closed 分类。非 workspace context 除 project/Git/file/upload 控件外，还隔离 commands、skills、`atWorkspaceCwd`、draft/history 与 held attachments；typed UI 覆盖 recreated/missing/compromised directory、repair/reload、archived、creation outcome unknown 和 `fileCleanupPending`。入口、Recents、深链和 surface gating 在实现 PR 合入前都不能视为 `main` 行为。
 
 ---
 

@@ -637,3 +637,9 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - managed bridge 在 private `newSession` metadata 中发送绝对 deadline；child 把 cancellation 传播到配置、Gemini startup 与 `SessionStart` hook，并在 Session publication 前返回稳定 timeout。
 - 兼容旧 child 时，bridge 保留原始 request、requested-ID fence 与 settlement token；迟到成功只按精确 ID close，close/settlement 不确定则隔离该 shared channel 的 fresh admission，健康 sibling session 继续可用。
 - #10268 已合入；load/resume/prompt deadline 和 OS cgroup/Job Object containment 不在范围内。
+
+### #10554 — sessionless user-language fan-out（open）
+
+- `SERVE_CONTROL_EXT_METHODS.userLanguage` 是无 session/workspace selector 的 private control；daemon 已先持久化 user settings 和全局 output-language，因此 child 只 reload user scope，不重复写共享文件。
+- trusted runtime 有 live ACP channel 时调用 `setUserLanguage()`；无 channel 返回 skipped，非 `SessionNotFoundError` 的 runtime failure 与 local session refresh rejection 进入聚合 `failed`，不回滚持久化。
+- child 总是切 process i18n；只有 `syncOutputLanguage:true` 才并发刷新本 runtime 所有 Session 的 hierarchical memory 和 system instruction。project-bound output-language override 有意保留。

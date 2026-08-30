@@ -81,7 +81,8 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #9978 | feat(cli): Add standalone sessions for projectless tasks | merged | 该 PR 不注册 `/standalone/*`、不广告 `standalone_sessions_v1`、不新增 SDK/UI；只让内部 projectless Live path 和 existing generic owner routes 消费 standalone service/source guard。 |
 | #10179 | feat(cli): Add standalone daemon session API | merged | 最终实现仅在完整 standalone runtime 安装时广告 `standalone_sessions_v1` 并注册 public route family；该 PR 本身不含 SDK/UI。 |
 | #10294 | feat(sdk): Add standalone session APIs | merged | 最终实现消费 `standalone_sessions_v1`，为完整 lifecycle 增加严格 validators、explicit restore strategy 与 outcome-unknown exact recovery。 |
-| #10403 | feat(serve): Enable full API access on trusted loopback | open | 当前 diff 不新增 capability tag，但让 trusted-loopback authority 满足 strict mutation，并允许显式启用 `session_shell_command`；SDK 注释同步该部署模式。 |
+| #10403 | feat(serve): Enable full API access on trusted loopback | merged | 不新增 capability tag；trusted-loopback authority 满足 strict mutation，并允许显式启用 `session_shell_command`，SDK 注释同步该部署模式。 |
+| #10554 | feat(serve): add sessionless POST /language for user-level language sync | open | 新增条件 `user_language_sync`；与 `workspace_settings` 共用 `persistSettingAvailable` predicate，route/SDK 不存在时客户端必须降级。 |
 | #9261 | feat(serve): Add workspace session live-state endpoint and catalog version | merged | 新增 `workspace_session_live_state` capability、trusted-only memory-only `GET /workspaces/:workspace/sessions/live-state`、catalog version 与 TS SDK surface。 |
 | #9366 | feat(web-shell): Consume workspace session live-state | merged | 不新增 protocol；WebShell 消费 #9261 的 capability/route，用 version-fenced handshake 减少 full catalog polling。 |
 | #9380 | feat(serve): measure ACP child peak old-generation heap | merged | `/daemon/status` additive 暴露 ACP child old-generation peak heap measurement；observe-only，不改 child argv/enforcement。 |
@@ -545,7 +546,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978/#10179/#10294 已合入；#9626/#10403 是 open**。standalone public capability 与 TypeScript SDK 已由 #10179/#10294 合入；storage conflict repair 与 trusted-loopback authority 仍只能记录当前方案。#9978 本身明确没有 `standalone_sessions_v1`，#10179 新增该 capability，#10294 是 capability-gated consumer；#10403 不新增 tag，只改变 strict operator authority 和显式 session shell 的广告条件。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新。
+8. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978/#10179/#10294/#10403 已合入；#9626/#10554 是 open**。standalone public capability 与 TypeScript SDK 已由 #10179/#10294 合入；storage conflict repair 与 user-level language sync 仍只能记录当前方案。#9978 本身明确没有 `standalone_sessions_v1`，#10179 新增该 capability，#10294 是 capability-gated consumer；#10403 不新增 tag，只改变 strict operator authority 和显式 session shell 的广告条件；#10554 则新增与 settings persistence 锁步的条件 tag。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新。
 
 ---
 

@@ -39,7 +39,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **current-session scheduled task**：#9838 已合入 durable `cron_create` 对 daemon 顶层普通 session 的显式复用；#10144 已合入 REST binding 前的 empty-session default source persistence。Core prompt context、private ACP caller identity、Serve owner/lifecycle admission、generation rollback 与条件 capability 共同 gate，默认仍创建 dedicated session。
 - **ACP process-tree ownership**：#10142 已合入，让标准 ACP spawn 管理整个进程树，使用 bounded process snapshot、TERM→KILL 与 root-exit cleanup；legacy attach 保持 direct-child。
 - **new-session initialization deadline**：#10268 已合入，把绝对 deadline 与 AbortSignal 贯穿 child 初始化；旧 child 迟到时由 bridge 做 exact close、requested-ID fencing 与 fresh-admission quarantine。
-- **post-commit cleanup ownership**：#10286 已关闭并由 #10300(open) 取代；主 transcript mutation 前仍用 snapshot/generation fence，提交后以 exact writer lock ownership 约束 sidecar/organization cleanup。
+- **post-commit cleanup ownership**：#10286 已关闭并由 #10300(merged) 取代；主 transcript mutation 前仍用 snapshot/generation fence，提交后以 exact writer lock ownership 约束 sidecar/organization cleanup。
 - **persisted session catalog cache + cancellation / live-state**：#8892 已合入 2 秒 process-local single-flight cache；#8954 再把 REST/ACP waiter cancellation 传播到 JSONL、runtime-status、worktree sidecar、project membership 与分页读取，最后一个 waiter 取消才 abort physical scan；#9261 已合入 daemon-local `generation+revision` catalog version 和纯内存 live-state 探针，#9396 已合入 bridge-local session activity `updatedAt` watermark，#9476 已合入 WebShell completion-sequence consumer。
 - **continuation admission logs**：#8932 已合入，在 daemon 接受 session continuation 后写低敏 `continuation enqueued` 结构化日志，记录 `sessionId`、生成的 `promptId` 和可选 `clientId`。
 - **event epoch / degraded replay**：load/resume 与 SSE replay 的 cursor 从纯数字向 `(eventEpoch,lastEventId)` 演进，compaction snapshot 保留 turn attribution，并在 ingest failure 后暴露 degraded 状态（#7458）。
@@ -132,7 +132,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#10179](https://github.com/QwenLM/qwen-code/pull/10179) | merged | standalone public daemon API | 条件 capability、public route family、exact owner admission 与 journaled delete recovery |
 | [#10268](https://github.com/QwenLM/qwen-code/pull/10268) | merged | new-session initialization deadline | child-side cancellation、迟到 exact close、ID fence 与 channel-scoped fresh-admission quarantine |
 | [#10286](https://github.com/QwenLM/qwen-code/pull/10286) | closed | cleanup ownership 前身 | 关闭前方案以 writer lease 保护 post-commit cleanup，未接入 merged standalone lifecycle，由 #10300 取代 |
-| [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | open | post-commit cleanup ownership | descriptor/path inode + raw lock owner 校验，并接入普通与 standalone lifecycle/recovery |
+| [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | merged | post-commit cleanup ownership | descriptor/path inode + raw lock owner 校验，并接入普通与 standalone lifecycle/recovery |
 
 ---
 
@@ -220,7 +220,7 @@ catalog version 由 `generation` 与 `revision` 组成，只支持整对 equalit
 
 #10268 已合入，最终让 new-session timeout 约束底层工作，而不只拒绝 wrapper。managed parent 在 private metadata 中发送绝对 deadline，child 把 AbortSignal 传到 Config、Gemini startup 和 `SessionStart` hook，并在发布前拒绝过期 Session。旧 child 若迟到成功，bridge 按精确 ID close；settlement/cleanup 无法证明时只拒绝该 shared channel 的 fresh admission，健康 sibling 保持可用。
 
-#10286 已关闭；替代的 #10300 当前 open diff 把生命周期 fence 分为两段。transcript mutation 前继续检查 snapshot、runtime generation 与 writer lease；commit 后通过 `assertCleanupOwned()` 逐步核对同一普通 lock 文件的 descriptor/path inode、active owner 和 raw record，再清理 worktree/PR/prompt-ledger/file-history/organization。standalone 路径额外叠加 selected-runtime assertion，ownership 丢失后保留残留并返回 per-session error，而不是跨 owner 清理。
+#10286 已关闭；替代的 #10300 最终把生命周期 fence 分为两段。transcript mutation 前继续检查 snapshot、runtime generation 与 writer lease；commit 后通过 `assertCleanupOwned()` 逐步核对同一普通 lock 文件的 descriptor/path inode、active owner、raw record 与 acquisition inode，再清理 worktree/PR/prompt-ledger/file-history/organization。standalone 路径额外叠加 selected-runtime assertion，already-active/already-archived 重试也先取得 writer/maintenance lease。ownership 丢失后保留残留并返回 per-session error，而不是跨 owner 清理；由于 transcript commit 不回滚，batch item 可能同时出现在 errors 中，调用方应重试同一权威 lifecycle 操作完成对账。
 
 ## 数据结构
 
@@ -700,7 +700,7 @@ sequenceDiagram
 
 5. **deadline 释放 FIFO 但不杀共享 channel**。#7400 后 absolute deadline 会发布 terminal 并释放 session FIFO，避免单个坏 prompt 永久阻塞同会话；但它不会直接 kill ACP channel，因为 channel 可能被其它 session 共享。忽略 `cancel()` 的 agent 仍需要后续 channel-level 回收/隔离策略兜底。
 
-6. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9976/#9978/#10142/#10144/#10179/#10268 已合入，#9626/#10300 仍为 open，#10286 已关闭**。ACP process-tree、standalone public API 与 new-session deadline 已按 merged diff 记录；persisted maintenance 与 post-commit cleanup ownership 只能记录当前方案。#9978 本身没有 public route/capability/SDK/UI，#10179 承接 route/capability，#10294 已承接 SDK。
+6. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9976/#9978/#10142/#10144/#10179/#10268/#10300 已合入，#9626 仍为 open，#10286 已关闭**。ACP process-tree、standalone public API、new-session deadline 与 post-commit cleanup ownership 已按 merged diff 记录；persisted maintenance 仍只能记录当前方案。#9978 本身没有 public route/capability/SDK/UI，#10179 承接 route/capability，#10294 已承接 SDK。
 
 ---
 
@@ -718,7 +718,7 @@ sequenceDiagram
 - **activeWork lifecycle gate（#8588 / #9042 / #9134 / #9820）**：#8588 PR diff 覆盖 child active/idle transition、heartbeat timeout、non-owning session/channel/old seq 忽略、last-client-detach 延迟 close、prompt settle cleanup 与 deep-health aggregation；#9042 覆盖 background shell running/terminal notification/parent continuation hold 与 partial coverage cleanup gate；#9134 覆盖 conditional close 不破坏 queued work、共享 drain budget、legacy category child 的 deferred spawn-owner kill、close/probe in-flight guard、definitive close refusal retry 与 quarantine reap；#9820 追加 1024 条 refusal hold 采纳上限和旧 cache 保留。
 - **safe restore timeout（#8691 merged）**：PR diff 覆盖空 channel timeout/reap、sibling session survival、same-id fencing/coalescing、late close exactly-once、cleanup quarantine/recovery、capacity retention、transport close 与 hanging request shutdown。
 - **selective restore runtime（#9055）**：PR diff 覆盖 full/recent/resume parity fixtures、single index construction、paging/limit、oversized replay bounds、413 sibling survival、pagination metadata、background notification active-chain 和 replay publication cap。
-- **Conversations standalone primitives / maintenance / restore state**：#9341/#9512 已合入 source classification、standalone directory identity/ensure hardening、session id admission 与 JSONL integrity；#9513/#9665/#9687/#9763 已合入 archive race recovery、AUQ re-hang/hardening 与 per-session model binding restore。#9978 已合入 internal service、private directory containment、owner routing 与 projectless Live task 迁移；#10179 已合入 public API 与 journaled delete。#9626/#10300 仍为 open，分别覆盖 maintainable storage/conflict repair 与 post-commit cleanup ownership；#9362/#9396/#9476 已合入 runtime I/O retry、live-state `updatedAt` 与 WebShell completion settle。
+- **Conversations standalone primitives / maintenance / restore state**：#9341/#9512 已合入 source classification、standalone directory identity/ensure hardening、session id admission 与 JSONL integrity；#9513/#9665/#9687/#9763 已合入 archive race recovery、AUQ re-hang/hardening 与 per-session model binding restore。#9978 已合入 internal service、private directory containment、owner routing 与 projectless Live task 迁移；#10179 已合入 public API 与 journaled delete；#10300 已合入 post-commit cleanup ownership。#9626 仍为 open persisted maintenance/conflict repair；#9362/#9396/#9476 已合入 runtime I/O retry、live-state `updatedAt` 与 WebShell completion settle。
 - **managed writer shutdown**：#7812 覆盖 admission close、accepted transcript drain、exact-owned writer lock retirement、partial channel construction/teardown join 与 ACP child SIGTERM/SIGKILL/reap。
 - **Todo Stop Guard continuation hardening**：#7821 覆盖 owner claim/release、失败恢复、Stop hook 重跑、workspace relocation、session disposal、overlapping prompt 与 cron queue cap。
 - **session writer lease opt-in / timestamp drift / maintenance / handoff**：#7894 覆盖 restart-required opt-in 与 ACP bootstrap gate；#7886 覆盖 timestamp-only drift reconciliation、digest baseline 和 release-aware baseline read；#7975 覆盖 selected runtime maintenance storage、daemon writer lease 与 shutdown draining；#7976 覆盖 sealed lock proof、fixed claim、certified takeover 与 failure-closed races。

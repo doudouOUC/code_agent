@@ -8,7 +8,7 @@
 
 Channel adapter 让 qwen-code 可以从本地 TUI 之外的消息通道接收用户输入。adapter 不应该依赖某个具体 bridge 实现，否则后续要切到 daemon-backed bridge、测试 fake bridge 或多 channel bridge 时，所有 adapter 都会被迫跟着底层类名和生命周期细节变化。
 
-#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录；#10420 当前 open diff 继续补命名任务可见输出归因。
+#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录；#10420 已合入命名任务可见输出归因。
 
 ---
 
@@ -90,13 +90,13 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 
 入站 turn 在异步 media preparation 前绑定接收时的 session ID 与 generation，并用 queued-turn ownership 保持到 prompt 完成。queued/running turn、pending permission、cancel wind-down 或 bridge active prompt 都使 create/use/close fail closed，因此选择变化不会把已接收消息重路由。该阶段只支持 shared workspace；worktree、非选中任务 cancel、主动投递、webhook、loop 和跨 daemon exactly-once 仍在范围外。
 
-### 3.7 named-task delivery attribution（#10420 open）
+### 3.7 named-task delivery attribution（#10420 merged）
 
-#10420 当前 open diff 为 Part 3A。`NamedSessionManager` 从已验证 catalog 派生 exact session ID→task name/status/target 索引；registry 与索引只在原子写成功后一起发布。常规 turn 走已有 named resolution，background/permission miss 只允许按 owner lock、exact selected route 与 cwd 规则有界收养 legacy `default`，不扫描无界 closed task 列表。
+#10420 最终合入 Part 3A。`NamedSessionManager` 从已验证 catalog 派生 exact session ID→task name/status/target 索引；registry 与索引只在原子写成功后一起发布。常规 turn 走已有 named resolution，background/permission miss 只允许按 owner lock、exact selected route 与 cwd 规则有界收养 legacy `default`，不扫描无界 closed task 列表。
 
-Turn 或 permission admission 捕获独立于 model text 的 immutable `sourceLabel`：私聊为 `[task]`，群聊为 `[sender · task]`。各 adapter 在自己的 plain/Markdown/HTML/card/split/fallback/media/retry 最终发送边界转义并重复标签，保证每个独立可见对象恰好一次；raw bridge response、transcript 与 telemetry 不被改写。GitHub restart-safe final-delivery outbox 仅持久化 optional captured label，以维持既有重试归因。
+Turn 或 permission admission 捕获独立于 model text 的 immutable `sourceLabel`：私聊为 `[task]`，群聊为 `[sender · task]`。各 adapter 在自己的 plain/Markdown/HTML/card/split/fallback/media/retry 最终发送边界转义并重复标签，保证每个独立可见对象恰好一次；raw bridge response、transcript 与 telemetry 不被改写。GitHub restart-safe final-delivery outbox 仅持久化 optional captured label，以维持既有重试归因。Feishu 在 bot-origin card reply extraction 时剥离已渲染标签，避免 attribution 进入引用输入；Telegram 在 4096 字符限制内做 markup-balanced 分片并给每片重复标签，必要时逐片回退 plain。
 
-命名模式文本权限提示展示 exact request ID 和带 ID 的 approve/deny 命令；bare command 与同步 catalog/selection 回执保持 Part 2 行为。该 PR 不解除 selected-task busy guard、不增加 named cancel 或并发执行，也不扩展 webhook/loop/history/standalone/worktree 范围。未合入前不能视为 `main` 能力。
+命名模式文本权限提示展示 exact request ID 和带 ID 的 approve/deny 命令；bare command 与同步 catalog/selection 回执保持 Part 2 行为。该 PR 不解除 selected-task busy guard、不增加 named cancel 或并发执行，也不扩展 webhook/loop/history/standalone/worktree 范围。
 
 ---
 
@@ -117,7 +117,7 @@ Turn 或 permission admission 捕获独立于 model text 的 immutable `sourceLa
 | #7019 | merged | multi-workspace hardening 文档仍可能把 channel workers 写成 primary-only 或全 workspace 自动展开。 | 用户/开发文档明确 worker selection 按 owning trusted workspace 分组，`--channel all` 暂保持 primary-only v1，并把 channel worker 归入 workspace-qualified / legacy-primary ownership 边界。 |
 | #10145 | merged | 同一 chat 多 session 共享 latest reply/typing 状态，乱序异步完成会错投消息或提前取消 typing。 | QQ 用 async-local reply context 保留 segment origin；微信 typing 按 chat/session 引用计数；示例 adapter 同步采用 message-scoped context，公共接口和 persisted schema 不变。 |
 | #10198 | merged | 同一 owner 在一个 chat 中无法保留和切换多个隔离任务，异步入站又可能漂移到新的 selected session。 | daemon-only 命名任务 catalog 保存精确 session ID；命令面只暴露任务名，turn 在媒体准备前绑定 session/generation，busy 时拒绝任务变更，重启按原 ID 精确恢复。 |
-| #10420 | open | 命名任务的异步结果和权限界面无法标识来源 task。 | 当前 diff 以 exact session presentation index 和 delivery-only `sourceLabel` 覆盖 adapter 分片、卡片、fallback、后台与权限边界；不改变 model text、transcript 或 Part 2 并发语义。 |
+| #10420 | merged | 命名任务的异步结果和权限界面无法标识来源 task。 | exact session presentation index 和 delivery-only `sourceLabel` 覆盖 adapter 分片、卡片、fallback、后台与权限边界；补 Feishu 回抽剥离与 Telegram markup-balanced 分片，不改变 model text、transcript 或 Part 2 并发语义。 |
 
 ---
 
@@ -128,6 +128,6 @@ Turn 或 permission admission 捕获独立于 model text 的 immutable `sourceLa
 3. 新插件应优先面向 `ChannelAgentBridge` 编程，只有 standalone ACP-backed 路径才需要知道 `AcpBridge`。
 4. #10145 只修复单进程内的 delivery ownership；跨进程重启、平台去重和 exactly-once 仍需要独立 journal/adapter 协议。
 5. #10198 的 named sessions 当前只支持 shared workspace 与 selected-task 操作；worktree、非选中 task cancel、主动投递、webhook、loop 和 history backfill 尚未开放。
-6. #10420 仍为 open，跨 adapter 的标签与权限归因不能视为 `main` 行为；真实平台 transport E2E 和预发验证仍待完成。
+6. #10420 已合入跨 adapter 标签与权限归因；真实平台 transport E2E 和预发验证仍待完成。
 
 _按个人 PR 口径更新于 2026-08-30_
