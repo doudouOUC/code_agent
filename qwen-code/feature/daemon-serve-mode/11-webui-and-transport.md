@@ -422,11 +422,15 @@ Local Control 配对材料也改为按 operator authority 展示：trusted prima
 
 Provider 用 context key、restore matching、generation 与 supersession guard 隔离 create/load/resume/reconnect 的迟到结果；standalone working-directory、directory error 与 outcome-unknown recovery 进入 typed connection state。Standalone/Live 不初始化 workspace providers、skills、ACP preheat、Git status 或 workspace invalidation。该 PR 只提供 routing/provider boundary，没有加入全局 New Chat、Recents 或生命周期 UI。
 
-## 2026-08-30 follow-up：standalone WebShell PR6 UI 计划（#10514 open）
+## 2026-08-31 follow-up：standalone WebShell runtime（#10514 open）
 
-#10514 是 docs-only open 计划，不是运行时实现。计划让 Home/global New Chat 使用 pending standalone context，项目/Goals/Git 入口保持 exact workspace，当前会话继承显式 context，Live 当前会话 New Chat 保持既有 `startLive('new')`。Scheduled Tasks 等 workspace-maintenance caller 必须显式解析并传递 workspace cwd；pending/attached standalone 同时阻断 Git status 和 workspace slash-command handler，且 standalone history 不读取 legacy 全局 fallback。capability loading 时等待、加载失败时 fail closed；只有加载完成且明确缺少 `standalone_sessions_v1` 时才允许 legacy primary fallback，capability 存在但创建失败时保留 standalone intent 并展示错误。
+#10514 已从 docs-only 计划推进为 open runtime diff。App 引入显式 global/inherit/workspace 新会话意图：Home/global New Task 在 `standalone_sessions_v1` 可用时创建 standalone，capability loading 时等待、加载失败时 fail closed，只有明确缺少 capability 才回退 trusted primary workspace；项目、Goals、Git、Scheduled Tasks 传 exact workspace cwd，Live 当前会话仍走 `startLive('new')`。Standalone create 不携带 workspace source/worktree/branch，失败或 outcome unknown 也不静默改变原意图。
 
-计划还定义顶层 standalone Recents 的 active/archived lanes、逐 ID lifecycle partial result、`?context=standalone` deep-link 的 pre-provider exact owner resolution，以及 URL/sessionStorage/controlled prop ingress 的 fail-closed 分类。非 workspace context 除 project/Git/file/upload 控件外，还隔离 commands、skills、`atWorkspaceCwd`、draft/history 与 held attachments；typed UI 覆盖 recreated/missing/compromised directory、repair/reload、archived、creation outcome unknown 和 `fileCleanupPending`。入口、Recents、深链和 surface gating 在实现 PR 合入前都不能视为 `main` 行为。
+Provider mount 前先按 `?context=standalone|live` 分类：standalone deep link 做 exact summary lookup、可取消的有界 creating poll 和 archived unarchive，再挂载显式 provider。新顶层 `StandaloneRecents` 分页展示 active/archived 顶层 session，并逐 ID 执行 rename/export/archive/unarchive/delete、解释 partial-success 与 `fileCleanupPending`。Session owner/generation guard 阻止查询、创建和恢复的迟到结果发布到新 context。
+
+非 workspace context 同时关闭 workspace selector、Git、Goals/Scheduled Tasks、项目 settings/providers/skills、file upload、Web Terminal 和 split view，阻断对应后台 effect、项目 slash commands 与 workspace action refs；Shell 和普通 session 工具保留。Composer 使用独立 standalone/Live draft/history scope，不读取 legacy unscoped fallback，context 切换丢弃 held attachments，并在 ingestion/submit 再校验。URL、sessionStorage 和 controlled split IDs 必须精确排除 standalone owner，能力或 owner 不确定时 fail closed。typed recovery 覆盖 missing/compromised/recreated directory、repair/reload、archived、creation outcome unknown 与 pending file cleanup。
+
+该 PR 仍为 open，且当前 GitHub unit 与 WebShell E2E jobs 非绿，不能视为 `main` 行为。Standalone uploads、durable scheduling、跨 runtime move/fork 与 split view 仍不在当前实现范围。
 
 ---
 

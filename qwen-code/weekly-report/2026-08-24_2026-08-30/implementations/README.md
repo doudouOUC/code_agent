@@ -27,7 +27,7 @@
 | [#10418](https://github.com/QwenLM/qwen-code/pull/10418) | ✅ merged | feat(web-shell): Add explicit daemon session contexts | [pr-10418.md](pr-10418.md) |
 | [#10420](https://github.com/QwenLM/qwen-code/pull/10420) | ✅ merged | feat(channels): Attribute named task output | [pr-10420.md](pr-10420.md) |
 | [#10512](https://github.com/QwenLM/qwen-code/pull/10512) | ⚫ closed | fix(core): Harden surviving hook supervision | [pr-10512.md](pr-10512.md) |
-| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | 🟡 open | docs(plans): Add standalone PR6 WebShell UI plan | [pr-10514.md](pr-10514.md) |
+| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | 🟡 open | feat(web-shell): Add standalone chats | [pr-10514.md](pr-10514.md) |
 | [#10554](https://github.com/QwenLM/qwen-code/pull/10554) | 🟡 open | feat(serve): add sessionless POST /language for user-level language sync | [pr-10554.md](pr-10554.md) |
 
-_按个人 PR 口径更新于 2026-08-30_
+_按个人 PR 口径更新于 2026-08-31_
