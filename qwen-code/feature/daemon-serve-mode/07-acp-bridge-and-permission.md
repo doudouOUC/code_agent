@@ -643,3 +643,9 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `SERVE_CONTROL_EXT_METHODS.userLanguage` 是无 session/workspace selector 的 private control；daemon 已先持久化 user settings 和全局 output-language，因此 child 只 reload user scope，不重复写共享文件。
 - trusted runtime 有 live ACP channel 时调用 `setUserLanguage()`；无 channel 返回 skipped，非 `SessionNotFoundError` 的 runtime failure 与 local session refresh rejection 进入聚合 `failed`，不回滚持久化。
 - child 总是切 process i18n；只有 `syncOutputLanguage:true` 才并发刷新本 runtime 所有 Session 的 hierarchical memory 和 system instruction。project-bound output-language override 有意保留。
+
+### #10569 — provider error detail terminal（merged）
+
+- bridge 的 JSON-RPC error detail 提取保留既有优先级：非空 `data` 字符串、`data.details`、`data.message`，再解包 Agent SDK 常见的 `data.error` 字符串或 `data.error.message`。
+- 提取结果进入已有 `turn_error.data.message` 和 terminal persistence/live-state 链，不新增 event 字段、`errorKind` 或 retry 语义；旧的更具体 detail 形状仍比 nested error 优先。
+- 这一变化解决 provider 消息被泛化 `Internal error` 覆盖的问题，不将任意 provider response body 扩展为新的协议面。

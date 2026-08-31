@@ -657,3 +657,9 @@ sequenceDiagram
 
 - #9380 已合入，在 `/daemon/status` additive 暴露 `runtime.memory.children.heap`，包含 per-child old-generation committed peak、major-GC 后 live-set peak、total heap peak、major GC count/time、reported count 和 `unclassifiedSpaceNames`。
 - 该字段为 observe-only；未采样时返回 `null`，多个 child 取独立最大值而非求和，`limits.memory.enforced` 保持 `false`，child spawn argv、capability registry 和 admission 行为不变。
+
+### #10643 — `session_worktree_persistence_v1`（open）
+
+- 当前 open diff 仅在 daemon 完整安装 worktree create/restore/relocate 与 strict marker/sidecar dependencies 时宣告 `session_worktree_persistence_v1`；Channel worker 在缺 capability 时不发 `--worktree` 请求，也不 fallback shared workspace。
+- capability 只表示可协商该流程，不是某个 response 已安全持久的证明。每次 create/restore 还必须检查精确 canonical worktree path 和 `worktreeState:'persisted-v1'`；SDK/bridge 不能只因 capability 存在就发布 attachment。
+- marker/sidecar/cwd/owner 不匹配都是 fail-closed 运行时结果，不新增“自动回退普通 workspace”协议语义。PR 尚未合入，capability 不能视为当前 `main` 发布契约。

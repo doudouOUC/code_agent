@@ -526,4 +526,14 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - `SetUserLanguageResult` additive 返回 resolved language、nullable output language，以及 `{runtimes,sessions,failed}` refresh summary；零 runtime/session 仍是成功。
 - SDK helper 不自动 capability preflight；调用方必须先检查 `user_language_sync`，旧 daemon 会 404。PR 未合入前不能作为发布 SDK 契约。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-08-31_
+### #10571 — daemon JSON-RPC error detail（merged）
+
+- `DaemonClient` 共享 HTTP error formatter 只在 generic `Internal error` + numeric JSON-RPC code + 5xx 形状下，按 `data` 字符串、`data.details`、`data.message` 的顺序保留首个非空详情。
+- 具体顶层 error、4xx、非数字 code、非 JSON body 和原 status/response 不被新规则改写，因此这是错误消息保真，不是新 wire shape。
+
+### #10643 — worktree session metadata（open）
+
+- 当前 diff 增加 capability-gated worktree request/result metadata；客户端必须同时验证 canonical path 和 per-response `persisted-v1` attestation，不能只因 daemon 宣告 `session_worktree_persistence_v1` 就当作 attachment 成功。
+- PR 尚未合入，这些 types/reattach 约束不是当前发布 SDK 契约。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-01_

@@ -399,4 +399,10 @@ sequenceDiagram
 
 #9396 已合入，在 `DaemonSessionLiveState` 上补 optional `updatedAt` activity watermark。客户端应把它当 volatile recency signal，不能用它替代 catalog version；普通 turn activity 不改变 `generation+revision`。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-20_
+## 2026-09-01 follow-up：JSON-RPC detail 与 worktree attestation
+
+#10571 已合入 TypeScript `DaemonClient` 的 generic JSON-RPC 5xx detail 保留。formatter 只在 status >= 500、顶层 `error` 精确为 `Internal error` 且 code 为数字时，按 `data` 字符串、`data.details`、`data.message` 解包首个非空详情。具体顶层错误、4xx、非数字 code 和原 response 保持旧行为。
+
+#10643 当前 open diff 在 `DaemonSessionClient`/daemon types 中传递 worktree request、canonical path 和 per-response `worktreeState:'persisted-v1'`。reattach 必须精确匹配 attestation/path，bridge/router 只在 daemon 返回完整证明后发布 worktree attachment。capability 只是 preflight，不能替代每次 response 验证；PR 尚未合入。
+
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-01_

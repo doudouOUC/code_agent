@@ -886,6 +886,9 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #10418 | explicit daemon product session contexts | 已合入；WebUI provider 显式区分 workspace/standalone/Live，standalone 消费专用 SDK，Live 精确选择 trusted non-primary runtime，非 workspace 跳过项目专属状态。 |
 | #10514(open) | standalone WebShell chats | 当前 runtime diff 增加显式 global/workspace/Live 新会话意图、standalone Recents 与生命周期、pre-provider exact deep-link gate、非 workspace 项目功能隔离、composer/split ingress guard 和 typed recovery；尚未合入。 |
 | #10554(open) | sessionless user-level language sync | 当前 diff 条件广告 `user_language_sync`，由 daemon 唯一持久化 user/global output language，再向 trusted runtimes fan-out 并通过 SDK 暴露聚合结果。 |
+| #10569 | provider error detail terminal | 已合入；bridge 在保留既有优先级后解包 `data.error`/`data.error.message`，让 `turn_error` 保留 provider 稳定详情，不改 wire、`errorKind` 或 retry。 |
+| #10576 | managed-daemon tool PATH docs | 已合入 docs-only 部署口径：systemd/launchd 不读交互 shell profile，service 应配置受信绝对 PATH，并从新 daemon session 验证 bare tools，token 继续分离保管。 |
+| #10643(open) | worktree-isolated named tasks | 当前 diff 用 `session_worktree_persistence_v1`、canonical relocate、排他 marker+原子 sidecar 和 strict restore attestation 建立 persisted-v1 worktree session；尚未合入。 |
 | #9055 | selective session restore runtime | cold restore 按 indexed union records 读取 runtime resume state 与请求 replay projection，避免先 full materialize 再按 `historyPageSize` 裁剪。 |
 | #8469 | repeated ACP tool execution failure guard | 基于 execution outcome 识别同类前台 ACP 工具执行失败循环，warn/enforce 可注入纠偏或停止自动续跑。 |
 | #6716 | persistent workspace registration | dynamic workspace desired-state store、启动恢复与 registration list/forget API。 |
@@ -916,4 +919,4 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 7. **`/health` deep 探针非真实 liveness**。`?deep=1` 只读 Map-size getter（`sessionCount`/`pendingPermissionCount`）和 #8588/#9042 已合入的 `activeWork` 状态，包含 background Agent、terminal notification 和 background shell hold，但仍不 ping 各子进程。它能阻止“仍有后台 Agent/terminal notification/shell 时被当作空闲重启”，但检测不出"wedged 但仍计数/仍 active"的会话，真实 liveness 仍应靠 TCP/进程/trace/log 等观测。
 
-8. **open/draft diff 不能写成 main 已落地能力**。#8093/#8824 为 closed draft，#9048/#10286 为 closed，只能作为历史前身记录。#9626/#9738/#10514/#10554 为 open，只能作为当前方案记录。#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978/#10142/#10144/#10179/#10268/#10269/#10294/#10300/#10403/#10418 已按 merged diff 更新；#8743 已由 #9055 runtime PR 承接，不再按未落地 draft 追踪。其余 merged PR 继续以最终 diff 为准。
+8. **open/draft diff 不能写成 main 已落地能力**。#8093/#8824 为 closed draft，#9048/#10286 为 closed，只能作为历史前身记录。#9626/#9738/#10514/#10554/#10643 为 open，只能作为当前方案记录。#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978/#10142/#10144/#10179/#10268/#10269/#10294/#10300/#10403/#10418/#10569/#10576 已按 merged diff 更新；#8743 已由 #9055 runtime PR 承接，不再按未落地 draft 追踪。其余 merged PR 继续以最终 diff 为准。

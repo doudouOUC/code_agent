@@ -999,3 +999,10 @@ sequenceDiagram
 - recent replay 使用 count limit、4MiB source byte 软预算、16MiB expansion ceiling、anchor、`hasMore` 和 `partial` 语义；resume 使用 `none`，旧客户端省略 `historyPageSize` 时仍走 `all`。
 - 超过 256MiB cold restore 返回 request-scoped `413 transcript_too_large`，不 fallback 到旧 full loader；单条 replay record 过大可返回成功 runtime + bounded replay error。
 - #9055 还保留 compressed/legacy model history、record ancestry、interrupted turns、FileHistory、artifacts、Goals/checkpoint evidence、attribution、telemetry、usage、source metadata 和 background notification active-chain 语义，并在 replay 发布前检查 32 MiB/10,000 updates 上限。
+
+### #10643 — persisted worktree session lifecycle（open）
+
+- 当前 open diff 为 named Channel task 创建 canonical Git worktree，将 exact session relocate 后要求 child 返回 cwd 精确一致。只有排他 0600 `.qwen-session` marker 与原子 sidecar 都已持久化，create response 才返回 `worktreeState:'persisted-v1'`。
+- restore 不走泛化 worktree context 回放；route 严格校验 64 KiB 有界 sidecar、workspace/repo root、realpath 在 `.qwen/worktrees` 下、regular single-link marker 与 exact storage session owner。active session 必须已在该 cwd；idle session relocate 后必须再次匹配。
+- create/persistence/relocation 失败使用 orphan-guarded exact session delete；只在 session definitively removed 时回收 checkout/branch，所有权不确定时保留数据并 fail closed。restore mismatch 不 fallback shared workspace。
+- close 当前保留 transcript 和 worktree；merge-back、branch delete、push/rebase、crash 后 in-flight work 续跑及 `/clear`/`/new`/`/reset` 后续语义不在 v1 范围。PR 尚未合入，不能将该 lifecycle 视为 `main` 能力。
