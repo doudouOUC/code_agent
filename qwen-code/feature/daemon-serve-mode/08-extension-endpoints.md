@@ -93,7 +93,7 @@ bridge 对**同一 session 的多个 prompt** 做 FIFO 串行化（见 `bridge.t
 | #6825 | feat(serve): add extension management v2 | merged | `extension_management_v2` 实现：transactional user-level artifact store、workspace activation policy、operation queue、post-commit warnings、SDK/TUI/Web Shell surface。 |
 | #6826 | feat(serve): support multi-workspace rewind and shell | 2026-07-13 | rewind snapshots、rewind、shell singular route 按 live owner runtime dispatch；SDK rewind 强制 REST。 |
 | #6833 | fix(serve): Route session continue, language, and artifacts by owner | merged | continue、language、artifact add/delete legacy route 按 owning runtime dispatch。 |
-| #10554 | feat(serve): add sessionless POST /language for user-level language sync | open | 条件 `POST /language`，daemon 唯一持久化 user/global output language，再 fan-out trusted runtimes 并广播 `language_changed`。 |
+| #10554 | feat(serve): add sessionless POST /language for user-level language sync | merged | 条件 `POST /language`，daemon 唯一持久化 user/global output language，再 fan-out trusted runtimes 并广播 `language_changed`。 |
 | #6716 | feat(serve): persist dynamic workspace registrations | 2026-07-11 | persistent dynamic workspace desired-state store、`persist:true` add workspace、`GET/DELETE /workspace-registrations` 与 lazy workspace-qualified ACP mount。 |
 | #6717 | feat(serve): Expose read-only untrusted session catalogs | 2026-07-11 | untrusted secondary workspace persisted-only session/session-group catalog，不 merge live、不启动 ACP。 |
 | #6724 | fix(cli): Scope session organization mutations by workspace | 2026-07-11 | trusted secondary workspace `PATCH /workspaces/:workspace/session/:id/organization`。 |
@@ -486,13 +486,13 @@ HTTP surface 分两组：
 
 `POST /workspace/settings` 是 strict mutation route。body `{scope, key, value}`，当前 `scope` 只允许 `workspace`；value 按 schema type 校验，string 限长 1024。写入成功后广播 `settings_changed {key,value,scope}` 到所有 session bus。`requiresRestart` 仍会返回给客户端：设置落盘不等于 live session 已经重新读取。
 
-## sessionless user language（#10554 open）
+## sessionless user language（#10554 merged）
 
-当前 diff 新增 process-global `POST /language`，仅在 `persistSetting` 可用时注册，并与条件 capability `user_language_sync` 使用同一 predicate。route 走 non-strict mutation gate，body 为 `{language, syncOutputLanguage?}`，可选 client ID 只用于事件归因；它不接受 workspace selector 或 session ID。
+最终实现新增 process-global `POST /language`，仅在 `persistSetting` 可用时注册，并与条件 capability `user_language_sync` 使用同一 predicate。route 走 non-strict mutation gate，body 为 `{language, syncOutputLanguage?}`，可选 client ID 只用于事件归因；它不接受 workspace selector 或 session ID。
 
 daemon 是唯一持久化写者：先写 user `general.language`；当 `syncOutputLanguage:true` 时，再写全局 `output-language.md` 与 user `general.outputLanguage`。任一步失败返回 `500 persist_error`，后续步骤不执行，但此前已成功写入的状态不回滚。之后 daemon best-effort 切自身 i18n，并向 trusted live runtimes fan-out private user-language control；无 live channel 是成功跳过，runtime/session refresh failure 只进入 `{refresh:{runtimes,sessions,failed}}`。
 
-最后向所有 workspace registry 发布 `language_changed {language,outputLanguage,userLevel:true}`，并在 client ID 存在时附加 originator。只有同步输出语言时 child 才刷新 Session memory/system instruction；project-bound output-language override 保持不变。该 PR 仍为 open，route/tag/SDK 不能视为 `main` 能力。
+最后向所有 workspace registry 发布 `language_changed {language,outputLanguage,userLevel:true}`，并在 client ID 存在时附加 originator。只有同步输出语言时 child 才刷新 Session memory/system instruction；project-bound output-language override 保持不变。
 
 
 - `POST /workspace/settings` 通过共享 `validateSettingValue()` 拒绝低于 minimum 的值。

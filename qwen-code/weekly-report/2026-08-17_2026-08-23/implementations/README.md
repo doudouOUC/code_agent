@@ -13,10 +13,10 @@
 | [#9512](https://github.com/QwenLM/qwen-code/pull/9512) | ✅ merged | fix(serve): Harden standalone conversation primitives | [pr-9512.md](pr-9512.md) |
 | [#9513](https://github.com/QwenLM/qwen-code/pull/9513) | ✅ merged | fix(cli): Recover sessions across archive races | [pr-9513.md](pr-9513.md) |
 | [#9563](https://github.com/QwenLM/qwen-code/pull/9563) | ✅ merged | fix(web-shell): Stop repeated session title catalog refreshes | [pr-9563.md](pr-9563.md) |
-| [#9626](https://github.com/QwenLM/qwen-code/pull/9626) | 🟡 open | fix(serve): Repair persisted session lifecycle | [pr-9626.md](pr-9626.md) |
+| [#9626](https://github.com/QwenLM/qwen-code/pull/9626) | ✅ merged | fix(serve): Repair persisted session lifecycle | [pr-9626.md](pr-9626.md) |
 | [#9665](https://github.com/QwenLM/qwen-code/pull/9665) | ✅ merged | feat(serve): restore ask_user_question HITL on session load/resume | [pr-9665.md](pr-9665.md) |
 | [#9687](https://github.com/QwenLM/qwen-code/pull/9687) | ✅ merged | feat(cli): restore each daemon session onto its last selected model | [pr-9687.md](pr-9687.md) |
-| [#9738](https://github.com/QwenLM/qwen-code/pull/9738) | 🟡 open | feat(serve): add --open-with-auth | [pr-9738.md](pr-9738.md) |
+| [#9738](https://github.com/QwenLM/qwen-code/pull/9738) | ✅ merged | feat(serve): add --open-with-auth | [pr-9738.md](pr-9738.md) |
 | [#9763](https://github.com/QwenLM/qwen-code/pull/9763) | ✅ merged | fix(daemon): keep restored ask_user_question valid after load | [pr-9763.md](pr-9763.md) |
 
-_按个人 PR 口径更新于 2026-08-24_
+_按个人 PR 口径更新于 2026-09-02_

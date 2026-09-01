@@ -35,7 +35,7 @@
 | #9838 | current-session scheduled task（merged） | 完整 runtime 才安装 current-session host callback；selected runtime 做 owner/session/task binding 准入、generation fence 与 rollback |
 | #10179 | standalone daemon session API（merged） | 完整 standalone service/runtime 才注册 public route 并广告 `standalone_sessions_v1`；所有 route 要求 exact standalone owner |
 | #10403 | trusted-loopback operator authority（merged） | `auth.ts:isTrustedLoopbackMode` / `requestHasOperatorAuthority`；`run-qwen-serve.ts` 解析并复核实际 loopback bind；strict mutation/session shell/Local Control 共用 authority |
-| #10554 | sessionless 用户语言同步（open） | 条件 `user_language_sync`；`POST /language` 由 daemon 唯一持久化 user setting，再 fan-out trusted runtimes |
+| #10554 | sessionless 用户语言同步（merged） | 条件 `user_language_sync`；`POST /language` 由 daemon 唯一持久化 user setting，再 fan-out trusted runtimes |
 | #9933 | 默认关闭 ACP permission timeout | `DEFAULT_PERMISSION_TIMEOUT_MS=0`；省略或 0 不装 timer，正整数仍经启动校验和 clamp 透传到 bridge |
 | #4552 | 运行时 MCP server add/remove（T2.8） | `server.ts` `POST/DELETE /workspace/mcp/servers`(L2329/L2412) |
 | #4606 | request 级访问日志 | `server.ts` access-log middleware L875-920；`daemonLogger.ts` |
@@ -589,12 +589,12 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - `serve/acp-http/dispatch.ts`：ACP HTTP/WS 把同一 restore timeout 映射为 JSON-RPC `-32603` data，保留 `httpStatus:504` 和 retryable 标志。
 - `bridge.ts`：cleanup/settlement 不确定时 quarantine channel 或保留 abandoned restore fence，后续新 session 操作 fail-closed 为 `acp_channel_unavailable` / 503；reason 区分 `restore_cleanup_failed`、`awaiting_abandoned_cleanup` 和 `restore_settlement_overdue`，不影响已有 sibling session 继续运行。
 
-### #9738 — `serve --open-with-auth`（open）
+### #9738 — `serve --open-with-auth`（merged）
 
-- 当前 runtime diff 新增独立、默认关闭的 `--open-with-auth`；该 flag 自带 browser open intent，冗余 `--open`/`--no-open` 不会关闭它。bare `--open`、embedded `runQwenServe()`、Chrome extension 与未传新 flag 的路径保持既有 token-less 兼容行为。
+- 最终实现新增独立、默认关闭的 `--open-with-auth`；该 flag 自带 browser open intent，冗余 `--open`/`--no-open` 不会关闭它。bare `--open`、embedded `runQwenServe()`、Chrome extension 与未传新 flag 的路径保持既有 token-less 兼容行为。
 - yargs 与 fast path 都在 listen 前调用 `applyOpenWithAuth()`：只接受 loopback，要求 Web Shell 未被 `--no-web` 禁用且 built assets 存在；任一条件不满足都 boot-loud 失败。配置 token 时复用 `--token` 优先于 `QWEN_SERVER_TOKEN` 的 trimmed 值，否则生成 32-byte base64url bearer。
 - selected token 进入既有 `runQwenServe()` / `bearerAuth` / WebSocket / strict mutation / worker handoff，不新增认证协议或持久 credential。browser eligible 时通过既有 `#token=` fragment 交付；headless 时 daemon 仍启动并打印手动 secret-bearing URL。
-- loopback `/health` 与 static assets 继续按既有 exemption 工作，`--require-auth` 仍 gate `/health`；Local Control 使用独立 pairing token。当前 PR 未合入，Windows/Linux runtime E2E、持久 token、client identity/revoke 与 SDK/extension discovery 不在范围。
+- loopback `/health` 与 static assets 继续按既有 exemption 工作，`--require-auth` 仍 gate `/health`；Local Control 使用独立 pairing token。Windows/Linux runtime E2E、持久 token、client identity/revoke 与 SDK/extension discovery 不在范围。
 
 ### #9838 — current-session scheduled task runtime wiring（merged）
 
@@ -617,8 +617,8 @@ idle 预算低于 15s 心跳间隔时，下一次心跳的 `lastWriteAt` 刷新�
 - `localhost` 在 authority 派生前先经 DNS 解析，listen 后再核对 `server.address()`；若实际地址不是 loopback 则启动失败。loopback predicate 接受 `localhost`、IPv6 loopback 与合法 IPv4 `127/8`。非 loopback 无 token、`--require-auth` 无 token、wildcard CORS 无 token、LAN pairing、Host/Origin 与 WebSocket credential isolation 保持不变。
 - 风险边界是所有可访问本机 primary loopback listener 的进程都会获得完整 operator API。共享主机、CI runner、远程开发机或存在不可信本地进程时必须配置 `QWEN_SERVER_TOKEN` 并启用 `--require-auth`。
 
-### #10554 — sessionless user-level language sync（open）
+### #10554 — sessionless user-level language sync（merged）
 
-- 当前 diff 仅在 settings persistence 可用时注册 `POST /language` 并广告 `user_language_sync`。route 走 non-strict `mutate()`，不接受 workspace/session selector；body 校验语言、optional output-language sync 与 client ID。
+- 最终实现仅在 settings persistence 可用时注册 `POST /language` 并广告 `user_language_sync`。route 走 non-strict `mutate()`，不接受 workspace/session selector；body 校验语言、optional output-language sync 与 client ID。
 - daemon 是 user settings 和全局 `output-language.md` 的唯一写者。持久化完成后 best-effort 切自身 i18n，再向 trusted live runtimes fan-out private control；无 live channel 按 skipped success，部分 runtime/session failure 只进入 response summary。
-- 同步输出语言时才刷新 local session memory/system instruction；project-bound output-language override 不重写。当前 PR 未合入，客户端必须先 gate `user_language_sync`。
+- 同步输出语言时才刷新 local session memory/system instruction；project-bound output-language override 不重写。客户端必须先 gate `user_language_sync`。

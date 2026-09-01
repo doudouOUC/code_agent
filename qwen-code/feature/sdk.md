@@ -390,7 +390,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #9261 | MERGED | workspace session live-state SDK surface | 新增 `DaemonSessionCatalogVersion`、`DaemonWorkspaceSessionLiveState`、`getWorkspaceSessionLiveState()` 与 `getSessionLiveState()`，调用方仍需 gate `workspace_session_live_state`。 |
 | #9380 | MERGED | daemon status child heap measurement types | 追加 ACP child old-generation peak heap status optional fields，未采样时 `heap:null`。 |
 | #9396 | MERGED | live-state activity watermark | 在 `DaemonSessionLiveState` 上追加 optional `updatedAt`，不改变 response v1 或 capability。 |
-| #9626 | OPEN | session storage conflict repair | 当前 diff 在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`，默认 conflict 从 HTTP 200 batch `errors` 读取。 |
+| #9626 | MERGED | session storage conflict repair | 最终在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`，默认 conflict 从 HTTP 200 batch `errors` 读取。 |
 | #10179 | MERGED | standalone daemon REST lifecycle | 条件广告 `standalone_sessions_v1` 并提供 exact-owner create/list/get/load/resume/repair/metadata/export/archive/unarchive/delete route；该 PR 本身不含 SDK。 |
 | #10294 | MERGED | standalone TypeScript SDK | 最终为完整 standalone lifecycle 增加 capability gate、strict validators、explicit restore strategy 与 outcome-unknown exact recovery，不自动重试 create。 |
 
@@ -422,11 +422,11 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 11. **same-session refresh diagnostics 已合入**。#8939 在 TS daemon SDK 类型/诊断上暴露 restore epoch 与 partial replay diagnostics；字段保持 optional/additive，旧 daemon 仍按缺失字段兼容。
 
-12. **#9626 仍是 open**。`resolveConflicts` / `resolvedConflicts` 和 `session_storage_conflict_repair` 只能作为当前 additive SDK 方案记录；未广告 capability 的 daemon 必须保持默认 conflict 行为，客户端不能试探性发送 repair option。
+12. **#9626 已合入**。`resolveConflicts` / `resolvedConflicts` 和 `session_storage_conflict_repair` 是 additive SDK surface；未广告 capability 的 daemon 必须保持默认 conflict 行为，客户端不能试探性发送 repair option。
 
 13. **#10294 已合入**。standalone TypeScript methods、runtime validators、recovery error 与 215 KiB browser bundle budget 已进入发布 SDK 契约；WebUI/WebShell 流程仍在范围外。
 
-14. **#10554 仍为 open**。`DaemonClient.setUserLanguage()` 与 `SetUserLanguageResult` 只能作为当前 additive 方案记录；consumer 必须先 gate `user_language_sync`，零 session 是成功，`refresh.failed` 表示持久化后仍有 runtime/session 未刷新。
+14. **#10554 已合入**。`DaemonClient.setUserLanguage()` 与 `SetUserLanguageResult` 是 additive surface；consumer 必须先 gate `user_language_sync`，零 session 是成功，`refresh.failed` 表示持久化后仍有 runtime/session 未刷新。
 
 ---
 
@@ -514,17 +514,17 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - #9380 已合入，在 daemon status SDK types 中增加 `runtime.memory.children.heap`，表示 ACP child old-generation peak measurement。缺席或 `null` 代表未采样，不能解释为零需求；多个 child 的 heap peak 是 per-child maxima，不与 RSS 一样求和。
 - #9396 已合入，在 `DaemonSessionLiveState.updatedAt` 上补 optional activity watermark。该字段是 volatile recency signal，不替代 `catalogVersion`，旧 daemon/旧 SDK 可按缺失字段兼容。
 
-### #9626 — session storage conflict repair（open）
+### #9626 — session storage conflict repair（merged）
 
-- 当前 open diff 为 `archiveSessions` / `unarchiveSessions` 增加 options overload：只有客户端确认 `session_storage_conflict_repair` 后才发送 `resolveConflicts:true`。
+- 最终为 `archiveSessions` / `unarchiveSessions` 增加 options overload：只有客户端确认 `session_storage_conflict_repair` 后才发送 `resolveConflicts:true`。
 - response 中的 `resolvedConflicts` 是 optional/additive，表示 keep-destination repair 实际丢弃了另一状态副本；它不表示 transcript merge，也不改变 delete 的 delete-both 语义。
-- 默认 archive/unarchive conflict 现在作为 HTTP 200 batch `errors` 返回；SDK 不能再只依赖 workspace-qualified HTTP 409 envelope。PR 尚未合入；旧 SDK、旧 daemon 和未广告 capability 的 daemon 都应保持默认 fail-closed conflict。
+- 默认 archive/unarchive conflict 现在作为 HTTP 200 batch `errors` 返回；SDK 不能再只依赖 workspace-qualified HTTP 409 envelope。旧 SDK、旧 daemon 和未广告 capability 的 daemon 都应保持默认 fail-closed conflict。
 
-### #10554 — sessionless user-language SDK（open）
+### #10554 — sessionless user-language SDK（merged）
 
 - `DaemonClient.setUserLanguage(language, opts)` 调用 process-global `POST /language`；`opts` 只包含 optional `syncOutputLanguage` 与 client ID，不接受 workspace/session selector。
 - `SetUserLanguageResult` additive 返回 resolved language、nullable output language，以及 `{runtimes,sessions,failed}` refresh summary；零 runtime/session 仍是成功。
-- SDK helper 不自动 capability preflight；调用方必须先检查 `user_language_sync`，旧 daemon 会 404。PR 未合入前不能作为发布 SDK 契约。
+- SDK helper 不自动 capability preflight；调用方必须先检查 `user_language_sync`，旧 daemon 会 404。
 
 ### #10571 — daemon JSON-RPC error detail（merged）
 
@@ -536,4 +536,9 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 当前 diff 增加 capability-gated worktree request/result metadata；客户端必须同时验证 canonical path 和 per-response `persisted-v1` attestation，不能只因 daemon 宣告 `session_worktree_persistence_v1` 就当作 attachment 成功。
 - PR 尚未合入，这些 types/reattach 约束不是当前发布 SDK 契约。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-01_
+### #10719 — standalone session options（open）
+
+- 当前 diff 增加 capability-gated `getStandaloneSessionOptions()`，严格验证只读 provider/model/config-options response，不接受 workspace/session selector，也不返回 internal Conversations cwd 或 ACP state。
+- WebShell 可用该结果在零 session 时 hydrate model/reasoning controls；旧 daemon、缺 capability 或 invalid response 继续按 daemon default 创建。PR 尚未合入。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-02_

@@ -106,7 +106,7 @@ Turn 或 permission admission 捕获独立于 model text 的 immutable `sourceLa
 
 ### 3.9 worktree-isolated named tasks（#10643 open）
 
-#10643 当前 open diff 为 `/session new <name> --worktree` 增加 opt-in isolation。worker 必须先看到 daemon `session_worktree_persistence_v1` 能力；daemon 创建 canonical worktree、relocate exact session，再用排他 0600 `.qwen-session` marker 和原子 sidecar 产生 per-response `persisted-v1` attestation。registry 只在该证明完整时记录 `isolation:'worktree'` 与 canonical cwd。
+#10643 当前 open diff 为 `/session new <name> --worktree` 增加 opt-in isolation。worker 必须先看到 daemon `session_worktree_persistence_v1` 能力；daemon 创建 canonical worktree、relocate exact session，再用排他 0600 `.qwen-session` marker 和原子 sidecar 产生 per-response `persisted-v1` attestation。registry 只在该证明完整时记录 `isolation:'worktree'` 与 canonical cwd。latest head 还把 restore AUQ prompt 延后到 sidecar/marker/cwd attestation 完成；证明失败会按 client 丢弃 deferred prompt，避免恢复 turn 在错误 cwd 启动。
 
 restore 严格校验 workspace/repo root、realpath containment、sidecar/marker owner 和运行时 cwd；不确定时 fail closed，不 fallback shared workspace。create 失败只在 exact session 已确认删除后回收 checkout/branch，否则保留以免破坏未知 owner 的数据。selected worktree task 中 `/clear`/`/new`/`/reset` 当前会提前拒绝，close 保留 transcript/worktree。该 PR 尚未合入，不能将这些行为当作 `main` 能力。
 
@@ -145,4 +145,4 @@ restore 严格校验 workspace/repo root、realpath containment、sidecar/marker
 6. #10420/#10574 已合入跨 adapter 标签、权限归因与并发控制；真实平台 transport E2E 和预发验证仍待完成。
 7. #10643 仍为 open；`session_worktree_persistence_v1`、worktree-isolated task、marker/sidecar restore 和相关 SDK metadata 不能视为 `main` 能力。
 
-_按个人 PR 口径更新于 2026-09-01_
+_按个人 PR 口径更新于 2026-09-02_

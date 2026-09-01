@@ -380,9 +380,9 @@ sequenceDiagram
 
 ## 已知限制
 
-### #10554 sessionless user-language SDK（open）
+### #10554 sessionless user-language SDK（merged）
 
-当前 diff 给 TypeScript `DaemonClient` 增加 `setUserLanguage(language, {syncOutputLanguage?,clientId?})`，调用 `POST /language` 并返回 `SetUserLanguageResult {language,outputLanguage,refresh:{runtimes,sessions,failed}}`。SDK 不在每次调用内自动请求 capabilities；consumer 必须先检查 `features.includes('user_language_sync')`，旧 daemon 会 404。零 session/零 live runtime 是成功，不应由客户端误判为失败；`refresh.failed > 0` 表示持久化已经完成但部分 runtime/session 仍陈旧，需要提示重试或重启。当前 PR 未合入，该 method/result shape 只能作为 open 方案记录。
+最终给 TypeScript `DaemonClient` 增加 `setUserLanguage(language, {syncOutputLanguage?,clientId?})`，调用 `POST /language` 并返回 `SetUserLanguageResult {language,outputLanguage,refresh:{runtimes,sessions,failed}}`。SDK 不在每次调用内自动请求 capabilities；consumer 必须先检查 `features.includes('user_language_sync')`，旧 daemon 会 404。零 session/零 live runtime 是成功，不应由客户端误判为失败；`refresh.failed > 0` 表示持久化已经完成但部分 runtime/session 仍陈旧，需要提示重试或重启。
 
 1. **adapter spike 均未接入默认路径**：TUI / channel / IDE spike 全部 default-off，各自声明了显式 "not covered" gap（无 live daemon E2E、无 flag 解析、无 production wiring）。
 2. **orphan prompt**：客户端断连后 prompt 仍跑到完成（结果 publish 到 SSE bus 无人消费）——这是设计选择，非 bug。
@@ -405,4 +405,6 @@ sequenceDiagram
 
 #10643 当前 open diff 在 `DaemonSessionClient`/daemon types 中传递 worktree request、canonical path 和 per-response `worktreeState:'persisted-v1'`。reattach 必须精确匹配 attestation/path，bridge/router 只在 daemon 返回完整证明后发布 worktree attachment。capability 只是 preflight，不能替代每次 response 验证；PR 尚未合入。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-01_
+#10719 当前 open diff 增加 `DaemonClient.getStandaloneSessionOptions()`。method 先 gate `standalone_session_options_v1`，再严格验证整个 provider/model/config-options response；它不接受 workspace 或 session selector，也不把 internal Conversations cwd/ACP state 暴露为 SDK surface。旧 daemon 或 invalid response 由调用方按 unavailable 处理，不能猜测 provider shape。PR 尚未合入。
+
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-02_

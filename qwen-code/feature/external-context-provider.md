@@ -1,7 +1,7 @@
 # Direct External Context Search / Auto Recall / Mem0 Write 技术方案
 
-> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening；#8352 Auto Recall proxy lifecycle；#8507 optional Mem0 write；#9068 provider extension profile；#10113/#10149/#10634 configurable Mem0 extension）。
-> 当前记录：#7586/#7877/#8206/#8352/#8507/#9068/#10113/#10149/#10634 已按 merged diff、changed files、测试路径与 examples 记录最终实现。
+> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening；#8352 Auto Recall proxy lifecycle；#8507 optional Mem0 write；#9068 provider extension profile；#10113/#10149/#10634 configurable Mem0 extension；#10653 npm distribution）。
+> 当前记录：#7586/#7877/#8206/#8352/#8507/#9068/#10113/#10149/#10634 已按 merged diff 记录最终实现；#10653 只记录当前 open diff，不能视为已发布 package。
 
 ---
 
@@ -120,13 +120,15 @@ direct retrieval、auto recall 和 optional Mem0 write 都不提供企业级隔�
 
 profile 同时提供 language-neutral JSON schema、test vectors、MCP text/structured output reference、remote OAuth 示例与 self-contained local REST adapter 示例。输出保持 bounded untrusted context item，不把 provider detail、credential env name、内部错误或管理状态暴露给模型；远端 OAuth 仅是 provider-owned transport 示例，不改变 Qwen 侧 direct/governed 边界。
 
-### 3.10 configurable Mem0 extension（#10113 merged / #10149 merged）
+### 3.10 configurable Mem0 extension 与分发（#10113/#10149/#10634 merged；#10653 open）
 
 #10113 已合入 docs-only 设计：新的自包含 stdio extension 对 Qwen Code 仍只暴露 `context_search({query})` 和 External Context MCP Profile v1。管理员用绝对路径配置 immutable instance，实例只能引用 closed、versioned dialect preset；profile、instance schema、dialect 和 upstream version 分开演进。dialect grammar 只允许枚举 GET/POST、鉴权/字段位置和静态结果字段路径，禁止任意 header/template/JSONPath/code、env expansion、redirect、retry、probing、cache 与写入。默认 HTTPS，credential 只引用命名环境变量。
 
 #10149 在该设计上合入 runtime skeleton：`integrations/external-context-mem0` 限制配置 64 KiB、response 1 MiB，并严格验证 preset/ID/path/endpoint；请求只走 allowlisted GET/POST，最多归一化 5 条 untrusted Profile v1 result，MCP 只注册 `context_search`。该阶段 `builtInPresets` 故意为空，因此不能连接真实 provider。
 
 #10634 已合入可运维的后续：instance config 升到 schemaVersion 2，不再引用 Qwen 内置 preset，而是用绝对 `dialectPath` 加载管理员所有的 closed Dialect V1。instance/dialect 独立做 64 KiB 有界读取、严格 schema/语义校验和固定脱敏错误；只在 path、endpoint、static field 与 scope 验证后才读 `credentialEnv`。Dialect 仍禁止任意 template/JSONPath/code、redirect、retry、probing、cache 与 write。旧 schemaVersion 1 preset config 必须显式迁移，否则 fail closed。
+
+#10653 当前 open diff 补公开分发而不扩大 runtime contract：`@qwen-code/external-context-mem0` package 与 Extension manifest 跟随 Qwen Code release version，加入统一 published-version guard；release workflow 只在 maintainer 完成首次 npm bootstrap/trusted-publisher 配置并显式启用 repository variable 后，才在其它 package 前执行 provenance publish。tarball 仍只含 bundle、canonical schemas、manifest、README 与 package metadata，不包含 provider preset、管理员 instance/dialect、credential、Core wiring、write 或 Auto Recall。
 
 ---
 
@@ -139,6 +141,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 - #8352 追加黑洞 CONNECT proxy 子进程回归，要求 stdout `{}`、stderr 为空、exit code 0、无 signal，并在 8000ms guard 前退出；同时覆盖 dispatcher mock cleanup、early no-op 不安装 proxy、proxy 返回值与 global dispatcher wiring。
 - #10113 为 docs-only contract review；#10149 声明 49 项 extension package 测试、package typecheck/lint/build/pack 与 root build/typecheck/lint，脚本套件的两项共享 timeout 单独重跑通过。真实 provider、Windows/Linux 和 TLS/proxy E2E 尚未验证。
 - #10634 声明 49 项 package 测试、root/package typecheck/lint/build、bundled stdio + loopback synthetic provider、restart-only reload、redaction 和 pack dry-run 通过；本次文档复核只核对 merged diff 与最新 `main`，未独立复跑。
+- #10653 声明 49 项 Extension package 测试、6-file npm dry-run tarball、临时 registry 安装/loopback provider 验证，以及 102 项 release/version script 测试通过（另有 1 项既有 host skip）；真实 npm.org publish 有意留给 maintainer，本次未独立复跑。
 
 ---
 
@@ -147,6 +150,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 - #8206 已按 merged diff 记录最终实现；dependency hardening 只收敛 direct external-context 依赖路径，不改变检索、auto recall 或 Mem0 write 的业务契约。
 - #9068 已合入；provider extension profile 是 query-only 接入面，不能替代企业级 governance profile。
 - #10113 的 docs-only contract、#10149 runtime skeleton 与 #10634 administrator-owned dialect loader 均已合入。当前 runtime 不再依赖内置 preset；管理员必须提供 schemaVersion 2 instance 和 closed Dialect V1 绝对文件。旧 schemaVersion 1 preset config 不会自动迁移。
+- #10653 仍为 open，公开 npm package 与 release workflow gate 不能视为当前已发布能力；首次 bootstrap、trusted publisher 和 repository variable 由 release maintainer 显式完成。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -168,5 +172,6 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 | [#10113](https://github.com/QwenLM/qwen-code/pull/10113) | MERGED | configurable Mem0 design | docs-only 定义 self-contained extension、immutable instance、closed/versioned dialect、HTTPS/credential/response bounds 和 retrieval-only 范围。 |
 | [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | MERGED | configurable Mem0 skeleton | 最终实现基于 #10113 merged 设计新增严格配置/request/MCP runtime 和测试；该 PR 阶段内置 preset 故意为空，当时不能连接真实 provider，后续由 #10634 承接。 |
 | [#10634](https://github.com/QwenLM/qwen-code/pull/10634) | MERGED | administrator-owned Mem0 dialects | 将 instance 升到 schemaVersion 2，用绝对 `dialectPath` 加载管理员所有 closed Dialect V1；instance/dialect 独立有界校验，完成非凭据验证后才读 env，旧 preset config fail closed。 |
+| [#10653](https://github.com/QwenLM/qwen-code/pull/10653) | OPEN | public npm distribution | 当前 diff 让 package/manifest 随 Qwen Code release version 同步，加入 published-version guard，并以 bootstrap variable 门控 provenance publish；package 仍不携带 provider 或管理员数据。 |
 
-_按个人 PR 口径更新于 2026-09-01_
+_按个人 PR 口径更新于 2026-09-02_

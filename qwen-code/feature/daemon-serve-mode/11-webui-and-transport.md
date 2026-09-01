@@ -56,7 +56,7 @@
 | #9396 | @doudouOUC | merged | live-state activity watermark：服务端在 live-state response 中补 optional `updatedAt`，普通 turn activity 不 bump catalog version。 |
 | #9476 | @doudouOUC | merged | WebShell live-state activity consumer：turn completion 通过 post-completion live-state response settle，并用可吸收 `updatedAt` 重排当前 active page。 |
 | #9563 | @doudouOUC | merged | WebShell session title refresh guard：effective title 已由 connection metadata 或 persisted catalog fallback 解析后，不再每 turn 重复刷新完整 catalog。 |
-| #9738 | @doudouOUC | open | `serve --open-with-auth`：当前 runtime diff 复用 URL fragment 到 tab-local `sessionStorage` 的 bearer handoff；尚未合入。 |
+| #9738 | @doudouOUC | merged | `serve --open-with-auth`：最终复用 URL fragment 到 tab-local `sessionStorage` 的 bearer handoff。 |
 | #9838 | @doudouOUC | merged | current-session scheduled task：capability-gated session mode selector，默认 dedicated；busy/pending/parented/sourced/cross-workspace/already-bound 时禁用复用。 |
 
 ---
@@ -404,7 +404,7 @@ WebUI daemon session action 在发送时把文件内容转成 ACP `resource` blo
 
 ## 2026-08-22 follow-up：`serve --open-with-auth`
 
-#9738 当前 open diff 新增独立 `--open-with-auth`，没有修改 Web Shell client 本身，而是复用已经落地的 browser credential handoff。CLI 选择或生成 bearer 后，把 `RunHandle.resolvedToken` 放入 `#token=`；client 读取 fragment、写入当前 tab 的 `sessionStorage`、清理地址栏，再由既有 fetch/SSE transport 发送 `Authorization: Bearer`。fragment 不进入 HTTP request 或 server access log，新 tab 不自动共享。
+#9738 已合入独立 `--open-with-auth`，没有修改 Web Shell client 本身，而是复用已经落地的 browser credential handoff。CLI 选择或生成 bearer 后，把 `RunHandle.resolvedToken` 放入 `#token=`；client 读取 fragment、写入当前 tab 的 `sessionStorage`、清理地址栏，再由既有 fetch/SSE transport 发送 `Authorization: Bearer`。fragment 不进入 HTTP request 或 server access log，新 tab 不自动共享。
 
 #9838 已合入，在 `ScheduledTasksDialog` 增加 session mode selector。只有 daemon 广告 `scheduled_task_session_reuse` 时才显示 current-session 选项，默认仍为 dedicated；当前 session 不存在、busy、等待 permission/AUQ、parented/sourced、跨 workspace 或已有 task binding 时禁用 current。只有用户明确选择后请求才携带复用 intent/session identity，UI 检查只用于反馈，Serve host 仍在提交边界独立重做全部准入。
 
@@ -422,15 +422,21 @@ Local Control 配对材料也改为按 operator authority 展示：trusted prima
 
 Provider 用 context key、restore matching、generation 与 supersession guard 隔离 create/load/resume/reconnect 的迟到结果；standalone working-directory、directory error 与 outcome-unknown recovery 进入 typed connection state。Standalone/Live 不初始化 workspace providers、skills、ACP preheat、Git status 或 workspace invalidation。该 PR 只提供 routing/provider boundary，没有加入全局 New Chat、Recents 或生命周期 UI。
 
-## 2026-08-31 follow-up：standalone WebShell runtime（#10514 open）
+## 2026-08-31 follow-up：standalone WebShell runtime（#10514 merged）
 
-#10514 已从 docs-only 计划推进为 open runtime diff。App 引入显式 global/inherit/workspace 新会话意图：Home/global New Task 在 `standalone_sessions_v1` 可用时创建 standalone，capability loading 时等待、加载失败时 fail closed，只有明确缺少 capability 才回退 trusted primary workspace；项目、Goals、Git、Scheduled Tasks 传 exact workspace cwd，Live 当前会话仍走 `startLive('new')`。Standalone create 不携带 workspace source/worktree/branch，失败或 outcome unknown 也不静默改变原意图。
+#10514 已合入 standalone WebShell runtime。App 引入显式 global/inherit/workspace 新会话意图：Home/global New Task 在 `standalone_sessions_v1` 可用时创建 standalone，capability loading 时等待、加载失败时 fail closed，只有明确缺少 capability 才回退 trusted primary workspace；项目、Goals、Git、Scheduled Tasks 传 exact workspace cwd，Live 当前会话仍走 `startLive('new')`。Standalone create 不携带 workspace source/worktree/branch，失败或 outcome unknown 也不静默改变原意图。
 
 Provider mount 前先按 `?context=standalone|live` 分类：standalone deep link 做 exact summary lookup、可取消的有界 creating poll 和 archived unarchive，再挂载显式 provider。新顶层 `StandaloneRecents` 分页展示 active/archived 顶层 session，并逐 ID 执行 rename/export/archive/unarchive/delete、解释 partial-success 与 `fileCleanupPending`。Session owner/generation guard 阻止查询、创建和恢复的迟到结果发布到新 context。
 
 非 workspace context 同时关闭 workspace selector、Git、Goals/Scheduled Tasks、项目 settings/providers/skills、file upload、Web Terminal 和 split view，阻断对应后台 effect、项目 slash commands 与 workspace action refs；Shell 和普通 session 工具保留。Composer 使用独立 standalone/Live draft/history scope，不读取 legacy unscoped fallback，context 切换丢弃 held attachments，并在 ingestion/submit 再校验。URL、sessionStorage 和 controlled split IDs 必须精确排除 standalone owner，能力或 owner 不确定时 fail closed。typed recovery 覆盖 missing/compromised/recreated directory、repair/reload、archived、creation outcome unknown 与 pending file cleanup。
 
-该 PR 仍为 open，且当前 GitHub unit 与 WebShell E2E jobs 非绿，不能视为 `main` 行为。Standalone uploads、durable scheduling、跨 runtime move/fork 与 split view 仍不在当前实现范围。
+最终实现已进入 `main`。Standalone uploads、durable scheduling、跨 runtime move/fork 与 split view 仍不在当前实现范围。
+
+## 2026-09-02 follow-up：fresh standalone model options（#10719 open）
+
+#10719 当前 open diff 让零 session 的 standalone 页面先通过 capability-gated read-only endpoint 获取 exact Conversations runtime 的 provider/model catalog。`DaemonSessionProvider` 用 context generation guard 发布映射后的 providers/models/reasoning preview；失败或旧 daemon 缺 capability 时保持空 picker 隐藏，仍允许首个 prompt 按 daemon 默认模型创建，不回退 workspace。
+
+用户选择模型后，WebShell 把 `modelServiceId` 与 approval mode 一起放进唯一一次 standalone create，跳过 attach 后 best-effort model switch，避免首个 prompt 已用错模型。reasoning effort 仍在 attach 后应用，但对 standalone 使用 `persist:false`，不污染 internal Conversations workspace。endpoint/SDK/WebShell 均未合入，不能视为当前主干行为。
 
 ---
 
@@ -479,4 +485,4 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-08-30_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-02_

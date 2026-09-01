@@ -69,7 +69,7 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #9362 | fix(cli): Keep transient runtime record I/O retryable | merged | 不新增 capability 或 wire 字段；只调整 Conversations owner/discovery record 内部错误分类，让 transient I/O 继续走 retryable unavailable。 |
 | #9512 | fix(serve): Harden standalone conversation primitives | merged | 不新增 capability 或 wire 字段；收紧 directory ensure、JSONL integrity budget 与 identity error cause。 |
 | #9513 | fix(cli): Recover sessions across archive races | merged | 不新增 capability；exact-spelling active/archive recovery、transcript/export/delete 与 metadata/parent/directory race 都是既有 route 兼容修复。 |
-| #9626 | fix(serve): Repair persisted session lifecycle | open | 当前 diff 新增 `session_storage_conflict_repair`，客户端 gate 后才可发送 `resolveConflicts`，响应 additive 返回 `resolvedConflicts`；默认 conflict 进入 HTTP 200 batch `errors`。 |
+| #9626 | fix(serve): Repair persisted session lifecycle | merged | 最终新增 `session_storage_conflict_repair`，客户端 gate 后才可发送 `resolveConflicts`，响应 additive 返回 `resolvedConflicts`；默认 conflict 进入 HTTP 200 batch `errors`。 |
 | #9665 | feat(serve): restore ask_user_question HITL | merged | 默认关闭的 CLI flag；v1 不新增 capability tag、settings key、route 或 SDK method，客户端只能带外确认 operator 启动参数。 |
 | #9687 | feat(cli): restore each daemon session onto its last selected model | merged | 新增 transcript-internal `system/session_model` projection，不新增 public route/capability；仅 daemon ACP cold load/resume 消费。 |
 | #9763 | fix(daemon): keep restored ask_user_question valid after load | merged | 不新增 public capability；daemon 通过 private suppress meta 让 replay finalize 与 re-hang 决策锁步，并保持 restore flag default-off。 |
@@ -82,7 +82,7 @@ Mode B 的"协议面"由两套互相镜像、但**故意不互相 import** 的�
 | #10179 | feat(cli): Add standalone daemon session API | merged | 最终实现仅在完整 standalone runtime 安装时广告 `standalone_sessions_v1` 并注册 public route family；该 PR 本身不含 SDK/UI。 |
 | #10294 | feat(sdk): Add standalone session APIs | merged | 最终实现消费 `standalone_sessions_v1`，为完整 lifecycle 增加严格 validators、explicit restore strategy 与 outcome-unknown exact recovery。 |
 | #10403 | feat(serve): Enable full API access on trusted loopback | merged | 不新增 capability tag；trusted-loopback authority 满足 strict mutation，并允许显式启用 `session_shell_command`，SDK 注释同步该部署模式。 |
-| #10554 | feat(serve): add sessionless POST /language for user-level language sync | open | 新增条件 `user_language_sync`；与 `workspace_settings` 共用 `persistSettingAvailable` predicate，route/SDK 不存在时客户端必须降级。 |
+| #10554 | feat(serve): add sessionless POST /language for user-level language sync | merged | 新增条件 `user_language_sync`；与 `workspace_settings` 共用 `persistSettingAvailable` predicate，route/SDK 不存在时客户端必须降级。 |
 | #9261 | feat(serve): Add workspace session live-state endpoint and catalog version | merged | 新增 `workspace_session_live_state` capability、trusted-only memory-only `GET /workspaces/:workspace/sessions/live-state`、catalog version 与 TS SDK surface。 |
 | #9366 | feat(web-shell): Consume workspace session live-state | merged | 不新增 protocol；WebShell 消费 #9261 的 capability/route，用 version-fenced handshake 减少 full catalog polling。 |
 | #9380 | feat(serve): measure ACP child peak old-generation heap | merged | `/daemon/status` additive 暴露 ACP child old-generation peak heap measurement；observe-only，不改 child argv/enforcement。 |
@@ -546,7 +546,7 @@ sequenceDiagram
 
 7. **#8415 已合入**。`session_id_override` 已作为 capability gate 落地：客户端必须 feature-detect 后再发送 requested `sessionId`，且不能把本地 requested id 当作已创建事实，必须以 daemon response verification 为准。
 
-8. **#9513/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978/#10179/#10294/#10403 已合入；#9626/#10554 是 open**。standalone public capability 与 TypeScript SDK 已由 #10179/#10294 合入；storage conflict repair 与 user-level language sync 仍只能记录当前方案。#9978 本身明确没有 `standalone_sessions_v1`，#10179 新增该 capability，#10294 是 capability-gated consumer；#10403 不新增 tag，只改变 strict operator authority 和显式 session shell 的广告条件；#10554 则新增与 settings persistence 锁步的条件 tag。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新。
+8. **#9513/#9626/#9665/#9687/#9763/#9819/#9820/#9838/#9933/#9976/#9978/#10179/#10294/#10403/#10554 已合入**。standalone public capability 与 TypeScript SDK 已由 #10179/#10294 合入；storage conflict repair 与 user-level language sync 已按最终 additive surface 记录。#9978 本身明确没有 `standalone_sessions_v1`，#10179 新增该 capability，#10294 是 capability-gated consumer；#10403 不新增 tag，只改变 strict operator authority 和显式 session shell 的广告条件；#10554 新增与 settings persistence 锁步的条件 tag。#8691/#9042/#9055/#9134/#9181/#9261/#9362/#9380/#9396 已按 merged diff 更新。
 
 ---
 
@@ -630,7 +630,7 @@ sequenceDiagram
 - #9341 已合入，只在 daemon 内部引入 reserved `sourceType: "standalone"`、loadable metadata reader、explicit standalone / legacy projectless / Live source classification、case-insensitive session id conflict 和 standalone directory identity proof；REST `/session` 与 ACP `session/new` 继续拒绝外部 reserved standalone source。
 - #9512 已合入，不新增 protocol shape；只收紧 directory ensure race、JSONL integrity budget 与 Error cause 语义。
 - #9513 已合入且不新增 capability；exact-spelling 双副本的 active-first load/resume/transcript/export、delete-both 与 metadata/parent/directory race 都沿用既有 wire shape。
-- #9626 当前 open diff 新增 additive `session_storage_conflict_repair`。客户端必须 feature-detect 后才能发送 `resolveConflicts:true`；archive/unarchive response 只在实际修复时追加 `resolvedConflicts`，默认 conflict 保持非变更但统一进入 HTTP 200 batch `errors`。
+- #9626 已合入 additive `session_storage_conflict_repair`。客户端必须 feature-detect 后才能发送 `resolveConflicts:true`；archive/unarchive response 只在实际修复时追加 `resolvedConflicts`，默认 conflict 保持非变更但统一进入 HTTP 200 batch `errors`。
 - #9665 已合入，通过默认关闭的 `--restore-ask-user-question` 控制 load/resume AUQ re-hang；v1 有意不加 settings key 或 capability tag，因此不能从 `/capabilities` 推断可用性。
 - #9687 已合入 transcript-internal `system/session_model` record/projection，不新增 route、capability 或 SDK method；旧 transcript 与旧 daemon 按 assistant model/settings fallback 兼容。
 - #9763 已合入，不新增 public wire；private suppress meta 只在 daemon 明确不 re-hang 时关闭 replay skip/Core preservation，`qwen/session/loadUpdates`、fork/no-client 与普通 send 因此不会留下悬空协议状态。
@@ -663,3 +663,9 @@ sequenceDiagram
 - 当前 open diff 仅在 daemon 完整安装 worktree create/restore/relocate 与 strict marker/sidecar dependencies 时宣告 `session_worktree_persistence_v1`；Channel worker 在缺 capability 时不发 `--worktree` 请求，也不 fallback shared workspace。
 - capability 只表示可协商该流程，不是某个 response 已安全持久的证明。每次 create/restore 还必须检查精确 canonical worktree path 和 `worktreeState:'persisted-v1'`；SDK/bridge 不能只因 capability 存在就发布 attachment。
 - marker/sidecar/cwd/owner 不匹配都是 fail-closed 运行时结果，不新增“自动回退普通 workspace”协议语义。PR 尚未合入，capability 不能视为当前 `main` 发布契约。
+
+### #10719 — `standalone_session_options_v1`（open）
+
+- 当前 open diff 只在 exact internal Conversations runtime、standalone service route 和 SDK validator 都安装时广告 `standalone_session_options_v1`。客户端缺 tag 时不得试探 `GET /standalone/session-options`。
+- endpoint 不接受 workspace selector、query 或 body，只读 exact runtime provider status，并在返回前复核 runtime generation、canonical root 与 response `workspaceCwd` ownership；public response 有意移除内部 cwd 和 ACP live state。
+- capability 只说明 endpoint 可调用，SDK 仍需严格验证 provider/model/config option、approval mode 与 error kind。读取失败或旧 daemon 由 WebShell 保留 daemon-default create，不得 fallback 创建 workspace session。PR 尚未合入。
