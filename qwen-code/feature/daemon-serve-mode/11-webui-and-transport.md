@@ -432,11 +432,17 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 
 最终实现已进入 `main`。Standalone uploads、durable scheduling、跨 runtime move/fork 与 split view 仍不在当前实现范围。
 
-## 2026-09-02 follow-up：fresh standalone model options（#10719 open）
+## 2026-09-02 follow-up：fresh standalone model options 与重复清理恢复（#10719/#10824 merged）
 
-#10719 当前 open diff 让零 session 的 standalone 页面先通过 capability-gated read-only endpoint 获取 exact Conversations runtime 的 provider/model catalog。`DaemonSessionProvider` 用 context generation guard 发布映射后的 providers/models/reasoning preview；失败或旧 daemon 缺 capability 时保持空 picker 隐藏，仍允许首个 prompt 按 daemon 默认模型创建，不回退 workspace。
+#10719 最终让零 session 的 standalone 页面先通过 capability-gated read-only endpoint 获取 exact Conversations runtime 的 provider/model catalog。`DaemonSessionProvider` 用 context generation guard 发布映射后的 providers/models/reasoning preview；失败或旧 daemon 缺 capability 时保持空 picker 隐藏，仍允许首个 prompt 按 daemon 默认模型创建，不回退 workspace。
 
-用户选择模型后，WebShell 把 `modelServiceId` 与 approval mode 一起放进唯一一次 standalone create，跳过 attach 后 best-effort model switch，避免首个 prompt 已用错模型。reasoning effort 仍在 attach 后应用，但对 standalone 使用 `persist:false`，不污染 internal Conversations workspace。endpoint/SDK/WebShell 均未合入，不能视为当前主干行为。
+用户选择模型后，WebShell 把 `modelServiceId` 与 approval mode 一起放进唯一一次 standalone create，跳过 attach 后 best-effort model switch，避免首个 prompt 已用错模型。reasoning effort 仍在 attach 后应用，但对 standalone 使用 `persist:false`，不污染 internal Conversations workspace。#10824 随后修复同一 deferred standalone draft 连续 New task：clear 前捕获 standalone context，clear 后递增 `restoreSessionNonce`，使 options effect 即使 context key 未变化也会重跑；它仍不会在首个 prompt 前创建 session。
+
+## 2026-09-03 follow-up：session turn navigation 协议（#10751 open）
+
+#10751 当前仅交付 Phase 1 daemon/ACP/SDK 协议。稀疏 turn index 使用 durable user-record UUID，HMAC snapshot 固定 transcript identity/active leaf，并让 `atRecordId+snapshot` 锚定读取任意已索引 turn；公开 preview 不含 thought、tool payload 或生成 attachment token。
+
+WebShell 尚未建立 bounded page table、任意 turn 页面缓存或 virtualized rail，当前 rail 仍由已加载 transcript blocks 推导。因此不能仅因 `session_turn_navigation` capability 已在 open diff 中定义，就宣称浏览器已支持长会话全局 turn 导航。
 
 ---
 
@@ -485,4 +491,4 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-02_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-03_

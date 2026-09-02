@@ -405,6 +405,8 @@ sequenceDiagram
 
 #10643 当前 open diff 在 `DaemonSessionClient`/daemon types 中传递 worktree request、canonical path 和 per-response `worktreeState:'persisted-v1'`。reattach 必须精确匹配 attestation/path，bridge/router 只在 daemon 返回完整证明后发布 worktree attachment。capability 只是 preflight，不能替代每次 response 验证；PR 尚未合入。
 
-#10719 当前 open diff 增加 `DaemonClient.getStandaloneSessionOptions()`。method 先 gate `standalone_session_options_v1`，再严格验证整个 provider/model/config-options response；它不接受 workspace 或 session selector，也不把 internal Conversations cwd/ACP state 暴露为 SDK surface。旧 daemon 或 invalid response 由调用方按 unavailable 处理，不能猜测 provider shape。PR 尚未合入。
+#10719 最终增加 `DaemonClient.getStandaloneSessionOptions()`。method 先 gate `standalone_session_options_v1`，再严格验证整个 provider/model/config-options response；它不接受 workspace 或 session selector，也不把 internal Conversations cwd/ACP state 暴露为 SDK surface。旧 daemon 或 invalid response 由调用方按 unavailable 处理，不能猜测 provider shape。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-02_
+#10751 当前 open Phase 1 diff 在 `DaemonSessionClient` 增加 sparse turn-index、snapshot pagination 与 snapshot-bound transcript anchor API。客户端必须先 gate `session_turn_navigation`，把 server 签发的 snapshot 原样带到后续 index/anchor 请求，并把 ordinal 只当 snapshot-local 展示顺序；`turnId` 才是 durable identity。owner-resolved 与 workspace client 暴露相同 contract，响应 validator 对 labels/details/page bounds fail closed。浏览器 page table 与 virtualized rail 不在当前 PR，且这些 SDK methods 尚未合入。
+
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-03_

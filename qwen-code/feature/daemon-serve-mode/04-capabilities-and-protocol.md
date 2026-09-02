@@ -664,8 +664,15 @@ sequenceDiagram
 - capability 只表示可协商该流程，不是某个 response 已安全持久的证明。每次 create/restore 还必须检查精确 canonical worktree path 和 `worktreeState:'persisted-v1'`；SDK/bridge 不能只因 capability 存在就发布 attachment。
 - marker/sidecar/cwd/owner 不匹配都是 fail-closed 运行时结果，不新增“自动回退普通 workspace”协议语义。PR 尚未合入，capability 不能视为当前 `main` 发布契约。
 
-### #10719 — `standalone_session_options_v1`（open）
+### #10719 — `standalone_session_options_v1`（merged）
 
-- 当前 open diff 只在 exact internal Conversations runtime、standalone service route 和 SDK validator 都安装时广告 `standalone_session_options_v1`。客户端缺 tag 时不得试探 `GET /standalone/session-options`。
+- 最终只在 exact internal Conversations runtime、standalone service route 和 SDK validator 都安装时广告 `standalone_session_options_v1`。客户端缺 tag 时不得试探 `GET /standalone/session-options`。
 - endpoint 不接受 workspace selector、query 或 body，只读 exact runtime provider status，并在返回前复核 runtime generation、canonical root 与 response `workspaceCwd` ownership；public response 有意移除内部 cwd 和 ACP live state。
-- capability 只说明 endpoint 可调用，SDK 仍需严格验证 provider/model/config option、approval mode 与 error kind。读取失败或旧 daemon 由 WebShell 保留 daemon-default create，不得 fallback 创建 workspace session。PR 尚未合入。
+- capability 只说明 endpoint 可调用，SDK 仍需严格验证 provider/model/config option、approval mode 与 error kind。读取失败或旧 daemon 由 WebShell 保留 daemon-default create，不得 fallback 创建 workspace session。
+
+### #10751 — `session_turn_navigation`（open Phase 1）
+
+- 当前 open diff 只有在 sparse turn-index、HMAC snapshot 和 snapshot-bound transcript anchor 三者完整安装时才广告 `session_turn_navigation`。旧 daemon 缺 tag 时客户端不得试探 turn-index route。
+- `turnId` 使用持久 user record UUID；ordinal 只在当前 snapshot 内有意义。snapshot 绑定 workspace、session、transcript file identity/size、active leaf 与签发时间，index 分页和 `atRecordId` transcript 读取都必须复用匹配 snapshot。
+- owner-resolved 与 workspace-qualified route 返回同一有界 public projection。notification、goal runtime、mid-turn、live-only shell、thought、tool call/argument/result 和 raw payload 不进入公开 turn detail。
+- transcript anchor 与 cursor 互斥，anchor 是 inclusive，并 additive 返回 `targetRecordId`/`hasOlder`。当前 PR 只交付协议、ACP vendor method 与 SDK；浏览器 page table 和 virtualized rail 尚未实现，不能写成 `main` 能力。

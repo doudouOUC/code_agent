@@ -1011,3 +1011,11 @@ sequenceDiagram
 
 - daemon-owned standalone new/load/resume 在 managed activation 前可能还没有 content-generator config。最终实现只返回不依赖 generation 的 mode/model config options，不提前 refresh auth、activate provisional workspace 或安装 filesystem state。
 - activation 建立 generation config 后，既有 session-context refresh 再发布完整 `reasoning_effort`；mandatory-thinking model 仍过滤 `none`。这是延后 option materialization，不是放宽模型约束或改变非 standalone 路径。
+
+### #10828 — relaxed standalone daemon ownership（open docs-only design）
+
+- 当前 `main` 仍由 `ConversationRuntimeManager.ensureOnce()` 获取 process-global Conversations owner。#10828 只提出让多个更新后的 daemon 挂载同一 Conversations root，把写入完整性收窄到 standalone、Live 和 scheduled task 共用的强制 per-session writer lease；它不是已落地行为。
+- 方案仍拒绝同一 active session 的并行写：第二 daemon 遇到 occupied lease 返回 `409 session_writer_conflict`，active session 保持 daemon-local，不新增跨 daemon routing、共享 live index、distributed cache 或一般 multi-master。
+- local stale reclaim 仅允许 well-formed、unsealed owner 可证明同 hostname，Linux 同 boot ID/PID namespace，且进程已死或 PID 已复用；live、stalled、foreign、字段不全或不确定状态继续 fenced。legacy global owner 只做迁移检查，部署要求 drain-and-cutover，不能 mixed-version rolling。
+- scheduled task 复用 session lease：bound controller 并发恢复先选出唯一 resident scheduler，unbound durable task 在 task-file transaction 提交 controller binding 前保持 dormant；这不消除 dispatch 后、fired-state 持久化前的 at-least-once crash window。
+- deletion-journal reconciliation 遇到 lease contention 时跳过该 UUID，按另一 daemon 正在处理解释，不把无关操作升级为 compromised。WebShell 未来实现需把 list/legacy-owner failure 放在 Recents section，把 writer conflict/unavailable 放在受影响 session/section 并提供 retry；docs-only PR 尚未交付这些行为。
