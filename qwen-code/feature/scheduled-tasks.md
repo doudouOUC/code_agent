@@ -1,6 +1,6 @@
 # Scheduled Tasks 技术方案
 
-> 当前实现来源：[#9838](https://github.com/QwenLM/qwen-code/pull/9838) 与 [#10144](https://github.com/QwenLM/qwen-code/pull/10144)，均已合入。本文按最终 diff 记录 current-session reuse 与 empty-session persistence。
+> 当前实现来源：[#9838](https://github.com/QwenLM/qwen-code/pull/9838) 与 [#10144](https://github.com/QwenLM/qwen-code/pull/10144)，均已合入。本文按最终 diff 记录 current-session reuse 与 empty-session persistence，并登记 [#10828](https://github.com/QwenLM/qwen-code/pull/10828) 已合入的 ownership 设计和 [#10924](https://github.com/QwenLM/qwen-code/pull/10924) 尚未合入的 Conversations unbound-task fence。
 
 ## 背景与目标
 
@@ -77,6 +77,12 @@ REST existing-session path 可能绑定一个尚无 transcript entry 的 session
 
 trusted current-prompt `cron_create` 已位于持久化 prompt 内，不重复执行；unbound dedicated task 也不受影响。若 source anchor 成功但 task commit 后续失败，anchor 作为 caller-owned transcript 证据保留，不做可能破坏真实 session 的 rollback。
 
+### Conversations controller binding fence（#10828 merged design / #10924 open）
+
+#10828 的 docs-only 设计规定：当未来多个更新后 daemon 可以挂载同一 Conversations root 时，bound controller session 的并发恢复先由 mandatory session writer lease 选出唯一 resident scheduler；unbound durable task 必须在既有跨进程 task-file transaction 提交唯一 controller binding 后才能执行。该约束只消除并发 restore/binding 造成的重复，不改变 prompt 已 dispatch、fired-state 尚未持久化之间的 at-least-once 窗口。
+
+#10924 当前 open diff 在带 Conversations provenance 的 ACP child 上，于 scheduler 启动前安装 `setSkipDurableFire((job) => job.boundSessionId === undefined)`。默认 daemon 的 keepalive 仍是唯一 binding worker；若 embedded host 注入 marker 却不运行该 worker，unbound task 会保持 dormant，不 fallback 到普通 workspace scheduler 行为。外层 process-global Conversations owner 尚未移除，因此这仍是 cutover 前的增量 fence，不是多 daemon runtime 已交付。
+
 ## 能力与 Runtime Wiring
 
 新增条件能力 `scheduled_task_session_reuse`。它只在完整 current-session callback、scheduled-task store 和 managed runtime wiring 可用后广告；primary、startup secondary 与动态 workspace runtime 都需要安装同一 host callback。fast-path bootstrap envelope 可以暂时缺少该 tag，runtime mount 后才进入 advertised set；caller-injected bridge、测试/嵌入式 partial bridge 或旧 daemon 不广告，客户端必须回落到 dedicated 模式。
@@ -97,6 +103,7 @@ trusted current-prompt `cron_create` 已位于持久化 prompt 内，不重复�
 - generation 在 commit 后关闭：回滚刚创建的 task。
 - capability 缺失：Web Shell 只提供 dedicated；旧客户端省略 `sessionMode` 也保持原行为。
 - task 后续触发时若 session 不可立即使用，仍走既有 keepalive/rehydration/active-work 调度策略，不在创建请求里绕过生命周期门控。
+- #10924 未合入前，不能把 Conversations unbound-task skip 写成 `main` 现状；即使该 PR 合入，ownership gate removal、deletion-journal 与 Live/WebShell follow-up 也仍是后续范围。
 
 ## 验证策略
 
@@ -123,5 +130,7 @@ PR #9838 声明通过 Core cron-create、ACP bridge、Serve scheduled-task route
 |---|---|---|
 | [#9838](https://github.com/QwenLM/qwen-code/pull/9838) | merged | current-session `cron_create`、private ACP creator、Serve admission/persistence/rollback、条件 capability 与 Web Shell selector。 |
 | [#10144](https://github.com/QwenLM/qwen-code/pull/10144) | merged | REST existing-session task binding 前持久化 empty default session，稳定映射能力/不存在/失败错误并保留 generation fence。 |
+| [#10828](https://github.com/QwenLM/qwen-code/pull/10828) | merged docs-only | 定义 relaxed ownership 下 mandatory lease、唯一 controller binding 与 unbound durable task eligibility；不实现 runtime。 |
+| [#10924](https://github.com/QwenLM/qwen-code/pull/10924) | open | 当前 diff 在 Conversations-marked child 上阻止 unbound durable fire；global owner cutover 未包含。 |
 
-_按个人 PR 口径更新于 2026-08-27_
+_按个人 PR 口径更新于 2026-09-04_

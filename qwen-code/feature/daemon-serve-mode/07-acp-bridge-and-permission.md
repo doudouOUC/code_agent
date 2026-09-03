@@ -65,6 +65,7 @@
 | #10144 | persist empty sessions before task binding | merged private persistence | existing-session task commit 前通过 bridge 写入 default source anchor，不触发模型/hook/可见消息。 |
 | #10179 | standalone daemon session API | merged public lifecycle | 最终实现在 private service 上增加 exact-owner route family、conditional capability 与 journaled delete；SDK/UI 不在该 PR 范围。 |
 | #10268 | cancel timed-out session initialization | merged initialization lifecycle | 最终传递 private absolute deadline，child 发布前取消；旧 child 由 bridge 做迟到 exact close、ID fence 与 fresh-admission quarantine。 |
+| #10924 | mandatory Conversations writer fences | open private bridge/runtime fence | 当前 diff 只有在 exact Conversations marker 与 channel factory child-env forwarding 同时证明时才发布 runtime；缺证明的新 candidate 拒绝、existing runtime 终态 quarantine。 |
 
 > #4335 已 **MERGED**。其 PR body 明确列出五条硬不变量（N1/N2/N3/O5/O8）与若干 out-of-scope follow-up（见本文末节）。
 
@@ -649,3 +650,10 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - bridge 的 JSON-RPC error detail 提取保留既有优先级：非空 `data` 字符串、`data.details`、`data.message`，再解包 Agent SDK 常见的 `data.error` 字符串或 `data.error.message`。
 - 提取结果进入已有 `turn_error.data.message` 和 terminal persistence/live-state 链，不新增 event 字段、`errorKind` 或 retry 语义；旧的更具体 detail 形状仍比 nested error 优先。
 - 这一变化解决 provider 消息被泛化 `Internal error` 覆盖的问题，不将任意 provider response body 扩展为新的协议面。
+
+### #10924 — Conversations bridge mandatory-lease attestation（open）
+
+- `createSpawnChannelFactory()` 在包内登记它会把 `childEnvOverrides` 合并进真实 child environment；任意 marker-shaped overrides 搭配未登记 factory 都不能形成证明。该登记只防同进程装配错误，不把可构造任意 runtime 的 embedding code 当作安全边界。
+- `createAcpSessionBridge()` 从 frozen child overrides 的精确私有 marker 与 factory forwarding proof 合取出 immutable `mandatoryLeaseAttested`。`ConversationRuntimeManager` 在采用已有 runtime 或发布新 candidate 前验证：新候选拒绝并 dispose，已有 runtime 终态 quarantine，后续请求保持不可重试 `conversation_root_compromised`。
+- marker 在 CLI 入口、任何环境文件加载前与 private parent capability 一起捕获并删除，只在 ACP mode + capability + exact enable value 下接受；workspace/user `.env` 被排除，sandbox relaunch 只传递已经接受的私有状态。
+- 当前 PR 尚未合入且不移除 process-global Conversations owner；它是 #10828 merged docs-only design 的第一阶段 fence，不是多 daemon 并发挂载已经可用。

@@ -14,6 +14,7 @@
 | [#10751](https://github.com/QwenLM/qwen-code/pull/10751) | 🟡 open | feat(serve): add session turn navigation protocol | [pr-10751.md](pr-10751.md) |
 | [#10786](https://github.com/QwenLM/qwen-code/pull/10786) | ⚪ closed | fix(web-shell): Preserve workspace navigation in standalone tasks | [pr-10786.md](pr-10786.md) |
 | [#10824](https://github.com/QwenLM/qwen-code/pull/10824) | ✅ merged | fix(web-shell): Reload models for repeated new tasks | [pr-10824.md](pr-10824.md) |
-| [#10828](https://github.com/QwenLM/qwen-code/pull/10828) | 🟡 open | docs(design): Define relaxed standalone daemon ownership | [pr-10828.md](pr-10828.md) |
+| [#10828](https://github.com/QwenLM/qwen-code/pull/10828) | ✅ merged | docs(design): Define relaxed standalone daemon ownership | [pr-10828.md](pr-10828.md) |
+| [#10924](https://github.com/QwenLM/qwen-code/pull/10924) | 🟡 open | feat(serve): Fence Conversations writers with mandatory session leases | [pr-10924.md](pr-10924.md) |
 
-_按个人 PR 口径更新于 2026-09-03_
+_按个人 PR 口径更新于 2026-09-04_
