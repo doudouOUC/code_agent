@@ -4,9 +4,9 @@
 
 **主题**: standalone session core/REST/SDK/WebUI context 与 WebShell UI 实现、trusted-loopback operator authority、sessionless 用户语言同步、Channel 命名任务与输出归因、scheduled task 当前会话复用、command hook/ACP process tree、session 初始化取消、writer-lease cleanup、model provider runtime sync、Mem0 extension、OTel context usage
 
-**PR 统计**: 27 PRs - 23 merged / 2 open / 2 closed
-**当前已合并 PR 代码量**: +58,711 / -4,102，494 个文件变更
-**全量代码量**: +66,811 / -4,901，554 个文件变更
+**PR 统计**: 27 PRs - 25 merged / 0 open / 2 closed
+**当前已合并 PR 代码量**: +68,319 / -5,208，545 个文件变更
+**全量代码量**: +69,193 / -5,307，557 个文件变更
 **类型分布**: fix ×13, feat ×13, docs ×1
 **范围 (scope)**: serve/daemon ×15, acp-bridge ×12, cli/acp-integration ×16, core ×11, channels ×4, sdk ×4, webui/web-shell ×6, telemetry ×1, external-context ×2, docs/design ×23
 
@@ -41,8 +41,8 @@
 | [#10418](https://github.com/QwenLM/qwen-code/pull/10418) | ✅ merged | @doudouOUC | feat(web-shell): Add explicit daemon session contexts | +4331/-288 | 14 | 08-28 16:12 | 08-29 14:40 |
 | [#10420](https://github.com/QwenLM/qwen-code/pull/10420) | ✅ merged | @doudouOUC | feat(channels): Attribute named task output | +4643/-268 | 48 | 08-28 16:39 | 08-30 10:08 |
 | [#10512](https://github.com/QwenLM/qwen-code/pull/10512) | ⚫ closed | @doudouOUC | fix(core): Harden surviving hook supervision | +482/-56 | 4 | 08-29 14:48 | 08-29 14:56 |
-| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | 🟡 open | @doudouOUC | feat(web-shell): Add standalone chats | +6046/-696 | 26 | 08-29 15:49 | — |
-| [#10554](https://github.com/QwenLM/qwen-code/pull/10554) | 🟡 open | @doudouOUC | feat(serve): add sessionless POST /language for user-level language sync | +1180/-4 | 22 | 08-30 09:07 | — |
+| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | ✅ merged | @doudouOUC | feat(web-shell): Add standalone chats | +8132/-1100 | 27 | 08-29 15:49 | 09-01 09:43 |
+| [#10554](https://github.com/QwenLM/qwen-code/pull/10554) | ✅ merged | @doudouOUC | feat(serve): add sessionless POST /language for user-level language sync | +1476/-6 | 24 | 08-30 09:07 | 08-31 16:53 |
 
 ---
 
@@ -75,27 +75,27 @@
 | [#10418](https://github.com/QwenLM/qwen-code/pull/10418) | WebUI provider 只靠 `workspaceCwd` 推断会话归属，无法安全表达 standalone/Live，会暴露内部 Conversations cwd、错误回退 primary 或初始化 workspace-only 状态。 | 最终引入显式 `workspace` / `standalone` / `live` product context：workspace 保持兼容，standalone 调 capability-gated SDK 并保留 working-directory/create-recovery 状态，Live 在请求前解析唯一 trusted non-primary runtime；context key 与 supersession guard 防止迟到切换发布，非 workspace 不初始化 provider/skills/preheat/Git/invalidation。 | 已在 daemon WebUI/transport 与总览登记 merged provider routing boundary；可见 WebShell 入口仍留后续。完整实现见 [implementations/pr-10418.md](implementations/pr-10418.md)。 |
 | [#10420](https://github.com/QwenLM/qwen-code/pull/10420) | owner-scoped 命名任务虽能保留多个 session，但延迟结果、分片、卡片、后台输出和权限提示无法说明来自哪个任务。 | 最终为 exact session 建 O(1) task presentation index，在 turn/permission admission 时捕获独立 `sourceLabel`，由各 adapter 在每个可见发送边界渲染 `[task]` 或 `[sender · task]`；Feishu 防止 bot 回抽标签进入引用输入，Telegram 保证 4096 字符分片的 markup 平衡和逐片归因。模型文本/transcript 不变，busy/selection/concurrency 语义不扩大。 | 已在 [channel-adapters.md](../../feature/channel-adapters.md) 登记 merged Part 3A delivery attribution。完整实现见 [implementations/pr-10420.md](implementations/pr-10420.md)。 |
 | [#10512](https://github.com/QwenLM/qwen-code/pull/10512) | #10288 supervisor 仍存在 timeout 非法值、argv 边界、loader env 注入、Windows fallback 漂移和 deadline 附近自然完成被误判等加固缺口。 | 关闭前方案校验正有限 timeout、增加 Node `--`、隔离并仅向真实 hook 恢复 loader env、对齐 Windows taskkill，并仅在实际发出终止动作时报告 timeout；未合入，只作为 #10288 后续观察。 | 已在 [hooks.md](../../feature/hooks.md) 记录 closed 未合入 hardening 边界。完整方案见 [implementations/pr-10512.md](implementations/pr-10512.md)。 |
-| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | standalone daemon/SDK/provider 底座已合入，但 WebShell 仍缺全局入口、独立 Recents、context-aware 深链，以及与 workspace 项目功能隔离的完整交互。 | 当前 open diff 把 Home/global New Task 显式路由到 standalone，只有 capability 已加载且明确缺席时才回退 trusted primary workspace；项目、Goals、Git、Scheduled Tasks 保持 exact workspace intent，Live 沿用既有 `startLive('new')`。新增 standalone active/archived Recents 与 rename/export/archive/unarchive/delete，深链在 provider mount 前做 exact owner 查询、有界 creating poll 和 archived unarchive；App、provider、sidebar、composer 与 split-view ingress 用显式 product context、generation guard 和 typed recovery 隔离 project effects、draft/history、attachments 及迟到结果。 | 已在 daemon WebUI/transport、路线图与总览登记 open runtime 实现；尚未合入且当前 GitHub unit/E2E jobs 非绿，不能视为 `main` 界面。完整观察见 [implementations/pr-10514.md](implementations/pr-10514.md)。 |
-| [#10554](https://github.com/QwenLM/qwen-code/pull/10554) | host 在尚未创建 session 时无法统一切换用户 UI/输出语言；逐 session 写 user settings 又会让多个 workspace runtime 竞争同一全局文件。 | 当前 open diff 条件广告 `user_language_sync` 并增加 sessionless `POST /language`。daemon 作为 user settings/global output-language 唯一写者，持久化后 best-effort 切自身 i18n，再向 trusted live runtimes fan-out private `qwen/control/user/language`；只有同步输出语言时才刷新各 session memory/system instruction，项目级 output-language override 保留。响应汇总 runtime/session/failed 数，不回滚已提交设置。 | 已在 daemon endpoint、capability、ACP bridge、SDK 与总览登记 open 用户级语言同步方案。完整观察见 [implementations/pr-10554.md](implementations/pr-10554.md)。 |
+| [#10514](https://github.com/QwenLM/qwen-code/pull/10514) | standalone daemon/SDK/provider 底座已合入，但 WebShell 仍缺全局入口、独立 Recents、context-aware 深链，以及与 workspace 项目功能隔离的完整交互。 | 最终以显式 `NewSessionIntent` 将 Home/global New Task 路由到 capability-gated standalone 创建；入口在 provider mount 前完成 exact owner 查询、有界 creating poll 与 archived unarchive，active/archived Recents 提供 rename/export/archive/unarchive/delete。App、provider、sidebar、composer 与 split-view ingress 通过 product context、generation guard、独立 draft/history scope 和 typed recovery 隔离项目副作用、附件及迟到结果。 | 已在 daemon WebUI/transport、路线图与总览登记 merged runtime 实现。完整实现见 [implementations/pr-10514.md](implementations/pr-10514.md)。 |
+| [#10554](https://github.com/QwenLM/qwen-code/pull/10554) | host 在尚未创建 session 时无法统一切换用户 UI/输出语言；逐 session 写 user settings 又会让多个 workspace runtime 竞争同一全局文件。 | 最终条件广告 `user_language_sync` 并增加 sessionless `POST /language`。daemon 作为 user settings/global output-language 唯一写者，持久化后 best-effort 切换自身 i18n，再向 trusted live runtimes fan-out private `qwen/control/user/language`；只有同步输出语言时才刷新各 session memory/system instruction，项目级 output-language override 保留。响应汇总 runtime/session/failed 数，不回滚已提交设置。 | 已在 daemon endpoint、capability、ACP bridge、SDK 与总览登记 merged 用户级语言同步实现。完整实现见 [implementations/pr-10554.md](implementations/pr-10554.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [daemon-serve-mode/](../../feature/daemon-serve-mode/README.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10269 / #10286(closed) / #10300 / #10403 / #10418 / #10514(open) / #10554(open) | 刷新 standalone、ACP process tree、session 初始化、provider sync、post-commit cleanup、trusted-loopback authority、用户级语言同步与 WebUI/WebShell context/UI 阶段边界。 |
-| [daemon-serve-mode/01-http-server-and-middleware.md](../../feature/daemon-serve-mode/01-http-server-and-middleware.md) | #9838 / #9933 / #10179 / #10403 / #10554(open) | 记录 current-session runtime、permission timeout、standalone public route、trusted-loopback 鉴权矩阵与 sessionless language route。 |
+| [daemon-serve-mode/](../../feature/daemon-serve-mode/README.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10269 / #10286(closed) / #10300 / #10403 / #10418 / #10514 / #10554 | 刷新 standalone、ACP process tree、session 初始化、provider sync、post-commit cleanup、trusted-loopback authority、用户级语言同步与 WebUI/WebShell context/UI 最终边界。 |
+| [daemon-serve-mode/01-http-server-and-middleware.md](../../feature/daemon-serve-mode/01-http-server-and-middleware.md) | #9838 / #9933 / #10179 / #10403 / #10554 | 记录 current-session runtime、permission timeout、standalone public route、trusted-loopback 鉴权矩阵与 merged sessionless language route。 |
 | [daemon-serve-mode/03-session-lifecycle.md](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #9819 / #9820 / #9838 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10286(closed) / #10300 | 补 standalone/process tree、新建 session deadline 与 merged writer-owned cleanup 生命周期。 |
-| [daemon-serve-mode/04-capabilities-and-protocol.md](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10179 / #10294 / #10403 / #10554(open) | 记录 merged trusted-loopback authority 与条件 `user_language_sync` 发现契约。 |
-| [daemon-serve-mode/07-acp-bridge-and-permission.md](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10554(open) | 更新 standalone/process tree/deadline 与 sessionless user-language private fan-out。 |
-| [daemon-serve-mode/08-extension-endpoints.md](../../feature/daemon-serve-mode/08-extension-endpoints.md) | #10554(open) | 记录 process-global `POST /language` 的持久化、fan-out、事件和部分失败语义。 |
-| [daemon-serve-mode/10-client-adapters-and-sdk.md](../../feature/daemon-serve-mode/10-client-adapters-and-sdk.md) | #10554(open) | 记录 capability-gated `DaemonClient.setUserLanguage()` 与 additive result shape。 |
-| [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #9838 / #10403 / #10418 / #10514(open) | 记录 session mode selector、merged trusted-loopback Channel authority、explicit product context 与 open standalone WebShell runtime 实现。 |
+| [daemon-serve-mode/04-capabilities-and-protocol.md](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) | #9819 / #9820 / #9838 / #9933 / #9976 / #9978 / #10179 / #10294 / #10403 / #10554 | 记录 merged trusted-loopback authority 与条件 `user_language_sync` 发现契约。 |
+| [daemon-serve-mode/07-acp-bridge-and-permission.md](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #9820 / #9838 / #9933 / #9976 / #9978 / #10142 / #10144 / #10179 / #10268 / #10554 | 更新 standalone/process tree/deadline 与 merged sessionless user-language private fan-out。 |
+| [daemon-serve-mode/08-extension-endpoints.md](../../feature/daemon-serve-mode/08-extension-endpoints.md) | #10554 | 记录 merged process-global `POST /language` 的持久化、fan-out、事件和部分失败语义。 |
+| [daemon-serve-mode/10-client-adapters-and-sdk.md](../../feature/daemon-serve-mode/10-client-adapters-and-sdk.md) | #10554 | 记录 merged capability-gated `DaemonClient.setUserLanguage()` 与 additive result shape。 |
+| [daemon-serve-mode/11-webui-and-transport.md](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #9838 / #10403 / #10418 / #10514 | 记录 session mode selector、merged trusted-loopback Channel authority、explicit product context 与 standalone WebShell runtime 最终实现。 |
 | [permission-system.md](../../feature/permission-system.md) | #9933 | 将普通权限/AUQ 默认 deadline 从 5 分钟改为 disabled，并记录显式 `300000` 的兼容迁移。 |
 | [scheduled-tasks.md](../../feature/scheduled-tasks.md) | #9838 / #10144 | 更新 current-session task 最终实现，并补 empty-session persistence 前置步骤。 |
 | [hooks.md](../../feature/hooks.md) | #10100 / #10288 / #10512(closed) | 更新 merged fire-and-forget supervisor，并保留 closed hardening follow-up 观察。 |
 | [channel-adapters.md](../../feature/channel-adapters.md) | #10145 / #10198 / #10420 | 增加 same-chat delivery ownership、owner-scoped 命名任务 catalog 与 merged 输出归因实现。 |
 | [auth-providers.md](../../feature/auth-providers.md) | #10269 | 记录 merged provider mutation runtime sync 与失败降级。 |
-| [sdk.md](../../feature/sdk.md) | #10179 / #10294 / #10554(open) | 记录已合入的 standalone REST/SDK lifecycle，以及 open user-language SDK surface。 |
+| [sdk.md](../../feature/sdk.md) | #10179 / #10294 / #10554 | 记录已合入的 standalone REST/SDK lifecycle 与 user-language SDK surface。 |
 | [external-context-provider.md](../../feature/external-context-provider.md) | #10113 / #10149 | 将 configurable Mem0 design/runtime 更新为 merged，并保留空 preset 不可用边界。 |
 | [telemetry-observability/](../../feature/telemetry-observability/README.md) | #10016 | 将 request-start context snapshot、provider-total normalization 和低敏边界更新为 merged。 |
 | [telemetry-observability/06-genai-ttft-retry-and-metrics.md](../../feature/telemetry-observability/06-genai-ttft-retry-and-metrics.md) | #10016 | 将 `qwen-code.context.usage` 的 span 生命周期与分类不变量更新为 merged。 |
