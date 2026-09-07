@@ -438,11 +438,21 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 
 用户选择模型后，WebShell 把 `modelServiceId` 与 approval mode 一起放进唯一一次 standalone create，跳过 attach 后 best-effort model switch，避免首个 prompt 已用错模型。reasoning effort 仍在 attach 后应用，但对 standalone 使用 `persist:false`，不污染 internal Conversations workspace。#10824 随后修复同一 deferred standalone draft 连续 New task：clear 前捕获 standalone context，clear 后递增 `restoreSessionNonce`，使 options effect 即使 context key 未变化也会重跑；它仍不会在首个 prompt 前创建 session。
 
-## 2026-09-03 follow-up：session turn navigation 协议（#10751 open）
+## 2026-09-03 follow-up：session turn navigation 协议（#10751 merged）
 
-#10751 当前仅交付 Phase 1 daemon/ACP/SDK 协议。稀疏 turn index 使用 durable user-record UUID，HMAC snapshot 固定 transcript identity/active leaf，并让 `atRecordId+snapshot` 锚定读取任意已索引 turn；公开 preview 不含 thought、tool payload 或生成 attachment token。
+#10751 最终交付 Phase 1 daemon/ACP/SDK 协议。稀疏 turn index 使用 durable user-record UUID，HMAC snapshot 固定 transcript identity/active leaf，并让 `atRecordId+snapshot` 锚定读取任意已索引 turn；公开 preview 不含 thought、tool payload 或生成 attachment token。
 
-WebShell 尚未建立 bounded page table、任意 turn 页面缓存或 virtualized rail，当前 rail 仍由已加载 transcript blocks 推导。因此不能仅因 `session_turn_navigation` capability 已在 open diff 中定义，就宣称浏览器已支持长会话全局 turn 导航。
+WebShell `main` 尚未建立 bounded page table、任意 turn 页面缓存或 virtualized rail，当前 rail 仍由已加载 transcript blocks 推导。因此 `session_turn_navigation` capability只证明 daemon协议，不代表浏览器已支持长会话全局 turn导航。
+
+## 2026-09-07 follow-up：Phase 2设计、最终实现与关闭替代方案
+
+#11020 已合入 docs-only设计，提出在固定预算内分离 turn metadata、历史 pages/gaps与 live tail，并按 persisted record/prompt identity定位，Phase 3再提供 rail UI。设计本身不改变 runtime。
+
+#11053 与后续 #11143 均已关闭未合入。两者沿原设计把 replay/prepend/anchored page记录到 provider ledger，同时继续把 flat SDK transcript store作为唯一 render source；anchored page会按 ordinal splice进 flat store。这些 page ledger、gap和错误分类只能作为历史方案观察，不能视为 `main` 行为。
+
+#11054 最终合入的 Phase 2A选择不同边界：existing transcript store只保留 connected live window，immutable historical pages/ranges进入第二个 external `HistoricalTranscriptPageTable`；`DaemonTurnNavigationStore`统一 index、provisional、locator、anchored load、older/newer和 degraded fallback。最终 review又补齐淘汰后的 snapshot-bound gap recovery、exact `promptId`对账、可重试 window-full和 snapshot-bound traversal。sequential prepend迁移留给 Phase 2B，visible rail留给 Phase 3。
+
+#11053/#11143 与 #11054都修改 `DaemonSessionProvider`，但前者把 anchored pages纳入 flat render store，后者把它们隔离到 second store。最终只有 #11054合入，不能把关闭方案的 flat-store ledger语义叠加到当前 `main`架构。
 
 ---
 
@@ -491,4 +501,4 @@ WebShell 尚未建立 bounded page table、任意 turn 页面缓存或 virtualiz
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-03_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-06_

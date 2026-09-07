@@ -8,7 +8,7 @@
 
 Channel adapter 让 qwen-code 可以从本地 TUI 之外的消息通道接收用户输入。adapter 不应该依赖某个具体 bridge 实现，否则后续要切到 daemon-backed bridge、测试 fake bridge 或多 channel bridge 时，所有 adapter 都会被迫跟着底层类名和生命周期细节变化。
 
-#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录；#10420 已合入命名任务可见输出归因，#10574 已合入 running task 期间的精确切换/取消/权限控制；#10643 当前 open diff 进一步提出 worktree-isolated named task。
+#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录；#10420/#10574 已合入命名任务输出归因与并发控制，#10643 已合入 worktree-isolated named task；#11015 当前 open diff 进一步实现同 worktree ownership-transfer reset。
 
 ---
 
@@ -88,7 +88,7 @@ failure payload 只包含 bounded/redacted `channel`、`phase:'connect'`、optio
 
 `NamedSessionManager` 按 channel instance + chat/thread + sender 建 owner key，在 owner 私有的有界原子 JSON catalog 中维护最多 8 个命名任务。`/sessions`、`/session current|new|use|close` 只展示任务名、open/closed 和 shared isolation，不泄露 daemon session ID；inactive task 只按 catalog 中的精确 ID load，失败不创建 replacement。现有 route 继续作为当前选择兼容指针。
 
-入站 turn 在异步 media preparation 前绑定接收时的 session ID 与 generation，并用 queued-turn ownership 保持到 prompt 完成。#10198 合入时 queued/running turn、pending permission、cancel wind-down 或 bridge active prompt 都使 create/use/close fail closed；#10574 已在不改变已绑定 turn 目标的前提下放开 create/use，close busy task 仍 fail closed。当前 merged 能力仍只支持 shared workspace；worktree 隔离只存在于 #10643 open diff，主动投递、webhook、loop 和跨 daemon exactly-once 仍在范围外。
+入站 turn 在异步 media preparation 前绑定接收时的 session ID 与 generation，并用 queued-turn ownership 保持到 prompt 完成。#10198 合入时 queued/running turn、pending permission、cancel wind-down 或 bridge active prompt 都使 create/use/close fail closed；#10574 已在不改变已绑定 turn 目标的前提下放开 create/use，close busy task 仍 fail closed。#10643 已增加 opt-in worktree隔离；主动投递、webhook、loop 和跨 daemon exactly-once 仍在范围外。
 
 ### 3.7 named-task delivery attribution（#10420 merged）
 
@@ -104,11 +104,17 @@ Turn 或 permission admission 捕获独立于 model text 的 immutable `sourceLa
 
 `/session cancel [name]` 可取消 selected 或 exact owned open task 的 active prompt，并复用已有 `requestActivePromptCancellation()` 语义。bare permission 命令只检查 selected session，显式 request ID 才允许定位 owned inactive task。`multiSession:false` 仍走原有单 selected-session 路径。这一阶段解决 shared-workspace 并发控制，不提供文件/Git 工作树隔离。
 
-### 3.9 worktree-isolated named tasks（#10643 open）
+### 3.9 worktree-isolated named tasks（#10643 merged）
 
-#10643 当前 open diff 为 `/session new <name> --worktree` 增加 opt-in isolation。worker 必须先看到 daemon `session_worktree_persistence_v1` 能力；daemon 创建 canonical worktree、relocate exact session，再用排他 0600 `.qwen-session` marker 和原子 sidecar 产生 per-response `persisted-v1` attestation。registry 只在该证明完整时记录 `isolation:'worktree'` 与 canonical cwd。latest head 还把 restore AUQ prompt 和 dangling prompt terminal reconciliation 延后到 sidecar/marker/cwd attestation 完成；只有 deferred prompt 未接纳时才补 interrupted terminal，避免恢复 turn 在错误 cwd 启动或被误记为丢失。
+#10643 最终为 `/session new <name> --worktree` 增加 opt-in isolation。worker 必须先看到 daemon `session_worktree_persistence_v1` 能力；daemon 创建 canonical worktree、relocate exact session，再用排他 0600 `.qwen-session` marker 和原子 sidecar 产生 per-response `persisted-v1` attestation。registry 只在该证明完整时记录 `isolation:'worktree'` 与 canonical cwd。restore AUQ prompt 和 dangling prompt terminal reconciliation 延后到 sidecar/marker/cwd attestation 完成；只有 deferred prompt 未接纳时才补 interrupted terminal。
 
-restore 严格校验 workspace/repo root、realpath containment、sidecar/marker owner 和运行时 cwd；不确定时 fail closed，不 fallback shared workspace。spawn 前失败可直接回收 checkout/branch；spawn 完成后只在 exact session 已确认删除时回收，generation 关闭、kill 拒绝或探测不确定时保留以免破坏未知 owner 的数据。selected worktree task 中 `/clear`/`/new`/`/reset` 当前会提前拒绝，close 保留 transcript/worktree。该 PR 尚未合入，不能将这些行为当作 `main` 能力。
+restore 严格校验 workspace/repo root、realpath containment、sidecar/marker owner 和运行时 cwd；不确定时 fail closed，不 fallback shared workspace。spawn 前失败可直接回收 checkout/branch；spawn 完成后只在 exact session 已确认删除时回收，generation 关闭、kill 拒绝或探测不确定时保留以免破坏未知 owner 的数据。#10643 的 merged Part 4A仍提前拒绝 selected worktree task的 `/clear`/`/new`/`/reset`，close保留 transcript/worktree。
+
+### 3.10 worktree task reset（#11015 open）
+
+#11015 当前 open diff新增 `session_worktree_reset_v1`和 daemon-side ownership transfer。Channel在 owner lock内请求 reset，daemon在 canonical worktree lock下创建 replacement、relocate、写双向 supersession sidecar并以 marker CAS最后提交；随后 sever old session并返回 `persisted-v1`。manager原子替换 registry session ID，superseded restore可自愈，interrupted窗口只自动重试一次。任一 marker/sidecar/cwd/quiescence不一致都返回 bounded typed failure并保留既有用户状态。
+
+该 diff还修复 post-spawn无主 checkout、SDK stale claim、exclusive marker失败cleanup和 leading-flag缺名语法。它仍为 open，route、capability、reset命令与 registry自愈均不能视为 `main` 能力；orphan-reap和 sibling delete cleanup由 #11024承接。
 
 ---
 
@@ -131,7 +137,8 @@ restore 严格校验 workspace/repo root、realpath containment、sidecar/marker
 | #10198 | merged | 同一 owner 在一个 chat 中无法保留和切换多个隔离任务，异步入站又可能漂移到新的 selected session。 | daemon-only 命名任务 catalog 保存精确 session ID；命令面只暴露任务名，turn 在媒体准备前绑定 session/generation，busy 时拒绝任务变更，重启按原 ID 精确恢复。 |
 | #10420 | merged | 命名任务的异步结果和权限界面无法标识来源 task。 | exact session presentation index 和 delivery-only `sourceLabel` 覆盖 adapter 分片、卡片、fallback、后台与权限边界；补 Feishu 回抽剥离与 Telegram markup-balanced 分片，不改变 model text、transcript 或 Part 2 并发语义。 |
 | #10574 | merged | running task 会全局阻止创建/切换其他命名 task，且不能精确取消非 selected task 或约束跨 task 权限快捷命令。 | owner-scoped exact lookup/reservation 保留入站 turn 目标，放开 create/use 而保留 busy-close guard；增加 named cancel，bare permission 只看 selected task，exact request ID 可路由 owned inactive task。 |
-| #10643 | open | shared-workspace 命名 tasks 会互相干扰 Git/文件状态，重启恢复又缺少 exact worktree ownership 证明。 | 当前 diff 用 capability-gated `--worktree`、canonical relocate、排他 marker+原子 sidecar 和严格 restore attestation 建立 `persisted-v1`；任一 ownership 不确定时 fail closed，尚未合入。 |
+| #10643 | merged | shared-workspace 命名 tasks 会互相干扰 Git/文件状态，重启恢复又缺少 exact worktree ownership 证明。 | capability-gated `--worktree`、canonical relocate、排他 marker+原子 sidecar 和严格 restore attestation 建立 `persisted-v1`；任一 ownership 不确定时 fail closed。 |
+| #11015 | open | worktree task无法在保留 checkout/branch/name时重开 conversation。 | 当前 diff用 daemon ownership transfer、marker-last CAS、双向 supersession、typed恢复与 registry self-heal实现 clear/new/reset；尚未合入。 |
 
 ---
 
@@ -141,8 +148,8 @@ restore 严格校验 workspace/repo root、realpath containment、sidecar/marker
 2. daemon-managed worker 已支持 restart/heartbeat、prompt turn barrier、session listing、settings reload、workspace grouping、#6741 runtime selection control 和 #6950 startup failure diagnostics；多进程 rolling upgrade、跨 daemon worker 迁移仍未在本页覆盖。
 3. 新插件应优先面向 `ChannelAgentBridge` 编程，只有 standalone ACP-backed 路径才需要知道 `AcpBridge`。
 4. #10145 只修复单进程内的 delivery ownership；跨进程重启、平台去重和 exactly-once 仍需要独立 journal/adapter 协议。
-5. #10574 已合入 shared-workspace 的 running-task create/use、named cancel 和权限路由；worktree isolation 只存在于 #10643 open diff，主动投递、webhook、loop 和 history backfill 尚未开放。
+5. #10574 已合入 shared-workspace并发控制，#10643 已合入 opt-in worktree isolation；主动投递、webhook、loop 和 history backfill 尚未开放。
 6. #10420/#10574 已合入跨 adapter 标签、权限归因与并发控制；真实平台 transport E2E 和预发验证仍待完成。
-7. #10643 仍为 open；`session_worktree_persistence_v1`、worktree-isolated task、marker/sidecar restore 和相关 SDK metadata 不能视为 `main` 能力。
+7. #11015 仍为 open；`session_worktree_reset_v1`、ownership-transfer reset、superseded redirect和相关 SDK/registry自愈不能视为 `main` 能力。
 
-_按个人 PR 口径更新于 2026-09-04_
+_按个人 PR 口径更新于 2026-09-06_

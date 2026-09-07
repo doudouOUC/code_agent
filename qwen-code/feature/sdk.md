@@ -531,20 +531,25 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - `DaemonClient` 共享 HTTP error formatter 只在 generic `Internal error` + numeric JSON-RPC code + 5xx 形状下，按 `data` 字符串、`data.details`、`data.message` 的顺序保留首个非空详情。
 - 具体顶层 error、4xx、非数字 code、非 JSON body 和原 status/response 不被新规则改写，因此这是错误消息保真，不是新 wire shape。
 
-### #10643 — worktree session metadata（open）
+### #10643 — worktree session metadata（merged）
 
-- 当前 diff 增加 capability-gated worktree request/result metadata；客户端必须同时验证 canonical path 和 per-response `persisted-v1` attestation，不能只因 daemon 宣告 `session_worktree_persistence_v1` 就当作 attachment 成功。
-- PR 尚未合入，这些 types/reattach 约束不是当前发布 SDK 契约。
+- 最终增加 capability-gated worktree request/result metadata；客户端必须同时验证 canonical path 和 per-response `persisted-v1` attestation，不能只因 daemon 宣告 `session_worktree_persistence_v1` 就当作 attachment 成功。
 
 ### #10719 — standalone session options（merged）
 
 - 最终增加 capability-gated `getStandaloneSessionOptions()`，严格验证只读 provider/model/config-options response，不接受 workspace/session selector，也不返回 internal Conversations cwd 或 ACP state。
 - WebShell 用该结果在零 session 时 hydrate model/reasoning controls；旧 daemon、缺 capability 或 invalid response 继续按 daemon default 创建。
 
-### #10751 — session turn navigation SDK（open Phase 1）
+### #10751 — session turn navigation SDK（merged Phase 1）
 
-- 当前 diff 在 `DaemonSessionClient` 增加 capability-gated sparse turn-index、snapshot pagination 与 snapshot-bound transcript anchor API；owner-resolved 与 workspace client 使用同一 additive response contract。
+- 最终在 `DaemonSessionClient` 增加 capability-gated sparse turn-index、snapshot pagination 与 snapshot-bound transcript anchor API；owner-resolved 与 workspace client 使用同一 additive response contract。
 - 客户端必须把 server snapshot 原样带到后续分页和 `atRecordId` 读取，不能跨 snapshot 复用 ordinal/cursor；ordinal 只用于当前 snapshot 展示，durable identity 是 user-record UUID。
-- SDK validator 对 page size、label/detail 和 anchor fields 有界校验。浏览器 page table/virtualized rail 尚未实现，且 PR 尚未合入。
+- SDK validator 对 page size、label/detail 和 anchor fields 有界校验。浏览器 page table/virtualized rail 不属于该 SDK PR。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-03_
+### #11015 — worktree reset SDK（open）
+
+- 当前 open diff新增 capability-gated worktree reset request/response，必须同时验证 replacement session、canonical path与 per-response `persisted-v1`，不能只依赖 capability。
+- superseded restore的 typed replacement ID用于 Channel registry自愈；无 worktree response只清理 stale cached claim，带 worktree但证明/路径不符仍拒绝。
+- PR仍为 open，reset methods和 types不能视为当前发布 SDK契约。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-06_

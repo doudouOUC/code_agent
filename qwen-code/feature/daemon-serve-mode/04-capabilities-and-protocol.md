@@ -658,11 +658,11 @@ sequenceDiagram
 - #9380 已合入，在 `/daemon/status` additive 暴露 `runtime.memory.children.heap`，包含 per-child old-generation committed peak、major-GC 后 live-set peak、total heap peak、major GC count/time、reported count 和 `unclassifiedSpaceNames`。
 - 该字段为 observe-only；未采样时返回 `null`，多个 child 取独立最大值而非求和，`limits.memory.enforced` 保持 `false`，child spawn argv、capability registry 和 admission 行为不变。
 
-### #10643 — `session_worktree_persistence_v1`（open）
+### #10643 — `session_worktree_persistence_v1`（merged）
 
-- 当前 open diff 仅在 daemon 完整安装 worktree create/restore/relocate 与 strict marker/sidecar dependencies 时宣告 `session_worktree_persistence_v1`；Channel worker 在缺 capability 时不发 `--worktree` 请求，也不 fallback shared workspace。
+- 最终实现仅在 daemon 完整安装 worktree create/restore/relocate 与 strict marker/sidecar dependencies 时宣告 `session_worktree_persistence_v1`；Channel worker 在缺 capability 时不发 `--worktree` 请求，也不 fallback shared workspace。
 - capability 只表示可协商该流程，不是某个 response 已安全持久的证明。每次 create/restore 还必须检查精确 canonical worktree path 和 `worktreeState:'persisted-v1'`；SDK/bridge 不能只因 capability 存在就发布 attachment。
-- marker/sidecar/cwd/owner 不匹配都是 fail-closed 运行时结果，不新增“自动回退普通 workspace”协议语义。PR 尚未合入，capability 不能视为当前 `main` 发布契约。
+- marker/sidecar/cwd/owner 不匹配都是 fail-closed 运行时结果，不新增“自动回退普通 workspace”协议语义。
 
 ### #10719 — `standalone_session_options_v1`（merged）
 
@@ -670,9 +670,15 @@ sequenceDiagram
 - endpoint 不接受 workspace selector、query 或 body，只读 exact runtime provider status，并在返回前复核 runtime generation、canonical root 与 response `workspaceCwd` ownership；public response 有意移除内部 cwd 和 ACP live state。
 - capability 只说明 endpoint 可调用，SDK 仍需严格验证 provider/model/config option、approval mode 与 error kind。读取失败或旧 daemon 由 WebShell 保留 daemon-default create，不得 fallback 创建 workspace session。
 
-### #10751 — `session_turn_navigation`（open Phase 1）
+### #10751 — `session_turn_navigation`（merged Phase 1）
 
-- 当前 open diff 只有在 sparse turn-index、HMAC snapshot 和 snapshot-bound transcript anchor 三者完整安装时才广告 `session_turn_navigation`。旧 daemon 缺 tag 时客户端不得试探 turn-index route。
+- 最终实现只有在 sparse turn-index、HMAC snapshot 和 snapshot-bound transcript anchor 三者完整安装时才广告 `session_turn_navigation`。旧 daemon 缺 tag 时客户端不得试探 turn-index route。
 - `turnId` 使用持久 user record UUID；ordinal 只在当前 snapshot 内有意义。snapshot 绑定 workspace、session、transcript file identity/size、active leaf 与签发时间，index 分页和 `atRecordId` transcript 读取都必须复用匹配 snapshot。
 - owner-resolved 与 workspace-qualified route 返回同一有界 public projection。notification、goal runtime、mid-turn、live-only shell、thought、tool call/argument/result 和 raw payload 不进入公开 turn detail。
-- transcript anchor 与 cursor 互斥，anchor 是 inclusive，并 additive 返回 `targetRecordId`/`hasOlder`。当前 PR 只交付协议、ACP vendor method 与 SDK；浏览器 page table 和 virtualized rail 尚未实现，不能写成 `main` 能力。
+- transcript anchor 与 cursor 互斥，anchor 是 inclusive，并 additive 返回 `targetRecordId`/`hasOlder`。#10751 只交付协议、ACP vendor method 与 SDK；#11054 已合入 separate historical page table和 headless navigation store，#11053/#11143 flat-store方案已关闭未合入，virtualized rail尚未实现。
+
+### #11015 — `session_worktree_reset_v1`（open）
+
+- 当前 open diff只有在 worktree reset route、ownership lock、bridge barrier/sever与 Core marker transfer完整安装时才广告 `session_worktree_reset_v1`；缺 tag的 Channel不得试探 route。
+- `POST /session/:id/worktree-reset`使用 marker-last ownership transfer并返回 replacement session ID、canonical worktree和 per-response `persisted-v1`。capability不是 ownership证明，SDK/Channel仍需验证 response和 registry owner。
+- 兼容错误为 bounded 409 taxonomy：unsupported、active和 invalid-state；corrupt/ambiguous状态fail closed并把具体原因留在 daemon log。PR仍为 open，route/tag不能视为 `main` 契约。

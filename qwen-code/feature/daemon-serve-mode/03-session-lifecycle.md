@@ -28,7 +28,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 - **selective / shape-aware session restore**：#8743 的 docs-only design 已由 #9055 merged runtime PR 承接；cold load/resume 先构建 transcript index，只读取 runtime resume state 与目标 replay projection 所需 records，`historyPageSize` 在 payload read 前决定 recent page；#8933 已合入，要求 restore coalescing 按 `resume/none`、`load/all`、`load/recent(N)` 区分，避免不同 replay 语义互相满足。
 - **Conversations runtime foundation**：#8890 已合入，把 Conversations workspace/source helper 从 Live 命名空间迁到 shared `serve/conversations`，用 `ConversationRuntimeManager` one-flight 创建或采用唯一 Conversations runtime；仍不新增 standalone route、capability、SDK/UI 或每会话 ACP child。
 - **Conversations runtime boundary**：#9181 已合入，在 #8890 基础上补跨 daemon owner record、ServeAppLifecycle release proof、shutdown activity gate 和 ordinary runtime visibility guard；internal `live-conversation` runtime 只允许既有 Live/owner-routed compatibility path 使用，普通 workspace selector 不 fallback primary。
-- **relaxed Conversations ownership 设计与 fence**：#10828 已合入 docs-only 设计，将未来更新后 daemon 的并发边界从 process-global owner 收窄到同 session mandatory writer lease，并定义 bridge attestation、Live publisher、task/journal 与 rollout contract；#10924 的 open diff 先增加 marker/forwarding attestation、强制 lease、identity-qualified reclaim、batch error、generation pin 与 unbound-task fence，但仍保留外层 global owner。
+- **relaxed Conversations ownership 设计与 fence**：#10828 已合入 docs-only 设计，将未来更新后 daemon 的并发边界从 process-global owner 收窄到同 session mandatory writer lease；#10924 已合入 marker/forwarding attestation、强制 lease、identity-qualified reclaim、batch error、generation pin 与 unbound-task fence，但仍保留外层 global owner。
 - **standalone source / identity primitives**：#9341 已合入，在 Conversations runtime boundary 之后补 explicit standalone source classification、case-insensitive session id conflict detection、JSONL integrity-aware metadata read 和 standalone directory identity guard；#9512 已合入 ensure-race、integrity budget 与 Error cause hardening，仍不新增 public standalone route/capability/SDK/UI。
 - **standalone PR2B internal core 与 public API**：#9978 已合入 `StandaloneSessionService`，在唯一 Conversations runtime 中提供 create/get/list/load/resume/prompt/continue、确定性 private directory containment、projectless Live task 迁移和 terminal quarantine；#10179 已在其上合入 public standalone route/capability 与 journaled delete。
 - **archive race recovery 与 persisted maintenance**：#9513 已合入 exact-spelling active/archive 双副本的 active-first load/resume/transcript/export、delete-both、metadata move、legacy parent、目录消失与单次 catalog lookup；#9626 已合入 delete/archive/unarchive 的 physical maintenance classification、identity revalidation 与 capability-gated conflict repair。
@@ -135,7 +135,9 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#10286](https://github.com/QwenLM/qwen-code/pull/10286) | closed | cleanup ownership 前身 | 关闭前方案以 writer lease 保护 post-commit cleanup，未接入 merged standalone lifecycle，由 #10300 取代 |
 | [#10300](https://github.com/QwenLM/qwen-code/pull/10300) | merged | post-commit cleanup ownership | descriptor/path inode + raw lock owner 校验，并接入普通与 standalone lifecycle/recovery |
 | [#10828](https://github.com/QwenLM/qwen-code/pull/10828) | merged docs-only | relaxed standalone daemon ownership design | 定义同机多 daemon、mandatory per-session lease、bridge attestation、Live publisher、task/journal authority 与 drain-and-cutover contract；不实现 runtime |
-| [#10924](https://github.com/QwenLM/qwen-code/pull/10924) | open | mandatory Conversations writer fences | 当前 diff 增加私有 provenance marker、channel forwarding attestation、强制 lease、Linux identity-qualified reclaim、batch writer error 与 generation-scoped pin；global owner 仍保留 |
+| [#10924](https://github.com/QwenLM/qwen-code/pull/10924) | merged | mandatory Conversations writer fences | 私有 provenance marker、channel forwarding attestation、强制 lease、Linux identity-qualified reclaim、batch writer error 与 generation-scoped pin；global owner 仍保留 |
+| [#11015](https://github.com/QwenLM/qwen-code/pull/11015) | open | worktree session ownership transfer | 当前 diff新增 `session_worktree_reset_v1`、marker-last CAS、supersession redirect与 Channel registry self-heal；尚非 `main` 能力 |
+| [#11120](https://github.com/QwenLM/qwen-code/pull/11120) | merged | failed conditional-close probe backoff | 最终实现为 unanswered auto-close probe增加指数退避、JSON-RPC detail、无 promise轮询与 condemned/no-capability本地收敛；不修复 hold taxonomy根因 |
 
 ---
 
@@ -1003,23 +1005,27 @@ sequenceDiagram
 - 超过 256MiB cold restore 返回 request-scoped `413 transcript_too_large`，不 fallback 到旧 full loader；单条 replay record 过大可返回成功 runtime + bounded replay error。
 - #9055 还保留 compressed/legacy model history、record ancestry、interrupted turns、FileHistory、artifacts、Goals/checkpoint evidence、attribution、telemetry、usage、source metadata 和 background notification active-chain 语义，并在 replay 发布前检查 32 MiB/10,000 updates 上限。
 
-### #10643 — persisted worktree session lifecycle（open）
+### #10643 / #11015 — persisted worktree lifecycle（merged）与 reset transfer（open）
 
-- 当前 open diff 为 named Channel task 创建 canonical Git worktree，将 exact session relocate 后要求 child 返回 cwd 精确一致。只有排他 0600 `.qwen-session` marker 与原子 sidecar 都已持久化，create response 才返回 `worktreeState:'persisted-v1'`。
+- #10643 最终为 named Channel task 创建 canonical Git worktree，将 exact session relocate 后要求 child 返回 cwd 精确一致。只有排他 0600 `.qwen-session` marker 与原子 sidecar 都已持久化，create response 才返回 `worktreeState:'persisted-v1'`。
 - restore 不走泛化 worktree context 回放；route 严格校验 64 KiB 有界 sidecar、workspace/repo root、realpath 在 `.qwen/worktrees` 下、regular single-link marker 与 exact storage session owner。restore AUQ prompt 按 client 暂存到 worktree 证明完成后才触发，dangling prompt terminal 也只在 admission 未接纳后 reconciliation；active session 有 cwd 时必须精确匹配，idle session relocate 后也必须再次匹配。
 - create/persistence/relocation 失败使用 orphan-guarded exact session delete；spawn 前失败可回收 checkout/branch，spawn 后只有 session definitively removed 才回收，generation 关闭、kill 拒绝或探测不确定时保留数据并 fail closed。restore mismatch 不 fallback shared workspace。
-- close 当前保留 transcript 和 worktree；merge-back、branch delete、push/rebase、crash 后 in-flight work 续跑及 `/clear`/`/new`/`/reset` 后续语义不在 v1 范围。PR 尚未合入，不能将该 lifecycle 视为 `main` 能力。
+- #10643 的 close保留 transcript/worktree，Part 4A仍拒绝 `/clear`/`/new`/`/reset`。#11015 当前 open diff新增同 checkout ownership transfer：在 worktree lock下创建/relocate replacement、写双向 supersession sidecar、marker CAS最后提交并 sever old session；marker驱动崩溃恢复，typed redirect让 Channel registry自愈。route/capability尚非 `main` 能力。
 
 ### #10706 — standalone provisional config lifecycle（merged）
 
 - daemon-owned standalone new/load/resume 在 managed activation 前可能还没有 content-generator config。最终实现只返回不依赖 generation 的 mode/model config options，不提前 refresh auth、activate provisional workspace 或安装 filesystem state。
 - activation 建立 generation config 后，既有 session-context refresh 再发布完整 `reasoning_effort`；mandatory-thinking model 仍过滤 `none`。这是延后 option materialization，不是放宽模型约束或改变非 standalone 路径。
 
-### #10828 / #10924 — relaxed ownership design（merged docs）与 mandatory fences（open）
+### #10828 / #10924 — relaxed ownership design（merged docs）与 mandatory fences（merged）
 
 - #10828 已把完整设计合入 `main`，但它是 docs-only：支持拓扑限定为同一机器、同一 OS 用户下多个更新后 daemon，跨物理机共享 stable/runtime base 不受支持。runtime 当前仍由 `ConversationRuntimeManager.ensureOnce()` 获取 process-global Conversations owner，不能把设计合并等同于并发挂载已经可用。
 - 设计继续拒绝同一 active session 的并行写：第二 daemon 遇到 occupied lease 返回 `409 session_writer_conflict`，active session 保持 daemon-local，不新增跨 daemon routing、共享 live index、distributed cache 或一般 multi-master。bridge 发布还必须证明精确 private marker 与 channel factory child-env forwarding；Live start 由稳定 locator publisher 精确准入。
-- #10924 的当前 open diff 只先落增量 fence：Conversations ACP child 的 immutable provenance 强制启用 writer lease 和 `local` reclaim；bridge 缺 mandatory attestation 时，新 candidate 被拒绝，existing runtime 终态 quarantine 并持续返回不可重试 `conversation_root_compromised`。外层 global owner 未移除。
-- open diff 的 local stale reclaim 仅允许 well-formed owner 可证明同 hostname，Linux 同 boot ID/PID namespace，且进程已死或 PID 已复用；live、stalled、foreign、字段不全或不确定状态继续 fenced。standalone lifecycle/maintenance 使用同一策略，batch item 保留 writer error kind，directory pin 只在匹配 resident event epoch 内有效。
+- #10924 已先落增量 fence：Conversations ACP child 的 immutable provenance 强制启用 writer lease 和 `local` reclaim；bridge 缺 mandatory attestation 时，新 candidate 被拒绝，existing runtime 终态 quarantine 并持续返回不可重试 `conversation_root_compromised`。外层 global owner 未移除。
+- local stale reclaim 仅允许 well-formed owner 可证明同 hostname，Linux 同 boot ID/PID namespace，且进程已死或 PID 已复用；live、stalled、foreign、字段不全或不确定状态继续 fenced。standalone lifecycle/maintenance 使用同一策略，batch item 保留 writer error kind，directory pin 只在匹配 resident event epoch 内有效。
 - scheduled task 复用 session lease：bound controller 并发恢复先选出唯一 resident scheduler，marked Conversations child 在 task-file transaction 提交 controller binding 前拒绝执行 unbound durable task；这不消除 dispatch 后、fired-state 持久化前的 at-least-once crash window。
 - deletion-journal contention、global owner cutover、Live publisher/pending-intent admission 与 WebShell section/session inline degradation 仍属于 #10924 之后的实现范围。部署要求 drain-and-cutover，不能 mixed-version rolling。
+
+### #11120 — unanswered auto-close probe抑制（merged）
+
+#11120 最终实现处理 active-work taxonomy缺口的放大效应：child无法回答 `close-if-unheld`时，daemon保留首次即时恢复重试，第二次起按60秒指数退避到1小时；任意 child回答、hold report或 child从 snapshot消失都会清零。candidate gate在 probe前生效，避免每次 snapshot占满 drain budget；未协商 active-work或已 condemned的 channel则绕过 probe，直接按既有授权本地收敛，避免 ghost entry阻塞排空。日志改用共享错误提取器保留 plain-object JSON-RPC detail，Session无 completion promise时以10ms timer poll替代 busy-spin。该实现不让 cron/goal/monitor/history mutation变成 negotiated hold，因此只抑制、诊断而不根治误判 idle。
