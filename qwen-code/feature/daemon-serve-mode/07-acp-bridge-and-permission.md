@@ -657,7 +657,14 @@ mediator 自己也防跨 session：`vote()` 里 `if (pending.sessionId !== vote.
 - `createSpawnChannelFactory()` 在包内登记它会把 `childEnvOverrides` 合并进真实 child environment；任意 marker-shaped overrides 搭配未登记 factory 都不能形成证明。该登记只防同进程装配错误，不把可构造任意 runtime 的 embedding code 当作安全边界。
 - `createAcpSessionBridge()` 从 frozen child overrides 的精确私有 marker 与 factory forwarding proof 合取出 immutable `mandatoryLeaseAttested`。`ConversationRuntimeManager` 在采用已有 runtime 或发布新 candidate 前验证：新候选拒绝并 dispose，已有 runtime 终态 quarantine，后续请求保持不可重试 `conversation_root_compromised`。
 - marker 在 CLI 入口、任何环境文件加载前与 private parent capability 一起捕获并删除，只在 ACP mode + capability + exact enable value 下接受；workspace/user `.env` 被排除，sandbox relaunch 只传递已经接受的私有状态。
-- 该 PR已合入但不移除 process-global Conversations owner；它是 #10828 merged docs-only design 的第一阶段 fence，不是多 daemon并发挂载已经可用。
+- 该PR已合入mandatory fence，后续#11207已移除新版daemon的长期process-global Conversations owner并完成runtime cutover；同session仍必须由本节attestation产生的lease排他。
+
+### #11207 — relaxed Conversations ownership runtime cutover（merged）
+
+- `ConversationRuntimeManager`首次发布runtime前只执行legacy owner兼容检查：活跃旧owner阻止启动，身份稳定的dead owner在锁内回收；新版daemon不再持有root-wide owner，因此可共享Conversations root并服务不同session。
+- per-session写入安全仍由#10924的immutable marker/factory-forwarding attestation与mandatory writer lease负责；缺证明的existing runtime继续terminal quarantine，不以global owner移除为由放宽。
+- Live HTTP与Host启动共用`beforeStart`，必须与stable discovery publisher的protocol version、PID和instance nonce精确匹配；停止、禁用、detach或dispose会取消pending admission。
+- writer fence冲突不证明旧writer仍alive。恢复残留lock前必须先隔离daemon及其ACP children，部署仍要求新旧版本drain-and-cutover。
 
 ### #11120 — conditional-close probe退避与 detail（merged）
 

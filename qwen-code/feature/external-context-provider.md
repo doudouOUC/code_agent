@@ -1,7 +1,7 @@
 # Direct External Context Search / Auto Recall / Mem0 Write 技术方案
 
-> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening；#8352 Auto Recall proxy lifecycle；#8507 optional Mem0 write；#9068 provider extension profile；#10113/#10149/#10634 configurable Mem0 extension；#10653 npm distribution）。
-> 当前记录：#7586/#7877/#8206/#8352/#8507/#9068/#10113/#10149/#10634/#10653 已按 merged diff 记录最终实现；#10653 的代码合入不等于 npm.org 已完成实际发布。
+> 适用范围：`QwenLM/qwen-code` Direct External Context integration（#7586 retrieval-only MCP；#7877 submitted-prompt auto recall；#8206 dependency hardening；#8352 Auto Recall proxy lifecycle；#8507 optional Mem0 write；#9068 provider extension profile；#10113/#10149/#10634 configurable Mem0 extension；#10653 npm distribution；#11246 configurable Mem0 Auto Recall；#11311 daemon memory writer）。
+> 当前记录：#7586/#7877/#8206/#8352/#8507/#9068/#10113/#10149/#10634/#10653/#11246/#11311 已按 merged diff 记录最终实现；#10653 的代码合入不等于 npm.org 已完成实际发布。
 
 ---
 
@@ -130,6 +130,22 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 
 #10653 最终补公开分发而不扩大 runtime contract：`@qwen-code/external-context-mem0` package 与 Extension manifest 跟随 Qwen Code release version，加入统一 published-version guard；release workflow 只在 maintainer 完成首次 npm bootstrap/trusted-publisher 配置并显式启用 repository variable 后，才在其它 package 前执行 provenance publish。tarball 仍只含 bundle、canonical schemas、manifest、README 与 package metadata，不包含 provider preset、管理员 instance/dialect、credential、Core wiring、write 或 Auto Recall。
 
+### 3.11 configurable Mem0 Auto Recall（#11246 merged）
+
+#11246 已为 `@qwen-code/external-context-mem0` 合入独立安装的 `UserPromptSubmit` command-Hook profile。该profile只接受schemaVersion 3 instance：复用管理员自有closed Dialect V1、endpoint/credential/fixed scope，并额外绑定canonical且非文件系统根的 `repositoryRoot`。Hook对当前cwd做realpath containment，只有目录位于该root内才可能调用provider。
+
+query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；输入先做code fence、credential原文、常见secret assignment、Bearer/JWT与长token的best-effort脱敏，再限制为512 Unicode字符。stdin、instance/dialect、response、provider timeout与进程wall clock均有界；FIFO和其它special-file配置被拒绝。成功最多注入五条`untrusted_external_context`，空结果、配置错误、超时或provider失败均以`{}` fail open。
+
+默认Extension manifest仍是v2 MCP-only并只暴露`context_search`；v3仅由管理员显式注册的Hook入口接受，`--bare`、`--safe-mode`或`disableAllHooks:true`会按Core既有语义禁用它。#7877是direct external-context包的早期Auto Recall profile，#11246则把同一边界独立落到configurable Mem0分发包，二者不应混写成默认启用。
+
+### 3.12 daemon memory writer（#11311 merged）
+
+#11311 最终新增单独的schemaVersion 4 writer profile与closed WriteDialect V1。管理员固定endpoint、credential、scope和repository root，writer MCP只注册`context_remember({content})`；获准后将最多4000 Unicode code point的原文作为一条user message提交，固定`infer:false`，不做pre-search、dedupe、cache、poll、redirect或自动retry。
+
+结果分为`stored`、`accepted`、`failed`与`unknown`：只有得到record ID才确认stored，合法operation ID可记为accepted；transport/timeout/response shape不确定都返回unknown并明确禁止自动重试，因为provider可能已提交。tool annotations标记非只读、非幂等，以复用Core unsafe replay guard。WebShell同一diff还让无专用text/diff preview的generic MCP permission展示完整转义`rawInput/input/args`，即使其文本与title相同也不隐藏。
+
+该实现已进入`main`。它不修改默认只读Extension、不新增daemon route，也不代表真实Mem0/Holo写入兼容已验证。
+
 ---
 
 ## 4. 验证方式
@@ -142,6 +158,8 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 - #10113 为 docs-only contract review；#10149 声明 49 项 extension package 测试、package typecheck/lint/build/pack 与 root build/typecheck/lint，脚本套件的两项共享 timeout 单独重跑通过。真实 provider、Windows/Linux 和 TLS/proxy E2E 尚未验证。
 - #10634 声明 49 项 package 测试、root/package typecheck/lint/build、bundled stdio + loopback synthetic provider、restart-only reload、redaction 和 pack dry-run 通过；本次文档复核只核对 merged diff 与最新 `main`，未独立复跑。
 - #10653 声明 49 项 Extension package 测试、6-file npm dry-run tarball、临时 registry 安装/loopback provider 验证，以及 102 项 release/version script 测试通过（另有 1 项既有 host skip）；真实 npm.org publish 有意留给 maintainer，本次未独立复跑。
+- #11246 声明v3 config/sanitizer/Hook CLI/integration/subprocess、真实CLI turn与all-Hook opt-out验证通过；本次复核merged head、16个changed files与最新`main`，未连接真实provider。
+- #11311 声明Mem0 package 182项、WebShell 67项、daemon integration、18个合成服务场景、build/typecheck/bundle/lint/format与真实Chrome审批展示通过；真实Holo preflight仍为403，本次未独立复跑。
 
 ---
 
@@ -151,6 +169,8 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 - #9068 已合入；provider extension profile 是 query-only 接入面，不能替代企业级 governance profile。
 - #10113 的 docs-only contract、#10149 runtime skeleton 与 #10634 administrator-owned dialect loader 均已合入。当前 runtime 不再依赖内置 preset；管理员必须提供 schemaVersion 2 instance 和 closed Dialect V1 绝对文件。旧 schemaVersion 1 preset config 不会自动迁移。
 - #10653 已合入公开 package 与 release workflow gate；首次 bootstrap、trusted publisher 和 repository variable 仍由 release maintainer 显式完成，代码合入本身不能证明 npm.org 已有对应版本。
+- #11246 已合入独立v3 Auto Recall Hook，但不会修改默认v2 MCP manifest；启用后sanitized prompt会发送到管理员provider，sanitizer不是DLP。
+- #11311 已合入v4 daemon writer、write dialect和generic MCP完整参数preview；真实provider兼容与不确定写入后的人工核对仍由部署方负责。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -173,5 +193,7 @@ profile 同时提供 language-neutral JSON schema、test vectors、MCP text/stru
 | [#10149](https://github.com/QwenLM/qwen-code/pull/10149) | MERGED | configurable Mem0 skeleton | 最终实现基于 #10113 merged 设计新增严格配置/request/MCP runtime 和测试；该 PR 阶段内置 preset 故意为空，当时不能连接真实 provider，后续由 #10634 承接。 |
 | [#10634](https://github.com/QwenLM/qwen-code/pull/10634) | MERGED | administrator-owned Mem0 dialects | 将 instance 升到 schemaVersion 2，用绝对 `dialectPath` 加载管理员所有 closed Dialect V1；instance/dialect 独立有界校验，完成非凭据验证后才读 env，旧 preset config fail closed。 |
 | [#10653](https://github.com/QwenLM/qwen-code/pull/10653) | MERGED | public npm distribution | 最终让 package/manifest 随 Qwen Code release version 同步，加入 published-version guard，并以 bootstrap variable 门控 provenance publish；package 仍不携带 provider 或管理员数据，实际 npm.org 发布需另行核验。 |
+| [#11246](https://github.com/QwenLM/qwen-code/pull/11246) | MERGED | configurable Mem0 Auto Recall | 独立v3 `UserPromptSubmit` Hook绑定canonical repository root，只以sanitized `submitted_prompt`查询管理员dialect，最多五条结果作为bounded untrusted context注入；默认v2 MCP不变。 |
+| [#11311](https://github.com/QwenLM/qwen-code/pull/11311) | MERGED | daemon memory writer | 最终新增独立v4 writer与closed create dialect，单次提交exact text并区分stored/accepted/unknown；WebShell显示generic MCP完整参数。 |
 
-_按个人 PR 口径更新于 2026-09-03_
+_按个人 PR 口径更新于 2026-09-08_

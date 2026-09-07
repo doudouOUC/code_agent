@@ -58,6 +58,9 @@
 | #9563 | @doudouOUC | merged | WebShell session title refresh guard：effective title 已由 connection metadata 或 persisted catalog fallback 解析后，不再每 turn 重复刷新完整 catalog。 |
 | #9738 | @doudouOUC | merged | `serve --open-with-auth`：最终复用 URL fragment 到 tab-local `sessionStorage` 的 bearer handoff。 |
 | #9838 | @doudouOUC | merged | current-session scheduled task：capability-gated session mode selector，默认 dedicated；busy/pending/parented/sourced/cross-workspace/already-bound 时禁用复用。 |
+| #11207 | @doudouOUC | merged | writer-blocked standalone恢复与Recents操作改为session-local错误、显式重试和generation隔离，不再自动循环恢复或破坏其它导航。 |
+| #11208 | @doudouOUC | merged | 在separate-store Phase 2A上交付连续历史viewport、阅读锚点、bounded page loading与compact全局turn rail。 |
+| #11311 | @doudouOUC | merged | 最终让无专用preview的generic MCP permission展示完整literal arguments，并保留既有批准、拒绝与double-submit guard。 |
 
 ---
 
@@ -442,7 +445,7 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 
 #10751 最终交付 Phase 1 daemon/ACP/SDK 协议。稀疏 turn index 使用 durable user-record UUID，HMAC snapshot 固定 transcript identity/active leaf，并让 `atRecordId+snapshot` 锚定读取任意已索引 turn；公开 preview 不含 thought、tool payload 或生成 attachment token。
 
-WebShell `main` 尚未建立 bounded page table、任意 turn 页面缓存或 virtualized rail，当前 rail 仍由已加载 transcript blocks 推导。因此 `session_turn_navigation` capability只证明 daemon协议，不代表浏览器已支持长会话全局 turn导航。
+#10751 合入时，WebShell `main` 尚未建立 bounded page table、任意 turn 页面缓存或 virtualized rail，rail 仍由已加载 transcript blocks 推导；当时 `session_turn_navigation` capability 只证明 daemon 协议。后续 #11054 建立 separate-store 数据层，#11208 已把 bounded 历史 viewport、双向分页与全量 turn rail 接入可见 UI。
 
 ## 2026-09-07 follow-up：Phase 2设计、最终实现与关闭替代方案
 
@@ -450,9 +453,17 @@ WebShell `main` 尚未建立 bounded page table、任意 turn 页面缓存或 vi
 
 #11053 与后续 #11143 均已关闭未合入。两者沿原设计把 replay/prepend/anchored page记录到 provider ledger，同时继续把 flat SDK transcript store作为唯一 render source；anchored page会按 ordinal splice进 flat store。这些 page ledger、gap和错误分类只能作为历史方案观察，不能视为 `main` 行为。
 
-#11054 最终合入的 Phase 2A选择不同边界：existing transcript store只保留 connected live window，immutable historical pages/ranges进入第二个 external `HistoricalTranscriptPageTable`；`DaemonTurnNavigationStore`统一 index、provisional、locator、anchored load、older/newer和 degraded fallback。最终 review又补齐淘汰后的 snapshot-bound gap recovery、exact `promptId`对账、可重试 window-full和 snapshot-bound traversal。sequential prepend迁移留给 Phase 2B，visible rail留给 Phase 3。
+#11054 最终合入的 Phase 2A 选择不同边界：existing transcript store 只保留 connected live window，immutable historical pages/ranges 进入第二个 external `HistoricalTranscriptPageTable`；`DaemonTurnNavigationStore` 统一 index、provisional、locator、anchored load、older/newer 和 degraded fallback。最终 review 又补齐淘汰后的 snapshot-bound gap recovery、exact `promptId` 对账、可重试 window-full 和 snapshot-bound traversal。该 PR 合入时 sequential prepend 迁移与 visible rail 尚未交付，后续由 #11208 完成可见连续历史与 compact rail 集成。
 
 #11053/#11143 与 #11054都修改 `DaemonSessionProvider`，但前者把 anchored pages纳入 flat render store，后者把它们隔离到 second store。最终只有 #11054合入，不能把关闭方案的 flat-store ledger语义叠加到当前 `main`架构。
+
+## 2026-09-08 follow-up：writer恢复、连续历史与generic MCP参数预览
+
+#11207已合入writer-blocked standalone恢复。Provider识别`session_writer_conflict`、`session_writer_unavailable`、`session_writer_lost`和`session_transcript_changed`，direct-link restore不再自动循环或创建replacement；Recents把open/rename/archive/delete等writer错误限制在精确session，保留已有list和其它导航，并提供显式retry。session/context generation变化会使旧操作和迟到错误失效。
+
+#11208已把#11054的headless separate-store Phase 2A接入可见UI。`TranscriptViewport`在live store之外渲染frozen historical range，滚动临近边界时加载older/newer page，并用首个可见record/tool row与像素offset维持阅读位置；viewport pin保护阅读页，返回latest后恢复live mutation controls。`GlobalTurnNavigation`用64px compact ticks呈现bounded全量turn索引，hover/focus只展示已有prompt/preview，click/Enter才按需locate和fetch远端turn。窄视口、split pane、cursor-only或旧daemon保留原有策略。
+
+#11311 已合入。transcript adapter 对无专用 text/diff preview 的 generic MCP permission 读取 `rawInput/input/args`，pretty-print 完整 JSON 并转义控制字符，通过 `contentIsInput` 保证即使正文等于 title 也显示；`ToolApproval` 继续复用现有批准/拒绝和 double-submit guard。该改动同时服务独立 Mem0 writer 的显式内容审查，但不放宽 daemon permission policy。
 
 ---
 
@@ -501,4 +512,4 @@ WebShell `main` 尚未建立 bounded page table、任意 turn 页面缓存或 vi
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-06_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-08_
