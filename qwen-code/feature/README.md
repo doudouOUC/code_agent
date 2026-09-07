@@ -5,6 +5,14 @@
 > 配套：逐 PR 的描述↔实现一致性 + 正确性审查见 [`../weekly-report/`](../weekly-report/README.md)。
 > 口径：这里只保留 @doudouOUC 自己创建的 PR；其他作者 PR 不再作为本目录统计或专题入口。open/closed 未合入 PR 只作为方案记录，不能视为当前 `main` 已落地能力。
 
+## 独立研究 / 原型方案
+
+| 主题 | 文档 | 状态 | 一句话 |
+|---|---|---|---|
+| Managed Agents | [managed-agents/](managed-agents/README.md) | P0～P8 本地实验，未进入 upstream `main` | 常驻多租户 Gateway 持有模型和会话，按需 Tool-only Runtime 承载工作区、MCP 与 Skill；模型与 Runtime 并行启动，只在 Tool Call 边界等待。 |
+
+> 本节不计入下方按 @doudouOUC 个人 PR 汇总的 23 篇方案，也不代表 upstream 已落地能力。
+
 ## 23 篇技术方案
 
 > **daemon/serve** 与 **telemetry** 两块内容最多，已各自拆成文件夹（README 总览 + 多篇函数级深入子文档）；其余为单篇。
