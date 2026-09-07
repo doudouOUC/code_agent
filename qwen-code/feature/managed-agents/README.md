@@ -255,7 +255,11 @@ P8 仅支持配置一个固定 Runtime URL，证明了远程协议边界，还�
 ```ts
 interface ManagedRuntimeActivator {
   activate(request: ManagedRuntimePrepareRequest): ManagedRuntimeActivation;
-  release(sessionId: string): Promise<void>;
+  release(request: {
+    sessionId: string;
+    leaseId: string;
+    epoch: number;
+  }): Promise<boolean>;
 }
 
 interface ManagedRuntimeActivation {
@@ -461,7 +465,7 @@ P8 实验累计的针对性自动化验证包括：
 1. 把“固定 Runtime URL”替换为 `ManagedRuntimeActivator` 接口；
 2. Gateway admission 后立即调用 `activate()`，并保持模型立即开始；
 3. 本地 adapter 启动一个受控 Runtime 子进程，等待 authenticated readiness；
-4. 返回带 `leaseId + epoch` 的 handle，并验证 release、超时、取消和崩溃重启；
+4. 返回带 `leaseId + epoch` 的 handle；release 必须携带并条件校验同一组 fence，再验证超时、取消和崩溃重启；
 5. 用与 P8 相同的双进程 E2E 证明 API、时序和同轮 Tool 行为不变；
 6. 接口稳定后再增加 Kubernetes adapter，只替换生命周期实现。
 
