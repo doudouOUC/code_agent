@@ -4,6 +4,20 @@
 > [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`。本文中的“已实现”仅指实验工作树；生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 整理日期：2026-09-07。
 
+## 分阶段设计文档
+
+| 阶段 | 文档                                                                                 | 主题                                                   |
+| ---- | ------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| P0   | [Managed Agent Runtime P0](managed-agent-runtime-p0.md)                              | Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型 |
+| P1   | [Managed Agent Activation P1](managed-agent-activation-p1.md)                        | durable activation journal、lease fencing 与有界调度   |
+| P2   | [Managed Agent Prompt Admission P2](managed-agent-prompt-admission-p2.md)            | 完整用户消息持久化、幂等准入与恢复                     |
+| P3   | [Managed Agent Live Prompt P3](managed-agent-live-prompt-p3.md)                      | 首个实验 Managed Prompt 接入 live daemon               |
+| P4   | [Managed Agent Gateway Bootstrap P4](managed-agent-gateway-bootstrap-p4.md)          | 非权威 bootstrap 与 Runtime 并行启动的过渡方案         |
+| P5   | [Managed Agent Multi-Turn Continuity P5](managed-agent-multi-turn-p5.md)             | 多轮绑定、顺序所有权与 Runtime resume                  |
+| P6   | [Managed Agent Tool-only Runtime P6](managed-agent-tool-runtime-p6.md)               | Gateway 模型所有权与 Tool-only ACP Runtime             |
+| P7   | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime           |
+| P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
+
 ## 1. 结论
 
 推荐把现在“模型循环和本地执行环境一起启动”的 daemon 拆成两个生命周期：
@@ -341,17 +355,17 @@ Rust 适合未来独立的高吞吐 Gateway、placement service 或 sandbox supe
 
 ## 9. P0～P8 演进与当前有效口径
 
-| 阶段 | 结论                                                        | 当前状态                               |
-| ---- | ----------------------------------------------------------- | -------------------------------------- |
-| P0   | 定义 Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型 | 早期 in-Core broker 已移除；边界保留   |
-| P1   | 文件日志、activation lease、epoch fencing、slot/内存准入    | 底层实验保留                           |
-| P2   | 完整 `user.message` 先持久化，再排队和 ACK                  | 底层实验保留                           |
-| P3   | 首个 live Managed Prompt 进入现有 Runtime                   | 历史过渡方案                           |
-| P4   | 前置非权威 bootstrap 模型与 Runtime 并行                    | 已被 P7 替代                           |
-| P5   | Managed 多轮绑定、幂等、Runtime resume                      | 多轮契约保留，Runtime 模型所有权已替代 |
-| P6   | Gateway 持有模型和历史，ACP Runtime 只执行工具              | 所有权边界保留                         |
-| P7   | 第一次权威模型调用与 Runtime 并行，只在 Tool 边界等待       | 当前关键行为                           |
-| P8   | Gateway 与 Runtime 拆为两个进程，以私有 HTTP v1 连接        | 当前原型边界                           |
+| 阶段                                          | 结论                                                        | 当前状态                               |
+| --------------------------------------------- | ----------------------------------------------------------- | -------------------------------------- |
+| [P0](managed-agent-runtime-p0.md)             | 定义 Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型 | 早期 in-Core broker 已移除；边界保留   |
+| [P1](managed-agent-activation-p1.md)          | 文件日志、activation lease、epoch fencing、slot/内存准入    | 底层实验保留                           |
+| [P2](managed-agent-prompt-admission-p2.md)    | 完整 `user.message` 先持久化，再排队和 ACK                  | 底层实验保留                           |
+| [P3](managed-agent-live-prompt-p3.md)         | 首个 live Managed Prompt 进入现有 Runtime                   | 历史过渡方案                           |
+| [P4](managed-agent-gateway-bootstrap-p4.md)   | 前置非权威 bootstrap 模型与 Runtime 并行                    | 已被 P7 替代                           |
+| [P5](managed-agent-multi-turn-p5.md)          | Managed 多轮绑定、幂等、Runtime resume                      | 多轮契约保留，Runtime 模型所有权已替代 |
+| [P6](managed-agent-tool-runtime-p6.md)        | Gateway 持有模型和历史，ACP Runtime 只执行工具              | 所有权边界保留                         |
+| [P7](managed-agent-eager-authoritative-p7.md) | 第一次权威模型调用与 Runtime 并行，只在 Tool 边界等待       | 当前关键行为                           |
+| [P8](managed-agent-remote-runtime-p8.md)      | Gateway 与 Runtime 拆为两个进程，以私有 HTTP v1 连接        | 当前原型边界                           |
 
 实验代码的主要锚点：
 
