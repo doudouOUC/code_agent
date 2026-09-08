@@ -1,6 +1,6 @@
 # Managed Agent session surfaces
 
-> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [dfb1309f15](https://github.com/doudouOUC/qwen-code/commit/dfb1309f15297df37d60131bfa41038b27a39dad) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status and scope
 
@@ -106,7 +106,8 @@ continue from the last successfully committed conversation.
 After building and bundling the experimental branch, start the Gateway with
 `node dist/cli.js serve --experimental-managed-agents --port 4170` and the
 existing model configuration. See the [operator guide](README.md#10-当前体验方式)
-for the two-process commands; the globally installed CLI may lack these flags. Omit `--no-web` to use its Web Shell.
+for fixed-URL and auto-local commands; the globally installed CLI may lack these
+flags. Omit `--no-web` to use its Web Shell.
 For a separate Runtime worker, keep the P8 remote Runtime flags and credentials.
 The sidebar shows Managed Agents only when the Gateway advertises
 `managed_sessions`; cancellation additionally requires `managed_session_cancel`.
@@ -160,8 +161,10 @@ The reproducible local test plan and full process/browser report are in
 are intentionally git-ignored by repository convention. No external model
 provider, production deployment, Windows, or Linux run was used for this check.
 
-## Proposed next stage
+## Local Runtime activation (P9a)
 
 The [P9a local Runtime activation design](managed-agent-local-runtime-activation-p9a.md)
-specifies automatic worker startup, workspace reuse, owned-worker fencing,
-cancellation, and awaited cleanup. It is a proposal, not implemented behavior.
+implements opt-in automatic worker startup, workspace reuse, owned-worker fencing,
+cancellation, and awaited cleanup. Its validation section records the macOS
+process checks and remaining platform/E2E limits. Fixed-URL and in-process
+providers remain available without the auto-local flag.

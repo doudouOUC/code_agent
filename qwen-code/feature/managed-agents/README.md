@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8 实验实现 + Managed 会话展示与控制已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9 自动启动 Runtime、生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [dfb1309f15](https://github.com/doudouOUC/qwen-code/commit/dfb1309f15297df37d60131bfa41038b27a39dad)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-08。
 
 ## 分阶段设计文档
@@ -17,7 +17,7 @@
 | P7   | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime           |
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
 | P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
-| P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 待实现设计：自动启动、工作区复用、lease 校验、取消与可等待回收 |
+| P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
 
 ## 1. 结论
 
@@ -288,15 +288,15 @@ Web Shell 根据 `managed_sessions` capability 显示独立 Managed Agents 入�
 
 ## 6. Runtime Activator：不绑定 Kubernetes
 
-P8 的远程 Provider 使用固定 Runtime URL，尚未自动创建 worker 或 Pod。[P9a 详细设计](managed-agent-local-runtime-activation-p9a.md) 在 Gateway 内增加部署中立的 `ManagedRuntimeActivator`，首先实现本地子进程 adapter；现有 Remote Provider 继续负责 Tool-only HTTP。
+P8 的远程 Provider 使用固定 Runtime URL。[P9a 实现与验收](managed-agent-local-runtime-activation-p9a.md) 已在 Gateway 内增加 `ManagedRuntimeActivator` 和本地子进程 adapter，按需自动创建 worker；现有 Remote Provider 继续负责 Tool-only HTTP。自动创建 Pod 尚未实现。
 
 P9a 把三种结束操作分清：一次 Prompt 的 Runtime use 释放、一个工具 Session 的 release、整个 worker 的回收。Activator 同步返回 use，异步提供 endpoint；同一租户/工作区共享 worker，每次 use 独立释放；workspace revoke 和 Gateway close 等待 owned 进程树退出。`leaseId + epoch` 与 Gateway incarnation 绑定，旧回调不能作用于 replacement。此本地所有权契约不等同于生产分布式 TTL lease。
 
 现有 HTTP v1 body 严格校验字段，因此 P9a 为自动管理的 worker 使用 boot 绑定和内部 lease headers，不向 v1 body 添加不兼容字段；固定 URL 模式保持原契约。详细接口、容量与关闭语义以 P9a 文档为准。
 
-实现顺序建议：
+Activator 实现进度与后续顺序：
 
-1. **LocalProcessActivator**：由父进程启动、探活和回收 Tool-only Runtime，先验证生命周期、超时、取消和崩溃恢复；
+1. **LocalProcessRuntimeActivator（P9a 已实现）**：父进程启动、复用和回收 Tool-only Runtime；实际验证及平台限制见 P9a 第 15 节；
 2. **StaticPoolActivator**：从预热 Runtime 池分配，验证容量和租约复用；
 3. **KubernetesActivator**：把同一接口映射为 Pod 创建、Service/地址发现、readiness 与回收；
 4. 后续再加入 placement、镜像缓存、快照或预测预热，不修改 Agent 协议。
@@ -418,7 +418,14 @@ node dist/cli.js serve --port 4170 \
 
 通过 Gateway 输出的 Web Shell 登录入口完成现有 daemon 鉴权，再点击侧栏 Managed Agents，或使用 `http://127.0.0.1:4170/?managed=1`。新建后可刷新恢复、续轮和取消；阅读历史不会启动或接入 Runtime。为了验证延迟 Runtime，可先启动 Gateway、发送需要读取工作区文件的任务，看到等待状态后再启动 Runtime worker。
 
-不设置 `--experimental-managed-runtime-url` 时，实验保留 P7 的本地进程内 Provider。远程模式要求 Runtime Bearer token；非 loopback 地址必须使用 HTTPS。P9 自动创建 Runtime 尚未实现，当前远程模式仍需自行启动 worker。
+未设置固定 URL 或 auto-local 开关时，保留 P7 的本地进程内 Provider。固定 URL 模式仍需自行启动 worker，要求 Runtime Bearer token；非 loopback 地址必须使用 HTTPS。P9a 可只启动 Gateway，由它自动创建本地 worker：
+
+```bash
+node dist/cli.js serve --port 4170 --workspace /absolute/workspace \
+  --experimental-managed-agents --experimental-managed-runtime-auto-local
+```
+
+auto-local 与固定 URL、显式 Runtime token、worker 模式互斥；每代 worker 使用独立随机 token，无需手工配置 Runtime 端口。
 
 这只是架构验证，不应直接部署为生产多租户服务。
 
@@ -499,17 +506,19 @@ authoritative answer completed
 - 展示日志的磁盘压缩、保留期限和索引；升级前 P8 的助手/工具展示历史不自动回填；
 - Runtime 动态 MCP/Skill 能力发布、权限回传和 progress streaming；
 - Shell、写文件和其他 mutating Tool 的权限与 side-effect ledger；
-- Runtime idle eviction、预热池、资源配额和成本模型；
+- 生产 Runtime idle 策略、预热池、资源配额和成本模型（P9a 已实现本地最多 4 个 worker 与容量压力下空闲回收）；
 - 独立 credential-minimal Runtime 镜像/可执行程序；
 - Runtime 启动 p50/p95、真实 workload 命中率和大样本前三轮分布。
 
-## 14. 下一阶段：P9
+## 14. P9a 实现与后续 P9b
 
-[P9a 本地 Runtime 自动激活方案](managed-agent-local-runtime-activation-p9a.md)已完成设计，尚未实施。目标是用户只启动 Gateway，Web Shell 首轮推理立即开始，工具需要时接入自动创建的 Runtime，续轮复用，退出时完成回收。
+[P9a 本地 Runtime 自动激活方案](managed-agent-local-runtime-activation-p9a.md)已实现并同步实际验收。用户只启动 Gateway，首轮权威推理立即开始，工具需要时等待自动创建的 Runtime，续轮复用，退出时等待回收。无工具回答无需等待 Runtime；历史读取不启动 worker。
 
-设计采用同一 Gateway 内按租户/工作区复用 worker，保留独立 Tool Session；使用随机 token、boot scope 与 lease headers 限定 owned worker。四个实现切片依次为：私有 worker 启动合约、Activator/AutoLocal Provider、Gateway 生命周期接线、展示与兼容回归。
+实现采用同一 Gateway 内按租户/工作区复用 worker，保留独立 Tool Session；使用随机 token、boot scope 与 lease headers 限定 owned worker。私有入口、Activator/AutoLocal Provider、Gateway 生命周期接线与 runtime_released 展示事件均已落地。Tool-only ACP Session 不再依赖模型认证与 LLM 初始化。
 
-关键验收包括：无工具回答不依赖 Runtime；工具分发后不自动重试；取消 ACK 不冒充工具已终止；旧 lease/release 不影响新 worker；配置 reload、撤信任和退出完成回收；Gateway 历史读取不启动 Runtime。自定义配置/信任路径、worker 独立输出目录、进程树和三平台行为都有明确验证项。
+macOS 真实 Gateway/worker/ACP 验收通过无工具提前完成、真实文件工具、续轮复用、并发共享与单方取消、worker 崩溃、primary reload、Gateway 重启恢复、正常退出及 SIGKILL 后已知进程树回收。source 与 package dist 入口、bundle 参数冲突、自定义配置/信任路径、独立输出根和凭据哨兵检查通过。build、bundle、workspace package 类型检查和定向回归通过；根 integration 类型检查仍有 4 个已确认的基线错误。
+
+Windows/Linux 尚未实测，secondary/dynamic reload 与撤信任/强制移除完整 HTTP 组合未逐项真实 E2E；不可中断 execute 由 Provider/Activator 测试覆盖。本轮没有重新做浏览器视觉验收。测试覆盖、RSS 阶段快照和其余限制见 P9a 第 15 节。
 
 P9a 之后再设计 P9b Kubernetes adapter。生产身份、分布式租约、隔离和容量策略需要单独验证，不能把本地 IPC 和进程回收直接当作 Kubernetes 实现。
 
@@ -525,4 +534,4 @@ P9a 之后再设计 P9b Kubernetes adapter。生产身份、分布式租约、�
 - 自动重试可能产生副作用的 Tool；
 - 用 Kubernetes 对象替代 Session、租约和恢复语义。
 
-最终建议是：**保留常驻多租户 Gateway/Harness，把模型和会话留在 Gateway，把本地能力收敛为按需 Tool-only Runtime；先以 TypeScript 和 LocalProcessActivator 打通 P9，再接 Kubernetes。**
+最终建议是：**保留常驻多租户 Gateway/Harness，把模型和会话留在 Gateway，把本地能力收敛为按需 Tool-only Runtime；P9a 已用 TypeScript 和 LocalProcessRuntimeActivator 打通本地链路，下一步在明确生产身份和隔离边界后设计 P9b Kubernetes 接入。**

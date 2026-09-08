@@ -1,6 +1,6 @@
 # Managed Agent Remote Runtime P8
 
-> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [dfb1309f15](https://github.com/doudouOUC/qwen-code/commit/dfb1309f15297df37d60131bfa41038b27a39dad) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status
 
@@ -241,8 +241,10 @@ Managed Session path never does so.
 - Remote transport failures, cancellation, and identity mismatches fail closed
   without leaking secrets or retrying Tool execution after dispatch.
 
-## Proposed next stage
+## Local Runtime activation (P9a)
 
 The [P9a local Runtime activation design](managed-agent-local-runtime-activation-p9a.md)
-specifies automatic worker startup, workspace reuse, owned-worker fencing,
-cancellation, and awaited cleanup. It is a proposal, not implemented behavior.
+implements opt-in automatic worker startup, workspace reuse, owned-worker fencing,
+cancellation, and awaited cleanup. Its validation section records the macOS
+process checks and remaining platform/E2E limits. Fixed-URL and in-process
+providers remain available without the auto-local flag.
