@@ -179,6 +179,8 @@ host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `
 
 ## 本轮结论与待细化项
 
-优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。完整 Agent host、工作区环境快照和可等待的通道生命周期已落地；下一项按 [Runtime invocation v2 方案](managed-agent-runtime-invocations.md) 实现工具构造、审批准备及执行边界，然后接入三处普通会话 factory，使用 D2 的真实上下文/工具轮次验证复用行为。该方案已核对两处执行器、注册表、改参、Hook、输出与资源生命周期，仍标为待实现。
+优先解决的是 Agent 能力复用和普通会话契约。完整 Agent host、工作区环境快照和可等待的通道生命周期已落地；[Runtime invocation v2 方案](managed-agent-runtime-invocations.md) 的独立 worker 内核已通过本地 macOS 验收，Core/ACP Session 也已接入代理的准备、权限、确认、Hook 回执、单次执行及取消排空。代理直接执行没有调度器授权时失败；工具提示与物理执行结果分开记录，响应丢失不重复执行副作用。
+
+接下来需要把代理注册到真实 Gateway Config/factory：无工具轮次不能等待 Runtime，工具声明不能依赖构造本地工作区工具，父子 Agent 与不同 cwd 必须有正确的 Runtime 和文件快照作用域。随后完成 MCP/Skill、媒体/产物、后台工具及完整 Hook 语义，再切换 primary、secondary、replacement 三处普通会话 factory。当前直接组装双 Config 的真实工具测试只证明调度接线，不代表完整 Agent 生产入口、旧会话或默认替换已验收。
 
 具体可提取的 Agent driver 边界、普通历史转换格式和全部内部调用者迁移顺序，需要在对应切片中完成精确接口设计；本文不提前承诺实现工期，也不把这些项目列为已完成。独立本地 CLI/TUI 的执行默认不在此次 daemon 替换范围内。

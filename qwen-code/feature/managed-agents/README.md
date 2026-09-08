@@ -1,9 +1,9 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [7786edd123](https://github.com/doudouOUC/qwen-code/commit/7786edd123dd6a417d520cec552648b08b485ebb)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [5dde5c8dd7](https://github.com/doudouOUC/qwen-code/commit/5dde5c8dd77547760783b560a7162240679680ef)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-09。
 
-> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。[默认替换设计与差异清单](managed-agent-daemon-default.md)记录完整 Agent host、工作区快照及 Bridge 通道生命周期；[Runtime invocation v2](managed-agent-runtime-invocations.md) 阶段 1 的 macOS 本地验收已通过。独立 worker 的真实 Read/Write/Edit/前台 Shell 支持构造、确认、单次执行、结果重取和取消；运行中 release 等待子进程退出。完整九组真实验收及独立取消子进程用例通过，2850 项定向测试、build/bundle/完整 typecheck（含 integration）通过，原四项类型错误已修复。两轮验收的 14 个构建 hash 一致，自有进程、端口、临时目录已清理。普通默认入口尚未切换，下一步是阶段 2 的完整 Agent 注册表与两处调度器代理接线；随后补完整工具语义与客户端兼容，再替换三处普通会话 factory。当前 4170 预览保持不变。
+> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。[默认替换设计与差异清单](managed-agent-daemon-default.md)记录完整 Agent host、工作区快照及 Bridge 通道生命周期；[Runtime invocation v2](managed-agent-runtime-invocations.md) 的独立 worker 内核已通过阶段 1 本地 macOS 验收，阶段 2 的 Core/ACP Session 代理生命周期接线现已实现。准备、权限、确认、Hook 回执、单次执行与取消排空保留同一 Runtime 引用；修复真实验收发现的取消提示和空确认参数问题。最终 1,586 项定向测试、build/bundle/完整 typecheck 通过，Core 与 Session 各 11 组真实工具探针通过，10 项构建 hash 一致且自有进程、端口、临时目录全部清理。这些探针使用显式组装的双 Config 和记录型 ACP 适配器，不证明完整模型循环或生产注册已接通。下一步落实不等待 Runtime 的工具声明、真实 Gateway Config/factory 注册及父子 Agent 作用域，随后完成完整工具语义与客户端兼容，再替换三处普通会话 factory。普通默认入口尚未切换，当前 4170 预览未重启。
 
 ## 分阶段设计文档
 

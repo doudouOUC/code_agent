@@ -1,6 +1,6 @@
 # Managed Agent：Runtime invocation v2
 
-状态：阶段 1 的本地 macOS 验收通过。2026-09-09 已接入独立 worker 私有 v2 调用链，并验证真实读写/Edit/前台 Shell、取消、执行中释放及 v1 回归。下一步是阶段 2 的完整 Agent 注册表和两处调度器接线；普通 daemon 默认实现尚未替换。
+状态：阶段 1 的本地 macOS 验收通过；阶段 2 已接入 Core/ACP Session 的代理生命周期，生产注册表接入仍在实施。独立 worker 私有 v2 链路已验证真实读写/Edit/前台 Shell、取消、执行中释放及 v1 回归。普通 daemon 默认实现尚未替换。
 
 目标是让普通 daemon 的完整 Agent 留在常驻 Gateway，并把工作区工具真实执行交给独立 Tool-only Runtime worker。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
 
@@ -95,6 +95,28 @@ Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipF
 实现前需按现有确认/显示 union 列全序列化字段，并核对全部 MCP 类型判定消费者；这些是协议实现清单，不增加产品配置。具体路由命名及内部授权接口随最小接线确定，以上身份、参数摘要、单次执行和结果语义不可省略。
 
 2026-09-09 阶段 1 基线已使用隔离的真实 worker/ACP 进程验证：当前只声明 v1，已有 v1 路径拒绝 protocolVersion 2 及额外 invocation 字段，真实 read 成功，manifest 不包含 write/Shell，错误 lease/epoch/tenant 被拒绝。重复 release 曾返回 500，另一轮返回 released:true；不据此声明响应幂等或资源清理语义已达到 v2 要求。v2 准备、确认、执行及结果查询尚未实现，此基线不是阶段 1 验收通过。
+
+## 阶段 2 调度接线细化（实施中）
+
+两处调度器通过 invocation 上的可选 `managed` 生命周期准备和取消远端调用。准备必须发生在向 UI 发布 invocation 之前；准备结果中的规范化参数、描述、L3、确认及稳定 toolUseId 属于同一引用。现有本地工具保持同步 build。Gateway 完成原权限流程、Runtime preflight 和最终 guard 后，显式授权代理执行；绕过调度器直接 buildAndExecute 没有授权，必须失败。
+
+所有改参入口先等待旧引用取消排空，再准备新引用并重做权限；不能把 newContent 或 updatedInput 送入旧确认回调。执行前拒绝、确认取消、超时和全局取消均等待远端终态，批次完成不能先释放引用。运行结果保留物理 executionStatus；Runtime 的 Pre/Post/Failure Hook 回执在原位置消费，Gateway 不重跑这些工具 Hook。PermissionRequest 目前仍属于 Gateway 权限流程，其工作区执行迁移尚未完成，不能通过关闭 Hook 冒充兼容。
+
+完整生产接入仍有明确前置条件：注册表声明必须在不等待 Runtime 启动的情况下可用；不能为拿 schema 构造本地工作区工具。历史 AUTO 分类投影需要复用原工具的纯函数。父子 Agent 的执行作用域必须由真实 Config producer 分配；当前 FileHistoryService.trackEdit 写入最近快照，直接放开多个 prompt 并发会把编辑归错轮次，因此不能仅删除 Runtime 单轮限制。不同工作目录必须绑定对应 Runtime。以上生产边界、Session/子 Agent 验收及普通入口切换完成前，不宣称阶段 2 或默认替换通过。
+
+当前实施已新增纯 `RuntimeBackedTool`，注册时接收可信声明和分类器纯投影，第一次工具准备才取 Runtime client。代理不调用本地工作区工具的 build/execute。manifest 的输出预算、defer/search 元数据纳入摘要，Infinity 使用可序列化的 unlimited 表示；prepare 返回稳定 toolUseId。Core 与 Session 在原权限和最终 guard 流程中实际读取 managed 生命周期，Session 的工具展示直接接收已准备描述/位置，不再另行 build。Edit/Write 的用户编辑参数转换复用同一纯函数，编辑器只操作确认 DTO 中的内容缓冲。
+
+断线处理包含两种尚未得到引用的情况：beginTurn 响应丢失时，清理幂等等待同轮快照结束；prepare 响应丢失时，重取同一调用仅用于取消。execute 不重复发送，进度和终态通过原引用查询；不能证明排空时拒绝清理，不能把不确定结果写成 not_started。测试探针显式组装双 Config、真实工具和代理；这种组装不能替代生产 Config/factory 的注册，也不能证明旧会话、Channels/SDK、定时任务或子 Agent 已经迁移。
+
+### 调度接线的本地验收（2026-09-09）
+
+Core 与 ACP Session 各 11 组真实工具探针通过，覆盖 Read/Write/Edit/前台 Shell、确认拒绝、最终 guard 拒绝、PermissionRequest 改参后重做准备、PreToolUse ask、执行中取消及未授权直接调用。Runtime 运行真实工作区工具及命令 Hook；Gateway 不重复执行 Pre/Post/Failure Hook。文件检查点观察调用原始 FileHistoryService，验证 Write/Edit 的 trackEdit 归属。取消探针检查自有 Shell 退出后才完成批次，并确认没有延迟写入。
+
+真实验收发现并修复两处单测此前未覆盖的差异：远端物理取消不能沿用“工具已完成、输出被丢弃”的提示；Session 普通批准没有 answers 时不能传入含 undefined 字段的确认 payload。后者由严格摘要校验复现，修复 producer，没有放宽协议或在测试中增加 JSON 序列化兜底。执行已成功后才收到取消时，仍保留成功的物理状态与实际 Hook 回执。
+
+最终定向单测 1,586 项通过（Core 703、CLI 883），全仓 build、bundle、完整 typecheck（含 integration）及变更文件 lint/格式检查通过。真实探针使用相同的 10 个构建 hash，各轮前后不变；全部自有进程、端口、临时目录已清理，没有依赖兜底强杀。证据目录为 `.qwen/e2e-tests/managed-agent-scheduler-v2-evidence/core-1788895026267/` 和 `session-1788895077760/`，详细报告见 `.qwen/e2e-tests/managed-agent-scheduler-v2.md`。用户 4170 进程未重启、未发送请求。
+
+上述 Session 探针实际进入 runToolCalls，但 ACP 端使用记录与选择真实确认选项的适配器，并非完整 SDK 传输验收；已初始化真实 Chat，模型请求为零。双 Config、注册表和 Runtime client 由测试显式组装，不能证明生产初始化不构造本地工具，也不证明完整 Agent 模型循环、跨进程租约或父子 Agent 的作用域已接通。完整 L4 矩阵、真实编辑器交互、扩展工具和产物搬运仍待后续验收；本切片通过不等于阶段 2 的全部退出条件满足。
 
 ## 阶段 1 实现与本地验收（2026-09-09）
 
