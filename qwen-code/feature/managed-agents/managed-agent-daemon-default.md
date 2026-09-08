@@ -51,6 +51,8 @@ flowchart LR
 
 Web Shell 的普通 Session client 与 SDK 依赖普通 Prompt 的 ACK/事件契约；ACP 服务入口还会直接调用所属 Bridge。Conversations、Live 任务等也有内部 `sendPrompt` 调用，并非所有请求都经过 `/session/:id/prompt`。当前 Managed 创建还明确拒绝内部 Conversations 工作区。
 
+Channels 通过 `packages/cli/src/commands/channel/daemon-worker.ts` 和 `packages/channels/base/src/DaemonChannelBridge.ts` 使用普通 Session SDK，依赖 workspace、model、approvalMode、`sourceType=channel` 和实例级 `sourceId`。交付要等待正式回复、内容块和 stopReason，不能用 Prompt admission 代替。适配层须保留受信 channel metadata、附件在 admission 不确定时的保留行为，以及 thread/user 路由与取消归属。
+
 定时任务存在两类路径：手动 fresh-session 触发通过 `routes/scheduled-tasks.ts` 创建 Session 并 `sendPrompt`；自动 tick 则由 ACP `Session.ts` 的 `startCronScheduler` → `#enqueueCronPrompt` → `#executeCronPrompt` 在子进程内推进模型。Tool-only Session 在 `acpAgent.ts` 中明确不启动该 scheduler。因此，只替换 Bridge 的 `sendPrompt` 也会漏掉自动执行。
 
 替换时应将需要模型推进的定时/自动任务接入 Gateway 准入与执行所有者，同时保留现有 cron 锁、执行记录和过期 one-shot 处理规则。Goal、通知触发、后台子任务等同样要逐项审计实际模型入口，不能让 Tool-only worker 为兼容功能重新运行模型。相关入口还包括 `standalone-session-service.ts`、`live-session-coordinator.ts`、`live-task-service.ts`，迁移清单应记录最终回复交付和取消归属，而不仅记录发送函数。
@@ -121,6 +123,7 @@ D1 的开发启用方式沿用实验配置入口，不先对普通用户增加�
 以下为待实现后的验收计划，不是已通过结果。
 
 - 用既有普通 Web Shell 和未改调用方式的 SDK 走 create → prompt → thought/tool → completed；检查普通 SSE 与 ACP 的等价事件投影、用量和通知。
+- Channels 检查 thread/user 会话恢复、附件和最终交付；自动调度检查 controller/run 血缘、锁、错过 one-shot 的确认行为及单次执行。子任务完成通知须由 parent 持久接受，不能把 UI 收到事件当作交付完成。
 - 只读、编辑、Shell、用户问题分别覆盖允许、拒绝、取消、超时、重复决策和失联；写工具执行计数与文件结果必须可核对。
 - 首轮失败/取消、后续失败/取消、空会话、排队消息及完成竞态；展示历史与模型历史的差异必须可解释。
 - 工作区指令、Hooks、MCP/Skills、模型与模式设置、上下文压缩：校验模型请求和实际本地行为，不仅检查 UI 文本。
