@@ -145,3 +145,53 @@ ReadFile 内部的 PDF 视觉转换也属于模型调用。Tool-only Session 的
 真实验收包含独立取消子进程用例和完整九组调用链。完整用例的 v1 回归使用未读文件验证原生成功结果；首轮同文件命中 Read 缓存导致的测试断言失败已保留并更正。执行中 release 的用例中，子进程已收到 TERM 但仍存活时 release 保持 pending；约 313 ms 时进程已退出，约 380 ms 才收到 released:true，execute 返回 cancelled，4.2 秒内无迟到写入。两轮共 14 个构建文件 hash 相同且前后未变。
 
 证据目录为 `.qwen/e2e-tests/managed-runtime-invocations-evidence/v2-descendant-1788888641067/` 和 `v2-1788888737422/`，详细报告见 `.qwen/e2e-tests/managed-runtime-invocations.md`。全部测试使用隔离 HOME/工作区/端口，检查确认自有 worker、ACP、Shell、端口和临时目录已清理，没有依赖兜底强杀通过验收。当前用户 4170 预览未重启、未发送请求。此结果证明阶段 1 的 macOS 本地链路，不覆盖生产 Gateway 权限/guard 接线、完整工具与客户端兼容、Windows/Linux 实测或默认 daemon 切换；阶段 2–4 继续实施。
+
+## 阶段 2 生产注册与远端绑定细化（实施中）
+
+离线声明从 Read/Write/Edit/Shell 的真实定义提取，普通工具和代理共享 schema、描述、输出预算及 AUTO 纯投影。声明构造不能加载真实工具或获取 Runtime client；Shell 的平台与配置由可信 host 明确提供。注册仍经过原 PermissionManager 的 disabled/deferred/eager 判定。不能把仅共享 schema 的近似声明送入严格 manifest 摘要校验。
+
+完整 ACP channel 持有由已解析 workspace generation 创建的 Runtime provider。每个实际 Session Config 在初始化前取得独立的惰性 binding：Runtime Session 使用与 Gateway Session 不同的独立 UUID，并绑定 Config 的实际 cwd 与 host 的 workspace/generation；第一次 prepare 才启动独立 owned worker 并取得 v2 client；bootstrap 与只读 replay 不取得执行 client。绑定关闭进入 Config 的严格异步资源清理，不能依赖 ToolRegistry.stop 不等待的工具 dispose。初始化失败、关闭及 generation 退出共用该清理路径，不能把 HTTP 失败、AbortSignal 或删除 map 项当作排空。
+
+Remote provider 复用已认证 endpoint/lease，在 owned worker 九个 v2 路由上保持同一 Session 身份。execute 只发送一次，丢失响应由代理通过原引用 status/cancel 恢复，不重发或降级 v1。AutoLocal 每 Session 保存一次 use/client；释放先封住新调用，等待远端 Session 关闭，再释放 use。若 worker 已丢失，则必须等待 activator 提供的真实进程退出结果；失败保留 retiring binding，阻止复用而允许清理重试。单个 Session 释放不应提前停止同 generation 的其他 Session。
+
+这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移、父子 Agent 独立执行作用域与共享撤销归属仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。生产默认三处 channel factory 在这些功能与消费者验收完成后统一切换；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
+
+### 完整 host 与默认记忆验收（2026-09-09）
+
+注册组合验收已通过显式关闭自动记忆时的 root Session 三组：无工具轮次零 acquire、真实模型经独立 worker Read/Write/Shell 后返回正式 final、实际 close/release 和全部 Config 关闭。这只证明注册与远端调用主链；默认自动记忆配置的另一轮实际进程曾在 no-tool 结束后退出，不能把隔离结果替代默认行为验收。
+
+失败有两层实际原因。ACP Session 直接使用 Chat 模型循环，绕过 LlmClient 唯一保存 cache-safe params 的分支，但默认 memory extraction 仍从进程共享单槽读取该数据。共享 Gateway 下另一 Session 也可能覆盖该槽。MemoryManager 又对失败任务调用无人等待的 promise.finally，并且启动 queued extraction 时不处理拒绝，导致已有调用者 catch 无法阻止额外的未处理拒绝。
+
+修复让两个真实 extraction producer 在调度时捕获本轮 40 条 curated/slim 历史，并以必填 extractionHistory 随队列任务传递；完整 history 继续用于 cursor。planner 消费这个 Session 自己的快照，不回读 live chat 或全局槽；sessionId 与 Config 的身份检查继续保留。任务跟踪使用同时处理成功/失败的清理分支，排队任务失败保留任务错误记录并被观察，不再产生额外未处理拒绝。验收分别记录主会话、独立记忆模型请求和任务终态；即使记忆任务无需写文件即可正常结束，仍不能据此声明子 Agent 工作区工具作用域已经迁移。
+
+修复后的隔离真实进程验收 `registry-default-memory-1788899037951` 四组通过：省略 memory 设置并确认默认 extraction/dream 均启用；两个主轮次均返回正式 end_turn；两个真实记忆 Agent 完成独立模型请求，真实 MemoryManager 的 extraction 任务完成且 drain 成功。共观察到 5 次主 Agent 和 2 次记忆 Agent 模型请求。无工具轮次零 acquire；工具轮次实际 Read/Write/Shell 三次执行成功，Gateway 对这四类工作区工具的本地 build 为零。三个实际 Config 均完成关闭；worker、ACP、Shell 进程及两个测试端口退出，无超时或备用清理。验收前后及回读时 37 项构建摘要一致。记忆 Agent 本次返回“本次无持久记忆变化”，此结果只证明提取调用与任务结束，不证明记忆文件写入、子 Agent 工具迁移或普通 daemon 默认接入。
+
+### 下一步：子 Agent 的独立执行与共享文件历史
+
+每个实际子 Agent 启动时创建一次独立 Runtime Session；同一 workspace/generation 仍复用 owned worker 内的 ACP 进程。审批或模型设置派生 Config 继承该子作用域，不能每层派生都重复分配，也不能回退到父 Session 的 client。子 Config 的 FileReadCache 与单 Prompt 限制继续独立，父 Config 持有子作用域关闭任务，关闭失败保留所有权并允许重试。
+
+文件历史保留普通 daemon 的现有语义。源码核对发现，deriveConfig 通过原型继承已有 FileHistoryService，AgentTool/InProcessBackend 的普通子 Agent 沿用父服务；trackEdit 在调用开始读取最新快照，后台子任务可能归入后来父轮次。此前“子任务启动时固定父检查点”的设想会改变既有行为，不能作为兼容迁移的前提。子 Runtime 保持独立读缓存和调用状态，同一逻辑文件历史 owner 则复用同一服务；父快照推进及子编辑都由该 owner 处理，不能因每个子 Runtime 的 beginTurn 为共享历史额外创建轮次。纯模型子任务不取得执行 client。
+
+实际接入点包括 AgentTool 的普通/fork 启动、InProcessBackend、通用 runForkedAgent，以及 SubagentManager 的资源清理包装。先安装子绑定，再重建工具注册表；前台结束、后台终态、stop、respawn、父 Config 关闭均必须等待 managed 资源排空。不同 cwd/worktree 与记忆任务的权限、快照归属须分别沿用实际派生行为，不能一律借用父工具 client。Gateway 的 rewind 路由随后先封住并排空相关子作用域，再由 Runtime 执行文件恢复并回传历史收据；这是迁移后防止并发修改的设计要求，普通 Session 当前的活动轮次检查不构成后台 Agent 已全部结束的证明。
+
+备份文件实际存储在 `Storage.getGlobalQwenDir()/file-history/<Config.sessionId>`；owned worker 的 outputRoot 只重定向 QWEN_RUNTIME_DIR，不会改变这个全局备份根。删除临时 outputRoot 不等于删除备份文件，但会丢失其中的 Runtime 会话记录；每次恢复重新分配 Runtime UUID 也无法直接复用旧备份索引。下一步必须把逻辑会话的文件历史 owner、快照元数据及备份身份显式持久化并恢复，继续使用已有备份存储，禁止仅保留字节却丢失可达的撤销索引。
+
+自动记忆目录需要单独处理：getMemoryBaseDir 默认使用 Storage.getRuntimeBaseDir，而文件备份使用全局 Qwen 根。迁移时应沿用 Gateway 已解析且获准的记忆路径，不能让 Runtime 根据自己的临时 outputRoot 重算目录；作用域权限和真实写入位置必须一致。
+
+该切片验收必须覆盖实际子 Agent 模型到工具循环、父子并发与读缓存隔离、后台子任务跨父轮次后的现有文件归属、同文件修改和 rewind 次序、不同 cwd、关闭失败重试及自动记忆实际写入。当前“未绑定子作用域则拒绝执行”只是过渡保护；以上接入与验收完成之前继续保持阶段 2 未完成。
+
+### 审查发现的迟到 HTTP 请求与终结释放（已修复并验证）
+
+真实 HTTP 反例连续三次复现：首条 v2 manifest 已被 Express 解析但延后派发，Remote release 返回 released:true、Local 关闭 Session 后，再放行该请求，Local.getToolV2Client 会隐式 prepare 并重新创建相同 Session。客户端的 AbortSignal 只让 fetch 失败，并未阻止服务器派发。反例使用实际 Remote/Local provider 和 worker routes；Bridge 仅记录 Session 生命周期及测试文件标记，不冒充真实 SessionWriterLease。该失败使原有正常关闭验收不足以证明 HTTP 乱序下所有权已经终结，必须先修复再交付。
+
+新增 owned v2 Session 终结释放 `/internal/managed-runtime/v2/release`，该路由属于 owned worker 内已解析 workspace/live Session owner，沿用认证、lease、epoch、tenant、workspace/cwd 与 Session 身份校验。固定 URL 或没有 owned lease 的服务不能启用它。普通 v1 release 保留释放后再次使用同一 Session ID 的既有语义。
+
+实际 ManagedToolSession producer 关闭时显式传 terminal 意图，AutoLocal/Remote 同时从已分配的 v2 client 推断该意图，覆盖首条 v2 请求还没有到达以及首次 acquire 失败的情况。Local 在任何 await 前封住该 Session；只有真实 cleanup 成功，才将活动引用替换为只含身份和 completed 的轻量终态记录。记录存活到 provider/generation 结束，同身份重复终结成功、冲突身份拒绝，迟到 v1 prepare 和 v2 调用不得重建 Session。清理失败继续保留实际资源与重试入口。
+
+若普通 release 正在执行时升级为 terminal，Local 在原记录上提升关闭意图；Remote/AutoLocal 也必须等待匹配 v2 协议的终结 ACK，已经收到的 v1 ACK 不能代替它。终态记录不保留 Config、Runtime use、client Promise、warmup 或 cleanup 闭包。worker 丢失时仍须等待真实进程退出，不能为了完成释放重新激活 worker。
+
+修复验收包含迟到首条 v2 请求、迟到 v1 prepare、初次 acquire 失败、普通 release pending 升级、同身份幂等与冲突拒绝、v1 正常复用，以及完整 Agent 的默认记忆和真实工具回归。完整 server 的 owned HTTP 白名单也必须放行 v2 release；新增真实 server 回归先观察到 404，再修正白名单，整文件 372 项通过。Provider/AutoLocal/helper 三文件 53 项通过。
+
+新构建的 `fixed-1788901760083` 实际 HTTP 验收连续三次通过：每次都收到带正确 lease 的 v2 终结回执，再放行已解析的首条 manifest；等待生产路由处理结束后确认没有重建，合计 spawn=3、close=3、manifest=0，测试 Session 均不存在。此探针仍使用计数 Bridge，不把测试标记当作实际 ACP writer 证明。
+
+完整 host 的 `registry-default-memory-1788901782552` 四组再次通过，实际 worker 入口收到并返回 v2 release 200/released:true；主模型执行 Read/Write/Shell 后正常结束，两个真实记忆提取 Agent 也完成。worker、ACP、Shell、自有端口和临时目录全部回收，没有超时或备用强杀。37 个构建摘要前后及回读一致；迟到 HTTP 探针的 5 个摘要同样一致。完整 build/bundle/typecheck、变更文件 lint/格式通过；本切片实施期间去重累计 29 文件 3227 项测试通过（非全仓套件，Core client 的记忆/关闭筛选另有 372 项未运行）。记忆实际写入、子 Agent 执行作用域、完整初始化和普通 daemon 默认切换继续实施。

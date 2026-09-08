@@ -2,13 +2,13 @@
 
 ## 状态与目标
 
-2026-09-09，已完成完整 Agent host 复用入口、环境快照和 Bridge 通道生命周期适配；独立验证已覆盖真实历史回放资源的异步清理；v2 独立 worker 调用链已通过 macOS 真实读写/Edit/前台 Shell、取消、执行中释放和 v1 回归，完整 build/bundle/typecheck 与 2850 项定向测试通过。下一步是完整 Agent 注册表及两处调度器接线，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
+2026-09-09，已完成完整 Agent host 复用入口、环境快照和 Bridge 通道生命周期适配；独立验证已覆盖真实历史回放资源的异步清理；v2 独立 worker 调用链已通过 macOS 真实读写/Edit/前台 Shell、取消、执行中释放和 v1 回归，完整 build/bundle/typecheck 与 2850 项定向测试通过。Core 与 ACP Session 的代理生命周期调度已接通；真实 Config 注册、远端 v2 client 及严格 Session 释放已接通；完整 host 的主 Agent 读写/Shell 与默认自动记忆调用、任务结束和进程清理四组组合验收通过。子 Agent 工具、检查点归属和其余完整语义继续实施。默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
 
 本文记录当前差异和建议迁移顺序；没有将 Managed 设为默认，也不声明能力已对齐。已有 P0～P8、P9a 和展示测试继续复用。P9b 外部资源分配不作为本地默认替换的先决条件。
 
 ## 当前差异有多大
 
-daemon 的 HTTP 服务、认证、工作区注册、部分工具基础设施和 UI 组件可以复用；Agent 执行能力及会话协议的差异较大。当前 Managed 是可运行的只读 Agent 实验实现，不能通过替换一个路由就获得普通 daemon 的全部编码能力。
+daemon 的 HTTP 服务、认证、工作区注册、部分工具基础设施和 UI 组件可以复用；Agent 执行能力及会话协议的迁移仍在进行。独立 Managed 页面仍使用原只读实验模型循环；新增完整 host 已能通过独立 Runtime 完成部分读写工具链，但普通 daemon 入口、子 Agent 和完整工具语义仍需接入，不能仅替换一个路由就宣称能力对齐。
 
 ```mermaid
 flowchart LR
@@ -181,6 +181,20 @@ host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `
 
 优先解决的是 Agent 能力复用和普通会话契约。完整 Agent host、工作区环境快照和可等待的通道生命周期已落地；[Runtime invocation v2 方案](managed-agent-runtime-invocations.md) 的独立 worker 内核已通过本地 macOS 验收，Core/ACP Session 也已接入代理的准备、权限、确认、Hook 回执、单次执行及取消排空。代理直接执行没有调度器授权时失败；工具提示与物理执行结果分开记录，响应丢失不重复执行副作用。
 
-接下来需要把代理注册到真实 Gateway Config/factory：无工具轮次不能等待 Runtime，工具声明不能依赖构造本地工作区工具，父子 Agent 与不同 cwd 必须有正确的 Runtime 和文件快照作用域。随后完成 MCP/Skill、媒体/产物、后台工具及完整 Hook 语义，再切换 primary、secondary、replacement 三处普通会话 factory。当前直接组装双 Config 的真实工具测试只证明调度接线，不代表完整 Agent 生产入口、旧会话或默认替换已验收。
+代理已注册到真实 Gateway Config/factory，无工具轮次不等待 Runtime，四种内置工具声明不依赖构造本地工作区工具；完整模型循环的主 Session 已通过独立进程验收。接下来为父子 Agent 与不同 cwd 绑定正确的 Runtime 和文件快照作用域，完成 MCP/Skill、媒体/产物、后台工具及完整 Hook 语义，再切换 primary、secondary、replacement 三处普通会话 factory。当前完整 host 验收不代表旧会话、全部消费者或默认替换已验收。
 
 具体可提取的 Agent driver 边界、普通历史转换格式和全部内部调用者迁移顺序，需要在对应切片中完成精确接口设计；本文不提前承诺实现工期，也不把这些项目列为已完成。独立本地 CLI/TUI 的执行默认不在此次 daemon 替换范围内。
+
+## 当前注册与远端 Session 接线（实施中）
+
+完整 channel factory 已把工具 Session producer 同时传给 bootstrap Config 与 ACP host，host 在创建或恢复实际 Session Config 时继续传入。四种内置工具沿原 disabled/deferred/eager 注册规则生成代理；共享纯声明不加载真实工具、不等待 Runtime。每个 Config 使用独立的 Runtime Session 身份，第一次实际工具准备才获取 owned worker v2 client。该 factory 尚未接入普通 daemon 三处默认 channel 选择，不能将接口接线当作默认迁移完成。
+
+远端 v2 使用现有认证 lease 与九个 owned worker 路由；Session 释放失败保留 retiring 状态并允许清理重试，worker abort 必须等待真实退出才能证明排空。Config 普通关闭和 host writer handoff 都先等待工具 Session 释放；释放失败继续持有 writer，不把取消信号或 HTTP ACK 当成资源已经退出。Write/Edit/Shell 编辑确认选择“本会话始终允许”后，在真实 Runtime 确认成功时同步 Gateway 的 AUTO_EDIT 模式。
+
+本阶段已完成完整模型循环的主 Session 真实进程验收，并修复默认自动记忆提取依赖全局历史缓存及额外未处理拒绝的问题。提取任务使用本会话捕获快照；默认开启时两次真实提取 Agent 和主轮次均正常结束。父子 Agent 独立作用域及共同文件撤销、自动记忆实际写入、Gateway 的工作区初始化、其余工具和媒体/产物迁移、旧会话及全部客户端兼容继续推进。当前派生 Config 的代理会明确拒绝未绑定的子作用域，不能用这一临时限制替代最终子 Agent 兼容要求。
+
+### 2026-09-09 注册绑定验收补充
+
+完整 Agent Config 已注册共享声明的 Read/Write/Edit/Shell 代理，首次工具调用才取得 owned Runtime；Gateway 保留原模型循环和权限调度。真实默认记忆验收四组通过，并修复自动提取依赖共享模型参数槽及未处理拒绝导致的进程退出。新的 owned v2 终结释放在 Session 关闭后保留身份标记，迟到 HTTP 请求不再重新创建已关闭 Session；完整 server 白名单和真实 worker 关闭链路均已验证。详细边界、失败反例与复验记录见 [Runtime invocation v2](managed-agent-runtime-invocations.md)。
+
+这仍是阶段 2 的生产注册与远端绑定切片：普通 daemon 的三处 channel factory 尚未切换。后续先完成子 Agent 独立执行作用域和持久化文件撤销，再接通其余工作区能力，逐项验收普通 Web Shell、SDK、Channels、定时任务及旧会话后进行默认切换。
