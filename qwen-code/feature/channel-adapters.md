@@ -8,7 +8,7 @@
 
 Channel adapter 让 qwen-code 可以从本地 TUI 之外的消息通道接收用户输入。adapter 不应该依赖某个具体 bridge 实现，否则后续要切到 daemon-backed bridge、测试 fake bridge 或多 channel bridge 时，所有 adapter 都会被迫跟着底层类名和生命周期细节变化。
 
-#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录；#10420/#10574 已合入命名任务输出归因与并发控制，#10643 已合入 worktree-isolated named task；#11015/#11308/#11309 当前 open diff 分别承接同 worktree ownership-transfer reset、route cold restore 与 delete cleanup，均不能作为 `main` 能力承诺。
+#5978 的目标是把 adapter-facing 依赖从具体 `AcpBridge` 收窄为 `ChannelAgentBridge` contract：adapter 只需要知道“创建/恢复 session、发送 prompt、订阅事件、清理 session”等 agent-session 行为，不再把 `AcpBridge` 当成唯一实现。#6031 在此基础上让 `qwen serve --channel` 托管 out-of-process channel worker；#6098 再补 worker restart、heartbeat、status issue 和日志脱敏；#6165 把 daemon prompt completion 从 one-tick guess 改为 `turn_complete` SSE barrier；#6182 给 bridge 增加 session listing；#6309 进一步让 daemon-owned load replay 可以由 bridge snapshot 批量承接，避免历史帧走 live fanout；#6598 新增 channel worker reload，让 settings 变更不必重启整个 daemon；#6635 把 daemon-managed channel workers 按 workspace 分组，避免 multi-workspace daemon 中 secondary workspace channel 误用 primary env/settings；#6741 把 channel selection 做成 daemon runtime resource，支持运行时启用、替换、查询和停止 worker；#6950 把 adapter `connect()` startup failure 作为结构化诊断带回 supervisor/API/CLI；#7019 把 channel ownership 与 hardening fail-closed 口径同步到用户/开发文档；#10198 再为 daemon-managed user scope 增加 owner-scoped 命名任务目录；#10420/#10574 已合入命名任务输出归因与并发控制，#10643 已合入 worktree-isolated named task；#11308/#11309 已合入route cold restore与delete cleanup，#11015仍是同worktree ownership-transfer reset的open方案。
 
 ---
 
@@ -116,17 +116,17 @@ restore 严格校验 workspace/repo root、realpath containment、sidecar/marker
 
 该 diff还修复 post-spawn无主 checkout、SDK stale claim、exclusive marker失败cleanup和 leading-flag缺名语法。它仍为 open，route、capability、reset命令与 registry自愈均不能视为 `main` 能力；orphan-reap和 sibling delete cleanup由 #11024承接。
 
-### 3.11 worktree route managed restore（#11308 open）
+### 3.11 worktree route managed restore（#11308 merged）
 
-#11308 当前 open diff修复channel worker cold start的route恢复。Part 4A route原来只持久化worktree cwd，generic `loadSession`会把它当workspace root并收到 `workspace_mismatch`。新方案在route旁保存 `isolation:'worktree'` 与 `workspaceCwd`；eager restore使用workspace root调用既有managed load，再核验 `persisted-v1` worktree attestation与原cwd。superseded session可在同一路径重定向replacement并重写route id，lazy restore也再水合相同metadata。
+#11308最终修复channel worker cold start的route恢复。Part 4A route原来只持久化worktree cwd，generic `loadSession`会把它当workspace root并收到 `workspace_mismatch`。最终在route旁保存 `isolation:'worktree'` 与 `workspaceCwd`；eager restore使用workspace root调用既有managed load，再核验 `persisted-v1` worktree attestation与原cwd。superseded session可在同一路径重定向replacement并立即持久化新route id，lazy restore也再水合相同metadata。
 
-旧route无metadata时保持原有drop-then-lazy-heal行为，新route被旧worker读取时额外字段被忽略。该PR仍为open，当前 `main`尚不能保证worktree route在worker重启后主动恢复。
+最终review补齐managed load被route变更作废时的binding释放与映射回滚；旧route首次cold start仍保持原有drop-then-lazy-heal行为，但下次managed activation会补写metadata。新route被旧worker读取时额外字段被忽略。该实现已进入`main`。
 
-### 3.12 owned worktree delete cleanup（#11309 open）
+### 3.12 owned worktree delete cleanup（#11309 merged）
 
-#11309 当前 open diff为daemon session删除补ownership-verified worktree回收。delete前在共享path-keyed worktree lock下严格核验sidecar、marker、允许root containment与跨session sharing；record/sidecar确认删除后，仅对无未提交工作的checkout执行git worktree remove，并只尝试非force branch删除。superseded predecessor静默跳过，reset后的current replacement可忽略精确tombstone predecessor后正常清理。
+#11309最终为daemon session删除补ownership-verified worktree回收。delete前在共享path-keyed worktree lock下严格核验sidecar、marker、runtime workspace、允许root containment、slug推导目标与跨session sharing；record/sidecar确认删除且generation仍可写后，仅对没有tracked/untracked/非可再生ignored内容的checkout执行git worktree remove，并只尝试非force branch删除。superseded predecessor静默跳过，reset后的current replacement可忽略精确tombstone predecessor后正常清理。
 
-任何sidecar、marker、sharing、dirty tree或containment不确定都保留checkout并记录具名原因；外层已持有archive batch lock的internal runtime路径跳过cleanup以维持worktree→archive锁顺序。该PR仍为open，`main`当前删除Part 4A session仍可能保留worktree产物。
+任何sidecar、marker、sharing、dirty tree或containment不确定都保留checkout并记录具名原因；`session_closing`不折叠成not-found，执行失败后重新观察checkout，可能partial delete时不误报完整保留。外层已持有archive batch lock的internal runtime路径跳过cleanup以维持worktree→archive锁顺序。该实现已进入`main`，不扫描合入前已经泄漏的worktree。
 
 ---
 
@@ -151,8 +151,8 @@ restore 严格校验 workspace/repo root、realpath containment、sidecar/marker
 | #10574 | merged | running task 会全局阻止创建/切换其他命名 task，且不能精确取消非 selected task 或约束跨 task 权限快捷命令。 | owner-scoped exact lookup/reservation 保留入站 turn 目标，放开 create/use 而保留 busy-close guard；增加 named cancel，bare permission 只看 selected task，exact request ID 可路由 owned inactive task。 |
 | #10643 | merged | shared-workspace 命名 tasks 会互相干扰 Git/文件状态，重启恢复又缺少 exact worktree ownership 证明。 | capability-gated `--worktree`、canonical relocate、排他 marker+原子 sidecar 和严格 restore attestation 建立 `persisted-v1`；任一 ownership 不确定时 fail closed。 |
 | #11015 | open | worktree task无法在保留 checkout/branch/name时重开 conversation。 | 当前 diff用 daemon ownership transfer、marker-last CAS、双向 supersession、typed恢复与 registry self-heal实现 clear/new/reset；尚未合入。 |
-| #11308 | open | worker重启时generic load无法用worktree cwd解析注册workspace，持久route被丢弃。 | 当前diff持久化worktree isolation/workspace root，cold start改走managed load并复核attestation，superseded id重定向replacement；尚未合入。 |
-| #11309 | open | 删除worktree-owning session后checkout、marker、git registration与branch永久残留。 | 当前diff在共享ownership lock下先验证owner，删除确认后仅清理clean checkout并非force删branch，任何歧义fail closed保留；尚未合入。 |
+| #11308 | merged | worker重启时generic load无法用worktree cwd解析注册workspace，持久route被丢弃。 | 最终持久化worktree isolation/workspace root，cold start改走managed load并复核attestation，superseded id重定向replacement，同时补失效load回滚与旧route metadata迁移。 |
+| #11309 | merged | 删除worktree-owning session后checkout、marker、git registration与branch永久残留。 | 最终在共享ownership lock下验证owner/runtime/路径/用户工作，删除确认后仅清理可安全回收的checkout并非force删branch，任何歧义fail closed保留。 |
 
 ---
 
@@ -165,6 +165,6 @@ restore 严格校验 workspace/repo root、realpath containment、sidecar/marker
 5. #10574 已合入 shared-workspace并发控制，#10643 已合入 opt-in worktree isolation；主动投递、webhook、loop 和 history backfill 尚未开放。
 6. #10420/#10574 已合入跨 adapter 标签、权限归因与并发控制；真实平台 transport E2E 和预发验证仍待完成。
 7. #11015 仍为 open；`session_worktree_reset_v1`、ownership-transfer reset、superseded redirect和相关 SDK/registry自愈不能视为 `main` 能力。
-8. #11308/#11309 仍为 open；worktree route managed cold restore与session delete物理cleanup均不能视为 `main` 能力。
+8. #11308/#11309 已合入worktree route managed cold restore与session delete物理cleanup；历史无metadata route有一次drop-then-lazy-heal迁移成本，历史已泄漏worktree仍无周期清扫。
 
-_按个人 PR 口径更新于 2026-09-08_
+_按个人 PR 口径更新于 2026-09-09_

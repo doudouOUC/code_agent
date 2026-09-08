@@ -5,8 +5,8 @@
 > 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
 **时间范围**: 2026-04-06 ~ 2026-09-13（持续更新）
-**总计**: 479 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37 见对应周目录（W37 当前个人增量 +13,137 / -568，131 个文件变更）
+**总计**: 485 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37 见对应周目录（W37 当前个人增量 +18,733 / -741，191 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -36,11 +36,11 @@
 | 2026-08-17 ~ 2026-08-23 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-17_2026-08-23) · [Obsidian](2026-08-17_2026-08-23/README.md)) (W34 最终版) | 16 | 14/2/0 | +24,650/-1,725 | standalone conversation primitives/hardening、session archive race 与 persisted maintenance、AUQ HITL restore/hardening、per-session model restore、`serve --open-with-auth`、workspace live-state WebShell consumer/activity/title guard、ACP child heap measurement、duplicate provider tool-call guard |
 | 2026-08-24 ~ 2026-08-30 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-24_2026-08-30) · [Obsidian](2026-08-24_2026-08-30/README.md)) (W35 最终版) | 27 | 25/0/2 | +69,193/-5,307 | standalone core/REST/SDK/WebUI context 与 WebShell UI 实现、trusted-loopback authority、sessionless user-language sync、Channel 命名任务/输出归因、session 初始化/cleanup、provider runtime sync、hook/ACP process tree、Mem0、OTel context usage |
 | 2026-08-31 ~ 2026-09-06 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-31_2026-09-06) · [Obsidian](2026-08-31_2026-09-06/README.md)) (W36 最终版) | 20 | 16/1/3 | +42,533/-1,627 | provider/SDK 错误详情、Channel worktree isolation/reset、Mem0 分发、standalone/WebShell、turn navigation 协议与客户端方案收敛、relaxed ownership/writer fences、close probe 抑制 |
-| 2026-09-07 ~ 2026-09-13 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-07_2026-09-13) · [Obsidian](2026-09-07_2026-09-13/README.md)) (W37 周内累计) | 8 | 6/2/0 | +13,137/-568 | relaxed Conversations ownership runtime、WebShell 连续历史/compact turn rail、CI/housekeeping 稳定性、Mem0 Auto Recall/显式写入、Channel worktree 恢复/回收 |
+| 2026-09-07 ~ 2026-09-13 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-07_2026-09-13) · [Obsidian](2026-09-07_2026-09-13/README.md)) (W37 周内累计) | 14 | 12/2/0 | +18,733/-741 | relaxed Conversations ownership runtime、WebShell 连续历史/turn rail/轮询/浏览器通知、CI/housekeeping 稳定性、Mem0 Auto Recall/写入/删除、Channel worktree 恢复/回收 |
 
 ## 类型分布
 
-feat ×232, fix ×174, refactor ×16, other ×13, docs ×14, chore ×7, perf ×16, test ×6, merge ×1
+feat ×234, fix ×177, refactor ×16, other ×13, docs ×14, chore ×7, perf ×17, test ×6, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

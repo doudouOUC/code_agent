@@ -682,3 +682,10 @@ sequenceDiagram
 - 当前 open diff只有在 worktree reset route、ownership lock、bridge barrier/sever与 Core marker transfer完整安装时才广告 `session_worktree_reset_v1`；缺 tag的 Channel不得试探 route。
 - `POST /session/:id/worktree-reset`使用 marker-last ownership transfer并返回 replacement session ID、canonical worktree和 per-response `persisted-v1`。capability不是 ownership证明，SDK/Channel仍需验证 response和 registry owner。
 - 兼容错误为 bounded 409 taxonomy：unsupported、active和 invalid-state；corrupt/ambiguous状态fail closed并把具体原因留在 daemon log。PR仍为 open，route/tag不能视为 `main` 契约。
+
+### #11339 — `sessionLiveStatePollIntervalMs`（merged）
+
+- daemon在支持workspace session live-state时，可在capabilities顶层返回optional `sessionLiveStatePollIntervalMs`。这是consumer调度提示，不是新的feature tag；旧daemon省略字段时，WebShell必须使用5000ms兼容默认值。
+- `QWEN_SESSION_LIVE_STATE_POLL_INTERVAL_MS`只接受1000到2147483647范围内的十进制整数；缺失、零值、负数、小数、带单位、越界或其它非法输入全部回退5000ms。该值从daemon启动进程环境读取，不做per-workspace覆盖。
+- WebShell要独立验证字段并回退，不能把malformed capability传给timer。interval变化只影响下一轮调度，不得重置已提交live-state、并发第二个in-flight read或改变30秒错误backoff。
+- 该字段只调整已有live-state polling cadence，不表示SSE、batch read、自适应polling或完整catalog polling已落地；较大值会相应增加跨client状态变化的可见延迟。

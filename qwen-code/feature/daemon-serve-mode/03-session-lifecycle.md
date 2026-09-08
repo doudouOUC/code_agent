@@ -140,7 +140,7 @@ Mode B 把"会话"提升为 daemon 内的一等资源：早期一个 `qwen serve
 | [#11120](https://github.com/QwenLM/qwen-code/pull/11120) | merged | failed conditional-close probe backoff | 最终实现为 unanswered auto-close probe增加指数退避、JSON-RPC detail、无 promise轮询与 condemned/no-capability本地收敛；不修复 hold taxonomy根因 |
 | [#11207](https://github.com/QwenLM/qwen-code/pull/11207) | merged | relaxed Conversations runtime cutover | 首次发布前做 legacy-owner 兼容检查，不再长期持有新版 global owner；不同 daemon 可服务不同 session，同 session 仍由 mandatory lease 排他 |
 | [#11285](https://github.com/QwenLM/qwen-code/pull/11285) | merged | housekeeping bind-mount fail-fast | lock 目录改为单层 `0700` 创建，使 deleted bind mount 上的 `ENOENT` 快速失败并进入已有降级路径 |
-| [#11309](https://github.com/QwenLM/qwen-code/pull/11309) | open | owned worktree delete cleanup | 当前 diff 在删除前核验 sidecar、marker、containment 与 sharing，确认删除后仅回收 clean checkout；尚未进入 `main` |
+| [#11309](https://github.com/QwenLM/qwen-code/pull/11309) | merged | owned worktree delete cleanup | 最终在共享ownership lock下核验sidecar、marker、runtime归属、路径/slug、sharing与用户工作，确认删除后保守回收checkout且从不强删branch |
 
 ---
 
@@ -1008,13 +1008,14 @@ sequenceDiagram
 - 超过 256MiB cold restore 返回 request-scoped `413 transcript_too_large`，不 fallback 到旧 full loader；单条 replay record 过大可返回成功 runtime + bounded replay error。
 - #9055 还保留 compressed/legacy model history、record ancestry、interrupted turns、FileHistory、artifacts、Goals/checkpoint evidence、attribution、telemetry、usage、source metadata 和 background notification active-chain 语义，并在 replay 发布前检查 32 MiB/10,000 updates 上限。
 
-### #10643 / #11015 / #11309 — persisted worktree lifecycle、reset transfer与delete cleanup
+### #10643 / #11015 / #11308 / #11309 — persisted worktree lifecycle、route恢复、reset transfer与delete cleanup
 
 - #10643 最终为 named Channel task 创建 canonical Git worktree，将 exact session relocate 后要求 child 返回 cwd 精确一致。只有排他 0600 `.qwen-session` marker 与原子 sidecar 都已持久化，create response 才返回 `worktreeState:'persisted-v1'`。
 - restore 不走泛化 worktree context 回放；route 严格校验 64 KiB 有界 sidecar、workspace/repo root、realpath 在 `.qwen/worktrees` 下、regular single-link marker 与 exact storage session owner。restore AUQ prompt 按 client 暂存到 worktree 证明完成后才触发，dangling prompt terminal 也只在 admission 未接纳后 reconciliation；active session 有 cwd 时必须精确匹配，idle session relocate 后也必须再次匹配。
 - create/persistence/relocation 失败使用 orphan-guarded exact session delete；spawn 前失败可回收 checkout/branch，spawn 后只有 session definitively removed 才回收，generation 关闭、kill 拒绝或探测不确定时保留数据并 fail closed。restore mismatch 不 fallback shared workspace。
-- #10643 的 close保留 transcript/worktree，Part 4A仍拒绝 `/clear`/`/new`/`/reset`。#11015 当前 open diff新增同 checkout ownership transfer：在 worktree lock下创建/relocate replacement、写双向 supersession sidecar、marker CAS最后提交并 sever old session；marker驱动崩溃恢复，typed redirect让 Channel registry自愈。route/capability尚非 `main` 能力。
-- #11309 当前open diff补daemon session delete后的物理回收：在共享worktree lock下于删record前核验sidecar、marker、allowed-root containment与sharing，确认删除后仅移除clean checkout并非force删branch；歧义或dirty状态全部保留并记录原因。该cleanup尚未合入`main`，也不扫描历史泄漏worktree。
+- #10643 的 close保留 transcript/worktree，Part 4A仍拒绝 `/clear`/`/new`/`/reset`。#11015 当前 open diff新增同 checkout ownership transfer：在 worktree lock下创建/relocate replacement、写双向 supersession sidecar、marker CAS最后提交并 sever old session；marker驱动崩溃恢复，typed redirect让 Channel registry自愈。reset route/capability尚非 `main` 能力。
+- #11308已合入worktree route managed restore：route持久化isolation/workspace root，cold start以workspace root加载后复核`persisted-v1` attestation；superseded redirect立即改写route，失效load释放binding并回滚映射，旧route在后续managed activation补齐metadata。
+- #11309已合入daemon session delete后的物理回收：在共享worktree lock下于删record前核验sidecar、marker、runtime workspace、allowed-root/slug containment与sharing，确认删除且generation仍可写后仅移除没有用户工作的checkout并非force删branch；歧义、dirty或可能partial delete均保守记录。它不扫描历史泄漏worktree。
 
 ### #10706 — standalone provisional config lifecycle（merged）
 

@@ -465,6 +465,18 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 
 #11311 已合入。transcript adapter 对无专用 text/diff preview 的 generic MCP permission 读取 `rawInput/input/args`，pretty-print 完整 JSON 并转义控制字符，通过 `contentIsInput` 保证即使正文等于 title 也显示；`ToolApproval` 继续复用现有批准/拒绝和 double-submit guard。该改动同时服务独立 Mem0 writer 的显式内容审查，但不放宽 daemon permission policy。
 
+## 2026-09-08 follow-up：历史导航收口、live-state cadence 与浏览器通知
+
+#11322已合入`MessageList` locate-scroll timer生命周期修复。每个列表只保留一个150ms cooldown timer：新定位先取消旧timer，unmount也清理并置空；回调继续用generation guard释放scroll cooldown并安排timeline更新。定位滚动、flash高亮和virtualizer行为不变，修复的是组件卸载后继续请求RAF的竞态。
+
+#11323已合入`GlobalTurnNavigation`首帧请求优化。组件用session-scoped初始化状态，在layout phase把scroll/focus定位到最新turn后才扫描visible missing metadata；tail page已缓存时不再先请求ordinal 0，空session后count到达和session切换也执行相同tail初始化。missing tail、用户滚到顶部及Home/End/键盘动作仍按需调用`loadOrdinal`。
+
+#11339已合入live-state polling cadence协商。daemon capability可返回optional `sessionLiveStatePollIntervalMs`，App、SessionOverviewPanel和WebShellSidebar统一消费；省略或非法时回退5000ms。hook把interval timer与active polling state effect分离，配置变化不会丢已提交状态或并发重读，并保留visibility/local invalidation立即刷新、in-flight合并和30秒错误backoff。该改动没有引入SSE。
+
+#11398仍是open draft。当前diff只在顶层standalone WebShell的Settings→UI提供default-off、origin-local且跨tab同步的browser notification偏好；用户显式开启才请求权限。Provider在transcript projection后发布已观察terminal，same-session recovery保留admitted prompt；后台仍挂载chat的完成/失败发通用文本，cancelled、initial history、前台已消费terminal静默。
+
+同page pane先内存去重，Web Locks与localStorage可用时再以SHA-256 turn identity和最多1024条claim跨tab协调；能力不足退化为page-local dedupe与notification tag replacement。页面/chat必须保持运行，closed-page push、未挂载chat、Channel、embedded host、daemon settings与public SDK callback均不在当前diff；不能把它写成`main`能力。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -512,4 +524,4 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-08_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-09_
