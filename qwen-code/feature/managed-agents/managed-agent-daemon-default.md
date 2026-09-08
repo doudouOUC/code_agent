@@ -2,7 +2,7 @@
 
 ## 状态与目标
 
-2026-09-09，已完成完整 Agent host 复用入口、环境快照和 Bridge 通道生命周期适配；独立验证已覆盖真实历史回放资源的异步清理，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
+2026-09-09，已完成完整 Agent host 复用入口、环境快照和 Bridge 通道生命周期适配；独立验证已覆盖真实历史回放资源的异步清理；v2 独立 worker 调用链已通过 macOS 真实读写/Edit/前台 Shell、取消、执行中释放和 v1 回归，完整 build/bundle/typecheck 与 2850 项定向测试通过。下一步是完整 Agent 注册表及两处调度器接线，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
 
 本文记录当前差异和建议迁移顺序；没有将 Managed 设为默认，也不声明能力已对齐。已有 P0～P8、P9a 和展示测试继续复用。P9b 外部资源分配不作为本地默认替换的先决条件。
 

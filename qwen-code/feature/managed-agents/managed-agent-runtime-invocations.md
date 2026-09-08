@@ -1,6 +1,6 @@
 # Managed Agent：Runtime invocation v2
 
-状态：方案待实现。2026-09-09 按当前源码核对；本文不代表默认 daemon 替换已完成。
+状态：阶段 1 的本地 macOS 验收通过。2026-09-09 已接入独立 worker 私有 v2 调用链，并验证真实读写/Edit/前台 Shell、取消、执行中释放及 v1 回归。下一步是阶段 2 的完整 Agent 注册表和两处调度器接线；普通 daemon 默认实现尚未替换。
 
 目标是让普通 daemon 的完整 Agent 留在常驻 Gateway，并把工作区工具真实执行交给独立 Tool-only Runtime worker。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
 
@@ -15,6 +15,8 @@
 Skill 由 Runtime 读取文件/运行脚本，Gateway 负责模型展开和模型覆盖；TaskStop 分别取消 Gateway 的 Agent 与 Runtime 的后台 Shell。不能仅按工具 `Kind` 决定归属。Session/Prompt Hook 的工作区脚本也需要远端执行，模型参与的决策仍在 Gateway；只迁移 Pre/PostToolUse 不构成完整 Hook 兼容。
 
 ## 已验证的实际入口
+
+下表行号来自阶段 1 开始时的代码基线 `824e92d84f41fc9ab19d1130385b491a8f37c466`，后续实现会移动行号；审查当前实现应按符号定位。
 
 | 源码锚点                                                                                                                                       | 当前约束与改动位置                                                                                                            |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -93,3 +95,31 @@ Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipF
 实现前需按现有确认/显示 union 列全序列化字段，并核对全部 MCP 类型判定消费者；这些是协议实现清单，不增加产品配置。具体路由命名及内部授权接口随最小接线确定，以上身份、参数摘要、单次执行和结果语义不可省略。
 
 2026-09-09 阶段 1 基线已使用隔离的真实 worker/ACP 进程验证：当前只声明 v1，已有 v1 路径拒绝 protocolVersion 2 及额外 invocation 字段，真实 read 成功，manifest 不包含 write/Shell，错误 lease/epoch/tenant 被拒绝。重复 release 曾返回 500，另一轮返回 released:true；不据此声明响应幂等或资源清理语义已达到 v2 要求。v2 准备、确认、执行及结果查询尚未实现，此基线不是阶段 1 验收通过。
+
+## 阶段 1 实现与本地验收（2026-09-09）
+
+已新增 Runtime 持有的真实 invocation、严格 JSON/确认 DTO 和参数摘要。每个调用保存一次 build 的结果、真实确认回调、稳定 toolUseId、preflight 结果和执行 Promise；相同调用重试返回原引用/结果，冲突参数不能覆盖记录。权限确认与 PreToolUse ask 后的确认分开记录；修改参数取消旧引用，再以新参数 prepare。取消 ACK 与实际 settled 分开，关闭等待准备、确认、Hook 和实际执行结束。
+
+实际链路为 owned worker 私有 HTTP → Local provider 保存的 Runtime client → 所属 Bridge → 可信父进程握手的 ACP Tool-only Session → 当前 Config 实例持有的 Runtime。ACP 所有权以 Config 实例保存，不能同名 Session 换实例后沿用。普通 daemon/fixed URL v1 listener 不开放 v2；v2 不接受模型传入的 approved/authorized 字段，也不降级调用 v1 execute。完整 Gateway 调度器的权限和最终 guard 尚未接入，当前真实进程脚本仅模拟有权限的私有 Gateway 调用者。
+
+私有 HTTP 路径为 `/internal/managed-runtime/v2/{manifest,begin-turn,prepare,confirmation,confirm,preflight,execute,status,cancel}`，每个请求严格携带 version 2 及原有 tenant/workspace/cwd/session/turnKind；沿用 owned lease ID/epoch 校验。begin-turn/prepare 另带 identity，之后操作带 reference；reference 必须匹配外层 Session、prompt/call、capability/policy/args 摘要和随机 invocationId。响应为 `{protocolVersion:2,result}`，begin-turn/confirm 的 result 为 null。底层沿用既有 Session warmup 身份表示不等于 v1 工具降级。
+
+owned 标记在 CLI 启动加载工作区配置之前捕获并删除，重启时仅转发捕获值，再通过显式 host options 传入。工作区 .env 不能把普通 ACP 子进程改成 owned Runtime。活动占用新增真实 tool 类别；准备/确认/执行中阻止空闲关闭，显式关闭先 seal，等待所有 Runtime 排空，再关闭 writer/Config；一项失败不能让另一项未结束的执行提前失去 Config。最终 ACP/helper/CLI 入口、活动占用和 provider 五个文件共 726 项定向测试通过。
+
+Local provider 每次 v2 调用重新核对绑定、workspace 实例和生命周期。release 合并同会话的并发请求，并等待真实 close；失败保留 retiring，禁止 prepare/执行，只允许仍归属原绑定的 status/cancel。warmup 或恢复失败后的清理保存原 client，重试不再 attach。已知绑定关闭失败后的 session_not_found 不是排空证据，仍需 generation 回收；provider.dispose 仅使能力引用失效，不能替代 worker 资源清理。provider 20 项定向测试通过。
+
+当前内核要求显式 begin-turn 完成一次文件快照后才 prepare；真实 Edit/Write/Shell 的 execute 自己执行 trackEdit，内核不重复备份。内核保留完整工具结果与独立物理 executionStatus，省略工作区工具的模型控制字段；进度环有单调 seq、firstAvailableSeq 和缺口标记。记录目前保存在会话进程内，最多 1024 个 invocation、每次调用保留最多 1 MiB 进度；这是阶段 1 的边界，不能作为普通 daemon 长会话最终兼容承诺。持久化重放、资源搬运、MCP/Skill/图片、后台 Shell 及两处调度器的完整元数据仍属后续阶段。
+
+ReadFile 内部的 PDF 视觉转换也属于模型调用。Tool-only Session 的 Config 不再选择视觉模型，即使工作区显式设置了 visionModel；普通 Agent 的选择行为保留。对应红测先复现了 Runtime 仍能选到模型，修复后 core 五个定向文件共 1137 项通过。图片/PDF 的完整模型转换由阶段 3 接回 Gateway，当前不以停止 Runtime 推理替代最终媒体兼容。
+
+诊断已观察到真实 read/write/Edit，以及前台 Shell 同一 invocation 并发/完成后重试只追加一次；丢失已完成 HTTP 响应后查询/重试没有重复写入。prepare、confirm、preflight 都没有目标写入；逐项改动 lease/身份/摘要被拒绝。此前诊断暴露的缺口已修复，最终验证结果如下：
+
+- Shell 的实际取消结果可能不带 error，新内核曾误报 success。已在源码为 ToolResult 增加显式物理结果、由 Shell 生产并由 Runtime 消费，保留取消后 Write 实际完成仍为 success；单测及新构建的真实 worker 均验证为 cancelled；取消后已完成的实际写入仍保持 success。
+- 前台 Shell 包装器先退出后，忽略 TERM/HUP 的同组子进程仍然存活。实测 status 已 settled，取消约 4 秒后子进程仍写出文件；单纯 await invocation.execute 不构成进程树排空证明。已补充 POSIX 所属进程组的结束等待，取消在 leader 退出后继续升级到 SIGKILL，并等待实际组退出。相同复现的新构建验收中，首个 settled 样本约在取消后 536 ms，父子进程均已不存在，5.2 秒内没有迟到写入；不能用取消 ACK 或固定延时视为结束。其证据范围是已观测组成员，未观测的 detached/setsid 逃逸和 Windows 等效所有权仍未完成，不能将此局部修复声明为所有平台的完整进程树保证。
+- sed 的备份操作曾被 AbortSignal 的 Promise race 提前抛开。红测确认备份未结束时 Shell 已返回；源码改为等待不可取消的读取/备份后再处理取消，目标文件写入原有等待语义保留。定向 Shell 与内核测试、最终构建及独立审查已通过。
+
+最终 `npm run build`、`npm run bundle` 和完整 `npm run typecheck`（含 integration）通过；core 1137、ACP Bridge 987、CLI 726，共 2850 项定向测试通过，变更文件 lint/格式与独立审查通过。此前四项 integration 类型错误通过 IPC 回调类型注解和 ProcessRegistry 的源码路径映射修复。
+
+真实验收包含独立取消子进程用例和完整九组调用链。完整用例的 v1 回归使用未读文件验证原生成功结果；首轮同文件命中 Read 缓存导致的测试断言失败已保留并更正。执行中 release 的用例中，子进程已收到 TERM 但仍存活时 release 保持 pending；约 313 ms 时进程已退出，约 380 ms 才收到 released:true，execute 返回 cancelled，4.2 秒内无迟到写入。两轮共 14 个构建文件 hash 相同且前后未变。
+
+证据目录为 `.qwen/e2e-tests/managed-runtime-invocations-evidence/v2-descendant-1788888641067/` 和 `v2-1788888737422/`，详细报告见 `.qwen/e2e-tests/managed-runtime-invocations.md`。全部测试使用隔离 HOME/工作区/端口，检查确认自有 worker、ACP、Shell、端口和临时目录已清理，没有依赖兜底强杀通过验收。当前用户 4170 预览未重启、未发送请求。此结果证明阶段 1 的 macOS 本地链路，不覆盖生产 Gateway 权限/guard 接线、完整工具与客户端兼容、Windows/Linux 实测或默认 daemon 切换；阶段 2–4 继续实施。
