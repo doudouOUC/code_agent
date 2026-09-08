@@ -2,7 +2,7 @@
 
 ## 状态与目标
 
-2026-09-08 设计草案，依据代码 `7f498eed1b`。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
+2026-09-08，已完成完整 Agent host 复用入口，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
 
 本文记录当前差异和建议迁移顺序；没有将 Managed 设为默认，也不声明能力已对齐。已有 P0～P8、P9a 和展示测试继续复用。P9b 外部资源分配不作为本地默认替换的先决条件。
 
@@ -118,6 +118,24 @@ flowchart LR
 
 D1 的开发启用方式沿用实验配置入口，不先对普通用户增加新的引擎选择 UI。只有 D2～D4 的兼容门槛满足，D5 才改变默认。
 
+### 首个实现切片：可托管的完整 Agent
+
+代码调查确认 ACP Bridge 已有 `ChannelFactory` 和内存 ACP 通道。已从 `runAcpAgent` 提取使用注入 Stream 的 `createAcpAgentHost`，stdio 入口复用这个 host；这样后续 Gateway 可以使用同一个 Qwen Agent 和普通 ACP 契约，无需复制 Prompt、队列或定时任务协议。host 负责 bootstrap Config、反向 MCP 通道绑定、私有父进程握手与幂等的资源清理；环境变量消费、console 重定向、stdio、信号、进程退出和全局退出清理仍属于进程入口。调用者拥有 transport，关闭连接后须等待 host 的 `dispose`，不能将 transport 关闭视为资源清理完成。
+
+真实 ACP 验证还发现两项生命周期问题：内存通道在 NDJSON 写入持锁时调用 writable abort 会漏关一端；ACP SDK 0.14.1 在连接关闭后会保留尚未响应的 RPC。前者改为对双向 TransformStream controller 置错，后者由 host 对 Qwen 使用的客户端请求（权限、反向扩展调用、文件读写）绑定关闭信号。该保护不代表原始 SDK 任意调用自动获得取消语义；后续 Bridge 接入仍须保留其请求退出保护。
+
+此切片用真实内存 ACP 连接验证初始化、会话调用、错误 capability 和断开清理，并回归原 stdio 生命周期。workspace MCP discovery 的独立 Config 和在途队列也归 host 清理；加载、初始化或 discovery 期间关闭时，不得随后启动或发布新资源。重载队列以及直接 restart、manage、runtime-add/remove 等 MCP 控制请求统一等待结束，再清理 bootstrap/session Config 和 pool；discovery Config 在有在途操作时执行最终清理，防止晚建立的连接泄漏。它仅建立复用入口，尚不启用 Gateway 托管或改变默认：会话配置加载仍会调用修改 `process.env` 的 `reloadEnvironment`，工具构造和审批准备也会读取工作区。后续必须解决这些环境及本地操作边界，再接入 Managed Runtime；不能把完整 Session 直接嵌入 daemon 当作最终的模型/工具分离。
+
+当前已通过 ACP Agent/host、worktree 恢复与 RPC 生命周期单测 593 项、内存通道单测 12 项，以及 70 次独立关闭竞态探针。普通 daemon 的工具调用后正式最终回复、关闭并恢复同一会话两项隔离 E2E 已通过；Managed 默认路径尚未接入，不能据此声明其行为已验收。全仓 build/bundle 和 workspace 包 typecheck 通过；根 typecheck 的 integration 阶段仍有此前相同的四个错误（`daemon-worker.ts:913` 隐式 any，`run-qwen-serve.ts:5228/6120/7089` 的 ProcessRegistry src/dist 类型身份冲突）。这些结果只证明本切片；D1～D5 的默认替换验收尚未完成。
+
+### 下一切片：显式工作区环境快照
+
+优先复用 `environment.ts` 已有的纯函数 `buildRuntimeEnvironment(settings,cwd,baseEnv,workspaceTrusted)`，使用 daemon 启动时保存的基础环境，为每个工作区构建冻结快照。通过 `loadCliConfig` 的 host-only options 传给 Config，再接入模型解析、`ModelsConfig` 切模型/刷新鉴权和跨 provider 子 Agent。Config 现有的 `environment?: string[]` 是提示词上下文，不应挪作环境字典。
+
+显式快照缺键时必须保持缺失，不能回退读取 `process.env`。这同样适用于 settings `${VAR}` 插值及其 reload；只设置 `skipLoadEnvironment` 或只传初始模型 API key 不构成隔离。热重载从基础环境重建快照，不能把上一份有效快照当基础，否则删除的键会残留。未启用托管环境的 stdio 入口保留现有环境解析行为。
+
+先验收两个工作区同名 envKey 的并发创建、交错 refreshAuth/切模型、缺键拒绝回退和删除键重载，再接 MCP、普通 Shell、PTY、命令 Hook 的 Runtime 环境消费者。工作区文件读取与进程执行仍归 Tool-only Runtime；完成模型快照这一步不表示本地执行已经隔离。
+
 ## 验收矩阵
 
 以下为待实现后的验收计划，不是已通过结果。
@@ -131,10 +149,10 @@ D1 的开发启用方式沿用实验配置入口，不先对普通用户增加�
 - primary/secondary/dynamic workspace 的 reload、撤信任、移除；共享 Runtime 中取消一个 Session 不影响另一个，配置和凭据不跨工作区。
 - 默认开启/关闭与版本回退：已有会话所有者不变，未知所有者失败明确，绝不隐式执行另一套 Agent。
 
-测试使用隔离端口、目录和可控模型服务；当前 4170 预览不作为迁移试验对象。本次仅做代码调查和文档设计，没有运行替换后的行为测试。
+测试使用隔离端口、目录和可控模型服务；当前 4170 预览不作为迁移试验对象。已运行上述 host 和普通 daemon 回归；默认替换后的行为矩阵仍待实现和验收。
 
 ## 本轮结论与待细化项
 
-优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。下一项可实施工作是 D1 的调用者/路由清单与最小接缝，并用 D2 的一个真实上下文/工具轮次验证复用方向。
+优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。完整 Agent host 接缝已经落地；下一项是工作区环境快照及本地操作边界，再接入普通会话，使用 D2 的真实上下文/工具轮次验证复用行为。
 
 具体可提取的 Agent driver 边界、普通历史转换格式和全部内部调用者迁移顺序，需要在对应切片中完成精确接口设计；本文不提前承诺实现工期，也不把这些项目列为已完成。独立本地 CLI/TUI 的执行默认不在此次 daemon 替换范围内。

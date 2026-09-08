@@ -1,9 +1,9 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [7f498eed1b](https://github.com/doudouOUC/qwen-code/commit/7f498eed1b4f947601ec0273fd2cd5c5b0056e26)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [bf06117511](https://github.com/doudouOUC/qwen-code/commit/bf061175115d887ba6ce6654f1b70a785aa7a550)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-08。
 
-> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。现有实现仍为只读实验路径；完整能力与普通协议尚未对齐。[默认替换设计与差异清单](managed-agent-daemon-default.md)为下一阶段工作，不表示已经切换默认。
+> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。现有实现仍为只读实验路径；完整能力与普通协议尚未对齐。[默认替换设计与差异清单](managed-agent-daemon-default.md)已记录首个实现切片：完整 Qwen Agent 的可托管 host、内存 ACP 关闭保护与 MCP 生命周期清理。593 项相关单测、12 项通道单测、70 次关闭探针及两项普通 daemon E2E 已通过；根 typecheck 仍有四个既存 integration 类型错误。尚未切换默认，下一步是工作区环境快照及工具边界。
 
 ## 分阶段设计文档
 
@@ -20,7 +20,7 @@
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
 | P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
 | P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
-| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 设计草案：普通会话兼容、现有 Agent 能力复用、编码/审批、恢复与默认切换 |
+| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 Agent host 已落地；普通会话接入、环境/工具边界、恢复与默认切换待完成 |
 
 ## 1. 结论
 
