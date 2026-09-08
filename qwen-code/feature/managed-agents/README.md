@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [b14ca3c683](https://github.com/doudouOUC/qwen-code/commit/b14ca3c68393364b1c4d6c065351c3ea10659a29)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [7f498eed1b](https://github.com/doudouOUC/qwen-code/commit/7f498eed1b4f947601ec0273fd2cd5c5b0056e26)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-08。
 
 ## 分阶段设计文档
@@ -287,6 +287,8 @@ Web Shell 根据 `managed_sessions` capability 显示独立 Managed Agents 入�
 升级前的 P8 数据可从 inbox 恢复用户准入和结果，但不会从单独的模型 conversation store 补造旧助手/工具展示历史。新增日志支持重启恢复；状态目录按监听地址和端口区分，重启需保持相同配置。响应页和实时缓存有界，磁盘日志的保留期限、压缩和索引仍待实现。
 
 2026-09-08 展示修复：Managed 消息列表的父容器补齐 flex 高度约束，避免长对话的思考、工具进度和回答被裁切；输入框上方新增固定位置的提交/加载/运行状态和耗时，执行结束后自动移除。已用真实浏览器验证列表滚动与回答末尾可见，26 项定向测试及 build/bundle 通过。详情见 [会话展示方案](managed-agent-session-surfaces.md#live-progress-visibility)。
+
+已将进度展示回归固化为两条 `@smoke` 浏览器用例，覆盖长列表滚动跟尾、思考/工具/回答进入视口，以及已有成功轮次的会话取消结算后继续发送。使用真实 Web Shell 与 SDK SSE 解析、本地 HTTP/事件夹具；两条 Managed 用例加两条普通会话用例各连续运行三次，共 12 项通过。恢复旧布局的反向验证准确失败，确认测试能捕获裁切问题；现有 CI 会自动纳入 smoke 用例。此次未扩展 P9b，也不将 mock 浏览器测试计作真实 Gateway/Runtime 验收。
 
 ## 6. Runtime Activator：不绑定 Kubernetes
 

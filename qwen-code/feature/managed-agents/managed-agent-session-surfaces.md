@@ -195,3 +195,37 @@ the list scrolled its 1,631px content to the bottom while the parent stayed
 unscrolled. The existing session and Runtime were preserved. Build, bundle,
 workspace package typechecks, and 26 focused Managed tests passed; root
 integration typechecking still reports the four known baseline errors above.
+
+The committed Playwright suite
+`packages/web-shell/client/e2e/web-shell.managed-progress.spec.ts` exercises the
+full Web Shell and SDK SSE parser against deterministic HTTP/event fixtures.
+Its two `@smoke` cases are included by the existing Web Shell smoke CI job:
+
+- A long successful transcript remains bounded and scrolls to the latest
+  thought, tool, and answer. Phase and elapsed time remain visible before
+  content arrives, and completion restores the composer.
+- After a successful first turn, cancelling the next turn sends its exact
+  prompt ID. The cancellation acknowledgement keeps sending disabled until
+  terminal settlement; a subsequent prompt continues the same session.
+
+Run from `packages/web-shell` with an isolated Vite port and an unreachable
+fallback daemon, keeping the user's preview and real model out of the test:
+
+```sh
+QWEN_DAEMON_URL=http://127.0.0.1:1 PLAYWRIGHT_PORT=5197 \
+  npx playwright test client/e2e/web-shell.managed-progress.spec.ts \
+  --project=chromium --workers=1
+```
+
+These browser tests verify rendering, scrolling, request routing, and event
+consumption. Gateway execution and Runtime lifecycle remain covered separately;
+the cancellation fixture assumes an earlier committed turn, not a cancelled
+bootstrap turn. Loading, session-switch races, and other terminal states retain
+their focused component coverage.
+
+On macOS Chromium, both Managed cases and the two existing ordinary compact
+thinking cases passed three consecutive runs (12 checks). Restoring the old
+transcript wrapper made the long-transcript case fail its height, clipping,
+overflow, and scroll-position assertions; the original source was then restored.
+Build, package typechecks, ESLint, and formatting passed. Root integration
+typechecking retained the same four baseline errors noted above.
