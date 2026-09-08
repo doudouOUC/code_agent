@@ -1,6 +1,6 @@
 # Managed Agent：Runtime invocation v2
 
-状态：阶段 1 的本地 macOS 验收通过；阶段 2 已接入 Core/ACP Session 的代理生命周期，生产注册表接入仍在实施。独立 worker 私有 v2 链路已验证真实读写/Edit/前台 Shell、取消、执行中释放及 v1 回归。普通 daemon 默认实现尚未替换。
+状态：阶段 1 的本地 macOS 验收通过；阶段 2 已接通 Core/ACP Session 调度、四类工具的生产注册与远端绑定，以及独立子作用域和持久父文件历史。子读写、读取隔离、后台跨父轮次、默认记忆实际写入和 cold load 五组真实验收通过，详见 [子任务与文件历史](managed-agent-child-scopes.md)。其余工具、初始化、物理历史操作和客户端兼容仍在实施，普通 daemon 默认实现尚未替换。
 
 目标是让普通 daemon 的完整 Agent 留在常驻 Gateway，并把工作区工具真实执行交给独立 Tool-only Runtime worker。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
 
@@ -20,16 +20,16 @@ Skill 由 Runtime 读取文件/运行脚本，Gateway 负责模型展开和模�
 
 | 源码锚点                                                                                                                                       | 当前约束与改动位置                                                                                                            |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [Config.createToolRegistry](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/config/config.ts#L9078)                                                                    | 两处执行器共用 DeclarativeTool 注册表；在此替换工作区工具工厂，不能先本地 build 再替换 execute。                              |
-| [ToolInvocation](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/tools.ts#L20)                                                                                   | DeclarativeTool.build 产生 invocation，再调用 getDefaultPermission、getConfirmationDetails、execute；确认回调不能直接序列化。 |
-| [CoreToolScheduler](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/core/coreToolScheduler.ts#L2078)                                                                   | build 后进入权限/确认；setArgsInternal（1749）会重建 invocation，执行前 guard 在 4648，execute 在 4853。                      |
-| [Session.runTool](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/cli/src/acp-integration/session/Session.ts#L10989)                                                            | 独立的完整执行路径：build（11380）、权限（11439）、确认（12158）、guard（12344）、execute（12505），必须同时接线。            |
-| [现有 Runtime 执行](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/cli/src/acp-integration/acpAgent.ts#L11698)                                                                 | 当前 manifest（845）限制只读，execute（11791）复用完整非交互调度器；不能直接作为 v2 的执行内核。                              |
-| [非交互执行器](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/core/nonInteractiveToolExecutor.ts#L30)                                                                 | 会再次运行 CoreToolScheduler；非交互 ask 被拒绝，且其结果处理可能调用图片模型。                                               |
-| [ToolResult](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/tools.ts#L486) / [v1 返回值](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/acp-bridge/src/bridgeTypes.ts#L127)                     | v1 responseParts/status/error 不能完整表达原始 ToolResult、产物和输出文件。                                                   |
-| [Config 初始化](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/config/config.ts#L3038) / [子 Agent 配置](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/subagents/subagent-manager.ts#L1024) | 初始化及派生 Config 会建立本地服务/重建注册表；远端工具边界必须由真实 host producer 传入并继承。                              |
+| [Config.createToolRegistry](../../packages/core/src/config/config.ts#L9078)                                                                    | 两处执行器共用 DeclarativeTool 注册表；在此替换工作区工具工厂，不能先本地 build 再替换 execute。                              |
+| [ToolInvocation](../../packages/core/src/tools/tools.ts#L20)                                                                                   | DeclarativeTool.build 产生 invocation，再调用 getDefaultPermission、getConfirmationDetails、execute；确认回调不能直接序列化。 |
+| [CoreToolScheduler](../../packages/core/src/core/coreToolScheduler.ts#L2078)                                                                   | build 后进入权限/确认；setArgsInternal（1749）会重建 invocation，执行前 guard 在 4648，execute 在 4853。                      |
+| [Session.runTool](../../packages/cli/src/acp-integration/session/Session.ts#L10989)                                                            | 独立的完整执行路径：build（11380）、权限（11439）、确认（12158）、guard（12344）、execute（12505），必须同时接线。            |
+| [现有 Runtime 执行](../../packages/cli/src/acp-integration/acpAgent.ts#L11698)                                                                 | 当前 manifest（845）限制只读，execute（11791）复用完整非交互调度器；不能直接作为 v2 的执行内核。                              |
+| [非交互执行器](../../packages/core/src/core/nonInteractiveToolExecutor.ts#L30)                                                                 | 会再次运行 CoreToolScheduler；非交互 ask 被拒绝，且其结果处理可能调用图片模型。                                               |
+| [ToolResult](../../packages/core/src/tools/tools.ts#L486) / [v1 返回值](../../packages/acp-bridge/src/bridgeTypes.ts#L127)                     | v1 responseParts/status/error 不能完整表达原始 ToolResult、产物和输出文件。                                                   |
+| [Config 初始化](../../packages/core/src/config/config.ts#L3038) / [子 Agent 配置](../../packages/core/src/subagents/subagent-manager.ts#L1024) | 初始化及派生 Config 会建立本地服务/重建注册表；远端工具边界必须由真实 host producer 传入并继承。                              |
 
-文件校验和确认本身已有工作区访问，例如 [ReadFile 参数校验](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/read-file.ts#L573) 和 [Edit 确认/diff](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/edit.ts#L408)。因此远端边界从真实 build 开始。
+文件校验和确认本身已有工作区访问，例如 [ReadFile 参数校验](../../packages/core/src/tools/read-file.ts#L573) 和 [Edit 确认/diff](../../packages/core/src/tools/edit.ts#L408)。因此远端边界从真实 build 开始。
 
 ## v2 最小协议
 
@@ -94,7 +94,7 @@ Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipF
 
 实现前需按现有确认/显示 union 列全序列化字段，并核对全部 MCP 类型判定消费者；这些是协议实现清单，不增加产品配置。具体路由命名及内部授权接口随最小接线确定，以上身份、参数摘要、单次执行和结果语义不可省略。
 
-2026-09-09 阶段 1 基线已使用隔离的真实 worker/ACP 进程验证：当前只声明 v1，已有 v1 路径拒绝 protocolVersion 2 及额外 invocation 字段，真实 read 成功，manifest 不包含 write/Shell，错误 lease/epoch/tenant 被拒绝。重复 release 曾返回 500，另一轮返回 released:true；不据此声明响应幂等或资源清理语义已达到 v2 要求。v2 准备、确认、执行及结果查询尚未实现，此基线不是阶段 1 验收通过。
+2026-09-09 阶段 1 实现前的基线使用隔离的真实 worker/ACP 进程验证：当时只声明 v1，已有 v1 路径拒绝 protocolVersion 2 及额外 invocation 字段，真实 read 成功，manifest 不包含 write/Shell，错误 lease/epoch/tenant 被拒绝。重复 release 曾返回 500，另一轮返回 released:true；不据此声明响应幂等或资源清理语义已达到 v2 要求。当时 v2 准备、确认、执行及结果查询尚未实现，此基线不是阶段 1 验收通过。
 
 ## 阶段 2 调度接线细化（实施中）
 
@@ -104,7 +104,7 @@ Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipF
 
 完整生产接入仍有明确前置条件：注册表声明必须在不等待 Runtime 启动的情况下可用；不能为拿 schema 构造本地工作区工具。历史 AUTO 分类投影需要复用原工具的纯函数。父子 Agent 的执行作用域必须由真实 Config producer 分配；当前 FileHistoryService.trackEdit 写入最近快照，直接放开多个 prompt 并发会把编辑归错轮次，因此不能仅删除 Runtime 单轮限制。不同工作目录必须绑定对应 Runtime。以上生产边界、Session/子 Agent 验收及普通入口切换完成前，不宣称阶段 2 或默认替换通过。
 
-当前实施已新增纯 `RuntimeBackedTool`，注册时接收可信声明和分类器纯投影，第一次工具准备才取 Runtime client。代理不调用本地工作区工具的 build/execute。manifest 的输出预算、defer/search 元数据纳入摘要，Infinity 使用可序列化的 unlimited 表示；prepare 返回稳定 toolUseId。Core 与 Session 在原权限和最终 guard 流程中实际读取 managed 生命周期，Session 的工具展示直接接收已准备描述/位置，不再另行 build。Edit/Write 的用户编辑参数转换复用同一纯函数，编辑器只操作确认 DTO 中的内容缓冲。
+当前实施已新增纯 `RuntimeBackedTool`，注册时接收可信声明和分类器纯投影。代理自身在第一次工具准备时取得 Runtime client；已有文件历史的父 checkpoint 可以先行获取 client。代理不调用本地工作区工具的 build/execute。manifest 的输出预算、defer/search 元数据纳入摘要，Infinity 使用可序列化的 unlimited 表示；prepare 返回稳定 toolUseId。Core 与 Session 在原权限和最终 guard 流程中实际读取 managed 生命周期，Session 的工具展示直接接收已准备描述/位置，不再另行 build。Edit/Write 的用户编辑参数转换复用同一纯函数，编辑器只操作确认 DTO 中的内容缓冲。
 
 断线处理包含两种尚未得到引用的情况：beginTurn 响应丢失时，清理幂等等待同轮快照结束；prepare 响应丢失时，重取同一调用仅用于取消。execute 不重复发送，进度和终态通过原引用查询；不能证明排空时拒绝清理，不能把不确定结果写成 not_started。测试探针显式组装双 Config、真实工具和代理；这种组装不能替代生产 Config/factory 的注册，也不能证明旧会话、Channels/SDK、定时任务或子 Agent 已经迁移。
 
@@ -122,7 +122,7 @@ Core 与 ACP Session 各 11 组真实工具探针通过，覆盖 Read/Write/Edit
 
 已新增 Runtime 持有的真实 invocation、严格 JSON/确认 DTO 和参数摘要。每个调用保存一次 build 的结果、真实确认回调、稳定 toolUseId、preflight 结果和执行 Promise；相同调用重试返回原引用/结果，冲突参数不能覆盖记录。权限确认与 PreToolUse ask 后的确认分开记录；修改参数取消旧引用，再以新参数 prepare。取消 ACK 与实际 settled 分开，关闭等待准备、确认、Hook 和实际执行结束。
 
-实际链路为 owned worker 私有 HTTP → Local provider 保存的 Runtime client → 所属 Bridge → 可信父进程握手的 ACP Tool-only Session → 当前 Config 实例持有的 Runtime。ACP 所有权以 Config 实例保存，不能同名 Session 换实例后沿用。普通 daemon/fixed URL v1 listener 不开放 v2；v2 不接受模型传入的 approved/authorized 字段，也不降级调用 v1 execute。完整 Gateway 调度器的权限和最终 guard 尚未接入，当前真实进程脚本仅模拟有权限的私有 Gateway 调用者。
+实际链路为 owned worker 私有 HTTP → Local provider 保存的 Runtime client → 所属 Bridge → 可信父进程握手的 ACP Tool-only Session → 当前 Config 实例持有的 Runtime。ACP 所有权以 Config 实例保存，不能同名 Session 换实例后沿用。普通 daemon/fixed URL v1 listener 不开放 v2；v2 不接受模型传入的 approved/authorized 字段，也不降级调用 v1 execute。该阶段验收当时，完整 Gateway 调度器的权限和最终 guard 尚未接入，真实进程脚本仅模拟有权限的私有 Gateway 调用者；后续调度接线验收见上文。
 
 私有 HTTP 路径为 `/internal/managed-runtime/v2/{manifest,begin-turn,prepare,confirmation,confirm,preflight,execute,status,cancel}`，每个请求严格携带 version 2 及原有 tenant/workspace/cwd/session/turnKind；沿用 owned lease ID/epoch 校验。begin-turn/prepare 另带 identity，之后操作带 reference；reference 必须匹配外层 Session、prompt/call、capability/policy/args 摘要和随机 invocationId。响应为 `{protocolVersion:2,result}`，begin-turn/confirm 的 result 为 null。底层沿用既有 Session warmup 身份表示不等于 v1 工具降级。
 
@@ -150,11 +150,11 @@ ReadFile 内部的 PDF 视觉转换也属于模型调用。Tool-only Session 的
 
 离线声明从 Read/Write/Edit/Shell 的真实定义提取，普通工具和代理共享 schema、描述、输出预算及 AUTO 纯投影。声明构造不能加载真实工具或获取 Runtime client；Shell 的平台与配置由可信 host 明确提供。注册仍经过原 PermissionManager 的 disabled/deferred/eager 判定。不能把仅共享 schema 的近似声明送入严格 manifest 摘要校验。
 
-完整 ACP channel 持有由已解析 workspace generation 创建的 Runtime provider。每个实际 Session Config 在初始化前取得独立的惰性 binding：Runtime Session 使用与 Gateway Session 不同的独立 UUID，并绑定 Config 的实际 cwd 与 host 的 workspace/generation；第一次 prepare 才启动独立 owned worker 并取得 v2 client；bootstrap 与只读 replay 不取得执行 client。绑定关闭进入 Config 的严格异步资源清理，不能依赖 ToolRegistry.stop 不等待的工具 dispose。初始化失败、关闭及 generation 退出共用该清理路径，不能把 HTTP 失败、AbortSignal 或删除 map 项当作排空。
+完整 ACP channel 持有由已解析 workspace generation 创建的 Runtime provider。每个实际 Session Config 在初始化前取得独立的惰性 binding：Runtime Session 使用与 Gateway Session 不同的独立 UUID，并绑定 Config 的实际 cwd 与 host 的 workspace/generation；新建且无已跟踪文件历史的会话在第一次 prepare 时启动独立 owned worker 并取得 v2 client；已有文件历史的父 checkpoint 可以提前启动 worker，模型仍可并行开始。bootstrap 与只读 replay 不取得执行 client。绑定关闭进入 Config 的严格异步资源清理，不能依赖 ToolRegistry.stop 不等待的工具 dispose。初始化失败、关闭及 generation 退出共用该清理路径，不能把 HTTP 失败、AbortSignal 或删除 map 项当作排空。
 
-Remote provider 复用已认证 endpoint/lease，在 owned worker 九个 v2 路由上保持同一 Session 身份。execute 只发送一次，丢失响应由代理通过原引用 status/cancel 恢复，不重发或降级 v1。AutoLocal 每 Session 保存一次 use/client；释放先封住新调用，等待远端 Session 关闭，再释放 use。若 worker 已丢失，则必须等待 activator 提供的真实进程退出结果；失败保留 retiring binding，阻止复用而允许清理重试。单个 Session 释放不应提前停止同 generation 的其他 Session。
+Remote provider 复用已认证 endpoint/lease，在 owned worker 的工具调用、文件历史和终结释放 v2 路由上保持同一 Session 身份。execute 只发送一次，丢失响应由代理通过原引用 status/cancel 恢复，不重发或降级 v1。AutoLocal 每 Session 保存一次 use/client；释放先封住新调用，等待远端 Session 关闭，再释放 use。若 worker 已丢失，则必须等待 activator 提供的真实进程退出结果；失败保留 retiring binding，阻止复用而允许清理重试。单个 Session 释放不应提前停止同 generation 的其他 Session。
 
-这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移、父子 Agent 独立执行作用域与共享撤销归属仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。生产默认三处 channel factory 在这些功能与消费者验收完成后统一切换；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
+这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。该注册切片当时尚未接通子作用域；其后实现与验收见下文。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移及物理撤销仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。生产默认三处 channel factory 在这些功能与消费者验收完成后统一切换；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
 
 ### 完整 host 与默认记忆验收（2026-09-09）
 
@@ -166,19 +166,17 @@ Remote provider 复用已认证 endpoint/lease，在 owned worker 九个 v2 路�
 
 修复后的隔离真实进程验收 `registry-default-memory-1788899037951` 四组通过：省略 memory 设置并确认默认 extraction/dream 均启用；两个主轮次均返回正式 end_turn；两个真实记忆 Agent 完成独立模型请求，真实 MemoryManager 的 extraction 任务完成且 drain 成功。共观察到 5 次主 Agent 和 2 次记忆 Agent 模型请求。无工具轮次零 acquire；工具轮次实际 Read/Write/Shell 三次执行成功，Gateway 对这四类工作区工具的本地 build 为零。三个实际 Config 均完成关闭；worker、ACP、Shell 进程及两个测试端口退出，无超时或备用清理。验收前后及回读时 37 项构建摘要一致。记忆 Agent 本次返回“本次无持久记忆变化”，此结果只证明提取调用与任务结束，不证明记忆文件写入、子 Agent 工具迁移或普通 daemon 默认接入。
 
-### 下一步：子 Agent 的独立执行与共享文件历史
+### 子 Agent 的独立执行与共享文件历史（实现与限定验收通过）
 
-每个实际子 Agent 启动时创建一次独立 Runtime Session；同一 workspace/generation 仍复用 owned worker 内的 ACP 进程。审批或模型设置派生 Config 继承该子作用域，不能每层派生都重复分配，也不能回退到父 Session 的 client。子 Config 的 FileReadCache 与单 Prompt 限制继续独立，父 Config 持有子作用域关闭任务，关闭失败保留所有权并允许重试。
+完整设计、入口和证据见 [Managed 子任务执行与持久文件历史](managed-agent-child-scopes.md)。每个实际 Agent 启动创建一次独立执行作用域；权限和模型配置 overlay 继承它。AgentTool 前台/后台/fork、cold resume、InProcessBackend、工具型 runForkedAgent（包括 Memory）及 Manager 直接调用已接入。热继续保留作用域，冷恢复或 respawn 等待旧资源清理后使用新 UUID。
 
-文件历史保留普通 daemon 的现有语义。源码核对发现，deriveConfig 通过原型继承已有 FileHistoryService，AgentTool/InProcessBackend 的普通子 Agent 沿用父服务；trackEdit 在调用开始读取最新快照，后台子任务可能归入后来父轮次。此前“子任务启动时固定父检查点”的设想会改变既有行为，不能作为兼容迁移的前提。子 Runtime 保持独立读缓存和调用状态，同一逻辑文件历史 owner 则复用同一服务；父快照推进及子编辑都由该 owner 处理，不能因每个子 Runtime 的 beginTurn 为共享历史额外创建轮次。纯模型子任务不取得执行 client。
+同一逻辑父会话只持有一个真实 FileHistoryService owner，使用持久父 Session ID 保存备份。子 Runtime 的 cwd、读取缓存、调用状态独立；子 prompt 不增加父快照。文件编辑沿用最近父快照的既有行为：P1 启动的后台 child 在 P2 开始后编辑，归属 P2，不固定在子启动轮次。当前所有实际工具和 checkpoint 经过共享队列，长 Shell 造成的并发限制仍待解决。
 
-实际接入点包括 AgentTool 的普通/fork 启动、InProcessBackend、通用 runForkedAgent，以及 SubagentManager 的资源清理包装。先安装子绑定，再重建工具注册表；前台结束、后台终态、stop、respawn、父 Config 关闭均必须等待 managed 资源排空。不同 cwd/worktree 与记忆任务的权限、快照归属须分别沿用实际派生行为，不能一律借用父工具 client。Gateway 的 rewind 路由随后先封住并排空相关子作用域，再由 Runtime 执行文件恢复并回传历史收据；这是迁移后防止并发修改的设计要求，普通 Session 当前的活动轮次检查不构成后台 Agent 已全部结束的证明。
+ACP/Core 的真实父轮次 producer 推进 checkpoint；无 Runtime 且无跟踪文件时只在 Gateway 持久记录空快照。首次子工具先绑定父 owner，再绑定独立子 Session。私有 v2 增加 bind-history/checkpoint/history 并贯通实际 HTTP 白名单；历史保持原 lease、身份和可信父校验，限额为 8 MiB。索引经 revision 回到原 Gateway writer，严格批写 ACK 后才更新镜像。关闭先封锁和排空子作用域，同步历史、终结释放 Runtime，再完成 Gateway 清理，失败保留重试。
 
-备份文件实际存储在 `Storage.getGlobalQwenDir()/file-history/<Config.sessionId>`；owned worker 的 outputRoot 只重定向 QWEN_RUNTIME_DIR，不会改变这个全局备份根。删除临时 outputRoot 不等于删除备份文件，但会丢失其中的 Runtime 会话记录；每次恢复重新分配 Runtime UUID 也无法直接复用旧备份索引。下一步必须把逻辑会话的文件历史 owner、快照元数据及备份身份显式持久化并恢复，继续使用已有备份存储，禁止仅保留字节却丢失可达的撤销索引。
+macOS 五组真实完整 host 验收通过：A 父未用文件工具而子 Read/Write 成功；B 父 Read 不授予子 prior-read；C 后台跨 P1/P2 两次写入同属 P2 并保留 V0；D 默认 Memory extractor 经子 Runtime 写原 Gateway trusted 根中的项目记忆和索引，真实任务完成；E 旧 worker 退出后实际 loadSession，同一父 Session 的新 Runtime 恢复 JSONL 快照并实读 V0 备份及当前 V1。各组均核对 terminal v2 release、真实进程退出和临时目录清理，共同 42 项及补充后联合 57 项构建摘要不变。
 
-自动记忆目录需要单独处理：getMemoryBaseDir 默认使用 Storage.getRuntimeBaseDir，而文件备份使用全局 Qwen 根。迁移时应沿用 Gateway 已解析且获准的记忆路径，不能让 Runtime 根据自己的临时 outputRoot 重算目录；作用域权限和真实写入位置必须一致。
-
-该切片验收必须覆盖实际子 Agent 模型到工具循环、父子并发与读缓存隔离、后台子任务跨父轮次后的现有文件归属、同文件修改和 rewind 次序、不同 cwd、关闭失败重试及自动记忆实际写入。当前“未绑定子作用域则拒绝执行”只是过渡保护；以上接入与验收完成之前继续保持阶段 2 未完成。
+完整 build/bundle/typecheck、变更 lint/格式和人工审查通过，本阶段去重 23 文件 2,191 项定向测试通过，两个筛选文件另有 1,203 项未运行。external-v1 隐藏子 Agent 缺少 invocation context 的既有拒绝保留为未兼容范围；五组采用 builtin guard。E 不证明 Gateway 物理 rewind/diff/branch/delete 已迁移，D 不证明 Memory scaffold/index rebuild 等本地操作已经移出 Gateway。其余工具、初始化、不同 cwd/故障组合、长历史与 Windows/Linux 验收继续实施，阶段 2 和默认替换整体仍未完成。
 
 ### 审查发现的迟到 HTTP 请求与终结释放（已修复并验证）
 
@@ -194,4 +192,4 @@ Remote provider 复用已认证 endpoint/lease，在 owned worker 九个 v2 路�
 
 新构建的 `fixed-1788901760083` 实际 HTTP 验收连续三次通过：每次都收到带正确 lease 的 v2 终结回执，再放行已解析的首条 manifest；等待生产路由处理结束后确认没有重建，合计 spawn=3、close=3、manifest=0，测试 Session 均不存在。此探针仍使用计数 Bridge，不把测试标记当作实际 ACP writer 证明。
 
-完整 host 的 `registry-default-memory-1788901782552` 四组再次通过，实际 worker 入口收到并返回 v2 release 200/released:true；主模型执行 Read/Write/Shell 后正常结束，两个真实记忆提取 Agent 也完成。worker、ACP、Shell、自有端口和临时目录全部回收，没有超时或备用强杀。37 个构建摘要前后及回读一致；迟到 HTTP 探针的 5 个摘要同样一致。完整 build/bundle/typecheck、变更文件 lint/格式通过；本切片实施期间去重累计 29 文件 3227 项测试通过（非全仓套件，Core client 的记忆/关闭筛选另有 372 项未运行）。记忆实际写入、子 Agent 执行作用域、完整初始化和普通 daemon 默认切换继续实施。
+完整 host 的 `registry-default-memory-1788901782552` 四组再次通过，实际 worker 入口收到并返回 v2 release 200/released:true；主模型执行 Read/Write/Shell 后正常结束，两个真实记忆提取 Agent 也完成。worker、ACP、Shell、自有端口和临时目录全部回收，没有超时或备用强杀。37 个构建摘要前后及回读一致；迟到 HTTP 探针的 5 个摘要同样一致。完整 build/bundle/typecheck、变更文件 lint/格式通过；本切片实施期间去重累计 29 文件 3227 项测试通过（非全仓套件，Core client 的记忆/关闭筛选另有 372 项未运行）。上述终结释放切片当时未验证记忆实际写入与子作用域；后续五组结果见前一节。完整初始化和普通 daemon 默认切换继续实施。

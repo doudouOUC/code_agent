@@ -1,9 +1,11 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [174e072ac4](https://github.com/doudouOUC/qwen-code/commit/174e072ac4170efbf868866a929ac3823030193b)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [aad95e62aa](https://github.com/doudouOUC/qwen-code/commit/aad95e62aa7dcea052df849269b80c0a8b0f5332)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-09。
 
-> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK、Channels、定时任务和旧会话继续使用统一协议。[默认替换设计与差异清单](managed-agent-daemon-default.md)记录完整迁移范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)现已接通实际 Agent Config 的 Read/Write/Edit/Shell 代理和 owned Runtime 绑定，首次工具调用才等待执行环境。完整 host 在默认记忆配置下通过真实模型→Read/Write/Shell→final→关闭清理四组验收，自动提取使用各自会话历史快照；记忆本次未写持久文件。审查发现的迟到 HTTP 请求重建已关闭 Session 问题已修复，owned v2 终结释放及真实 server 白名单接通，原反例连续三次复验均未重建。最终 build/bundle/完整 typecheck、变更文件 lint/格式及独立审查通过，实施期间去重累计 29 文件 3,227 项定向测试通过（非全仓套件，Core client 筛选另有 372 项未运行）。两组真实探针的 5/37 项构建 hash 一致，自有进程、端口和临时目录全部清理。下一步接通子 Agent 独立执行、共享逻辑文件历史及持久化恢复，再完成其余工具和客户端兼容，最后切换三处普通会话 factory。原方案的固定启动检查点设想已按现有最新快照语义修正。普通默认入口尚未切换，当前 4170 预览保持运行。
+> 当前产品目标：让 Managed Agent 替换 daemon 默认执行实现，兼容普通 Web Shell、SDK、Channels、定时任务及旧会话。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)已接通完整 Agent 的四类工作区工具代理和 owned Runtime。[子任务与持久文件历史](managed-agent-child-scopes.md)进一步接入独立子作用域、共享父快照及严格索引持久化。五组真实 macOS 验收通过：子首次读写、父子 prior-read 隔离、后台跨父轮次重复写入、默认自动记忆实际写原目录，以及旧 worker 完全退出后的真实 cold load 与新 Runtime 读取旧备份。完整 build/bundle/typecheck、变更 lint/格式和人工审查通过；本阶段去重 23 文件 2,191 项定向测试通过（非全仓套件，两个筛选文件另有 1,203 项未运行）。各组共同 42 项、联合 57 项构建摘要保持一致，测试进程、端口和临时目录均已回收。
+>
+> 普通默认入口尚未切换，4170 预览未访问或重启。下一步迁移 Glob/可选 LS，再处理 Grep、NotebookEdit/多媒体、MCP/Skills/Hooks、后台进程/Git、物理历史及可信工作区初始化；并发长 Shell、8 MiB 以上历史、external-v1 子任务和完整客户端兼容仍待完成。冷加载备份验收不代表 rewind/branch 或全部旧会话迁移已经完成。
 
 ## 分阶段设计文档
 
@@ -20,8 +22,9 @@
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
 | P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
 | P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
-| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host、工作区快照与可等待的通道清理已落地；独立工具边界、普通入口和默认切换待完成 |
-| D1～D5 工具边界 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 阶段 2 实际注册与 owned v2 绑定已验收：默认记忆、真实主 Agent 工具与终结释放；继续子作用域和共享文件历史 |
+| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host、工作区快照与可等待的通道清理已落地；其余工具边界、普通入口和默认切换待完成 |
+| D1～D5 工具边界 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 阶段 2：真实四类工具代理、owned v2 绑定、终结释放与子作用域已接通；其余工具与完整初始化继续实施 |
+| D1～D5 子任务与历史 | [子任务与持久文件历史](managed-agent-child-scopes.md) | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份 |
 
 ## 1. 结论
 
