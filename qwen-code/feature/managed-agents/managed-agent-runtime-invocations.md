@@ -41,13 +41,14 @@ Skill 由 Runtime 读取文件/运行脚本，Gateway 负责模型展开和模�
 | prepareInvocation             | Runtime 真实 build，返回随机 invocationId、normalizedArgs、argsDigest、描述/位置、L3、交互要求和分类器所需数据；此时不 execute。                          |
 | getConfirmation               | 按 invocationId/digest 返回现有确认 union 的可序列化 DTO；真实回调留在 Runtime。                                                                          |
 | confirmInvocation             | 校验绑定并调用真实 onConfirm；传递 outcome 及现有 payload，不能顺带 execute。取消释放尚未执行的 invocation。                                              |
-| executeInvocation             | 接受同一调用的 Gateway 执行授权，检查 lease、版本、参数摘要及状态，只启动一次；重复请求返回同一次执行状态/结果。                                          |
+| preflightInvocation           | 权限完成后，在原 PreToolUse 位置执行 Runtime Hook；保存 toolUseId/结果，返回 allow/ask/deny/stop。先于 Gateway 最终 guard，ask 重入不重复触发。           |
+| executeInvocation             | 接受同一调用的 Gateway 执行授权，检查已完成 preflight、lease、版本、参数摘要及状态，只启动一次；重复请求返回同一次执行状态/结果。                         |
 | cancelInvocation              | 返回 cancelRequested/当前状态；取消 ACK 不表示执行已结束。                                                                                                |
 | watch/getResult、readResource | 按 invocationId 读取有序进度、终态及产物；断线后继续同一调用，不创建新调用重试执行。                                                                      |
 
 准备记录保存规范化参数及真实 invocation，绑定上述身份与摘要；已准备记录在取消、到期、会话关闭或 generation 失效时释放。有效状态为 prepared → authorized → executing → settled；另有执行前 cancelled/not_started、needs_reprepare/needs_confirmation 和非终态 cancel_requested。过期的会话、lease、manifest 或授权必须拒绝。
 
-授权只证明 Gateway 对该 invocation/digest 已完成现有权限与执行前 guard，使用现有认证私有通道传递即可，不引入签名体系。自动允许不会调用 onConfirm，因此授权不能等同于 confirmInvocation 成功；两处执行器均需在最终 guard 后通过窄接口给当前 invocation 授权。未授权的代理 buildAndExecute 必须失败。
+授权只证明 Gateway 对该 invocation/digest 已完成现有权限与执行前 guard，使用现有认证私有通道传递即可，不引入签名体系。自动允许不会调用 onConfirm，因此授权不能等同于 confirmInvocation 成功；两处执行器按 Runtime preflight → Gateway 原 guard → 授权/执行的顺序接线，只调用一次既有 Bridge/provider 策略链。Tool-only worker 没有 Gateway 的活跃模型 Prompt，不能把它自身 Bridge 的反向 guard 当成 Gateway guard；v2 Runtime 不重复安装同一个 managed guard，仍检查执行身份、lease 和摘要。未授权的代理 buildAndExecute 必须失败。
 
 ## 注册表与两处调度器接线
 
@@ -55,8 +56,10 @@ Skill 由 Runtime 读取文件/运行脚本，Gateway 负责模型展开和模�
 2. 给 ToolInvocation 增加可选异步 `prepare(signal, { callId, promptId })` 或等价窄接口；CoreToolScheduler 和 Session.runTool 在 build 后、读取有效参数/描述/位置/权限之前 await。旧工具行为不变，Session 补齐 promptId 传递；不能把网络准备偷偷放进无 AbortSignal 的 getDefaultPermission。
 3. Gateway 用远端 L3/确认 DTO 继续现有 PermissionManager、交互确认、权限持久化和 guard。Runtime onConfirm 的必要效果按现有 outcome 显式同步，例如 ProceedAlways 对审批模式的影响；不提供任意远端 Config 修改能力。
 4. Core 的 setArgsInternal、编辑器修改、权限 Hook updatedInput，以及 Session 的直接参数更新，都使旧 invocation/digest/授权失效并重新 prepare。编辑器可操作建议内容缓冲区，真实文件读取/diff 由 Runtime 完成，不能复用 Gateway 本地 EditTool 文件访问。
-5. 保留当前 Hook 时序。Runtime PreToolUse 若在批准后改参或要求 ask，返回 needs_reprepare/needs_confirmation，Gateway 以同一 callId 重新进入现有确认流程，再按新摘要授权；不得用旧批准执行新参数，也不能为省一次 RPC 提前执行 Hook。
-6. 从当前执行器抽取窄的“已准备 invocation 执行阶段”，包含 Runtime guard、检查点、工具 Hook、execute 和进度；不把整个非交互 CoreToolScheduler 放回 Runtime。Gateway 不重复运行这些 Hook，也不在 proxy 内调用本地 invocation.execute。
+5. 保留当前 Hook 时序。现有 PreToolUse 返回 allow/ask/deny/stop 及上下文，不支持 updatedInput；参数重写来自 PermissionRequest Hook，按上一项重新 prepare/授权。PreToolUse 要求 ask 时，Runtime 返回 needs_confirmation 并保留 toolUseId，由 Gateway 按调用者现有策略处理：Core 以同一 callId 进入确认后继续，不能重复触发该 PreToolUse；Session 当前仍把 ask 视为阻断，不在本次迁移中悄悄改成自动允许或新增交互。迁移不额外新增 PreToolUse 改参能力，也不能为省一次 RPC 提前执行 Hook。
+6. 从当前执行器抽取窄的“已准备 invocation 执行阶段”，包含 Runtime preflight/工具 Hook、执行绑定校验、execute 和进度；不把整个非交互 CoreToolScheduler 放回 Runtime。文件检查点保留真实 Edit/Write execute 内部的 FileHistoryService.trackEdit，并把 Session 的 turn makeSnapshot 接入 Runtime；不在内核外额外重复记一次 edit。Gateway 不重复运行这些 Hook，也不在 proxy 内调用本地 invocation.execute。
+
+Gateway 既有 built-in guard 仍含本地文件检查，完整迁移需把这些检查放到 Runtime 并以绑定当前调用的结果接回原策略链，不能两端重复运行整个 guard，也不能在默认验收中豁免这些本地访问。
 
 MCP 当前存在 `instanceof DiscoveredMCPTool` 消费者；proxy 需要可验证的 MCP 元数据/窄判定辅助，保留权限分类、显示、发现与输出行为，不能通过在 Gateway 构造 MCP client 满足类型分支。
 
@@ -88,3 +91,5 @@ Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipF
 每阶段补充对应源码测试及真实进程验收；阶段 1–3 不宣称普通 daemon 默认替换完成。第 4 阶段还需原有消费者回归，模型只在 Gateway、工作区副作用只在 Runtime 的观测证据作为最终退出条件。
 
 实现前需按现有确认/显示 union 列全序列化字段，并核对全部 MCP 类型判定消费者；这些是协议实现清单，不增加产品配置。具体路由命名及内部授权接口随最小接线确定，以上身份、参数摘要、单次执行和结果语义不可省略。
+
+2026-09-09 阶段 1 基线已使用隔离的真实 worker/ACP 进程验证：当前只声明 v1，已有 v1 路径拒绝 protocolVersion 2 及额外 invocation 字段，真实 read 成功，manifest 不包含 write/Shell，错误 lease/epoch/tenant 被拒绝。重复 release 曾返回 500，另一轮返回 released:true；不据此声明响应幂等或资源清理语义已达到 v2 要求。v2 准备、确认、执行及结果查询尚未实现，此基线不是阶段 1 验收通过。

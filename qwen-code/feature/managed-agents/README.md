@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [824e92d84f](https://github.com/doudouOUC/qwen-code/commit/824e92d84f41fc9ab19d1130385b491a8f37c466)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [b64e4f2c9a](https://github.com/doudouOUC/qwen-code/commit/b64e4f2c9a092c693bf67f4b0eed5185575e30ca)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-09。
 
 > 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。现有实现仍为只读实验路径；完整能力与普通协议尚未对齐。[默认替换设计与差异清单](managed-agent-daemon-default.md)已记录完整 Agent host、工作区快照及 Bridge 所有的通道生命周期。本阶段 1,970 项定向测试与六组隔离真实验收通过，包含历史回放清理前不报告退出、失败清理后不启动替代实例；13 个实际 Config 完成一次 shutdown，5 个 channel 完成退出。build/bundle、变更 lint 与 workspace 包 typecheck 通过，根仍有四项既存 integration 类型错误。默认尚未切换；下一步按 [Runtime invocation v2 方案](managed-agent-runtime-invocations.md) 接通独立 worker 的工具构造、审批和执行，再替换三处普通会话 factory。当前 4170 预览保持不变。
