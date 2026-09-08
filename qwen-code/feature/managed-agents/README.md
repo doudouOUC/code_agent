@@ -3,6 +3,8 @@
 > 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [7f498eed1b](https://github.com/doudouOUC/qwen-code/commit/7f498eed1b4f947601ec0273fd2cd5c5b0056e26)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-08。
 
+> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。现有实现仍为只读实验路径；完整能力与普通协议尚未对齐。[默认替换设计与差异清单](managed-agent-daemon-default.md)为下一阶段工作，不表示已经切换默认。
+
 ## 分阶段设计文档
 
 | 阶段 | 文档                                                                                 | 主题                                                   |
@@ -18,6 +20,7 @@
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
 | P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
 | P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
+| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 设计草案：普通会话兼容、现有 Agent 能力复用、编码/审批、恢复与默认切换 |
 
 ## 1. 结论
 
@@ -524,7 +527,7 @@ macOS 真实 Gateway/worker/ACP 验收通过无工具提前完成、真实文件
 
 Windows/Linux 尚未实测，secondary/dynamic reload 与撤信任/强制移除完整 HTTP 组合未逐项真实 E2E；不可中断 execute 由 Provider/Activator 测试覆盖。本轮没有重新做浏览器视觉验收。测试覆盖、RSS 阶段快照和其余限制见 P9a 第 15 节。
 
-P9a 之后再设计 P9b Kubernetes adapter。生产身份、分布式租约、隔离和容量策略需要单独验证，不能把本地 IPC 和进程回收直接当作 Kubernetes 实现。
+当前优先推进 D1～D5 的 daemon 默认执行替换；P9b Kubernetes adapter 作为后续独立工作。生产身份、分布式租约、隔离和容量策略需要单独验证，不能把本地 IPC 和进程回收直接当作 Kubernetes 实现。
 
 ## 15. 非目标
 
@@ -538,4 +541,4 @@ P9a 之后再设计 P9b Kubernetes adapter。生产身份、分布式租约、�
 - 自动重试可能产生副作用的 Tool；
 - 用 Kubernetes 对象替代 Session、租约和恢复语义。
 
-最终建议是：**保留常驻多租户 Gateway/Harness，把模型和会话留在 Gateway，把本地能力收敛为按需 Tool-only Runtime；P9a 已用 TypeScript 和 LocalProcessRuntimeActivator 打通本地链路，下一步在明确生产身份和隔离边界后设计 P9b Kubernetes 接入。**
+最终建议是：**保留常驻多租户 Gateway/Harness，把模型和会话留在 Gateway，把本地能力收敛为按需 Tool-only Runtime；P9a 已用 TypeScript 和 LocalProcessRuntimeActivator 打通本地链路，下一步复用现有完整 Agent 能力并对齐普通 daemon 会话协议，再切换新会话默认；P9b Kubernetes 接入另行推进。**

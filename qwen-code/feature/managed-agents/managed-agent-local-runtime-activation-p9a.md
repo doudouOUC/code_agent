@@ -6,6 +6,8 @@
 
 ## 1. 目标与边界
 
+产品目标已明确为 [Managed Agent 替换 daemon 默认执行实现](managed-agent-daemon-default.md)。P9a 提供其中可复用的本地 Runtime 生命周期；默认替换仍需对齐普通 Agent 能力和会话协议，不以 P9b Kubernetes 接入为前提。
+
 用户只启动 Gateway，在 Web Shell 创建 Managed 任务；Gateway 开始权威模型推理，同时按需启动本机 Tool-only Runtime。模型请求工具时等待该 Runtime，工具结果回到原模型上下文；续轮复用仍有效的 Runtime。会话目录、展示日志、模型历史和 Prompt outcome 始终属于 Gateway。
 
 P9a 交付本地进程生命周期，包括启动、共享、有限容量、租约校验、取消、撤信任和退出清理。固定 Runtime URL 模式与 P7 进程内模式继续可用。Kubernetes/VM placement、预热池、分布式 lease store、生产多租户身份、动态 MCP/Skill 发布和可变更工具仍留在后续阶段。

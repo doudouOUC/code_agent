@@ -1,6 +1,11 @@
 # Managed Agent session surfaces
 
-> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [b14ca3c683](https://github.com/doudouOUC/qwen-code/commit/b14ca3c68393364b1c4d6c065351c3ea10659a29) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+The product target is now to make Managed Agent the daemon's default execution
+implementation; see [the default migration design](managed-agent-daemon-default.md).
+The separate surface described here remains the implemented experimental entry
+point. It does not establish ordinary-session protocol or coding-capability parity.
+
+> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [8b1fd03c9a](https://github.com/doudouOUC/qwen-code/commit/8b1fd03c9a3a681ac535cb17eebe01a2fb728fd0) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status and scope
 
