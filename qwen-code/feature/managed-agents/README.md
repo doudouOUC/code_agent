@@ -17,6 +17,7 @@
 | P7   | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime           |
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
 | P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
+| P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 待实现设计：自动启动、工作区复用、lease 校验、取消与可等待回收 |
 
 ## 1. 结论
 
@@ -287,27 +288,11 @@ Web Shell 根据 `managed_sessions` capability 显示独立 Managed Agents 入�
 
 ## 6. Runtime Activator：不绑定 Kubernetes
 
-P8 仅支持配置一个固定 Runtime URL，证明了远程协议边界，还没有自动创建 Pod。下一步应先增加一个部署中立接口：
+P8 的远程 Provider 使用固定 Runtime URL，尚未自动创建 worker 或 Pod。[P9a 详细设计](managed-agent-local-runtime-activation-p9a.md) 在 Gateway 内增加部署中立的 `ManagedRuntimeActivator`，首先实现本地子进程 adapter；现有 Remote Provider 继续负责 Tool-only HTTP。
 
-```ts
-interface ManagedRuntimeActivator {
-  activate(request: ManagedRuntimePrepareRequest): ManagedRuntimeActivation;
-  release(request: {
-    sessionId: string;
-    leaseId: string;
-    epoch: number;
-  }): Promise<boolean>;
-}
+P9a 把三种结束操作分清：一次 Prompt 的 Runtime use 释放、一个工具 Session 的 release、整个 worker 的回收。Activator 同步返回 use，异步提供 endpoint；同一租户/工作区共享 worker，每次 use 独立释放；workspace revoke 和 Gateway close 等待 owned 进程树退出。`leaseId + epoch` 与 Gateway incarnation 绑定，旧回调不能作用于 replacement。此本地所有权契约不等同于生产分布式 TTL lease。
 
-interface ManagedRuntimeActivation {
-  ready: Promise<{
-    baseUrl: string;
-    token: string;
-    leaseId: string;
-    epoch: number;
-  }>;
-}
-```
+现有 HTTP v1 body 严格校验字段，因此 P9a 为自动管理的 worker 使用 boot 绑定和内部 lease headers，不向 v1 body 添加不兼容字段；固定 URL 模式保持原契约。详细接口、容量与关闭语义以 P9a 文档为准。
 
 实现顺序建议：
 
@@ -520,23 +505,13 @@ authoritative answer completed
 
 ## 14. 下一阶段：P9
 
-先做最小的 **LocalProcessActivator**，不要直接写 Kubernetes controller：
+[P9a 本地 Runtime 自动激活方案](managed-agent-local-runtime-activation-p9a.md)已完成设计，尚未实施。目标是用户只启动 Gateway，Web Shell 首轮推理立即开始，工具需要时接入自动创建的 Runtime，续轮复用，退出时完成回收。
 
-1. 把“固定 Runtime URL”替换为 `ManagedRuntimeActivator` 接口；
-2. Gateway admission 后立即调用 `activate()`，并保持模型立即开始；
-3. 本地 adapter 启动一个受控 Runtime 子进程，等待 authenticated readiness；
-4. 返回带 `leaseId + epoch` 的 handle；release 必须携带并条件校验同一组 fence，再验证超时、取消和崩溃重启；
-5. 用与 P8 相同的双进程 E2E 证明 API、时序和同轮 Tool 行为不变；
-6. 接口稳定后再增加 Kubernetes adapter，只替换生命周期实现。
+设计采用同一 Gateway 内按租户/工作区复用 worker，保留独立 Tool Session；使用随机 token、boot scope 与 lease headers 限定 owned worker。四个实现切片依次为：私有 worker 启动合约、Activator/AutoLocal Provider、Gateway 生命周期接线、展示与兼容回归。
 
-P9 的通过标准：
+关键验收包括：无工具回答不依赖 Runtime；工具分发后不自动重试；取消 ACK 不冒充工具已终止；旧 lease/release 不影响新 worker；配置 reload、撤信任和退出完成回收；Gateway 历史读取不启动 Runtime。自定义配置/信任路径、worker 独立输出目录、进程树和三平台行为都有明确验证项。
 
-- 用户第一次 Prompt 到达时 Runtime 可以完全不存在；
-- `agent_started` 仍先于 `runtime_ready`；
-- 无 Tool 请求在 Runtime 启动失败时仍能完成；
-- Tool 请求可等待自动启动的 Runtime，并只执行一次；
-- Gateway 或 Runtime 重启不会让旧 lease 的结果推进 Session；
-- 本地进程与 Kubernetes 实现共享同一组 Activator 合约测试。
+P9a 之后再设计 P9b Kubernetes adapter。生产身份、分布式租约、隔离和容量策略需要单独验证，不能把本地 IPC 和进程回收直接当作 Kubernetes 实现。
 
 ## 15. 非目标
 

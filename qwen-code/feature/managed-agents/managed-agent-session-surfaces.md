@@ -159,3 +159,9 @@ The reproducible local test plan and full process/browser report are in
 `.qwen/scripts/managed-agent-session-surfaces-e2e.mjs`. These working artifacts
 are intentionally git-ignored by repository convention. No external model
 provider, production deployment, Windows, or Linux run was used for this check.
+
+## Proposed next stage
+
+The [P9a local Runtime activation design](managed-agent-local-runtime-activation-p9a.md)
+specifies automatic worker startup, workspace reuse, owned-worker fencing,
+cancellation, and awaited cleanup. It is a proposal, not implemented behavior.

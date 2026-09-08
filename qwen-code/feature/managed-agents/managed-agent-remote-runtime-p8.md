@@ -240,3 +240,9 @@ Managed Session path never does so.
 - Local mode remains behaviorally compatible with P7.
 - Remote transport failures, cancellation, and identity mismatches fail closed
   without leaking secrets or retrying Tool execution after dispatch.
+
+## Proposed next stage
+
+The [P9a local Runtime activation design](managed-agent-local-runtime-activation-p9a.md)
+specifies automatic worker startup, workspace reuse, owned-worker fencing,
+cancellation, and awaited cleanup. It is a proposal, not implemented behavior.
