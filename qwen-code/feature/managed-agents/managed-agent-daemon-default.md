@@ -124,7 +124,7 @@ D1 的开发启用方式沿用实验配置入口，不先对普通用户增加�
 
 真实 ACP 验证还发现两项生命周期问题：内存通道在 NDJSON 写入持锁时调用 writable abort 会漏关一端；ACP SDK 0.14.1 在连接关闭后会保留尚未响应的 RPC。前者改为对双向 TransformStream controller 置错，后者由 host 对 Qwen 使用的客户端请求（权限、反向扩展调用、文件读写）绑定关闭信号。该保护不代表原始 SDK 任意调用自动获得取消语义；后续 Bridge 接入仍须保留其请求退出保护。
 
-此切片用真实内存 ACP 连接验证初始化、会话调用、错误 capability 和断开清理，并回归原 stdio 生命周期。workspace MCP discovery 的独立 Config 和在途队列也归 host 清理；加载、初始化或 discovery 期间关闭时，不得随后启动或发布新资源。重载队列以及直接 restart、manage、runtime-add/remove 等 MCP 控制请求统一等待结束，再清理 bootstrap/session Config 和 pool；discovery Config 在有在途操作时执行最终清理，防止晚建立的连接泄漏。它仅建立复用入口，尚不启用 Gateway 托管或改变默认：会话配置加载仍会调用修改 `process.env` 的 `reloadEnvironment`，工具构造和审批准备也会读取工作区。后续必须解决这些环境及本地操作边界，再接入 Managed Runtime；不能把完整 Session 直接嵌入 daemon 当作最终的模型/工具分离。
+此切片用真实内存 ACP 连接验证初始化、会话调用、错误 capability 和断开清理，并回归原 stdio 生命周期。workspace MCP discovery 的独立 Config 和在途队列也归 host 清理；加载、初始化或 discovery 期间关闭时，不得随后启动或发布新资源。重载队列以及直接 restart、manage、runtime-add/remove 等 MCP 控制请求统一等待结束，再清理 bootstrap/session Config 和 pool；discovery Config 在有在途操作时执行最终清理，防止晚建立的连接泄漏。它仅建立复用入口，尚不启用 Gateway 托管或改变默认：这一最初接缝仍存在会话配置加载修改 `process.env` 的问题（后续显式 host 接线见下文），工具构造和审批准备也会读取工作区。后续必须解决本地操作边界，再接入 Managed Runtime；不能把完整 Session 直接嵌入 daemon 当作最终的模型/工具分离。
 
 当前已通过 ACP Agent/host、worktree 恢复与 RPC 生命周期单测 593 项、内存通道单测 12 项，以及 70 次独立关闭竞态探针。普通 daemon 的工具调用后正式最终回复、关闭并恢复同一会话两项隔离 E2E 已通过；Managed 默认路径尚未接入，不能据此声明其行为已验收。全仓 build/bundle 和 workspace 包 typecheck 通过；根 typecheck 的 integration 阶段仍有此前相同的四个错误（`daemon-worker.ts:913` 隐式 any，`run-qwen-serve.ts:5228/6120/7089` 的 ProcessRegistry src/dist 类型身份冲突）。这些结果只证明本切片；D1～D5 的默认替换验收尚未完成。
 
@@ -140,11 +140,17 @@ OpenAI/DashScope SDK 显式接收 base URL、organization 和 project，缺失�
 
 网络和账户边界分开处理。普通显式快照 Config 不安装全局代理或修改进程 TLS；唯一共享 runner 由 daemon 授予 host-only `processNetworkOwner`，保留固定宿主出口供 Google SDK 和 OAuth 的全局 fetch 使用，并在首次鉴权前等待代理安装。该字段不来自用户 settings、环境或 HTTP 请求。Google ADC 与 Qwen OAuth 仍使用宿主账户及 HOME/QWEN_HOME 缓存，工作区快照不构成账户隔离；Google/账户请求的逐工作区传输策略仍待接入。固定宿主策略仅维持现有实验入口的兼容，不是最终多工作区网络隔离方案。
 
-本轮 build、bundle、变更文件 lint 和 workspace 包 typecheck 已通过；最终定向回归为 core 1,386 项、CLI 674 项，以及真实 app 的启动基线/ACP 开关回归 1 项，共 2,061 项。根 typecheck 仍是此前四项 integration 错误：`daemon-worker.ts:913` 隐式 any，`run-qwen-serve.ts:5232/6124/7094` 的 ProcessRegistry src/dist 类型身份冲突。独立验证覆盖核心快照 10 个样本、7 次 Google SDK 本地截获请求、5 次 OpenAI 本地 HTTP 请求、HOME 符号链接修复复验，以及 2 次宿主全局代理本地 HTTP 请求。HTTPS 实测确认：进程关闭证书验证时空快照仍拒绝自签名证书；真实 HOME bootstrap 保留显式 TLS 配置，允许该本地请求，同时 primary 模型配置优先级不变。最终 bundle 的真实 CLI 验证覆盖 Managed full-yargs、普通 fast path 与普通 full-yargs：Managed 的唯一模型请求使用 HOME key/URL/organization/project，primary trap 零请求；两种普通入口的唯一请求均使用 primary `.env` 与 `settings.env`，输出预算为夹具指定的 2,233。三种入口都验证 HOME token 的错误凭据 401/正确凭据 200、只读限流 20 次成功后 429，以及 ACP 关闭返回 404 而 REST 仍可完成会话。Managed 实验循环仍固定 4,096 输出 token，此验证不能证明其已继承完整 Agent 预算。Google ADC 使用替身鉴权，未验证真实账户。验证结果只支持上述边界；本地工具、MCP、PTY、Hooks 的环境仍须在 Tool-only Runtime 中处理。完整 ACP host 的每 Session 配置创建、辅助 discovery Config、权限设置重读以及 `reloadEnvironment` 仍未改为所属工作区快照，普通入口和默认策略也尚未切换。
+本轮 build、bundle、变更文件 lint 和 workspace 包 typecheck 已通过；最终定向回归为 core 1,386 项、CLI 674 项，以及真实 app 的启动基线/ACP 开关回归 1 项，共 2,061 项。根 typecheck 仍是此前四项 integration 错误：`daemon-worker.ts:913` 隐式 any，`run-qwen-serve.ts:5232/6124/7094` 的 ProcessRegistry src/dist 类型身份冲突。独立验证覆盖核心快照 10 个样本、7 次 Google SDK 本地截获请求、5 次 OpenAI 本地 HTTP 请求、HOME 符号链接修复复验，以及 2 次宿主全局代理本地 HTTP 请求。HTTPS 实测确认：进程关闭证书验证时空快照仍拒绝自签名证书；真实 HOME bootstrap 保留显式 TLS 配置，允许该本地请求，同时 primary 模型配置优先级不变。最终 bundle 的真实 CLI 验证覆盖 Managed full-yargs、普通 fast path 与普通 full-yargs：Managed 的唯一模型请求使用 HOME key/URL/organization/project，primary trap 零请求；两种普通入口的唯一请求均使用 primary `.env` 与 `settings.env`，输出预算为夹具指定的 2,233。三种入口都验证 HOME token 的错误凭据 401/正确凭据 200、只读限流 20 次成功后 429，以及 ACP 关闭返回 404 而 REST 仍可完成会话。Managed 实验循环仍固定 4,096 输出 token，此验证不能证明其已继承完整 Agent 预算。Google ADC 使用替身鉴权，未验证真实账户。验证结果只支持上述边界；本地工具、MCP、PTY、Hooks 的环境仍须在 Tool-only Runtime 中处理。以上验证对应模型环境基础切片；完整 ACP host 的后续配置接线见下文，普通入口和默认策略尚未切换。
 
-下一步把有效配置与 generation 绑定到逻辑 Session 的已验证工作区，并接入完整 Agent host；热重载从 daemon 基础环境重新构建，禁止以上一次快照为基线而保留已删除的键。随后用普通 create/prompt/events/transcript/cancel 验证真实模型与 Runtime 工具边界，继续完成 D1～D5。
+### 完整 ACP host 的工作区与环境绑定
 
-下一接线限定为每个 workspace generation 一个完整 ACP host。现有 QwenAgent 只有一个 MCP pool/discovery Config，并将 workspace reload 广播给自身 Session，因此不让单个 host 跨工作区。显式环境分支须绕过仅按 cwd 缓存的 `loadSettingsCached`，将 Session、恢复/replay 和 discovery 的配置构造及重读统一接到 host 快照；stdio 保留原缓存与环境重载。host 固定已验证 canonical cwd，输出目录使用既有 `Storage.runWithResolvedRuntimeBaseDir` 绑定，拒绝客户端请求切换归属。generation guard 来自 workspace registry，发布新 Session 前再次检查；快照变化通过所属 generation 的生命周期处理，不能把旧 Session 静默转入新 generation。这一接线仍不允许 Gateway 直接执行本地文件、MCP 或 Hook，相关依赖须继续迁移到 Tool-only Runtime。
+`createAcpAgentHost` 的显式 `runtimeEnvironment` 模式将 host 固定到 bootstrap Config 所属 canonical cwd、信任状态与持久化输出根。调用者和 bootstrap Config 的环境必须相同；host 在第一次异步操作前复制冻结快照。Session 新建、load/resume、transcript replay、辅助 MCP discovery、权限和其他 settings 重读统一使用该快照，绕过仅按 cwd 缓存且会修改进程环境的旧 settings cache。重读磁盘 settings 仍生效，但 `.env` 和调用者对象的后续变化不会修改既有 host 的环境；此模式不会调用全局 `reloadEnvironment`。
+
+host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `Storage.runWithResolvedRuntimeBaseDir` 固定输出根；历史读取及 Config 构造沿用同一根。Session 新建、恢复、列表和扩展请求拒绝其他 canonical cwd，省略 cwd 的扩展请求使用绑定工作区。MCP pool 的开关、预算和 ACP 本地读取根也使用 host 快照，鉴权预检不再借用全局 key 或 Vertex project。扩展 workspace settings 的 `.env` 路径与敏感值存储 namespace 也明确传入所属 cwd，包含安装更新读取旧设置的路径；权限持久化重读继承同一信任决定，未信任工作区的文件不参与用户规则保存。`sessionCd` 的目标 path 同样受绑定检查，不能绕过请求 cwd 校验。未显式传入环境的 stdio host 继续使用旧配置缓存、环境重载和目录迁移。
+
+独立真实 ACP 基线已经复现旧版两个 host 均借用 ambient C 凭据、共享输出根、跨 cwd 创建成功，以及 reload/restore 后凭据漂移。本轮全仓 build/bundle、变更文件 lint、workspace 包 typecheck 通过；CLI 961 项及 core 扩展 182 项定向测试通过，共 1,143 项。根 typecheck 仍只有上文记录的四项既存 integration 错误。真实完整 host 的四次模型请求分别使用 A/B key 与 origin，ambient C 零请求；关闭/恢复保留真实历史且不重新调用模型。跨 cwd 新建、load 和 sessionCd 被拒绝，缺键鉴权失败；未信任 host 的坏 JSON 读取计数为零，bootstrap 与 Session 的用户权限保存均成功。四个 host、三个本地模型端口及临时数据已清理。扩展文件与敏感值 namespace 另有双工作区单测覆盖，敏感值存储在测试中使用替身，未访问系统 keychain。独立审查无剩余发现，最终 host 构建 SHA-256 为 `d92843ddabdfabaf34afe32757320e06f56c6187d0655b4df63e6d627e976c38`。这一阶段只建立可复用 host 的配置和归属边界，尚未把完整 host 接入普通 Gateway，也未改变默认执行策略。
+
+下一步从 workspace registry 向完整 host factory 传入已验证 generation 及 guard，在操作与 Session 发布前检查有效性。一个 workspace generation 对应一个 host：现有 QwenAgent 只有一个 MCP pool/discovery Config，并向其 Session 广播 workspace reload。环境变化必须从 daemon 基础环境重新构建新 generation，不能以上一次快照为基线保留已删除键，也不能把旧 Session 静默迁入新 generation。本地文件、MCP、Skill 与 Hook 依赖继续迁移到 Tool-only Runtime，然后接入普通 create/prompt/events/transcript/cancel，完成 D1～D5。生产接入点已定位为 primary、secondary 和 replacement generation 的 `ChannelFactory`；普通路由继续走既有 Bridge 契约。内存 channel 的退出必须等待 host 异步清理，不能把同步 abort 当作 containment 完成；Tool-only provider 必须指向独立 worker，不能重新使用 Gateway 自身 registry。上述执行边界完成前，不将完整内存 host 开启为普通默认。
 
 ## 验收矩阵
 
@@ -163,6 +169,6 @@ OpenAI/DashScope SDK 显式接收 base URL、organization 和 project，缺失�
 
 ## 本轮结论与待细化项
 
-优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。完整 Agent host 接缝已经落地；下一项是工作区环境快照及本地操作边界，再接入普通会话，使用 D2 的真实上下文/工具轮次验证复用行为。
+优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。完整 Agent host 接缝已经落地；显式 host 的工作区环境已接线；下一项是 generation 生命周期及本地操作边界，再接入普通会话，使用 D2 的真实上下文/工具轮次验证复用行为。
 
 具体可提取的 Agent driver 边界、普通历史转换格式和全部内部调用者迁移顺序，需要在对应切片中完成精确接口设计；本文不提前承诺实现工期，也不把这些项目列为已完成。独立本地 CLI/TUI 的执行默认不在此次 daemon 替换范围内。
