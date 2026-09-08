@@ -2,7 +2,7 @@
 
 ## 状态与目标
 
-2026-09-08，已完成完整 Agent host 复用入口，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
+2026-09-08，已完成完整 Agent host 复用入口；模型环境快照和共享 Gateway 宿主接线已通过定向验证，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
 
 本文记录当前差异和建议迁移顺序；没有将 Managed 设为默认，也不声明能力已对齐。已有 P0～P8、P9a 和展示测试继续复用。P9b 外部资源分配不作为本地默认替换的先决条件。
 
@@ -128,13 +128,23 @@ D1 的开发启用方式沿用实验配置入口，不先对普通用户增加�
 
 当前已通过 ACP Agent/host、worktree 恢复与 RPC 生命周期单测 593 项、内存通道单测 12 项，以及 70 次独立关闭竞态探针。普通 daemon 的工具调用后正式最终回复、关闭并恢复同一会话两项隔离 E2E 已通过；Managed 默认路径尚未接入，不能据此声明其行为已验收。全仓 build/bundle 和 workspace 包 typecheck 通过；根 typecheck 的 integration 阶段仍有此前相同的四个错误（`daemon-worker.ts:913` 隐式 any，`run-qwen-serve.ts:5228/6120/7089` 的 ProcessRegistry src/dist 类型身份冲突）。这些结果只证明本切片；D1～D5 的默认替换验收尚未完成。
 
-### 下一切片：显式工作区环境快照
+### 显式环境快照：模型消费者与宿主接线
 
-优先复用 `environment.ts` 已有的纯函数 `buildRuntimeEnvironment(settings,cwd,baseEnv,workspaceTrusted)`，使用 daemon 启动时保存的基础环境，为每个工作区构建冻结快照。通过 `loadCliConfig` 的 host-only options 传给 Config，再接入模型解析、`ModelsConfig` 切模型/刷新鉴权和跨 provider 子 Agent。Config 现有的 `environment?: string[]` 是提示词上下文，不应挪作环境字典。
+`loadCliConfig` 的 host-only options 现在可以传入冻结的 `runtimeEnvironment`，Config、模型选择与鉴权刷新、跨 provider 子 Agent、settings 插值、scope reload、输出 token 上限和流超时使用同一环境。缺键保持缺失，不再借用 `process.env`；未传快照的独立 stdio 入口保留原有环境解析。Config 现有的 `environment?: string[]` 仍是提示词上下文，与环境字典无关。同一模型的鉴权刷新按记录的来源键重读有效凭据，保留通用 API key 回退，同时不会保留已删除的环境凭据。快照目前固定于 Config 生命周期，尚未实现工作区热更新。
 
-显式快照缺键时必须保持缺失，不能回退读取 `process.env`。这同样适用于 settings `${VAR}` 插值及其 reload；只设置 `skipLoadEnvironment` 或只传初始模型 API key 不构成隔离。热重载从基础环境重建快照，不能把上一份有效快照当基础，否则删除的键会残留。未启用托管环境的 stdio 入口保留现有环境解析行为。
+OpenAI/DashScope SDK 显式接收 base URL、organization 和 project，缺失值不会触发 SDK 的全局补入。Google 的 Gemini/Vertex 模式、API key、项目、地域和 endpoint 也明确解析；Vertex ADC 校验使用同一份项目环境。OpenAI/Anthropic 的快照 dispatcher 固定代理绕过规则和 TLS 验证策略，缓存包含 `NO_PROXY`，代理构造失败明确报错，不回到全局 dispatcher。显式安全 TLS 也传入 `rejectUnauthorized=true`，避免继承进程级关闭验证的状态。
 
-先验收两个工作区同名 envKey 的并发创建、交错 refreshAuth/切模型、缺键拒绝回退和删除键重载，再接 MCP、普通 Shell、PTY、命令 Hook 的 Runtime 环境消费者。工作区文件读取与进程执行仍归 Tool-only Runtime；完成模型快照这一步不表示本地执行已经隔离。
+真实 producer 从 `run-qwen-serve` 捕获的 `daemonRuntimeBaseEnv` 进入现有共享 runner，环境发现限定在 HOME。先解析 home `.env`，再解析用户/系统 `settings.env`，最后用有效环境解析模型配置；不读取 primary、请求工作区或其祖先的配置。独立测试发现 HOME 经符号链接解析后与未规范化 HOME 比较会越过边界，已在环境发现函数中统一比较规范路径。这是共享 Gateway 的宿主快照，当前 runner 仍只有一份配置，不能宣称每个 workspace 的完整 Config 已迁移。
+
+完整 CLI 的 warning settings 预读原先会先把 primary 环境写入进程，再被 daemon 当作启动基线继承。现在先捕获 launch 环境及 HOME 专属启动键，普通模型键仍由各工作区自行发现；token、限流和 ACP HTTP 开关保留原 daemon 启动配置。HOME bootstrap 只加入初始加载允许且不能热重载的键，拒绝 loader 注入，并在传入 worker 前删除私有 Tool Guard credential。它不把 HOME 模型 key 固化为工作区基线，因此不改变 workspace 优先于 HOME 的模型配置顺序。直接构造 runner 也经过同一 bootstrap，保留 HOME TLS/CA 的启动语义。
+
+网络和账户边界分开处理。普通显式快照 Config 不安装全局代理或修改进程 TLS；唯一共享 runner 由 daemon 授予 host-only `processNetworkOwner`，保留固定宿主出口供 Google SDK 和 OAuth 的全局 fetch 使用，并在首次鉴权前等待代理安装。该字段不来自用户 settings、环境或 HTTP 请求。Google ADC 与 Qwen OAuth 仍使用宿主账户及 HOME/QWEN_HOME 缓存，工作区快照不构成账户隔离；Google/账户请求的逐工作区传输策略仍待接入。固定宿主策略仅维持现有实验入口的兼容，不是最终多工作区网络隔离方案。
+
+本轮 build、bundle、变更文件 lint 和 workspace 包 typecheck 已通过；最终定向回归为 core 1,386 项、CLI 674 项，以及真实 app 的启动基线/ACP 开关回归 1 项，共 2,061 项。根 typecheck 仍是此前四项 integration 错误：`daemon-worker.ts:913` 隐式 any，`run-qwen-serve.ts:5232/6124/7094` 的 ProcessRegistry src/dist 类型身份冲突。独立验证覆盖核心快照 10 个样本、7 次 Google SDK 本地截获请求、5 次 OpenAI 本地 HTTP 请求、HOME 符号链接修复复验，以及 2 次宿主全局代理本地 HTTP 请求。HTTPS 实测确认：进程关闭证书验证时空快照仍拒绝自签名证书；真实 HOME bootstrap 保留显式 TLS 配置，允许该本地请求，同时 primary 模型配置优先级不变。最终 bundle 的真实 CLI 验证覆盖 Managed full-yargs、普通 fast path 与普通 full-yargs：Managed 的唯一模型请求使用 HOME key/URL/organization/project，primary trap 零请求；两种普通入口的唯一请求均使用 primary `.env` 与 `settings.env`，输出预算为夹具指定的 2,233。三种入口都验证 HOME token 的错误凭据 401/正确凭据 200、只读限流 20 次成功后 429，以及 ACP 关闭返回 404 而 REST 仍可完成会话。Managed 实验循环仍固定 4,096 输出 token，此验证不能证明其已继承完整 Agent 预算。Google ADC 使用替身鉴权，未验证真实账户。验证结果只支持上述边界；本地工具、MCP、PTY、Hooks 的环境仍须在 Tool-only Runtime 中处理。完整 ACP host 的每 Session 配置创建、辅助 discovery Config、权限设置重读以及 `reloadEnvironment` 仍未改为所属工作区快照，普通入口和默认策略也尚未切换。
+
+下一步把有效配置与 generation 绑定到逻辑 Session 的已验证工作区，并接入完整 Agent host；热重载从 daemon 基础环境重新构建，禁止以上一次快照为基线而保留已删除的键。随后用普通 create/prompt/events/transcript/cancel 验证真实模型与 Runtime 工具边界，继续完成 D1～D5。
+
+下一接线限定为每个 workspace generation 一个完整 ACP host。现有 QwenAgent 只有一个 MCP pool/discovery Config，并将 workspace reload 广播给自身 Session，因此不让单个 host 跨工作区。显式环境分支须绕过仅按 cwd 缓存的 `loadSettingsCached`，将 Session、恢复/replay 和 discovery 的配置构造及重读统一接到 host 快照；stdio 保留原缓存与环境重载。host 固定已验证 canonical cwd，输出目录使用既有 `Storage.runWithResolvedRuntimeBaseDir` 绑定，拒绝客户端请求切换归属。generation guard 来自 workspace registry，发布新 Session 前再次检查；快照变化通过所属 generation 的生命周期处理，不能把旧 Session 静默转入新 generation。这一接线仍不允许 Gateway 直接执行本地文件、MCP 或 Hook，相关依赖须继续迁移到 Tool-only Runtime。
 
 ## 验收矩阵
 
