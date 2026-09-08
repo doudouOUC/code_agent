@@ -2,7 +2,7 @@
 
 ## 状态与目标
 
-2026-09-08，已完成完整 Agent host 复用入口；模型环境快照和共享 Gateway 宿主接线已通过定向验证，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
+2026-09-09，已完成完整 Agent host 复用入口、环境快照和 Bridge 通道生命周期适配；独立验证已覆盖真实历史回放资源的异步清理，默认替换仍在实施中。差异调查起点为代码 `7f498eed1b`，后续实现与验证见下文。用户明确的目标是让 Managed Agent 替换 daemon 的默认 Agent 执行实现，普通 Web Shell、SDK 和 daemon 内部调用者直接使用它。独立 Managed Agents 页面是已有实验验证入口，不是最终交付形态。
 
 本文记录当前差异和建议迁移顺序；没有将 Managed 设为默认，也不声明能力已对齐。已有 P0～P8、P9a 和展示测试继续复用。P9b 外部资源分配不作为本地默认替换的先决条件。
 
@@ -150,7 +150,17 @@ host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `
 
 独立真实 ACP 基线已经复现旧版两个 host 均借用 ambient C 凭据、共享输出根、跨 cwd 创建成功，以及 reload/restore 后凭据漂移。本轮全仓 build/bundle、变更文件 lint、workspace 包 typecheck 通过；CLI 961 项及 core 扩展 182 项定向测试通过，共 1,143 项。根 typecheck 仍只有上文记录的四项既存 integration 错误。真实完整 host 的四次模型请求分别使用 A/B key 与 origin，ambient C 零请求；关闭/恢复保留真实历史且不重新调用模型。跨 cwd 新建、load 和 sessionCd 被拒绝，缺键鉴权失败；未信任 host 的坏 JSON 读取计数为零，bootstrap 与 Session 的用户权限保存均成功。四个 host、三个本地模型端口及临时数据已清理。扩展文件与敏感值 namespace 另有双工作区单测覆盖，敏感值存储在测试中使用替身，未访问系统 keychain。独立审查无剩余发现，最终 host 构建 SHA-256 为 `d92843ddabdfabaf34afe32757320e06f56c6187d0655b4df63e6d627e976c38`。这一阶段只建立可复用 host 的配置和归属边界，尚未把完整 host 接入普通 Gateway，也未改变默认执行策略。
 
-下一步从 workspace registry 向完整 host factory 传入已验证 generation 及 guard，在操作与 Session 发布前检查有效性。一个 workspace generation 对应一个 host：现有 QwenAgent 只有一个 MCP pool/discovery Config，并向其 Session 广播 workspace reload。环境变化必须从 daemon 基础环境重新构建新 generation，不能以上一次快照为基线保留已删除键，也不能把旧 Session 静默迁入新 generation。本地文件、MCP、Skill 与 Hook 依赖继续迁移到 Tool-only Runtime，然后接入普通 create/prompt/events/transcript/cancel，完成 D1～D5。生产接入点已定位为 primary、secondary 和 replacement generation 的 `ChannelFactory`；普通路由继续走既有 Bridge 契约。内存 channel 的退出必须等待 host 异步清理，不能把同步 abort 当作 containment 完成；Tool-only provider 必须指向独立 worker，不能重新使用 Gateway 自身 registry。上述执行边界完成前，不将完整内存 host 开启为普通默认。
+完整 host factory 已接收 generation guard，具体生命周期见下一节；生产 workspace registry 的 factory 替换仍待工具边界完成。一个 workspace generation 内同一时刻最多一个未清理的 host：现有 QwenAgent 只有一个 MCP pool/discovery Config，并向其 Session 广播 workspace reload。环境变化必须从 daemon 基础环境重新构建新 generation，不能以上一次快照为基线保留已删除键，也不能把旧 Session 静默迁入新 generation。本地文件、MCP、Skill 与 Hook 依赖继续迁移到 Tool-only Runtime，然后接入普通 create/prompt/events/transcript/cancel，完成 D1～D5。生产接入点已定位为 primary、secondary 和 replacement generation 的 `ChannelFactory`；普通路由继续走既有 Bridge 契约。内存 channel 的退出必须等待 host 异步清理，不能把同步 abort 当作 containment 完成；Tool-only provider 必须指向独立 worker，不能重新使用 Gateway 自身 registry。上述执行边界完成前，不将完整内存 host 开启为普通默认。
+
+### Bridge 所有的完整 Agent 通道
+
+已增加 `createManagedAgentChannelFactory`，由 generation 的 canonical cwd、环境、信任决定、输出根及 CLI 参数快照构造真实 bootstrap Config 和完整 ACP host。它返回现有 `AcpChannel`，由 Bridge 完成初始化、私有握手、Session 索引及 Prompt 队列；不引入另一套会话注册表。私有父 capability 与 Tool Guard 标记只进入 host options，不进入模型环境；源环境及参数在 factory 构造时复制，不能受之后的调用者修改影响。工作区 generation 的关闭信号在异步启动期间和通道存活期间均生效，关闭后不发布新 host。
+
+传输失效立即停止 Bridge 接受工作，但 `exited` 只在 host 的异步 `dispose` 成功后完成。daemon 的 workspace 清理不再用 `killAllSync()` 的返回代替成功的异步 shutdown；失败 generation 保持 blocked，不能继续安装 replacement。该要求同样适用于现有 spawn 通道：同步发出停止请求本身不证明资源已终止。主动 kill、意外 EOF 和 generation 关闭共享一次清理；同一个 factory 的后继 host 必须等待前驱清理成功，清理失败后拒绝再次创建。启动期间已创建的 Config/host 若清理失败，以 `AcpChannelTeardownError` 交给 Bridge 保留，即便尚未返回 channel，shutdown 也不能吞掉这个失败。普通无残留的启动失败仍可重试。清理失败通过 `kill()`/Bridge shutdown 传播，不得把同步 abort 当成已完成的资源回收。独立验证使用真实 Bridge、完整 host 和本地模型夹具，检查普通新建、Prompt、历史、私有握手及退出竞态。这个适配器尚不能作为生产默认：完整本地工具注册与独立 Tool-only provider 必须先接通，随后替换 primary、secondary、replacement 三处生产 factory。
+
+只读 transcript 回放也纳入完整 Config 所有权。独立真实探针发现旧实现仅异步调用 tool registry 的 stop，尚未结束就报告 channel 退出。现在回放缓存失效、host 关闭、创建失败及关闭后晚返回均执行并等待严格的 Config shutdown；独立集合覆盖被新 settings 替换但尚未完成的旧回放创建。失败保留在回放自己的清理表中，不能被普通 Session 清理或 Promise.allSettled 忽略，也不会调用全局 telemetry shutdown。
+
+本切片全仓 build/bundle、变更文件 lint 和 workspace 包 typecheck 通过，定向单测共 1,970 项（ACP Agent/host 592、通道 16、workspace registry 23、定时路由 116、daemon 371、Bridge/内存通道 852）。根 typecheck 仍有相同四项既存 integration 错误。六组隔离真实验收通过：普通新建/Prompt/历史/恢复、启动前关闭、启动中关闭、在途 kill、generation 关闭、启动失败后清理失败。13 个实际初始化 Config 均完成一次真实 shutdown，5 个 channel 均退出；持有回放 registry stop 时 exited 保持 pending，释放后才退出。关闭/恢复没有新增模型请求，失败清理后的重试没有初始化新 Config。端口、socket 和临时目录已清理；未触碰 4170。最终 host 构建 SHA-256 为 `a225574c045f03b18a7852eafe7be5846040932094806d67454033ba9bc7b41f`。EOF 由通道单测覆盖，真实探针未注入；这些结果不证明独立 Tool-only 执行或默认路由已验收。
 
 ## 验收矩阵
 
@@ -169,6 +179,6 @@ host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `
 
 ## 本轮结论与待细化项
 
-优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。完整 Agent host 接缝已经落地；显式 host 的工作区环境已接线；下一项是 generation 生命周期及本地操作边界，再接入普通会话，使用 D2 的真实上下文/工具轮次验证复用行为。
+优先解决的是 Agent 能力复用和普通会话契约，而不是继续扩充独立页面。完整 Agent host、工作区环境快照和可等待的通道生命周期已落地；下一项按 [Runtime invocation v2 方案](managed-agent-runtime-invocations.md) 实现工具构造、审批准备及执行边界，然后接入三处普通会话 factory，使用 D2 的真实上下文/工具轮次验证复用行为。该方案已核对两处执行器、注册表、改参、Hook、输出与资源生命周期，仍标为待实现。
 
 具体可提取的 Agent driver 边界、普通历史转换格式和全部内部调用者迁移顺序，需要在对应切片中完成精确接口设计；本文不提前承诺实现工期，也不把这些项目列为已完成。独立本地 CLI/TUI 的执行默认不在此次 daemon 替换范围内。

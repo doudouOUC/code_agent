@@ -1,9 +1,9 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [d63eec71a1](https://github.com/doudouOUC/qwen-code/commit/d63eec71a116d7ce36b2ee8c8dbfb7e372fa8c41)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
-> 更新日期：2026-09-08。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [824e92d84f](https://github.com/doudouOUC/qwen-code/commit/824e92d84f41fc9ab19d1130385b491a8f37c466)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 更新日期：2026-09-09。
 
-> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。现有实现仍为只读实验路径；完整能力与普通协议尚未对齐。[默认替换设计与差异清单](managed-agent-daemon-default.md)已记录完整 Agent host 复用、模型快照与 host 工作区/输出根/信任绑定。本阶段 1,143 项定向测试、真实并行 host 模型请求与恢复、未信任配置和权限保存验收通过；workspace 包 typecheck 通过，根仍有四项既存 integration 类型错误。默认尚未切换；下一步通过既有 Bridge channel factory 接 generation 生命周期及独立 Tool-only Runtime，覆盖普通会话入口。
+> 当前产品目标：让 Managed Agent 替换 daemon 的默认执行实现，普通 Web Shell、SDK 和内部入口继续使用统一会话。现有实现仍为只读实验路径；完整能力与普通协议尚未对齐。[默认替换设计与差异清单](managed-agent-daemon-default.md)已记录完整 Agent host、工作区快照及 Bridge 所有的通道生命周期。本阶段 1,970 项定向测试与六组隔离真实验收通过，包含历史回放清理前不报告退出、失败清理后不启动替代实例；13 个实际 Config 完成一次 shutdown，5 个 channel 完成退出。build/bundle、变更 lint 与 workspace 包 typecheck 通过，根仍有四项既存 integration 类型错误。默认尚未切换；下一步按 [Runtime invocation v2 方案](managed-agent-runtime-invocations.md) 接通独立 worker 的工具构造、审批和执行，再替换三处普通会话 factory。当前 4170 预览保持不变。
 
 ## 分阶段设计文档
 
@@ -20,7 +20,8 @@
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
 | P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
 | P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
-| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host 与工作区快照绑定已落地；generation 接线、工具边界、普通会话与默认切换待完成 |
+| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host、工作区快照与可等待的通道清理已落地；独立工具边界、普通入口和默认切换待完成 |
+| D1～D5 工具边界 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 待实现：真实 build/确认/执行、两处调度器接线、取消、Hook 与产物协议 |
 
 ## 1. 结论
 
