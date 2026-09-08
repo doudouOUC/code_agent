@@ -1,6 +1,6 @@
 # Managed Agent Eager Authoritative Turn P7
 
-> 归档说明（2026-09-07）：本文记录本地 Qwen Code 实验工作树的阶段设计与验证，不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status
 
@@ -112,14 +112,17 @@ outcome and Runtime readiness remain separate axes.
 P7 proves the desired latency boundary in one daemon process. It does not yet
 provide authenticated multi-tenant identity, a distributed Runtime registry,
 lease/fencing over a remote transport, permission UI, mutating Tools, signed
-Agent Definitions, durable client event/final-output replay across daemon
-restart, an atomic recovery boundary across the Prompt journal and conversation
-history, client-initiated Managed turn cancellation, bounded journal/history
-compaction and retention, or provider-credential stripping from the ordinary
+Agent Definitions, an atomic recovery boundary across the Prompt journal and
+conversation history, bounded journal/history compaction and retention, or provider-credential stripping from the ordinary
 local ACP child. The local prototype also requires `qwen serve` itself to be
 running; it does not expose the resident Gateway route during that daemon's own
 cold bootstrap. Those remain required before deployment as a real Managed
 Agents service.
+
+The [Managed session surfaces](managed-agent-session-surfaces.md) follow-up
+adds durable display replay for new events, Gateway catalog/history reads,
+independent Runtime state, exact-Prompt cancellation, and a capability-gated Web
+Shell surface. Its upgrade and retention boundaries are documented separately.
 
 ## Exit criteria
 

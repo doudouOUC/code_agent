@@ -1,6 +1,6 @@
 # Managed Agent Remote Runtime P8
 
-> 归档说明（2026-09-07）：本文记录本地 Qwen Code 实验工作树的阶段设计与验证，不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status
 
@@ -204,7 +204,11 @@ qwen serve --no-web --port 4170 \
 ```
 
 Without `--experimental-managed-runtime-url`, P8 preserves the P7 local
-in-process provider. The public Managed Session API is unchanged.
+in-process provider. The original P8 Prompt API remains compatible. The
+[Managed session surfaces](managed-agent-session-surfaces.md) follow-up adds
+Gateway-owned catalog/history reads, recoverable display streaming, exact-Prompt
+cancellation, and capability-gated Web Shell navigation. These reads do not
+prepare or attach a Runtime, including when that worker is absent.
 
 When a remote Runtime URL is configured, the Gateway skips the ordinary
 boot-time ACP child preheat. Non-Managed compatibility routes remain mounted

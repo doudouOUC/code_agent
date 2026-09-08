@@ -1,8 +1,7 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：架构方案 + P0～P8 本地实验总结，尚未进入
-> [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`。本文中的“已实现”仅指实验工作树；生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
-> 整理日期：2026-09-07。
+> 状态：P0～P8 实验实现 + Managed 会话展示与控制已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，本次代码锚点为 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9 自动启动 Runtime、生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 更新日期：2026-09-08。
 
 ## 分阶段设计文档
 
@@ -17,6 +16,7 @@
 | P6   | [Managed Agent Tool-only Runtime P6](managed-agent-tool-runtime-p6.md)               | Gateway 模型所有权与 Tool-only ACP Runtime             |
 | P7   | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime           |
 | P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
+| P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
 
 ## 1. 结论
 
@@ -235,14 +235,19 @@ POST /internal/managed-runtime/v1/release
 
 ### 5.2 公共 Managed API
 
-实验 API 保持很小：
+当前实验 API：
 
-```text
-POST /managed/sessions
-POST /managed/sessions/:id/prompts
-GET  /managed/sessions/:id
-GET  /managed/sessions/:id/events
-```
+| 路由 | 归属与行为 |
+| --- | --- |
+| `GET /managed/sessions?cwd=&limit=&cursor=` | Gateway 持久会话目录，按调用者和可选工作区筛选；创建时间倒序、稳定游标分页。 |
+| `POST /managed/sessions` | 在已注册且可信的工作区幂等准入首轮；显式未知 `cwd` 返回 400，不回退到主工作区。 |
+| `POST /managed/sessions/:id/prompts` | 在会话绑定工作区顺序准入续轮，不重新绑定 Runtime 会话。 |
+| `GET /managed/sessions/:id` | Gateway 摘要、当前 Prompt、轮次和 Runtime 独立状态、`canSend` / `canCancel`。 |
+| `GET /managed/sessions/:id/transcript?before=&limit=` | Gateway 展示日志的时间正序窗口，返回 `olderCursor` 和 `lastEventId`。 |
+| `GET /managed/sessions/:id/events` | 经过鉴权的 SSE，以 `Last-Event-ID` 恢复观察；断流不取消执行。 |
+| `POST /managed/sessions/:id/cancel` | 用 `{promptId}` 请求取消明确的一轮，返回 `{accepted}`；不能误取消之后的新轮。 |
+
+目录和 transcript 的 `limit` 范围为 1～100，默认 50。目录的 `nextCursor` 用于继续翻页；transcript 的 `before` 不包含指定事件，用 `olderCursor` 加载更早历史。读接口只读取 Gateway 绑定和日志，不 attach、restore、prepare 或创建 Runtime；已移除或不可信工作区的历史仍可读，写操作按绑定工作区失败关闭。
 
 创建和续轮请求使用 `Idempotency-Key`，当前本地原型还使用 `X-Qwen-Managed-Client-Id` 做调用者关联。生产实现必须从已认证请求上下文派生 tenant/user 身份，不能相信请求 body 或普通 header 自报身份。
 
@@ -256,11 +261,29 @@ assistant_delta
 tool_requested
 runtime_starting
 runtime_ready | runtime_failed
+tool_started
 tool_completed
-completed | failed
+cancelling
+completed | failed | cancelled
 ```
 
-Runtime readiness 与 Prompt outcome 是两个独立状态轴：无 Tool 的轮次可以先完成，Runtime 稍后 Ready；客户端可在后续状态读取或重连中观察它。
+Runtime readiness 与 Prompt outcome 是两个独立状态轴：`phase` 区分准入、模型运行、等待 Runtime、工具运行、取消中和终态；`runtimeState` 独立区分 `unknown`、`starting`、`ready`、`failed`。无 Tool 的轮次可以先完成，之后 Runtime 启动失败也不能把已完成答案改成失败；Gateway 重启后 Runtime readiness 回到未知，等待新的准备确认。
+
+`tool_requested` 只表示模型请求工具，Runtime 未就绪时显示等待；完成 manifest 校验并即将 execute 时才发出 `tool_started`。取消先持久化请求，再中断模型或工具；`accepted: true` 不等于已经终止，已提交的完成结果在竞争中仍保持完成。客户端根据后续状态确认取消结果。
+
+### 5.3 会话展示、恢复与 Web Shell
+
+展示对象始终是 **Gateway Session**。Runtime 缺席、更换或回收不会新增或删除展示任务；普通会话目录继续隐藏 `managed-gateway` 内部 Runtime Session。已有 Agent View roster 管理 supervisor 的后台任务，不能作为 Gateway Managed 会话的权威目录。
+
+Gateway 在独立 `presentation.jsonl` 追加用户消息、助手文本、可展示的思考摘要、有界工具信息和生命周期事件。每个事件包含稳定 `sessionId`、`promptId` 和会话内单调递增的事件 ID，落盘后才向客户端发布。Inbox 仍负责准入和 Prompt 结果，模型 conversation store 仍负责后续模型上下文；展示日志不参与执行。
+
+客户端先取 transcript 与同一快照的 `lastEventId`，再订阅之后的事件；重复事件按 ID 去重，`stream_gap` 触发重取快照，不重新提交 Prompt。目录/会话切换会中止读取与 SSE，并阻止迟到数据更新当前页面。创建或续轮响应不确定时保留原 payload 和 `Idempotency-Key` 重试，避免产生第二次执行。
+
+Web Shell 根据 `managed_sessions` capability 显示独立 Managed Agents 入口，提供目录、历史、新建、续轮和取消；取消还要求 `managed_session_cancel`，操作按钮遵循服务端 `canSend` / `canCancel`。复用现有消息渲染，单独显示 Runtime 状态，支持中文文案；不挂载普通会话的模型切换、fork、archive 等不支持操作。URL `?managed=1&managedSession=<id>` 恢复 Managed 选择，不调用普通 Session load/restore。
+
+浏览器按 daemon URL 保存稳定 Managed client ID。清理该浏览器存储会改变目录关联，不会删除服务器历史。当前 bearer operator 与 client ID 只构成实验调用者关联，不是生产多租户身份系统。
+
+升级前的 P8 数据可从 inbox 恢复用户准入和结果，但不会从单独的模型 conversation store 补造旧助手/工具展示历史。新增日志支持重启恢复；状态目录按监听地址和端口区分，重启需保持相同配置。响应页和实时缓存有界，磁盘日志的保留期限、压缩和索引仍待实现。
 
 ## 6. Runtime Activator：不绑定 Kubernetes
 
@@ -353,7 +376,7 @@ Rust 适合未来独立的高吞吐 Gateway、placement service 或 sandbox supe
 
 这证明“权威推理不依赖 Runtime Ready”，但本次 Runtime Ready 前产生的是 thought，不是用户可见 final text；是否能在工具前展示有价值的自然语言，仍取决于模型和 Prompt。评估时必须区分 HTTP ACK、thought、首个 final delta 和首个 Tool result，不能把 ACK 当 TTFT。
 
-## 9. P0～P8 演进与当前有效口径
+## 9. P0～P8 及会话展示后续的当前有效口径
 
 | 阶段                                          | 结论                                                        | 当前状态                               |
 | --------------------------------------------- | ----------------------------------------------------------- | -------------------------------------- |
@@ -366,6 +389,7 @@ Rust 适合未来独立的高吞吐 Gateway、placement service 或 sandbox supe
 | [P6](managed-agent-tool-runtime-p6.md)        | Gateway 持有模型和历史，ACP Runtime 只执行工具              | 所有权边界保留                         |
 | [P7](managed-agent-eager-authoritative-p7.md) | 第一次权威模型调用与 Runtime 并行，只在 Tool 边界等待       | 当前关键行为                           |
 | [P8](managed-agent-remote-runtime-p8.md)      | Gateway 与 Runtime 拆为两个进程，以私有 HTTP v1 连接        | 当前原型边界                           |
+| [P8 后续](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示与恢复、独立状态、取消和 Web Shell | 已实现并验证，独立于 P9 自动激活 |
 
 实验代码的主要锚点：
 
@@ -377,26 +401,39 @@ Rust 适合未来独立的高吞吐 Gateway、placement service 或 sandbox supe
 - `packages/cli/src/serve/managed-runtime-provider.ts:LocalManagedRuntimeProvider`
 - `packages/cli/src/serve/managed-runtime-provider.ts:RemoteManagedRuntimeProvider`
 - `packages/cli/src/serve/routes/managed-runtime-worker.ts:registerManagedRuntimeWorkerRoutes`
+- `packages/cli/src/serve/managed-gateway-session-events.ts`：Gateway 展示日志和事件投影
+- `packages/sdk-typescript/src/daemon/DaemonClient.ts`：Managed REST 与 SSE 客户端
+- `packages/web-shell/client/components/managed/ManagedSessionsPage.tsx`：Web Shell 目录和控制入口
 
 ## 10. 当前体验方式
 
-实验工作树完成构建后，可以用两个端口验证进程边界：
+在上述实验分支的仓库根目录构建并生成 bundle；Node.js 要求 22 或更高，Gateway 沿用已有的模型配置。2026-09-08 验证时全局 `qwen` 0.23.0 不包含 Managed 参数，因此下面明确运行本分支产物。
+
+```bash
+npm ci
+npm run build
+npm run bundle
+```
+
+将 `/workspace` 换成两个进程都可访问的实际工作区，在两个终端分别启动。下列 token 仅为本地示例，应替换为自己的值：
 
 ```bash
 # Tool-only Runtime worker
-QWEN_SERVER_TOKEN=runtime-secret qwen serve --no-web --port 4181 \
+QWEN_SERVER_TOKEN=runtime-secret node dist/cli.js serve --no-web --port 4181 \
   --experimental-managed-runtime-worker --workspace /workspace
 
-# 常驻 Gateway
+# 常驻 Gateway，保留 Web Shell
 QWEN_SERVER_TOKEN=gateway-secret \
 QWEN_MANAGED_RUNTIME_TOKEN=runtime-secret \
-qwen serve --no-web --port 4170 \
+node dist/cli.js serve --port 4170 \
   --experimental-managed-agents \
   --experimental-managed-runtime-url http://127.0.0.1:4181 \
   --workspace /workspace
 ```
 
-不设置 `--experimental-managed-runtime-url` 时，实验保留 P7 的本地进程内 Provider。远程模式要求 Runtime Bearer token；非 loopback 地址必须使用 HTTPS。
+通过 Gateway 输出的 Web Shell 登录入口完成现有 daemon 鉴权，再点击侧栏 Managed Agents，或使用 `http://127.0.0.1:4170/?managed=1`。新建后可刷新恢复、续轮和取消；阅读历史不会启动或接入 Runtime。为了验证延迟 Runtime，可先启动 Gateway、发送需要读取工作区文件的任务，看到等待状态后再启动 Runtime worker。
+
+不设置 `--experimental-managed-runtime-url` 时，实验保留 P7 的本地进程内 Provider。远程模式要求 Runtime Bearer token；非 loopback 地址必须使用 HTTPS。P9 自动创建 Runtime 尚未实现，当前远程模式仍需自行启动 worker。
 
 这只是架构验证，不应直接部署为生产多租户服务。
 
@@ -452,7 +489,7 @@ authoritative answer completed
 
 ## 13. 已完成验证与限制
 
-P8 实验累计的针对性自动化验证包括：
+以下为原 P8 阶段的历史验证记录，不代表本次全部重跑：
 
 - Core Managed runtime：29 个测试；
 - Gateway 模型、会话事件、历史与 Runtime Provider：49 个测试；
@@ -462,10 +499,19 @@ P8 实验累计的针对性自动化验证包括：
 - ACP bridge 全量：838 个测试；
 - Core 与 ACP bridge typecheck 通过；CLI typecheck 被工作树既有 Ink 类型漂移阻塞，未发现 Managed Agents 新增错误。
 
+2026-09-08 会话展示与控制的新增验证（macOS，Node 22.22.3）：
+
+- 全仓 build、CLI bundle 和所有 workspace package typecheck 通过。根 `typecheck` 的 integration 部分仍有 4 个基线错误：1 个 daemon worker callback 隐式类型、3 个 source/dist `ProcessRegistry` 私有类型冲突；用同一依赖对干净 P8 `4df73b9c76` 复现了相同错误。前述历史 CLI Ink 问题不是本次结果。
+- Core 持久化针对性测试 22 个、CLI Managed/service/HTTP/orchestration 测试 63 个、SDK Managed/SSE 测试 22 个通过；Web Shell 完整 App 回归及 Managed、独立 URL 测试通过，最终中文文案回归通过；修改源文件的 ESLint 和 diff 检查通过。
+- 真实 Gateway + 延迟启动的 Runtime worker、确定性本地模型端点通过创建、幂等重试、鉴权与调用者隔离、未知工作区拒绝、重启恢复、历史分页、SSE 恢复、续轮、准确取消指定 Prompt 和实际文件读取。再次重启保留完成/取消结果，没有重新调用模型。
+- 浏览器验证通过新建、刷新恢复、续轮、取消和中文展示。流缺口、网络重试、切换竞态和审批可见性依靠组件/路由测试验证，不作为手工浏览器已测项目。
+- 本次未调用外部真实模型 Provider，未验证生产部署、Windows 或 Linux；第 8.2 节的 Kimi 时序是此前 P8 实测，不是本次新增证据。详细验收口径见 [Session Surfaces](managed-agent-session-surfaces.md#validation-on-2026-09-08)。
+
 仍未完成：
 
 - 固定 Runtime URL 之外的自动创建、placement、探活选择和 fenced lease；
-- 生产级多租户身份、分布式 Session store、持久事件 replay 与原子恢复边界；
+- 生产级多租户身份、分布式 Session store，以及 inbox 与模型 conversation store 的原子恢复边界；
+- 展示日志的磁盘压缩、保留期限和索引；升级前 P8 的助手/工具展示历史不自动回填；
 - Runtime 动态 MCP/Skill 能力发布、权限回传和 progress streaming；
 - Shell、写文件和其他 mutating Tool 的权限与 side-effect ledger；
 - Runtime idle eviction、预热池、资源配额和成本模型；

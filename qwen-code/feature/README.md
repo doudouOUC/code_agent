@@ -9,7 +9,7 @@
 
 | 主题 | 文档 | 状态 | 一句话 |
 |---|---|---|---|
-| Managed Agents | [managed-agents/](managed-agents/README.md) | P0～P8 本地实验，未进入 upstream `main` | 常驻多租户 Gateway 持有模型和会话，按需 Tool-only Runtime 承载工作区、MCP 与 Skill；模型与 Runtime 并行启动，只在 Tool Call 边界等待。 |
+| Managed Agents | [managed-agents/](managed-agents/README.md) | P0～P8 + 会话展示与控制已推送实验分支，未进入 upstream `main` | Gateway 持有模型、会话目录与持久展示历史；Web Shell 支持新建、续轮、取消和恢复；Tool-only Runtime 只在工具边界接入，P9 自动激活待实现。 |
 
 > 本节不计入下方按 @doudouOUC 个人 PR 汇总的 23 篇方案，也不代表 upstream 已落地能力。
 
