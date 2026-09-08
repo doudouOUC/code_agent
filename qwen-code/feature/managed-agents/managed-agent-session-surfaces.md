@@ -1,6 +1,6 @@
 # Managed Agent session surfaces
 
-> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [dfb1309f15](https://github.com/doudouOUC/qwen-code/commit/dfb1309f15297df37d60131bfa41038b27a39dad) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [b14ca3c683](https://github.com/doudouOUC/qwen-code/commit/b14ca3c68393364b1c4d6c065351c3ea10659a29) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status and scope
 
@@ -168,3 +168,30 @@ implements opt-in automatic worker startup, workspace reuse, owned-worker fencin
 cancellation, and awaited cleanup. Its validation section records the macOS
 process checks and remaining platform/E2E limits. Fixed-URL and in-process
 providers remain available without the auto-local flag.
+
+## Live progress visibility
+
+The Managed transcript must have a bounded flex column around the shared
+MessageList. That list owns scrolling and follows new messages; letting it grow
+inside a block with hidden overflow clips new thinking, tool activity, and
+answers instead of scrolling them into view.
+
+A compact status above the composer shows submission/loading immediately, then
+the active Managed phase and elapsed time from admission. It remains visible
+while reading earlier messages and during silent model/tool intervals, explains
+why another prompt cannot be sent, and disappears when the turn finishes. Its
+state comes from the Managed session, independently of ordinary chat streaming
+and Runtime readiness. Existing transcript rows show thinking summaries and tool
+details; no second event stream or model request is needed.
+
+Regression checks must cover a long transcript in a real browser, first and
+continuation turns before any model content, incremental thought/tool rows,
+silent intervals, completion/cancellation, and session switching. A mocked
+MessageList alone cannot verify clipping or automatic scrolling.
+
+The 2026-09-08 macOS preview reproduced an 11,551px-tall message list clipped by
+a 660px block parent. After the fix, the parent and list both measured 660px;
+the list scrolled its 1,631px content to the bottom while the parent stayed
+unscrolled. The existing session and Runtime were preserved. Build, bundle,
+workspace package typechecks, and 26 focused Managed tests passed; root
+integration typechecking still reports the four known baseline errors above.
