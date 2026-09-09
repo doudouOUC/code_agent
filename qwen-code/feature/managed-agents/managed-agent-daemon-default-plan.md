@@ -24,6 +24,6 @@
 
 M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复，build/typecheck/bundle、521 项定向测试、真实取消和正向读取、自审与独立审查通过。三个普通 factory 尚未切换；MCP/Hooks 依赖判定和 Channels 入口隔离尚无实现或验收证据。下一步调查和实现第 1 项，Gateway 转写及完整工作区/后台/历史能力不阻挡该调查。
 
-创建边界调查已确认：当前 ChannelFactory 仅接收 cwd/env，同一 Bridge 复用一个 channel，sourceType 在之后的 newSession 才传入，不能只替换 factory 就按 Channels 会话分流。后续应在创建/恢复时固定并持久化 owner。MCP 的有效集合包括 extension、runtime 和 Session 注入；Hooks 也受 extension、trust 与 disable 设置影响，不能只读取 settings 中一个字段就声称兼容选择完整。
+创建边界调查已确认：当前 ChannelFactory 仅接收 cwd/env，同一 Bridge 复用一个 channel，sourceType 在之后的 newSession 才传入，不能只替换 factory 就按 Channels 会话分流。[执行引擎详细设计](managed-session-execution-engine.md)明确先补严格持久归属和配置加载/恢复保护，再实现同一 Bridge 的双通道。非 leased ACP、原生 CLI 和运行中会话切换也必须防止跨引擎接管。MCP 的有效集合包括 extension、runtime 和 Session 注入；Hooks 也受 extension、trust 与 disable 设置影响，不能只读取 settings 中一个字段就声称兼容选择完整。
 
 每步沿用设计、基线或复现、实现、相关包定向测试、build/typecheck/bundle、真实行为验证、自审与独立审查。变更推送至 `feature/managed-agents-p0-p8` 并同步 companion 方案。未经验证的兼容判定不得用于扩大默认范围。

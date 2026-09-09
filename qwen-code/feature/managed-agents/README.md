@@ -36,6 +36,7 @@
 | P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
 | D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host、工作区快照与可等待的通道清理已落地；其余工具边界、普通入口和默认切换待完成 |
 | D1～D5 首阶段计划 | [默认替换首阶段计划](managed-agent-daemon-default-plan.md) | 用户调整后的范围、兼容选择边界和剩余验收 |
+| D1～D5 执行引擎 | [会话执行引擎选择与持久化](managed-session-execution-engine.md) | 设计已审查：严格持久归属、恢复保护、双通道与兼容选择；基线测试进行中，尚未实现 |
 | D1～D5 工具边界 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 阶段 2：Read/Write/Edit/Shell 及 Glob/可选 LS/Grep、owned v2 绑定与子作用域已接通；其余工具及初始化继续实施 |
 | D1～D5 子任务与历史 | [子任务与持久文件历史](managed-agent-child-scopes.md) | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份 |
 | D1～D5 搜索工具 | [Glob 与可选 LS](managed-agent-search-tools.md) | 真实父子 worker 搜索、独立目录与 ignore、记忆及外路径权限，四组加 prior-read 回归通过 |
