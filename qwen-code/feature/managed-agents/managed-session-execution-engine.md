@@ -53,6 +53,14 @@ Managed 的 writer lease 是必要条件，但 `experimentalZedIntegration` 和�
 
 保留原 spawn factory 为 legacy，另提供 Managed factory。只把可复用 channel、在途创建和对应 idle 状态按引擎分槽；继续使用一个 `byId`、一个总量 admission 和 `aliveChannels`。同一种引擎并发创建合并，不同引擎独立创建。dying、初始化失败、晚到响应和 shutdown 仍须等实际所属资源退出，不能因新槽可用而遗忘旧通道。
 
+第二片采用显式配对配置 `executionEngines`，包含 `legacy`、`managed` 两个 factory 与服务端 `select` 回调；与旧 `channelFactory` 同时传入时拒绝歧义。未启用配对配置的调用者保留通用单通道语义：旧注入接口也用于 Managed host，不能自动把它记为已核实 legacy。配对模式严格要求实际 new/load/resume 引擎回执。此接口尚待实现。
+
+选择回调接收经校验和快照化的既有 spawn 或 load/resume 请求及内部确认的 standalone 用途，保留 canonical workspace、来源、父会话、worktree/branch、模型与权限信息。同步总量和 ID 占用后，先登记在途操作，再异步选择，避免选择期间穿过限额或被 shutdown 遗漏。热 attach/恢复继续已有 entry；后续兼容判定还须在 attach 副作用前拒绝不支持的用途，不能只保护新建。某引擎的 quarantine 只阻断其自身新会话，全局进程与会话预算继续生效。
+
+channel slot 保存 factory、可复用 channel、在途创建和启动清理失败；idle timer 属于实际 ChannelInfo，旧 generation 的晚到清理不能取消新 generation 或另一引擎的 timer。工作区控制和 preheat 显式使用 legacy 控制通道；整体 channelLive 表示任一可用通道，legacy 子进程 RSS 仍按物理进程计数。关闭汇总所有槽与 aliveChannels，不能只等最后创建的通道。
+
+收到成功 ACP 响应但引擎回执缺失、非法或不匹配时，实际 Session 可能已经存在。必须复用原通道的未注册会话 close/drain/quarantine 路径，保留 ID 和总量占用直至确认释放；不能直接抛错后遗忘资源。branch 恢复失败清理也必须持有实际恢复通道。退出、权限和通知路由除 Session ID 外还校验 channel identity；pending replay 和生成事件分别核对已绑定的 restore channel 与 request connection。
+
 | 操作                                  | 分派依据                                                            |
 | ------------------------------------- | ------------------------------------------------------------------- |
 | 普通新建、手动内部新建                | 服务端用途和有效配置，只选一次                                      |
