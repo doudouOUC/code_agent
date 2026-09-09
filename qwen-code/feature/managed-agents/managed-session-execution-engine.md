@@ -32,6 +32,18 @@ macOS 两组隔离真实 host 验收通过：同一工作区两种引擎共存�
 
 本片使用实际配对 host test-script，尚未覆盖普通 daemon 默认入口、所有配置兼容组合、容量压力、权限对话或取消扩展 fallback。普通四处 factory 还未接线，不能将双通道验收等同默认替换完成。原始证据及范围见本地 `.qwen/issues/managed-engine-dual-channel-verification.md`，主任务独立回读摘要在 `.qwen/e2e-tests/managed-engine-dual-channel-root-audit.json`。4170 预览与用户数据未作为夹具。
 
+## 第 3 片的配置读取基础
+
+新增严格 settings 读取，复用原有四层合并、环境变量替换、trust 和版本迁移规则；迁移只在内存完成，损坏 JSON 不备份或重置文件。Managed channel、实际 host bootstrap 与后续 new/load/resume 都使用这个入口。项目 MCP 合并在实际 Managed Config 构造前拒绝读取或解析错误，避免把不完整配置当成空集合。普通 legacy settings 保留既有恢复语义，MCP 的 legacy 合并仍警告并保留有效条目。
+
+settings 与项目 MCP 共用严格文件读取：只有确认路径缺失才返回缺省；非普通文件、悬空文件或祖先目录软链接、读取失败和读取期间检测到的变化均报错。非普通文件在读取前拒绝，JSON 错误不包含配置内容。独立审查发现的祖先软链接误判已通过真实 loader 基线复现并修复。
+
+build、typecheck、bundle、相关 lint、自审和独立复审通过。最终读取及调用链的八个测试文件共 659 项通过，ACP 的 604 项回归也通过。macOS 最终产物验证包含五种 settings 输入、四种悬空路径，以及实际 Managed host 的四次启动拒绝和同一活 host 的十二次 new/load/resume 拒绝；拒绝前后配置和历史原字节不变，没有新增模型请求或工具执行。修复测试配置后，原 managed owner 保持，load 后再次完成真实 Runtime Read 和持久 final；两轮 Read 共四次模型 HTTP。
+
+三组自有进程、端口、writer 锁和目录均完成清理；1168 项定向源码/产物/夹具指纹包含全部 482 个根 bundle chunks，悬空路径组另含自己的脚本，不代表完整外部依赖闭包。主任务重新核对原始配置、ACP 请求/错误回执、工具输出和持久历史；实际 RPC 错误保留输入路径于 data.details，普通 Web Shell 的错误展示仍待普通入口验收。原始证据见本地 `.qwen/issues/managed-engine-strict-config-verification.md`，4170 与用户数据未用作夹具。
+
+这是每次配置读取的基础保护，尚不构成 selector 与执行端共享的跨来源原子快照。全局 settings 文件位置仍沿用现有 Storage/system path getter，显式 runtimeEnvironment 绑定变量替换；不同 QWEN_HOME/system path 的来源隔离还需随实际 Config/extension 输入一起处理。返回的 LoadedSettings 也仍保留管理写方法，不能将其称为不可变对象。extension 状态、动态 MCP/Hooks、共同兼容策略和四处普通 factory 接线继续按下述第 3 片设计实施。
+
 ## 不变量
 
 1. 同一 Session ID 的执行引擎不可变。创建、冷恢复决定连接，后续发送、取消、审批、模型设置和关闭沿既有连接执行。
@@ -97,6 +109,20 @@ channel slot 保存 factory、可复用 channel、在途创建和启动清理失
 服务端需传入创建用途，不能把缺省 source 或字符串 `default` 当作完整支持证明。例如手动定时运行目前使用 `default` 加 `scheduled_task_run:`，子会话有父关联，Channel 有可信来源；这些均须进入共同选择入口。当前不能绑定的 worktree/cwd/context、模型/权限或延期能力组合选择 legacy。
 
 实际 Managed host 初始化前复核必要配置。如果选择后配置变化，不在初始化副作用开始后改投 legacy。已 Managed Session 的后续配置变更只能在已验证范围内应用，超出范围准确失败。有限默认启用必须有正向可达的普通创建范围；不能以所有请求都选 legacy 通过测试来宣称替换成功。
+
+### 第 3 片接线设计
+
+当前普通创建的四处入口分别为 `runQwenServe` 的 primary、secondary、dynamic/replacement，以及 `createServeApp` 未注入 Bridge 的默认入口。四处使用共同的 CLI 内部工厂组合：保留各自既有 legacy factory、有效环境、工作区目录、generation guard、共享准入和诊断，再配置 Managed factory 与服务端 selector。注入 Bridge/registry 的嵌入者保留自有生命周期，Tool-only worker 继续原路径，不能递归创建完整 Managed Agent。普通 Managed 执行资源独立于实验展示页是否启用；不以实验页开关决定普通会话的执行引擎。
+
+兼容输入必须来自实际 workspace runtime，包含用途、canonical cwd、可信状态、有效环境、真实 argv、settings 各层、MCP 各来源及动态注入状态。MCP 除 settings 和 `.mcp.json`，还包含 CLI/session top-tier、active extensions、`mcp.serverCommand`、bootstrap/session runtime map 与 client MCP。Hooks 除 settings/active extension，还包括 session/Skill/agent 动态注册。创建时结果分为兼容、延期依赖、不确定；仅兼容选择 Managed，另两者选择 legacy。恢复先读严格持久 owner，Managed owner 必须通过同一兼容检查；热 attach 不重选，只在副作用前检查用途和配置变更是否受支持。
+
+现有 `loadSettings` 会迁移/修复文件，extension store 的读取会加锁、恢复并落盘，部分 loader 又把读取错误变为空集合。因此需要严格、无修复写入的配置快照入口，复用既有解析、合并、scope 和环境替换规则；明确区分 ENOENT、读取失败、损坏内容和未知版本。迁移计算可在内存完成，不能在选择过程中规范化或重置原文件。`.mcp.json` 的解析/读取诊断不能在合并时丢弃。extension cache 只有完整且仍对应所读源时才可证明空集合，部分或陈旧 cache 不能作为正向选择依据。明确仍有延期能力声明而仅因 pending/disabled 尚未连接，不以零 toolCount 认定已完成迁移。
+
+selector 和实际 Managed bootstrap/new/load/resume 使用同一兼容规则和可核对的输入快照。后者在 Hooks/MCP/模型/工具初始化前核对实际将使用的数据与动态注入；避免第一次选择后又从容错 loader 得到另一份配置。配置变化导致不兼容时准确拒绝并沿所属通道清理。后续 runtime/client MCP add、Hook/extension reload 等变更必须检查现有 Managed owner，不能绕过创建限制向其注入延期能力；legacy 上仍保留原有行为。快照不包含持久凭据副本，日志只记录来源类别与原因。
+
+普通资源接线还必须覆盖 shutdown、workspace drain/revoke、generation 失效和环境重载。现有本地 Runtime activator 自带进程 registry，接入共享资源管理时要区分释放自身资源与关闭整个 daemon registry；不能让一个工作区释放掉另一个引擎的进程。legacy 子进程、worker 进程树、驻留 Config 和会话数按实际口径计数；现有 child heap 观测不是硬内存限额，不能在状态中宣称新增硬限制。四处工厂统一沿现有 CLI 选项转换，当前应保留 LSP 与恢复提问开关，不重新解析宿主 argv。
+
+第 3 片先验证严格配置输入和普通 legacy 基线，再实施共同兼容策略与实际 host 保护，随后接四处工厂和变更入口。验收必须包含普通无延期依赖配置真正选中 Managed、有效/未知依赖保留 legacy、两种 owner 冷恢复、选择后配置变化、热 attach 与动态注入边界，以及同工作区两种引擎和多工作区隔离。该节是待实现设计，第二片的两组 host 验收不能用作这里的完成证据。
 
 ## 实施与验收顺序
 

@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [7ed5cfcd70](https://github.com/doudouOUC/qwen-code/commit/7ed5cfcd7087ca1787063620e2d2d3ecd7f70354)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [a836081466](https://github.com/doudouOUC/qwen-code/commit/a8360814668b3dfdff72ad3d99cbcaf26dd009a9)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-09。
 
 > 当前产品目标：让 Managed Agent 替换 daemon 默认执行实现。用户最新明确首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
@@ -17,7 +17,7 @@
 >
 > 此前补齐 PDF 物理取消：521 项定向测试与完整 build/typecheck/bundle 通过；五阶段真实取消、两次同 worker 后续读取和独立六页 PDF 正向读取通过。进程组与输出目录在物理回执前清理，失败夹具与限定证据完整保留；两轮自审与独立源码审查无新增阻塞，详见[媒体方案](managed-agent-media.md)。
 >
-> 执行引擎归属第一片已完成：完整物理 owner 读取、writer lease 内严格落盘、Config/CLI/UI 恢复保护和实际 ACP 回执，7 组真实进程验收通过。本次完成第二片同一 Bridge 的双通道与归属绑定：885 项定向测试、build/typecheck/bundle、两轮自审和独立审查通过。两组真实 host 验收覆盖共存、双向模型流取消、普通关闭后冷恢复与活会话交接，合计 10 次原生 Read/final、22 次模型 HTTP；物理资源和 writer 凭据已独立核对。有效配置兼容选择与普通默认入口尚待接线；详细证据和未覆盖范围见[执行引擎方案](managed-session-execution-engine.md)。
+> 执行引擎归属第一片已完成：完整物理 owner 读取、writer lease 内严格落盘、Config/CLI/UI 恢复保护和实际 ACP 回执，7 组真实进程验收通过。第二片同一 Bridge 的双通道与归属绑定已完成：885 项定向测试、build/typecheck/bundle、两轮自审和独立审查通过。两组真实 host 验收覆盖共存、双向模型流取消、普通关闭后冷恢复与活会话交接，合计 10 次原生 Read/final、22 次模型 HTTP；物理资源和 writer 凭据已独立核对。本次补齐严格 settings/项目 MCP 读取：不迁移落盘或重置坏配置，损坏的祖先软链接也明确拒绝；659 项相关单测、604 项 ACP 回归和三组最终真实验证通过，涵盖十六次配置拒绝与修复后原会话恢复 Read。有效配置兼容选择与普通默认入口尚待接线；详细证据和未覆盖范围见[执行引擎方案](managed-session-execution-engine.md)。
 >
 > 普通默认入口尚未切换，4170 预览未访问或重启。最新优先顺序是创建时选择引擎并持久化执行所有者，发送/取消/恢复按所有者分派，接通普通 Web Shell/SDK，再完成必要故障验收和有限范围默认启用。完整图片展示/产物、工作区/Skills 配置迁移、后台/子任务/自动记忆补齐、文件历史/撤销/分支迁移暂缓，已验证能力保留。正确 cwd、信任、模型权限配置、有效 MCP/Hooks 依赖及 Channels 来源识别和最小恢复仍是必要基础。旧会话和兼容性未知的会话在创建时固定旧路径，运行中不换引擎，Managed 失败不隐式降级重跑。局部工具验收不代表全部默认替换完成；定时任务核心链路和延期能力仍在总目标范围。
 
@@ -38,7 +38,7 @@
 | P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
 | D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host、工作区快照与可等待的通道清理已落地；其余工具边界、普通入口和默认切换待完成 |
 | D1～D5 首阶段计划 | [默认替换首阶段计划](managed-agent-daemon-default-plan.md) | 用户调整后的范围、兼容选择边界和剩余验收 |
-| D1～D5 执行引擎 | [会话执行引擎选择与持久化](managed-session-execution-engine.md) | 归属与双通道已实现并分别通过 7 组、2 组真实验收；有效配置兼容选择与普通默认入口待完成 |
+| D1～D5 执行引擎 | [会话执行引擎选择与持久化](managed-session-execution-engine.md) | 归属、双通道及严格配置读取基础已实现并验收；全来源兼容选择与普通默认入口待完成 |
 | D1～D5 工具边界 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 阶段 2：Read/Write/Edit/Shell 及 Glob/可选 LS/Grep、owned v2 绑定与子作用域已接通；其余工具及初始化继续实施 |
 | D1～D5 子任务与历史 | [子任务与持久文件历史](managed-agent-child-scopes.md) | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份 |
 | D1～D5 搜索工具 | [Glob 与可选 LS](managed-agent-search-tools.md) | 真实父子 worker 搜索、独立目录与 ignore、记忆及外路径权限，四组加 prior-read 回归通过 |
