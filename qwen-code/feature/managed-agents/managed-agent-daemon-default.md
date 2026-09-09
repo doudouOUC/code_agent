@@ -224,3 +224,9 @@ NotebookEdit 已使用原生 Runtime 实现，与 Read 共享所属会话的完�
 ### 2026-09-09 Notebook 取消时序与 v2 回执
 
 原生 NotebookEdit 增加执行入口、准备结束和最终 freshness check 之后的取消检查，避免取消后再发起写入；已完成的物理写入继续返回成功。Remote v2 provider 在 release 时封闭新调用准入，同时保留已派发 execute 的响应等待。151 项去重定向测试、三组真实完整 host 受控取消验收、build/bundle/typecheck、两轮自审及独立源码审查通过；56 项产物摘要稳定，所有试验进程、端口和临时目录完成清理。准确边界和失败基线见 [Notebook 专项复验](managed-agent-notebook-tools.md)。本阶段仍未切换三处普通 factory；下一步继续多媒体与有效配置传递，再按完整清单推进默认替换。
+
+### 2026-09-09 多媒体 M1 与调用能力快照
+
+[多媒体方案](managed-agent-media.md)的 M1 已接通 invocation 媒体快照、所属 Runtime 原生 Read/Zoom 和 v2 媒体预算。633 项去重定向测试、build/typecheck/bundle、两轮自审及独立源码审查通过；最终完整 host 中 Read/Zoom 和超过 8 MiB 的六页 PDF 从 worker 到物理回执再到模型的字节与哈希一致，worker 不调用模型，Gateway 不读取媒体文件。真实空 WAV 另经 native/dispatcher/Session 内部夹具验证：成功结果与 Hook 保留，重复查询不再执行工具，close 正常释放。完整 host 两组 81 项、空 WAV 组 83 项源码/构建摘要稳定，全部试验进程、端口和目录完成清理。PDF 组的实际 Hook 错误已如实保留，不将媒体通过扩大为全部 Hook 验收。
+
+该阶段仅覆盖已列明的媒体路径；PDF 转写 executor、物理渲染取消、DisplayImage 客户端展示、近上限并发回执和通用超限结果的关闭收敛仍待完成。后续继续 M2/M3 及原工具、初始化、历史和客户端清单，三处普通 factory 尚未切换，当前 4170 预览及用户数据保持原状。
