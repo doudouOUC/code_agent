@@ -220,3 +220,7 @@ Grep 的公共声明、原生 Runtime 执行、配置传递和 POSIX 进程退�
 NotebookEdit 已使用原生 Runtime 实现，与 Read 共享所属会话的完整读取记录。模型公共声明保持一致，用户修改整份 notebook 通过私有 prepare 元数据与旧引用关联；取消排空后重新准备、审批，保留用户修改说明和原生写入/备份规则。689 项去重定向测试及真实完整 host 的 Read→编辑→最终回复通过；私有 wire 追加验证两轮修改、幂等准备、失效引用拒绝与实体父备份。测试边界、失败夹具及未覆盖项见 [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md)。独立 Agent 仍受额度限制，本轮采用主任务人工审查。
 
 本切片没有切换 primary、secondary、replacement 普通会话 factory。后续继续完成 Notebook 故障时序和多媒体边界，以及此前工具/初始化/历史/客户端迁移清单；完整默认替换目标保持不变，当前预览及用户数据不参与试验。
+
+### 2026-09-09 Notebook 取消时序与 v2 回执
+
+原生 NotebookEdit 增加执行入口、准备结束和最终 freshness check 之后的取消检查，避免取消后再发起写入；已完成的物理写入继续返回成功。Remote v2 provider 在 release 时封闭新调用准入，同时保留已派发 execute 的响应等待。151 项去重定向测试、三组真实完整 host 受控取消验收、build/bundle/typecheck、两轮自审及独立源码审查通过；56 项产物摘要稳定，所有试验进程、端口和临时目录完成清理。准确边界和失败基线见 [Notebook 专项复验](managed-agent-notebook-tools.md)。本阶段仍未切换三处普通 factory；下一步继续多媒体与有效配置传递，再按完整清单推进默认替换。

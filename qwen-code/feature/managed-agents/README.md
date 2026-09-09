@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 方案
 
-> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [291a4750e4](https://github.com/doudouOUC/qwen-code/commit/291a4750e40a51c33b4fa0fe3c1d891a98a79aa6)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
+> 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [3c6556e70b](https://github.com/doudouOUC/qwen-code/commit/3c6556e70b58bea829bba3365b7b70a1fd65f30d)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-09。
 
 > 当前产品目标：让 Managed Agent 替换 daemon 默认执行实现，兼容普通 Web Shell、SDK、Channels、定时任务及旧会话。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
@@ -9,9 +9,11 @@
 >
 > 此前完成 [Grep 原生后端迁移](managed-agent-grep-tools.md)：Gateway 使用公共声明，Runtime 按绑定配置执行原生 rg/git grep/grep，等待所属进程组退出后结算取消与释放。517 项定向测试、16 组隔离验收和两轮人工自审通过，57 个不同构建文件摘要与当前产物一致；独立审查 Agent 因额度不可用，本次采用手工复审，不记为独立审查通过。后端损坏回退、权限差异、worktree 隔离、输出限制、部分读取后写入均有实际证据。
 >
-> 本次推进 [NotebookEdit 原生迁移与审批修改](managed-agent-notebook-tools.md)：与 Read 使用所属 Runtime 的完整读取记录，完整 notebook 用户修改经私有 prepare 引用重新准备和审批，保留原生写入与父备份。689 项去重定向测试、真实完整 host 的读取/编辑/最终回复、两轮私有 wire 修改及实体父备份核验通过；55 项构建产物（含 bundle）摘要稳定，测试进程/端口/临时目录已清理。build/bundle/typecheck/lint/格式和两轮人工自审通过；独立 Agent 受额度限制，本次仅手工复审。用户端编辑器、额外取消/故障组合及多媒体仍需验证。
+> 上一阶段完成 [NotebookEdit 原生迁移与审批修改](managed-agent-notebook-tools.md)：与 Read 使用所属 Runtime 的完整读取记录，完整 notebook 用户修改经私有 prepare 引用重新准备和审批，保留原生写入与父备份。689 项去重定向测试、真实完整 host 的读取/编辑/最终回复、两轮私有 wire 修改及实体父备份核验通过；55 项构建产物（含 bundle）摘要稳定，测试进程/端口/临时目录已清理。build/bundle/typecheck/lint/格式和两轮人工自审通过；当时独立 Agent 受额度限制，仅做手工复审。该阶段未覆盖用户端编辑器、取消时序及多媒体，取消时序后续结果见下文。
 >
-> 普通默认入口尚未切换，4170 预览未访问或重启。后续补齐 NotebookEdit 故障时序及多媒体、MCP/Skills/Hooks、后台进程/Git、物理历史及可信工作区初始化；有效 CLI 配置与同会话热更新、并发长 Shell、8 MiB 以上历史、external-v1 子任务及完整客户端兼容仍待完成。搜索局部验收与此前冷加载备份验收都不代表全部默认替换或旧会话迁移完成。
+> 本次补齐 NotebookEdit 取消时序与 v2 执行回执：读取/备份期间取消不再继续写入；已写入后关闭 Session 保留成功回执并等待排空，新执行仍被拒绝。151 项去重定向测试、三组真实 worker 受控延迟验收、完整 build/bundle/typecheck、两轮自审与独立源码审查通过；56 项产物摘要一致，进程、端口及临时根已清理。详见 [Notebook 专项复验](managed-agent-notebook-tools.md)。
+>
+> 普通默认入口尚未切换，4170 预览未访问或重启。后续补齐多媒体、MCP/Skills/Hooks、后台进程/Git、物理历史及可信工作区初始化；有效 CLI 配置与同会话热更新、并发长 Shell、8 MiB 以上历史、external-v1 子任务及完整客户端兼容仍待完成。搜索局部验收与此前冷加载备份验收都不代表全部默认替换或旧会话迁移完成。
 
 ## 分阶段设计文档
 

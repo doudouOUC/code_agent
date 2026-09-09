@@ -20,7 +20,9 @@ Runtime 核对修改来源正是当前 call slot 的旧引用、工具和参数�
 
 Gateway 调度器只在 NotebookEdit 的内容修改路径传递新增元数据；现有 Write/Edit 的公开参数和改参行为保留。沿原 prepare 通道贯穿 managed binding、provider、HTTP v2、Bridge 和 ACP dispatcher；每层都需设置并消费新增字段，不能出现只声明不转发的开关。修改后的物理结果、diff、用户修改说明与备份继续走原结果/历史协议。直接更新 cell 参数的 updatedInput 仍使用原取消再准备路径。
 
-取消与释放沿既有 invocation 生命周期等待所有准备、备份及写入结束，不以 Promise race 提前宣告资源释放。是否需要补充写入前取消检查以实际基线为准；若写入已经发生，不能将物理成功改写为未执行。不得以临时禁用历史、先读缓存伪造或忽略审批通过验收。
+取消与释放沿既有 invocation 生命周期等待所有准备、备份及写入结束，不以 Promise race 提前宣告资源释放。真实基线已复现读取或备份期间取消后仍写入，因此原生 NotebookEdit 在执行入口、准备完成后、最终读取检查后且写入之前检查取消；等待中的文件操作仍须真正结束。写入已经完成则继续生成原生成功结果，不在写入后的等待返回处改判取消。不得以临时禁用历史、先读缓存伪造或忽略审批通过验收。
+
+真实基线还发现 Session release 会提前中止客户端等待 execute 回执的 HTTP，而 worker 实际仍在排空。Remote provider 保留 release 后拒绝新 execute/prepare 的准入检查，但已接纳的 v2 execute 响应等待不再受 Session release controller 中止；provider 终止和请求超时仍有效。status/cancel/history 继续原 drain 规则，v1 不变，不允许用放开新执行准入的方式修复回执丢失。
 
 ## 验证计划
 
@@ -40,4 +42,10 @@ ZoomImage 在 worker 中解码和裁剪，但使用 Gateway 解析后的有效�
 
 本阶段去重通过 Core 604 项、CLI 80 项、Bridge 5 项，共 689 项测试，含 32 项原生 NotebookEdit 回归、完整 422 项 CoreToolScheduler 回归、10 项新 Runtime/proxy 测试。根 build/bundle/typecheck、lint 通过。所有隔离 cohort 均在继续编辑/构建前退出并清理；失败记录保留。初次测试中的同步抛错断言和类型夹具已修正。首次额外 wire 探针在重复修改中执行失效引用，触发既有 provider retiring；将这项破坏性检查放在最后后通过，未修改生产保护语义。
 
-尚未将 notebook 的所有故障/平台组合分别重跑为真实 host E2E；原生三种 cell 操作及格式规则由现有 32 项回归提供证据。Notebook 专项的取消写入时序、额外 worktree/故障组合及用户端编辑器仍需继续验证。普通默认入口、全客户端和多媒体均未由本阶段验收。
+尚未将 notebook 的所有故障/平台组合分别重跑为真实 host E2E；原生三种 cell 操作及格式规则由现有回归提供证据。下述专项取消时序已复验，额外 worktree/故障组合及用户端编辑器仍需继续验证。普通默认入口、全客户端和多媒体均未由本阶段验收。
+
+### 2026-09-09 取消与执行回执复验
+
+基于 `291a4750e4` 的实际 worker 基线复现了两个问题：读取/备份期间取消后仍写入；写入完成但原生方法尚未返回时关闭会话，客户端提前报 Session released，丢失真实成功回执。修复后，在相同隔离完整 host/Bridge/HTTP/ACP worker 中完成三组受控延迟验收：read、backup 期间取消均保留原文件字节并返回 cancelled；written 期间取消并关闭 Session，execute 和 close 在延迟屏障处均未结束，恢复后依次取得原生成功、客户端成功及终结 release 确认。每组先完成模型驱动的 Read→NotebookEdit→正式 final，再经可信私有客户端执行取消场景；此结果不等于用户界面 Cancel turn 已端到端验收。
+
+三组共 9 次本地模型请求，56 个构建产物摘要在组内、组间及最终回读一致；无超时、备用强杀、残留进程或监听端口，临时根全部删除。去重 Core 103 项、CLI 48 项共 151 项定向测试通过，包含已取消的原生入口、最终 freshness check 中取消、真实文件操作等待、保留已写成功结果，以及 release 后新 execute/prepare 拒绝而已接纳 execute 回执保留。完整 build/bundle/typecheck、变更文件 lint/格式、两轮自审及独立源码审查通过。首次构建的测试包装器返回类型已修正；失败基线与错误记录均保留。当前 4170 仍由原进程监听，未访问、重启或修改用户数据。
