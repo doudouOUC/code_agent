@@ -146,15 +146,21 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 
 该实现已进入`main`。它不修改默认只读Extension、不新增daemon route，也不代表真实Mem0/Holo写入兼容已验证。
 
-### 3.13 显式单条删除（#11337 merged；#11397 open）
+### 3.13 显式单条删除（#11337/#11397 merged）
 
 #11337已合入独立schemaVersion 5 delete profile，默认Extension、search与writer都不启用。它暴露`context_get({memoryId})`读取exact full record，以及destructive/non-idempotent的`context_forget({memoryId,expectedContent})`。ID限制为1到256个ASCII安全字符且拒绝`.`/`..`；expectedContent最多4000 Unicode code points并拒绝unpaired surrogate。
 
-管理员配置绑定canonical repository root、绝对closed Delete Dialect、endpoint、credential与固定非空scope。GET必须核对exact ID、全文和全部configured scope字段；absence只接受所选404或200 JSON null契约。forget在批准后再次GET并精确比较，最多发送一次DELETE；#11337合入的`main`只认可HTTP 200与固定英文成功message（可带`!`），可选status/event/cascade/error字段也受closed约束，之后还必须GET确认absence才返回`deleted`。
+管理员配置绑定canonical repository root、绝对closed Delete Dialect、endpoint、credential与固定非空scope。GET必须核对exact ID、全文和全部configured scope字段；absence只接受所选404或200 JSON null契约。forget在批准后再次GET并精确比较，最多发送一次DELETE；之后必须GET确认absence才返回`deleted`。
 
 结果分为`not_deleted`（零DELETE）、`deleted`（回执与post-delete absence均成立）和`unknown`（已提交但回执/确认不确定），不自动retry。GET与DELETE不是provider端原子事务，部署前还需验证record ID不复用和scope不可变。搜索结果中的超长ID整体省略而不是截断，避免错误target进入删除流程。
 
-#11397仍为open响应兼容方案。真实Holo已观察到HTTP 200与`Memory <id> deleted successfully.`，#11337严格message会报告unknown。当前diff改为接受任意成功HTTP状态并要求有界严格JSON可解析，不再解释message/status/event/cascade/error字段；仍只有exact final GET确认absence才报deleted，空/204、坏JSON、非成功状态或target仍存在均unknown且不retry。该放宽尚未进入`main`，不能覆盖上面的#11337最终口径。
+#11397最终把DELETE回执与Mem0 SDK的HTTP层口径对齐：接受任意成功HTTP状态并要求1MiB内严格UTF-8 JSON可解析，不再解释message/status/event/cascade/error字段。仍只有exact final GET确认absence才报deleted；空/204、坏JSON、非成功状态或target仍存在均unknown且不retry。该兼容调整已进入`main`，但不放宽删除前ID/scope/全文、repository binding、审批或deadline边界。
+
+### 3.14 daemon/ACP Auto Recall submission provenance（#11455 open）
+
+#11455当前open diff补齐ACP session producer。普通daemon提问目前运行`UserPromptSubmit`时只传model-bound `prompt`，导致#11246的v3 Auto Recall因缺少`submitted_prompt`直接返回`{}`。当前方案在resource、slash command和model-only扩展前，优先使用trusted `promptDisplayText`，否则连接ACP request中的text blocks；只对既有`isFreshUserTurn`且projection非空白的turn附加已有optional字段。
+
+显式空display不会回退到内部channel指令，retry、tool continuation、resource/image/audio内容与model-only delegation也不制造provenance。legacy `prompt`、hook执行策略、default extension registration及单profile repository/scope绑定均不变。该字段仍是用户可控文本而非认证或DLP边界；#11455尚未合入，当前`main`中的daemon/ACP Auto Recall缺口仍存在。
 
 ---
 
@@ -171,7 +177,8 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 - #11246 声明v3 config/sanitizer/Hook CLI/integration/subprocess、真实CLI turn与all-Hook opt-out验证通过；本次复核merged head、16个changed files与最新`main`，未连接真实provider。
 - #11311 声明Mem0 package 182项、WebShell 67项、daemon integration、18个合成服务场景、build/typecheck/bundle/lint/format与真实Chrome审批展示通过；真实Holo preflight仍为403，本次未独立复跑。
 - #11337 声明Mem0 package 330项、WebShell 67项、daemon integration、170项协议/package测试、21个daemon场景与真实Chrome 4000-codepoint审批通过；真实Holo未验证，本次只复核merged diff与最新`main`。
-- #11397 当前open diff声明本地provider复现Holo回执后12个daemon场景、package tests、root build/typecheck/bundle与package lint通过；未做fresh真实Holo/PolarDB验收，本次只核对open head与当前`main`差异。
+- #11397 声明本地provider复现Holo回执后12个daemon场景、package tests、root build/typecheck/bundle与package lint通过；未做fresh真实Holo/PolarDB验收，本次只核对最终head与最新`main`落点。
+- #11455 当前open diff声明869项session测试、root build/bundle/typecheck、focused lint/format，以及loopback provider与真实Holo各四个场景通过；本次只核对open head与当前`main`差异，未连接真实provider。
 
 ---
 
@@ -183,7 +190,8 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 - #10653 已合入公开 package 与 release workflow gate；首次 bootstrap、trusted publisher 和 repository variable 仍由 release maintainer 显式完成，代码合入本身不能证明 npm.org 已有对应版本。
 - #11246 已合入独立v3 Auto Recall Hook，但不会修改默认v2 MCP manifest；启用后sanitized prompt会发送到管理员provider，sanitizer不是DLP。
 - #11311 已合入v4 daemon writer、write dialect和generic MCP完整参数preview；真实provider兼容与不确定写入后的人工核对仍由部署方负责。
-- #11337 已合入v5 exact-get/forget显式删除，当前`main`仍使用严格英文DELETE回执并要求post-delete absence；#11397只是一项open的Mem0 SDK响应兼容方案。
+- #11337 已合入v5 exact-get/forget显式删除，#11397已将DELETE响应收敛为成功HTTP+有界JSON+post-delete absence，不解释provider-specific回执字段。
+- #11455仍是open ACP producer修复；在其合入前，普通daemon/ACP fresh turn不会为#11246 Auto Recall提供`submitted_prompt`。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -208,7 +216,8 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 | [#10653](https://github.com/QwenLM/qwen-code/pull/10653) | MERGED | public npm distribution | 最终让 package/manifest 随 Qwen Code release version 同步，加入 published-version guard，并以 bootstrap variable 门控 provenance publish；package 仍不携带 provider 或管理员数据，实际 npm.org 发布需另行核验。 |
 | [#11246](https://github.com/QwenLM/qwen-code/pull/11246) | MERGED | configurable Mem0 Auto Recall | 独立v3 `UserPromptSubmit` Hook绑定canonical repository root，只以sanitized `submitted_prompt`查询管理员dialect，最多五条结果作为bounded untrusted context注入；默认v2 MCP不变。 |
 | [#11311](https://github.com/QwenLM/qwen-code/pull/11311) | MERGED | daemon memory writer | 最终新增独立v4 writer与closed create dialect，单次提交exact text并区分stored/accepted/unknown；WebShell显示generic MCP完整参数。 |
-| [#11337](https://github.com/QwenLM/qwen-code/pull/11337) | MERGED | explicit daemon memory deletion | 最终新增独立v5 delete profile与exact get/forget工具，删除前核验ID/scope/全文，只提交一次并在严格回执后GET确认absence。 |
-| [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | OPEN | Mem0 DELETE response compatibility | 当前diff改为成功HTTP+有界JSON解析，不解释provider字段，但仍需post-delete exact GET确认absence；尚非`main`能力。 |
+| [#11337](https://github.com/QwenLM/qwen-code/pull/11337) | MERGED | explicit daemon memory deletion | 最终新增独立v5 delete profile与exact get/forget工具，删除前核验ID/scope/全文，只提交一次并在DELETE回执后GET确认absence。 |
+| [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | MERGED | Mem0 DELETE response compatibility | 最终接受成功HTTP与有界严格JSON而不解释provider字段，仍需post-delete exact GET确认absence。 |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | OPEN | ACP submitted prompt provenance | 当前diff让ACP fresh nonblank turn补充已有optional `submitted_prompt`，使显式配置的Auto Recall可运行；尚非`main`能力。 |
 
-_按个人 PR 口径更新于 2026-09-09_
+_按个人 PR 口径更新于 2026-09-10_

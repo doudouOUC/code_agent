@@ -473,9 +473,15 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 
 #11339已合入live-state polling cadence协商。daemon capability可返回optional `sessionLiveStatePollIntervalMs`，App、SessionOverviewPanel和WebShellSidebar统一消费；省略或非法时回退5000ms。hook把interval timer与active polling state effect分离，配置变化不会丢已提交状态或并发重读，并保留visibility/local invalidation立即刷新、in-flight合并和30秒错误backoff。该改动没有引入SSE。
 
-#11398仍是open draft。当前diff只在顶层standalone WebShell的Settings→UI提供default-off、origin-local且跨tab同步的browser notification偏好；用户显式开启才请求权限。Provider在transcript projection后发布已观察terminal，same-session recovery保留admitted prompt；后台仍挂载chat的完成/失败发通用文本，cancelled、initial history、前台已消费terminal静默。
+#11398已合入。顶层standalone WebShell的Settings→UI提供default-off、origin-local且跨tab同步的browser notification偏好；用户显式开启才请求权限。Provider在transcript projection后发布已观察terminal，same-session recovery保留admitted prompt；后台仍挂载chat的完成/失败发通用文本，cancelled、initial history、前台已消费terminal静默。
 
-同page pane先内存去重，Web Locks与localStorage可用时再以SHA-256 turn identity和最多1024条claim跨tab协调；能力不足退化为page-local dedupe与notification tag replacement。页面/chat必须保持运行，closed-page push、未挂载chat、Channel、embedded host、daemon settings与public SDK callback均不在当前diff；不能把它写成`main`能力。
+同page pane先内存去重，Web Locks与localStorage可用时再以SHA-256 turn identity和最多1024条claim跨tab协调；能力不足退化为page-local dedupe与notification tag replacement。页面/chat必须保持运行，closed-page push、未挂载chat、Channel、embedded host、daemon settings与public SDK callback均不在#11398范围。
+
+## 2026-09-10 follow-up：通知内容、品牌与点击导航
+
+#11447当前仍为open。当前diff在#11398终态事实之上，按`promptId`从完成transcript投影中提取顶层user/assistant block；admission label或pending event文本作为prompt fallback。通知标题使用应用名与最多60个Unicode code point的session title，正文包含本地化状态、最多80个code point的本轮提问和最多120个code point的回复纯文本摘要；failed turn不展示部分回复或错误详情，并提供随包图标。
+
+binding捕获workspace、standalone或Live session target。点击通知后向所属WebShell实例的私有`EventTarget`派发导航事件，App复核context与locked workspace，退出settings/split view并复用既有session loader；健康current session只收起panel，不重新load。`WebShellWithProviders.browserNotifications`允许嵌入宿主配置默认值、app name和icon；默认关闭，而内置standalone当前diff传`defaultEnabled:true`，只影响没有保存偏好的站点且仍不自动请求权限。标题/提问/回复会进入系统通知中心或锁屏，这一open方案尚未进入`main`。
 
 ---
 
@@ -524,4 +530,4 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-09_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-10_

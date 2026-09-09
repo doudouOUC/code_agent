@@ -1,12 +1,12 @@
 # daemon 资源预算、容量模型与公平调度
 
-> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget，以及 #9380 已合入的 ACP child peak old-generation measurement。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
+> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget、#9380 已合入的 ACP child peak old-generation measurement，以及 #11428 已合入的 workspace注册/child建模/Channel事务预算常量解耦。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
 
 ## 背景
 
 multi-workspace daemon 已经把 workspace runtime、session ownership、EventBus replay、file/transcript paging 等边界拆开，但资源保护仍主要停留在 workspace/session 数量、MCP client budget 和各 route 的局部 byte cap。缺口在于：bulk 操作、spawn/process work、buffered process output、fanout/replay/export 等路径可能共享同一 Node 进程内存与队列；单个 workspace 的重活如果没有全局和 per-workspace 公平 admission，会挤占其它 workspace 的 prompt completion、错误响应、cleanup 和 shutdown 空间。
 
-#8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型，但仍不应用、不拒绝 spawn。#9380 已合入 enforcement 前需要的真实 old-generation peak measurement。#8911 是第一段已接入生产 daemon-owned ACP child 的 buffer bound：它限制 NDJSON frame 与 decoded inbound queue；#8947 已合入覆盖 ACP SDK dispatch 后的 handler/outbound/request 队列；#9007 已合入继续覆盖 ACP HTTP pre-attach buffered replies 和 delivery-owned leases。
+#8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型，但仍不应用、不拒绝 spawn。#9380 已合入 enforcement 前需要的真实 old-generation peak measurement。#8911 是第一段已接入生产 daemon-owned ACP child 的 buffer bound：它限制 NDJSON frame 与 decoded inbound queue；#8947 已合入覆盖 ACP SDK dispatch 后的 handler/outbound/request 队列；#9007 已合入继续覆盖 ACP HTTP pre-attach buffered replies 和 delivery-owned leases。#11428 再把workspace注册上限、observe-only child建模上限与Channel控制事务预算从一个旧公开常量拆成三个owner，避免未来扩注册容量时连带修改其它资源契约。
 
 ## ResourceBudget
 
@@ -108,6 +108,14 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 
 所有 ownership-granting `session/new`、`session/load`、`session/resume` 与 `session/fork` 改为 provisional receipt：只有 reply 本地 delivery 成功才 commit ownership；overflow、serialization failure、delivery failure 或 teardown 会 rollback fresh session、persisted fork 与新增 attachment。daemon status 与 TS SDK 暴露 limit/current/high-water、pending delivery ownership、guard failure 与 per-connection/mount attribution counters。
 
+## Workspace Capacity Policy Decoupling（#11428 已合入）
+
+#11428 是#11386的行为保持型P0。此前公开`MAX_DAEMON_WORKSPACES = 25`同时被三个不同owner读取：CLI用它限制用户workspace注册，ACP bridge用它限制child heap分区模型中的最大并发数，Channel控制默认deadline又用它乘启动/停止/回滚预算。将注册目标直接提高到256会同时改动后两项契约。
+
+最终实现让CLI拥有`MAX_REGISTERED_WORKSPACES = 25`，child policy拥有私有`MAX_MODELED_ACP_CHILDREN = 25`，Channel timeout拥有私有`MAX_CHANNEL_CONTROL_WORKSPACES = 25`。旧公开常量仍以25保留并标记deprecated，只作导入兼容，内部策略不再读取；默认Channel事务预算保持2,130,000ms，child partition仍observe-only且不改变spawn argv，第26个用户workspace仍以409 `workspace_limit_reached`拒绝。
+
+随PR合入的1/25/256空workspace测量和LRU设计用于后续容量决策，不代表256注册、dormant runtime或eviction已实现。三个相同字面值属于独立策略，后续不能为了去重重新抽成共享默认值。
+
 ## 当前未接入项
 
 #8093 明确不做以下事情：
@@ -123,6 +131,7 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 - #9380 已合入，只观测 daemon-owned ACP child 的 old-generation peak，不观测 channel worker、MCP descendant 或完整 process tree；`peakLiveSetBytes` 是上界，不是 exact live set。
 - #8911 已对 daemon-owned ACP child 的 raw NDJSON 与 decoded inbound queue 接入固定 bounds，但不覆盖 ACP SDK handler/outbound/pending-response/outstanding request 队列。
 - #8947 已补 handler/outbound/request 队列 guard；#9007 已补 ACP HTTP pre-attach buffered reply byte budget 和 delivery-owned lease，但普通 live SSE/WS 新帧队列、单帧 stringify 瞬时放大、远端 exactly-once receipt 和完整 frame/session backpressure 不在本 PR 内。
+- #11428 只解耦三个容量常量并保留现值；不提高workspace注册上限、不实现runtime休眠/LRU，也不把child heap模型推进到enforcement。
 
 这些内容应在后续 PR 按 route ownership、error taxonomy 与 client compatibility 分批接入。
 
@@ -140,6 +149,7 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 - #9380 覆盖 child-heap-probe 11 条、daemon-status 54 条、ACP bridge/spawn/child-heap-policy 771 条和 SDK public surface 15 条，并在 Node 22.19.0、22.22.3、24.12.0 上检查 V8 heap space classifier。
 - #8911 已合入的 ACP bridge / daemon runtime focused tests，覆盖 frame limit、decoded queue count/bytes、unterminated EOF、metadata-only parse failure 和 exact child termination。
 - #8947 已合入并声明覆盖 ACP bridge guard、daemon runtime、build/typecheck/lint、Prettier 与 SDK backpressure probes；#9007 已合入并声明覆盖 ACP bridge/CLI/SDK focused tests、build/typecheck/lint 与 diff check。
+- #11428 声明613项定向测试、build/typecheck/bundle、targeted lint/format/diff check与隔离daemon的25/26注册边界E2E通过；另有1项Windows-only测试在macOS跳过，本次文档复核未复跑source仓测试。
 
 ## PR 归因
 
@@ -154,3 +164,4 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 | [#8911](https://github.com/QwenLM/qwen-code/pull/8911) | merged | 为 daemon-owned ACP child 启用 bounded NDJSON frame 与 decoded queue，超限时低敏记录并终止精确 child。 |
 | [#8947](https://github.com/QwenLM/qwen-code/pull/8947) | merged | 补 ACP SDK handler/outbound/prepared response/outstanding request guard 与 fatal channel generation isolation。 |
 | [#9007](https://github.com/QwenLM/qwen-code/pull/9007) | merged | 为 ACP HTTP pre-attach buffered replies 增加 stream/connection/global frame 与 byte budget、delivery lease、transactional ownership receipt 和 status/SDK counters。 |
+| [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | merged | 将workspace注册、ACP child建模和Channel控制预算拆成独立owner，保留25/25/2,130,000ms既有行为与deprecated公开常量兼容。 |

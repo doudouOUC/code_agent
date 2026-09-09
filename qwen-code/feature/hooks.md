@@ -1,7 +1,7 @@
 # Hooks / submitted prompt provenance 与命令进程生命周期
 
 > 适用范围：`UserPromptSubmit` hook 的 submitted prompt provenance，以及 command hook 的进程树回收。
-> 关键 PR：[#7762](https://github.com/QwenLM/qwen-code/pull/7762)、[#7877](https://github.com/QwenLM/qwen-code/pull/7877)、[#10100](https://github.com/QwenLM/qwen-code/pull/10100)（merged）、[#10288](https://github.com/QwenLM/qwen-code/pull/10288)（merged）、[#10512](https://github.com/QwenLM/qwen-code/pull/10512)（closed）。
+> 关键 PR：[#7762](https://github.com/QwenLM/qwen-code/pull/7762)、[#7877](https://github.com/QwenLM/qwen-code/pull/7877)、[#10100](https://github.com/QwenLM/qwen-code/pull/10100)（merged）、[#10288](https://github.com/QwenLM/qwen-code/pull/10288)（merged）、[#10512](https://github.com/QwenLM/qwen-code/pull/10512)（closed）、[#11455](https://github.com/QwenLM/qwen-code/pull/11455)（open）。
 > 说明：本文只按 @doudouOUC 个人 PR 记录已合入能力；字段是 optional additive surface，旧 hook consumer 不应假定它总存在。
 
 ---
@@ -13,6 +13,8 @@
 PR #7762 的目标是在不改变模型输入、不改变 hook 顺序、不破坏现有 hook consumer 的前提下，为安全审计、日志和同进程 hook 增加一个用户提交文本的 provenance 线索。
 
 PR #7877 进一步落地了这个字段的一个具体消费者：External Context Auto Recall hook 只用 `submitted_prompt` 构造 provider query，而不把 model-bound `prompt`、`@file` expansion、reminder 或其它系统上下文发给外部 provider。
+
+PR #11455 当前open diff把同一producer边界补到ACP session路径。现有daemon/ACP fresh turn只传`prompt`，使#11246 configurable Mem0 Auto Recall即使显式配置也因缺字段而no-op；该修复尚未进入`main`。
 
 ---
 
@@ -69,9 +71,15 @@ External Context Auto Recall 是 `submitted_prompt` 的已合入消费者。hook
 
 该 hook 先做 repository root realpath containment，再对 `submitted_prompt` 做 whitespace normalization、常见 accidental secret pattern 过滤和 512 code point 上限。provider 返回的检索结果不会改变 `prompt` 字段，而是通过 `hookSpecificOutput.additionalContext` 追加到 user-layer context，并包在 `untrusted_external_context` envelope 中。它证明 `submitted_prompt` 可以作为“用户提交文本 provenance”，但不把字段升级为安全认证或权限边界。
 
+### 3.6 ACP session producer（#11455 open）
+
+#11455当前diff在ACP session收到request后、resource/slash/model-only扩展前捕获submission projection。trusted `promptDisplayText`优先，包括显式空字符串；缺失时才将ACP text blocks按空格连接。只有既有`isFreshUserTurn`为true且projection非空白，Hook input才附加`submitted_prompt`；legacy `prompt`保持原值。
+
+retry、tool continuation、resource/image/audio正文、model-only delegation与空display都不会得到伪造provenance。该方案不增加wire字段、不改变hook注册或默认extension，也不把ACP text提升为身份/DLP证明。由于PR仍open，当前`main`只包含TUI等既有producer，不能把daemon Auto Recall描述为已修复。
+
 ---
 
-### 3.6 command hook process lifecycle（#10100 merged）
+### 3.7 command hook process lifecycle（#10100 merged）
 
 #10100 最终实现把 command hook 的 ownership 从直接 child 提升为受控进程树。POSIX spawn 使用 detached process group；timeout/cancel 先向 group 发送 SIGTERM，最多等待 2 秒，再对仍存活 group 发送 SIGKILL。root child 先 close 不会取消 escalation，完成路径对 child close 与 stdout/stderr drain 最多再等待 1 秒，超时后主动 destroy stream，避免孙进程持 pipe 让 hook 无界悬挂。
 
@@ -79,13 +87,13 @@ HookRunner 维护活跃 process-group registry，并在 SIGHUP、SIGINT、SIGQUI
 
 POSIX 主动逃逸进程组和 Windows/Linux 实机行为仍未在该 PR 中验证，因此回收保证只覆盖 owned process group 与已知平台机制。
 
-### 3.7 fire-and-forget supervisor ownership（#10288 merged）
+### 3.8 fire-and-forget supervisor ownership（#10288 merged）
 
 #10288 已合入，在 #10100 的父退出清理上补一条事件契约例外：`MessageDisplay`、`StopFailure` 和 `SessionDelete` 本来就忽略输出并允许在 Qwen 退出后完成。Qwen 先把完整输入写入 mode-0600 临时文件，再启动 detached、unref 且标准流独立的 Node supervisor；supervisor 启动真实 hook、持有 timeout，并在 POSIX 上持续监督 owned process group，即使根进程先于后代退出也不会提前结束监督。
 
 显式 AbortSignal 会转发给 supervisor 并继续回收完整进程树；用户 `NODE_OPTIONS` 只从内部 supervisor 环境移除，真实 hook 启动时恢复。普通 `async:true` hook 继续捕获输出并保持 process-scoped。该实现只改变三个 output-ignored 事件，不能推广到任意 async hook。
 
-### 3.8 supervisor hardening 关闭方案（#10512 closed）
+### 3.9 supervisor hardening 关闭方案（#10512 closed）
 
 #10512 在关闭前尝试补齐 #10288 的非阻塞 hardening：拒绝非正数/非有限 timeout、给 Node eval argv 增加 `--`、从内部 supervisor 隔离 `NODE_OPTIONS`/`LD_PRELOAD`/`DYLD_INSERT_LIBRARIES` 并仅向真实 hook 恢复、对齐 Windows taskkill fallback，以及让 deadline 当前 turn 已送达的自然 exit 0/124 优先于 timeout。
 
@@ -105,6 +113,7 @@ POSIX 主动逃逸进程组和 Windows/Linux 实机行为仍未在该 PR 中验�
 | `docs/users/features/hooks.md` | 用户可见 hook 字段文档。 |
 | `docs/design/submitted-prompt-provenance.md` | 字段语义、兼容性与省略条件设计。 |
 | `integrations/external-context/src/auto-recall.ts` | #7877 的 Auto Recall hook consumer，使用 `submitted_prompt` 作为唯一 provider query 来源。 |
+| `packages/cli/src/acp-integration/session/Session.ts` | #11455 open diff 的ACP fresh-turn producer；在扩展前选择trusted display或text blocks，并对retry/空值省略字段。 |
 | `packages/core/src/hooks/hookRunner.ts` | #10100 merged command hook process-group registry、TERM→KILL、bounded close/stdio drain；#10288 merged mode-0600 input staging、detached supervisor 与 abort forwarding；#10512 closed hardening 不计入运行时。 |
 | `packages/core/src/hooks/hook-runner.process.test.ts` | #10100 真实进程树/信号/orphan 测试；#10288 merged explicit/natural parent exit、timeout、root-before-descendant、5 MiB input 与 cleanup 测试。 |
 
@@ -115,6 +124,8 @@ POSIX 主动逃逸进程组和 Windows/Linux 实机行为仍未在该 PR 中验�
 PR #7762 覆盖 Core 测试、CLI 测试、build、bundle、typecheck、lint，以及真实 interactive command-hook E2E。E2E 的关键断言是：hook 能看到提交原文投影，但 `prompt` 仍保持扩展后的模型输入；ToolResult 与其它非 fresh user submission 不能误填 `submitted_prompt`。
 
 PR #7877 追加 external-context auto recall E2E，验证 `@file` expansion 不会送到 provider，但模型上下文仍能看到 expanded file 与 retrieved context；同时覆盖 missing/invalid `submitted_prompt` no-op、root containment、query bounds、timeout fail-open 与 context envelope budget。
+
+PR #11455 当前open diff声明869项session测试、root build/bundle/typecheck、focused lint/format与loopback/Holo各四个Auto Recall场景通过；本次只核对open head与当前`main`差异，未复跑或连接真实provider。
 
 PR #10100 最终声明 49 项 hook 测试以及聚焦 build/typecheck/lint/format；真实进程 harness 在 macOS 验证孙进程、root early-exit、TERM 无响应和 stream drain。#10288 最终声明 Core build/typecheck、776 项 hooks 测试和 changed-file checks，另验证显式/自然 parent exit、timeout、root-before-descendant、5 MiB input、exit 124、`NODE_OPTIONS` 隔离、0600 staging 与 cleanup。#10512 closed 方案声明 786 项本地 hooks 测试、93 项 focused HookRunner 测试与 5/5 deadline probe，但不能替代 merged 证据。Windows/Linux 尚未验证。
 
@@ -129,6 +140,7 @@ PR #10100 最终声明 49 项 hook 测试以及聚焦 build/typecheck/lint/forma
 | [#10100](https://github.com/QwenLM/qwen-code/pull/10100) | MERGED | command hook process lifecycle | 最终实现于 POSIX 管理独立 process group、TERM→KILL 与 bounded drain，在 Windows 使用有界 taskkill tree，并给父进程退出/信号增加幂等兜底清理。 |
 | [#10288](https://github.com/QwenLM/qwen-code/pull/10288) | MERGED | fire-and-forget hook lifecycle | 最终让三个 output-ignored 事件使用 staged input + detached supervisor；普通 async hook 保持 process-scoped，显式 cancellation 继续回收 owned tree。 |
 | [#10512](https://github.com/QwenLM/qwen-code/pull/10512) | CLOSED | surviving supervisor hardening | 关闭前方案覆盖 timeout/argv/loader env/Windows fallback/deadline race；未合入，不属于 `main`。 |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | OPEN | ACP submitted prompt provenance | 当前diff给ACP fresh nonblank turn补充已有optional字段，trusted display优先且retry/空display/非文本内容省略；尚非`main`能力。 |
 
 ---
 
@@ -139,5 +151,6 @@ PR #10100 最终声明 49 项 hook 测试以及聚焦 build/typecheck/lint/forma
 3. **large paste 是 compact projection**。hook 看到的是占位式投影，不是完整大段粘贴内容；这是为了与现有大粘贴处理和数据最小化保持一致。
 4. **`submitted_prompt` 不是安全认证**。#7877 证明它可作为 provider query 来源，但 hook 仍必须把字段视为用户可控文本，不能把它当权限证明。
 5. **#10100/#10288 已合入，#10512 已关闭未合入**。process-group ownership 与三个 fire-and-forget 事件的 supervisor 例外已进入 `main`；外部 SIGKILL 可能留下 staged input/独立 group，主动逃逸 group 的后代也不在回收保证内。#10512 的额外 hardening 不能视为已落地。
+6. **#11455仍为open**。daemon/ACP producer缺失`submitted_prompt`的问题尚未在`main`修复；单个Auto Recall profile仍只绑定一个repository root/scope。
 
-_按个人 PR 口径更新于 2026-08-30_
+_按个人 PR 口径更新于 2026-09-10_

@@ -14,7 +14,10 @@
 | [#11323](https://github.com/QwenLM/qwen-code/pull/11323) | ✅ merged | perf(web-shell): avoid an unnecessary initial turn-index page request | [pr-11323.md](pr-11323.md) |
 | [#11337](https://github.com/QwenLM/qwen-code/pull/11337) | ✅ merged | feat(external-context): Add daemon memory deletion | [pr-11337.md](pr-11337.md) |
 | [#11339](https://github.com/QwenLM/qwen-code/pull/11339) | ✅ merged | fix(serve): configure live-state polling with a five-second default | [pr-11339.md](pr-11339.md) |
-| [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | 🟡 open | fix(external-context): Align deletion responses with Mem0 SDK | [pr-11397.md](pr-11397.md) |
-| [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | 🟡 open (draft) | feat(web-shell): add opt-in browser task notifications | [pr-11398.md](pr-11398.md) |
+| [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | ✅ merged | fix(external-context): Align deletion responses with Mem0 SDK | [pr-11397.md](pr-11397.md) |
+| [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | ✅ merged | feat(web-shell): add opt-in browser task notifications | [pr-11398.md](pr-11398.md) |
+| [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | ✅ merged | refactor(serve): decouple workspace capacity policies | [pr-11428.md](pr-11428.md) |
+| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | 🟡 open | feat(web-shell): enrich browser notifications and open target sessions | [pr-11447.md](pr-11447.md) |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | 🟡 open | fix(acp): Preserve submitted prompt provenance for auto recall | [pr-11455.md](pr-11455.md) |
 
-_按个人 PR 口径更新于 2026-09-09_
+_按个人 PR 口径更新于 2026-09-10_
