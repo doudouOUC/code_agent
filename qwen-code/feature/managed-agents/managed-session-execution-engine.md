@@ -8,17 +8,29 @@
 
 当前 `sourceType` 表示创建来源；`managed-gateway` 专用于禁止 Prompt 的 Tool-only Session；工作区 `runtime-owner.json` 表示进程所有权；writer lease 表示写入资格。这些字段都不能兼作会话执行引擎。普通 Prompt 和 Cancel 已使用 SessionEntry 的 connection，可以复用其队列和事件契约。
 
-2026-09-09 已实现并验收下表第 1 片：持久 owner、严格恢复证明、初始化保护和实际 ACP 回执。双通道、兼容选择及普通默认入口切换仍待实现。
+2026-09-09 已实现并验收下表第 1、2 片：持久 owner、严格恢复证明、初始化保护、实际 ACP 回执，以及同一 Bridge 的双通道和归属绑定。有效配置兼容选择及普通默认入口切换仍待实现。
 
 ## 第 1 片实现与验收
 
 完整物理 transcript 在过滤、UUID 合并和历史分支选择之前累计执行归属，full load、严格 owner 预读和 selective projection 保留同一文件快照证明。完整旧历史解释为 legacy，损坏、非法或冲突归属不能用于执行恢复；可读历史仍供只读展示。当前 Managed fork 明确拒绝，legacy fork 保留源的物理 owner。
 
-Config 构造、CLI 配置加载和运行中 resume 在改变旧会话前检查归属。真实 ACP 创建/恢复在 writer lease 内重读权威历史，严格写入或验证 owner，然后才进入会话执行初始化；预加载 projection 的 Goal 迁移也延后到此处。预读后历史追加、改属或删除均拒绝，失败自动释放 writer。Managed host 实际开启 lease，用户关闭录制时明确拒绝；ACP new/load/resume 返回实际 Config 的引擎，尚未用该回执做 Bridge 双通道绑定。
+Config 构造、CLI 配置加载和运行中 resume 在改变旧会话前检查归属。真实 ACP 创建/恢复在 writer lease 内重读权威历史，严格写入或验证 owner，然后才进入会话执行初始化；预加载 projection 的 Goal 迁移也延后到此处。预读后历史追加、改属或删除均拒绝，失败自动释放 writer。Managed host 实际开启 lease，用户关闭录制时明确拒绝；ACP new/load/resume 返回实际 Config 的引擎，第 2 片在配对 Bridge 中使用该回执核验归属。
 
 macOS 隔离真实进程验收共 7 组通过：显式 lease 新建、默认设置新建、同引擎冷恢复、leased legacy ACP 拒绝接管、nonleased ACP 拒绝接管、原生 bundle CLI 拒绝接管、Managed 关闭录制拒绝。创建回执交给 Bridge 前已存在唯一 managed owner；正向路径经过真实 Runtime Read 和模型 HTTP。三种拒绝恢复没有新增模型请求、标记文件读取或 JSONL 写入，源与副本历史字节保持不变。所有测试自有进程、14 个端口、7 个目录和锁正常清理；4170 预览及用户数据未用作夹具。
 
 build、typecheck、bundle、相关 core/CLI 定向测试与审查已通过；单测另覆盖冲突/非法物理记录、读取快照变化、严格写失败、projection 变化及 UI 切换前拒绝。7 组 E2E 不包含这些全部故障的真实进程复现，也不证明完整 Hooks、fork/rewind 或默认替换完成。测试使用可控 localhost 模型响应，工具和持久化走真实实现。运行期间冻结源码与构建，115 项定向源码/包 dist/入口指纹一致；分块 bundle 另有测试后摘要，不能将它称为全部分块的测试前后指纹证明。原始验收与边界记录在本地 `.qwen/issues/managed-session-engine-verification.md`。
+
+## 第 2 片实现与验收
+
+同一个 Bridge 现可按服务端选择使用 legacy 或 Managed 通道，共享会话、ID 和资源准入；通过实际 ACP 引擎回执核验后绑定 Session。后续发送、取消、通知和关闭均校验实际通道，冷恢复按持久 owner 选择。工作区控制仍归 legacy，未启用配对配置的旧调用者保持原行为。
+
+build、typecheck、bundle、相关 lint 与六个 ACP Bridge 测试文件的 885 项测试通过。独立审查发现的不可寻址成功回执早释放、branch 超时后 host admission 早释放均已复现并修复，修订后审查未发现新增阻塞问题。定向测试覆盖选择期间的 ID/限额占用、错误回执清理、跨通道事件归属与关闭账本。
+
+macOS 两组隔离真实 host 验收通过：同一工作区两种引擎共存、双向模型流取消、普通关闭后实际通道退出并冷恢复，以及仍有活会话时 host shutdown 的 writer 交接。合计 10 次原生 Read/final、22 次 localhost 模型 HTTP 和 2 次取消；Managed 的原生读取在独立 Tool Runtime 内执行，Gateway 负责模型调用。主任务另行回读了持久 owner、完整 transcript、实际 wire/generation、取消 ACK 和物理退出证据。
+
+两组测试自有进程、端口和目录全部清理，无兜底终止信号。普通关闭后没有 writer lock；交接关闭留下的两份 sealed 凭据均与实际 transcript 字节数和 SHA 匹配，不将锁路径存在误判为泄漏。源码/产物/夹具的 1137 项定向指纹前后一致，包括根 dist 中全部 482 个 chunks；该清单不等于全 node_modules 依赖闭包。首次 fixed 运行因夹具只匹配 `session/cancel` 而失败，产品实际已通过 `craft/cancelPendingPrompt` 完成取消；保留原始失败，校准观察断言后两组通过，期间未改生产代码。
+
+本片使用实际配对 host test-script，尚未覆盖普通 daemon 默认入口、所有配置兼容组合、容量压力、权限对话或取消扩展 fallback。普通四处 factory 还未接线，不能将双通道验收等同默认替换完成。原始证据及范围见本地 `.qwen/issues/managed-engine-dual-channel-verification.md`，主任务独立回读摘要在 `.qwen/e2e-tests/managed-engine-dual-channel-root-audit.json`。4170 预览与用户数据未作为夹具。
 
 ## 不变量
 
@@ -53,13 +65,17 @@ Managed 的 writer lease 是必要条件，但 `experimentalZedIntegration` 和�
 
 保留原 spawn factory 为 legacy，另提供 Managed factory。只把可复用 channel、在途创建和对应 idle 状态按引擎分槽；继续使用一个 `byId`、一个总量 admission 和 `aliveChannels`。同一种引擎并发创建合并，不同引擎独立创建。dying、初始化失败、晚到响应和 shutdown 仍须等实际所属资源退出，不能因新槽可用而遗忘旧通道。
 
-第二片采用显式配对配置 `executionEngines`，包含 `legacy`、`managed` 两个 factory 与服务端 `select` 回调；与旧 `channelFactory` 同时传入时拒绝歧义。未启用配对配置的调用者保留通用单通道语义：旧注入接口也用于 Managed host，不能自动把它记为已核实 legacy。配对模式严格要求实际 new/load/resume 引擎回执。此接口尚待实现。
+第二片已实现显式配对配置 `executionEngines`，包含 `legacy`、`managed` 两个 factory 与服务端 `select` 回调；与旧 `channelFactory` 同时传入时拒绝歧义。未启用配对配置的调用者保留通用单通道语义：旧注入接口也用于 Managed host，不能自动把它记为已核实 legacy。配对模式严格要求实际 new/load/resume 引擎回执。普通 daemon 工厂尚未传入此配置；本片的真实验证使用同一工作区、同一配对 Bridge 和真实双引擎工厂。
 
 选择回调接收经校验和快照化的既有 spawn 或 load/resume 请求及内部确认的 standalone 用途，保留 canonical workspace、来源、父会话、worktree/branch、模型与权限信息。同步总量和 ID 占用后，先登记在途操作，再异步选择，避免选择期间穿过限额或被 shutdown 遗漏。热 attach/恢复继续已有 entry；后续兼容判定还须在 attach 副作用前拒绝不支持的用途，不能只保护新建。某引擎的 quarantine 只阻断其自身新会话，全局进程与会话预算继续生效。
 
 channel slot 保存 factory、可复用 channel、在途创建和启动清理失败；idle timer 属于实际 ChannelInfo，旧 generation 的晚到清理不能取消新 generation 或另一引擎的 timer。工作区控制和 preheat 显式使用 legacy 控制通道；整体 channelLive 表示任一可用通道，legacy 子进程 RSS 仍按物理进程计数。关闭汇总所有槽与 aliveChannels，不能只等最后创建的通道。
 
 收到成功 ACP 响应但引擎回执缺失、非法或不匹配时，实际 Session 可能已经存在。必须复用原通道的未注册会话 close/drain/quarantine 路径，保留 ID 和总量占用直至确认释放；不能直接抛错后遗忘资源。branch 恢复失败清理也必须持有实际恢复通道。退出、权限和通知路由除 Session ID 外还校验 channel identity；pending replay 和生成事件分别核对已绑定的 restore channel 与 request connection。
+
+配对新建还拒绝空或不可寻址的成功回执、错误的指定 ID、已注册 ID 以及被其他在途操作占用的 ID。若无法安全按 ID 关闭（没有可寻址 ID，或可能碰到同通道上的另一个会话），隔离实际响应通道，等待已有工作排空及物理退出，保留总量与 ID 占用；不能覆盖原 entry 或关闭另一引擎的同名会话。回执错误但严格关闭成功的空通道恢复原有 idle 策略。
+
+分支先为新会话占用 host admission，仅在进入冷恢复后把 reservation 移交给 restore。选择失败、初始化失败、错误回执和恢复超时均由同一恢复生命周期收尾；公开超时响应不释放仍在执行的恢复名额，必须等严格 close 或物理退出。进入冷恢复前的校验失败或热 attach 仍由分支外层释放，避免重复释放或遗漏。
 
 | 操作                                  | 分派依据                                                            |
 | ------------------------------------- | ------------------------------------------------------------------- |
