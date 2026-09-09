@@ -8,6 +8,14 @@
 
 ## 当前差异有多大
 
+### 2026-09-09 首阶段范围调整
+
+用户通过旁支明确要求 MCP、Hooks、Channels 先不对接。因此本阶段不新增这些能力的 Managed 接入、迁移或对齐验收，保留后续任务；下文较早记录中把它们列为默认切换前置条件的表述，以本节为准。已有实现与历史验收记录保留，不能将延期解释为删除原能力。
+
+本阶段继续内置工具、媒体、取消与恢复、旧会话兼容，以及普通 Web Shell、SDK、定时任务的核心链路。默认创建策略必须先根据真实有效配置、入口和持久化所有者划定兼容边界：依赖 MCP/Hooks 的会话与 Channels 入口保留旧执行路径，不能在已开始执行后切换引擎，也不能在 Managed 出错时隐式降级。具体配置判定和三处 factory 的分派接缝仍待源码核实，当前没有实施或验证该兼容选择。
+
+现有工具执行链中的 Hook 回执仍须准确保留，不把错误写成成功；这一回归要求不等于重新开展完整 Hook 迁移。阶段任务与尚未完成的证据见 [首阶段实施计划](managed-agent-daemon-default-plan.md)。
+
 daemon 的 HTTP 服务、认证、工作区注册、部分工具基础设施和 UI 组件可以复用；Agent 执行能力及会话协议的迁移仍在进行。独立 Managed 页面仍使用原只读实验模型循环；新增完整 host 已能通过独立 Runtime 完成部分读写工具链，但普通 daemon 默认入口及其余完整工具语义仍需接入，不能仅替换一个路由就宣称能力对齐。
 
 ```mermaid
@@ -167,10 +175,10 @@ host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `
 以下为待实现后的验收计划，不是已通过结果。
 
 - 用既有普通 Web Shell 和未改调用方式的 SDK 走 create → prompt → thought/tool → completed；检查普通 SSE 与 ACP 的等价事件投影、用量和通知。
-- Channels 检查 thread/user 会话恢复、附件和最终交付；自动调度检查 controller/run 血缘、锁、错过 one-shot 的确认行为及单次执行。子任务完成通知须由 parent 持久接受，不能把 UI 收到事件当作交付完成。
+- 自动调度检查 controller/run 血缘、锁、错过 one-shot 的确认行为及单次执行。子任务完成通知须由 parent 持久接受，不能把 UI 收到事件当作交付完成。Channels 首阶段保留原路径，其 Managed 迁移验收延期。
 - 只读、编辑、Shell、用户问题分别覆盖允许、拒绝、取消、超时、重复决策和失联；写工具执行计数与文件结果必须可核对。
 - 首轮失败/取消、后续失败/取消、空会话、排队消息及完成竞态；展示历史与模型历史的差异必须可解释。
-- 工作区指令、Hooks、MCP/Skills、模型与模式设置、上下文压缩：校验模型请求和实际本地行为，不仅检查 UI 文本。
+- 工作区指令、Skills、模型与模式设置、上下文压缩：校验模型请求和实际本地行为，不仅检查 UI 文本。配置了 MCP/Hooks 的会话须验证保留原路径；其 Managed 接入验收延期。
 - refresh/reconnect/restart、旧 Session restore/fork/archive/delete/export；确认没有重复模型调用和工具副作用。
 - primary/secondary/dynamic workspace 的 reload、撤信任、移除；共享 Runtime 中取消一个 Session 不影响另一个，配置和凭据不跨工作区。
 - 默认开启/关闭与版本回退：已有会话所有者不变，未知所有者失败明确，绝不隐式执行另一套 Agent。
@@ -230,3 +238,9 @@ NotebookEdit 已使用原生 Runtime 实现，与 Read 共享所属会话的完�
 [多媒体方案](managed-agent-media.md)的 M1 已接通 invocation 媒体快照、所属 Runtime 原生 Read/Zoom 和 v2 媒体预算。633 项去重定向测试、build/typecheck/bundle、两轮自审及独立源码审查通过；最终完整 host 中 Read/Zoom 和超过 8 MiB 的六页 PDF 从 worker 到物理回执再到模型的字节与哈希一致，worker 不调用模型，Gateway 不读取媒体文件。真实空 WAV 另经 native/dispatcher/Session 内部夹具验证：成功结果与 Hook 保留，重复查询不再执行工具，close 正常释放。完整 host 两组 81 项、空 WAV 组 83 项源码/构建摘要稳定，全部试验进程、端口和目录完成清理。PDF 组的实际 Hook 错误已如实保留，不将媒体通过扩大为全部 Hook 验收。
 
 该阶段仅覆盖已列明的媒体路径；PDF 转写 executor、物理渲染取消、DisplayImage 客户端展示、近上限并发回执和通用超限结果的关闭收敛仍待完成。后续继续 M2/M3 及原工具、初始化、历史和客户端清单，三处普通 factory 尚未切换，当前 4170 预览及用户数据保持原状。
+
+### 2026-09-09 PDF 物理取消与首阶段范围
+
+后续已补齐 PDF 的所属进程组取消：原生 Read 将实际 signal 和既有进程所有权要求传给元数据、探测、提取、渲染；等待进程退出和输出目录清理后结算，取消不再继续回退或记录成功读取。521 项定向测试、build/typecheck/bundle、五阶段真实取消、两次同 worker 后续读取和独立正向 PDF 读取验证通过，全部测试 handle 终结，失败夹具和清理证据按范围保留。详见[媒体方案](managed-agent-media.md)。Gateway PDF 转写仍待接通。
+
+用户调整后的首阶段不新增 MCP、Hooks、Channels 接入迁移，继续内置工具、媒体、取消恢复、旧会话和 Web Shell/SDK/定时任务核心链路。保留原路径的兼容选择仍需在创建/恢复时确定执行所有者；现有共享 factory 不具备按 session source 分流的上下文，不能直接替换后忽略这些会话。实施计划已独立记录上述剩余工作，三个普通 factory 尚未切换。

@@ -1,8 +1,10 @@
 # Managed 多媒体与调用配置
 
-状态：2026-09-09，基于 `3c6556e70b` 实施 M1，限定真实验收、两轮自审及独立最终源码审查通过；M2/M3 仍为设计。完整目标仍为 [daemon 默认替换](managed-agent-daemon-default.md)，此文不代表完整多媒体或默认替换已验收。三个普通会话 factory 尚未切换；4170 预览与用户数据保持原状。
+状态：2026-09-09，基于 `3c6556e70b` 实施 M1，限定真实验收、两轮自审及独立最终源码审查通过。基于 `429d780beb` 继续补齐 M2 的 PDF 物理取消，构建与真实复验通过；Gateway 转写接口及 M3 仍待实现。完整目标仍为 [daemon 默认替换](managed-agent-daemon-default.md)，此文不代表完整多媒体或默认替换已验收。三个普通会话 factory 尚未切换；4170 预览与用户数据保持原状。
 
 ## 迁移前差距
+
+首阶段范围遵循[默认替换方案的用户调整](managed-agent-daemon-default.md)：MCP、Hooks、Channels 的新增接入与迁移延期。媒体和取消仍继续；文中 Hook 检查指现有执行回执不回归，不要求在本阶段补齐完整 Hook 能力。
 
 Read 已在所属 Runtime 执行，但 fileUtils 读取 ContentGeneratorConfig.modalities；Tool-only Config 没有 Gateway 完成认证与模型解析后的能力。文本模型的图片/PDF候选也不会保留：Tool-only 的 getDefaultVisionBridgeModel 明确返回 undefined。这个禁止推理的保护必须保留，不能把 Gateway 的模型选择或凭据灌入 worker 解除它。
 
@@ -46,7 +48,25 @@ pending 请求属于已批准 invocation，带完整引用、requestId 和摘要
 
 pending bridge 时工具仍 executing。cancel/release 先封新执行并取消模型请求，允许已经接纳的工作答复作为 drain 回传；等待 Gateway 查询终结、Runtime 原生取消/结果处理、Hook 与 execute 结算，再确认释放。cancelAndDrain 不能停止服务已有回传而死锁，也不能用 Promise.race 提前宣告排空。Gateway 查询在取消前尚未开始时也必须有确定的未执行答复；失联/超时只按明确的失败规则结算，不猜测成功或重复收费。
 
-PDF物理进程取消也需要真实验证：目前 extractPDFText 支持 signal，但 Read 的调用点未传；页面渲染函数没有 signal 参数。这只是源码线索，先复现，再按所属进程退出和临时目录清理补齐，不能把模型取消当作 pdftoppm 已退出。
+修改前的 PDF 物理取消链存在缺口：extractPDFText 支持 signal，但 Read 的调用点未传；页面渲染函数也没有 signal 参数。后续全局 CLI 正向基线和五阶段 Managed 反例已完成，不能把模型取消当作 pdftoppm 已退出。
+
+### M2 物理执行前置条件（实施设计）
+
+ManagedToolRuntime 已在原生 invocation.execute 的第三参数传递 requireProcessGroupExit=true，修改前 Read 尚未消费。现在 Read 将该既有所有权要求连同本次 signal 传入 fileUtils；PDF 的 pdfinfo、pdftotext/pdftoppm 可用性探测、文本提取和页面渲染全部接入同一调用的取消链。所属 cwd 使用实际 tool Config 的根目录。Managed PDF 命令复用已有 runOwnedCommand，等待直属进程 close 和所属进程组退出；取消不能仅等待 execFile 的 AbortError 回调。未启用该所有权模式的调用保留原执行实现、可用性缓存、输出上限和错误分类。
+
+可用性探测的旧全局 in-flight promise 不能由某一个 Managed 调用取消，也不能让取消调用依赖另一个调用的未排空进程。因此 Managed 的探测按调用执行并遵循其 signal；普通探测仍共享旧缓存。元数据、探测、提取和渲染每个 await 后先检查取消，取消后不继续下一种回退或新建 PDF 模型请求。渲染输出读取也检查 signal；完成所属命令退出后才清理临时渲染目录。Managed 清理失败必须作为错误可见，不能默默声称清理完成。
+
+这一步只为完整 M2 建立物理生命周期条件；Gateway PDF executor、转写请求/答复、共享 turn 预算和 drain 回传仍须继续实施。先用原生 CLI 和冻结 Managed 构建证明具体取消反例，再变更源码；验收需记录取消前真实命令/进程、取消后的退出与最终回执、未启动后续阶段、无错误缓存/成功 Hook、临时目录清理，以及未取消读取的原生内容回归。
+
+### M2 Gateway 实施接缝（待实现）
+
+源码调查选择由 RuntimeBackedInvocation 唯一持有 PDF 模型工作、取消 controller、结果与完成回执状态；ManagedToolSession 复用现有 executions 登记并在 release 前等待该 invocation 的 cancelAndDrain。Session 不接管模型路由，也不新增独立的模型轮询服务。登记必须同步先于 execute dispatch 并检查 Session 准入，关闭后不能新增调用；原 execute RPC 或远端 settled 先到达时，也不能删除尚未结束的本地模型工作。关闭重试只重试已有结果的交付与状态确认，不重新发起转写。
+
+新私有读取/完成操作按完整 invocation reference 和 requestId 校验身份。Runtime status 只公开小型 pending 标记；候选读取单独校验原生图片和 PDF sourceContext，完成操作只接受有界的原生转写结果投影，不传 provider 原始错误或可执行的路由配置。两项操作均须接通 Core、CLI provider、HTTP worker 和 ACP 的现有 live-session-owner 及 drain 规则。取消时不关闭已经接纳的完成回传，否则原生 Read 和 release 会互相等待。
+
+Gateway 的执行循环启动并保存同一个转写 Promise，同时继续观察小型 status，看到 cancelRequested 即取消所属模型工作。预算使用 prepare 捕获的原 turn signal，实际请求使用单调用取消信号；服务增加进程内 budgetSignal，默认仍用原 signal，不增加 worker 预算权限。模型调用在原 invocation 的运行视图下启动，close 回调不能借用另一个异步作用域的默认 Config。Read 的桥接能力快照同时保留普通图片候选与 PDF 候选，仍禁止 Tool-only Config 创建模型生成器。
+
+后续验收包括原生 fallback/notice 等价、真实 worker 到 Gateway 的 PDF 图片、同 turn 与并发预算、模型进行中和丢失完成 ACK 时的取消、直接 Session.close、跨身份拒绝、超过 8 MiB 的候选读取及完成重试不重发模型。本节是确定的实施设计，当前尚未接通这些接口。
 
 ## 用户展示
 
@@ -60,7 +80,7 @@ DisplayImage 的主/子作用域来自 Gateway 的实际调用位置，不能以
 | M2   | 原生 PDF executor 注入与 Gateway bridge 请求/答复                    | 成功与每种原生 fallback/notice 一致；失败/取消的缓存与 Hook；零 worker 模型请求；共享 turn 图片预算、重连不重复；模型和 PDF 进程取消/释放真实排空          |
 | M3   | DisplayImage 调用作用域、真实客户端能力和产物路径                    | fork 执行禁止、非交互失败准确、支持客户端实际可见且不泄露私有路径；身份与关闭时的产物可达性                                                                |
 
-各阶段包括设计、E2E计划、全局 CLI 基线、隔离完整 host 反例与修复验收，相关包定向测试、build/typecheck/bundle、两次自审和独立审查。M1 已实施、限定验收见下文；M2/M3 待实施。M1 是完整多媒体迁移的依赖，不替代 M2/M3，也不把默认入口、全部客户端或旧会话迁移改为可选项。
+各阶段包括设计、E2E计划、全局 CLI 基线、隔离完整 host 反例与修复验收，相关包定向测试、build/typecheck/bundle、两次自审和独立审查。M1 已实施、限定验收见下文；M2 的物理取消已补齐，其 Gateway 接口及 M3 待实施。M1 是完整多媒体迁移的依赖，不替代 M2/M3，也不把本阶段约定的默认入口、客户端或旧会话迁移改为可选项。
 
 主要代码涉及 core 的 managed protocol/runtime/proxy/session、Read/Zoom/Display 与共享声明、fileUtils、PDF/Vision Bridge 服务；CLI 的 Managed Session、Local/Remote/AutoLocal provider、私有 worker routes、ACP dispatcher；ACP Bridge 方法和转发；各文件的原生与定向回归。改动前列出每个新增字段和方法的完整消费链，逐层验证准入、响应等待与 drain 所有权。
 
@@ -82,4 +102,18 @@ PDF 历史实际分页三次，最终回答在第三页。早先夹具只检查�
 
 空 WAV 的内部真实 native/dispatcher/ManagedToolSession 夹具已复验通过：execute、settled status/cancel 重复查询均保留完整 native 与 Hook DTO，媒体预算为 0；Runtime Pre/Post Hook 各执行一次，正常 close 到达一次 release。修改前同夹具确认原生 physical success，但六次查询及两次 close 均拒绝、release 为 0，随后进行了明确标注的手动底层清理。固定后 83 项源码/构建摘要一致，测试进程、端口和临时根已清理；本组 provider/transport 使用本地适配，不声称覆盖 HTTP worker lease 或音频模型转换。
 
-目前真实运行平台仅 macOS。设计要求的 M2/M3、PDF 物理取消、媒体首张例外和近上限并发回执、通用不可交付结果的关闭收敛、全部客户端和三个默认 factory 切换仍待完成。当前 4170 预览未访问或重启，用户数据不参与隔离测试。
+M1 验收时，M2/M3、PDF 物理取消、媒体首张例外和近上限并发回执、通用不可交付结果的关闭收敛、全部客户端和三个默认 factory 切换仍待完成。PDF 物理取消后续结果见下节。真实运行平台仅 macOS；4170 预览未访问或重启，用户数据不参与隔离测试。
+
+## M2 PDF 物理取消验证
+
+全局原生 CLI 先验证六页 PDF 读取。修改前完整 Managed host 分别暂停真实 pdfinfo、pdftotext 探测/提取和 pdftoppm 探测/渲染进程；五个阶段均确认 Read 已收到取消，但实际命令仍存活。测试明确解除暂停后仍继续后续阶段，返回物理成功并记录读取缓存。取消 Prompt 的 stopReason 不能证明原生读取已停止；这些基线均按反例记录。
+
+修复后五个相同阶段全部由取消本身排空，不再打开测试门闩。真实 native、wrapper 及同组抗 TERM 后代在 v2 物理回执前退出；渲染组已存在的输出目录也在回执前移除。没有新回退阶段、成功读取缓存或 PostToolUse，既有失败 Hook 按一次 PostToolUseFailure 回执保留。重复取消与正常 Session.close/release 均完成。原生 pre-abort 的零命令/零缓存验证属于 worker 内的原 invocation 直调，不能计为单独模型轮次。
+
+两种冷探测取消后，均在同一个 Session、同一个真实 worker 发起独立后续 Read，实际六页 JPEG 从 native 到 v2 到 Gateway 模型的顺序、字节及 SHA256 一致，共 9,907,128 base64 字节，最终回答进入持久历史。另一个独立正向组通过相同媒体和最终回复验证，透明观察到真实 Poppler 的 spawn/close 与原参数，未改变原生结果。worker 无模型调用，Gateway 未执行原生媒体工具或读取媒体文件。
+
+本阶段 build/typecheck/bundle、521 项去重定向测试、lint/格式检查通过。bundle SHA256 为 `cf2eef9d23b7684dedb5dcc8c87406266eb716b579da64bfe45f8fc047401034`。五组取消的 87 项冻结摘要保持一致，独立正向组 81 项为同一冻结产物集合的子集。最终阶段共九个执行 handle 全部终结并完成独立清理：五个正式取消通过、一个取消夹具观测失败、两个正向夹具失败、一个正式正向通过。失败分别涉及夹具自身哈希读取的归类、短命进程参数漏采和观察代码遗漏 import，均保留，未通过修改产品绕过。
+
+最初独立正向失败未捕获具体渲染目录身份，不伪造该目录的逐项证明；最终 06:22:54 UTC 的只读盘点显示 `/tmp/pdf-render-*` 为零项。其余已识别的输出目录、所有试验 PID、端口和临时根均已清理。此验证仅覆盖 macOS 的物理 PDF 路径；Gateway PDF 转写、预算/答复排空、M3、不可交付结果、默认入口及本阶段客户端矩阵继续实施。完整 Hook/MCP/Channels 迁移按用户要求延期。
+
+完整生产、测试与文档改动经过连续两轮自审和独立最终源码审查，未发现本次物理取消修复的新增阻塞。独立审查重新核对实际消费者链、原始取消/正向结果与全部冻结摘要；结论不扩展到待实现的 Gateway 转写协议、默认会话分派或全部客户端。
