@@ -212,3 +212,5 @@ Glob 和可选 LS 的后续迁移已完成下述限定验收；接着处理 Grep
 [搜索工具方案](managed-agent-search-tools.md)已将 Glob 和显式启用的 LS 接入共享声明、Gateway 代理及 owned Runtime。Read/Write/Edit/Shell 继续复用同一调用链。每个父子作用域在 bind 中传递实际目录列表、文件过滤、记忆根和 LS 启用状态；同 cwd 也派生独立工具视图，保留 custom ignore、目录权限和读取缓存。配置变化后既有绑定拒绝继续活动调用，清理仍可执行；同会话热更新与完整有效 CLI 配置对齐尚待补足。
 
 四组真实搜索验收覆盖默认 Glob、argv LS、注册 worktree 子任务/附加目录/custom ignore，以及 memory allow 与外目录 ask/reject；另用既有真实子任务 prior-read 组验证独立读取记录和备份。全部自有进程、端口及临时根完成清理；build/bundle/typecheck 和本阶段去重 322 项定向测试通过。此记录不替代此前子任务验收，也不代表完整默认切换：三个普通 factory、完整消费者及其余工具和初始化边界仍须完成。
+
+Grep 的公共声明、原生 Runtime 执行、配置传递和 POSIX 进程退出等待已实现，517 项定向测试与 16 组本机隔离验收通过。覆盖两后端父子搜索、worktree/输出阈值/部分读取后写入、权限差异、rg/grep/git 的取消与释放、版本探测超时及损坏 bundled 的系统回退。独立审查 Agent 因额度不可用，手工复审不记为独立审查通过。已验证边界及剩余工具、初始化、平台和默认切换工作见 [Managed Grep](managed-agent-grep-tools.md)。
