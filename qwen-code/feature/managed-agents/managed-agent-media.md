@@ -6,6 +6,8 @@
 
 首阶段范围遵循[默认替换方案的用户调整](managed-agent-daemon-default.md)：MCP、Hooks、Channels 的新增接入与迁移延期。媒体和取消仍继续；文中 Hook 检查指现有执行回执不回归，不要求在本阶段补齐完整 Hook 能力。
 
+最新优先级先进入创建时的执行引擎选择和持久化 owner 分派。当前 PDF 物理取消已完成收尾，Gateway PDF 转写设计继续保留，完整媒体与 M3 展示不作为开始该项的前置门槛；兼容性未知或依赖延期能力的会话在创建时保留旧路径。
+
 Read 已在所属 Runtime 执行，但 fileUtils 读取 ContentGeneratorConfig.modalities；Tool-only Config 没有 Gateway 完成认证与模型解析后的能力。文本模型的图片/PDF候选也不会保留：Tool-only 的 getDefaultVisionBridgeModel 明确返回 undefined。这个禁止推理的保护必须保留，不能把 Gateway 的模型选择或凭据灌入 worker 解除它。
 
 迁移前 ZoomImage 由 Gateway 构造与执行，要求有效 image 能力，工作区权限、忽略规则、原生 sharp 解码和归一化裁剪都必须迁移。其延迟声明、searchHint、参数和错误保持原样。DisplayImage 同时检查 fork 作用域、工作区 PNG、尺寸与终端渲染器；daemon 非交互入口原本没有终端渲染支持。不能因为拿到 worker 路径就向用户报告已展示。
