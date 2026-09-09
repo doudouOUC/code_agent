@@ -214,3 +214,9 @@ Glob 和可选 LS 的后续迁移已完成下述限定验收；接着处理 Grep
 四组真实搜索验收覆盖默认 Glob、argv LS、注册 worktree 子任务/附加目录/custom ignore，以及 memory allow 与外目录 ask/reject；另用既有真实子任务 prior-read 组验证独立读取记录和备份。全部自有进程、端口及临时根完成清理；build/bundle/typecheck 和本阶段去重 322 项定向测试通过。此记录不替代此前子任务验收，也不代表完整默认切换：三个普通 factory、完整消费者及其余工具和初始化边界仍须完成。
 
 Grep 的公共声明、原生 Runtime 执行、配置传递和 POSIX 进程退出等待已实现，517 项定向测试与 16 组本机隔离验收通过。覆盖两后端父子搜索、worktree/输出阈值/部分读取后写入、权限差异、rg/grep/git 的取消与释放、版本探测超时及损坏 bundled 的系统回退。独立审查 Agent 因额度不可用，手工复审不记为独立审查通过。已验证边界及剩余工具、初始化、平台和默认切换工作见 [Managed Grep](managed-agent-grep-tools.md)。
+
+### 2026-09-09 NotebookEdit Runtime 与审批修改
+
+NotebookEdit 已使用原生 Runtime 实现，与 Read 共享所属会话的完整读取记录。模型公共声明保持一致，用户修改整份 notebook 通过私有 prepare 元数据与旧引用关联；取消排空后重新准备、审批，保留用户修改说明和原生写入/备份规则。689 项去重定向测试及真实完整 host 的 Read→编辑→最终回复通过；私有 wire 追加验证两轮修改、幂等准备、失效引用拒绝与实体父备份。测试边界、失败夹具及未覆盖项见 [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md)。独立 Agent 仍受额度限制，本轮采用主任务人工审查。
+
+本切片没有切换 primary、secondary、replacement 普通会话 factory。后续继续完成 Notebook 故障时序和多媒体边界，以及此前工具/初始化/历史/客户端迁移清单；完整默认替换目标保持不变，当前预览及用户数据不参与试验。
