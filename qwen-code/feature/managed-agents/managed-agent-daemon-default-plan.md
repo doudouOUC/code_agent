@@ -22,8 +22,8 @@
 
 ## 当前证据与下一步
 
-M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复，build/typecheck/bundle、521 项定向测试、真实取消和正向读取、自审与独立审查通过。三个普通 factory 尚未切换；MCP/Hooks 依赖判定和 Channels 入口隔离尚无实现或验收证据。下一步调查和实现第 1 项，Gateway 转写及完整工作区/后台/历史能力不阻挡该调查。
+M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。第 1 项的持久归属切片现已实现：完整物理 owner 证明、writer lease 内权威校验和严格写入、Config/CLI/UI 恢复保护、实际 ACP engine 回执。build/typecheck/bundle、相关 core/CLI 定向测试及独立审查通过。7 组真实进程验收证明 Managed 新建和冷恢复成功，leased/nonleased ACP 与原生 CLI 拒绝接管，关闭录制时拒绝创建；详细证据与覆盖边界见执行引擎设计。
 
-创建边界调查已确认：当前 ChannelFactory 仅接收 cwd/env，同一 Bridge 复用一个 channel，sourceType 在之后的 newSession 才传入，不能只替换 factory 就按 Channels 会话分流。[执行引擎详细设计](managed-session-execution-engine.md)明确先补严格持久归属和配置加载/恢复保护，再实现同一 Bridge 的双通道。非 leased ACP、原生 CLI 和运行中会话切换也必须防止跨引擎接管。MCP 的有效集合包括 extension、runtime 和 Session 注入；Hooks 也受 extension、trust 与 disable 设置影响，不能只读取 settings 中一个字段就声称兼容选择完整。
+下一步实现同一 Bridge 的双通道和 SessionEntry 归属绑定，继续共用会话限额、ID reservation、事件及资源账本，让创建/冷恢复选择对应引擎，发送/取消/关闭沿已绑定通道运行。当前 ChannelFactory 仅接收 cwd/env，sourceType 在之后的 newSession 才传入；不能只替换 factory 就按 Channels 会话分流。[执行引擎详细设计](managed-session-execution-engine.md)列明消费范围和实施顺序。三个普通 factory 尚未切换，MCP/Hooks 有效依赖判定和 Channels 入口隔离仍待实现及验收；MCP 包括 extension、runtime 和 Session 注入，Hooks 受 extension、trust 与 disable 设置影响。Gateway 转写及完整工作区/后台/历史能力不阻挡这一步。
 
 每步沿用设计、基线或复现、实现、相关包定向测试、build/typecheck/bundle、真实行为验证、自审与独立审查。变更推送至 `feature/managed-agents-p0-p8` 并同步 companion 方案。未经验证的兼容判定不得用于扩大默认范围。

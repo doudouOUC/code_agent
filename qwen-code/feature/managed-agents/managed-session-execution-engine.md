@@ -8,7 +8,17 @@
 
 当前 `sourceType` 表示创建来源；`managed-gateway` 专用于禁止 Prompt 的 Tool-only Session；工作区 `runtime-owner.json` 表示进程所有权；writer lease 表示写入资格。这些字段都不能兼作会话执行引擎。普通 Prompt 和 Cancel 已使用 SessionEntry 的 connection，可以复用其队列和事件契约。
 
-本文是待实现设计，不表示默认入口已经切换。
+2026-09-09 已实现并验收下表第 1 片：持久 owner、严格恢复证明、初始化保护和实际 ACP 回执。双通道、兼容选择及普通默认入口切换仍待实现。
+
+## 第 1 片实现与验收
+
+完整物理 transcript 在过滤、UUID 合并和历史分支选择之前累计执行归属，full load、严格 owner 预读和 selective projection 保留同一文件快照证明。完整旧历史解释为 legacy，损坏、非法或冲突归属不能用于执行恢复；可读历史仍供只读展示。当前 Managed fork 明确拒绝，legacy fork 保留源的物理 owner。
+
+Config 构造、CLI 配置加载和运行中 resume 在改变旧会话前检查归属。真实 ACP 创建/恢复在 writer lease 内重读权威历史，严格写入或验证 owner，然后才进入会话执行初始化；预加载 projection 的 Goal 迁移也延后到此处。预读后历史追加、改属或删除均拒绝，失败自动释放 writer。Managed host 实际开启 lease，用户关闭录制时明确拒绝；ACP new/load/resume 返回实际 Config 的引擎，尚未用该回执做 Bridge 双通道绑定。
+
+macOS 隔离真实进程验收共 7 组通过：显式 lease 新建、默认设置新建、同引擎冷恢复、leased legacy ACP 拒绝接管、nonleased ACP 拒绝接管、原生 bundle CLI 拒绝接管、Managed 关闭录制拒绝。创建回执交给 Bridge 前已存在唯一 managed owner；正向路径经过真实 Runtime Read 和模型 HTTP。三种拒绝恢复没有新增模型请求、标记文件读取或 JSONL 写入，源与副本历史字节保持不变。所有测试自有进程、14 个端口、7 个目录和锁正常清理；4170 预览及用户数据未用作夹具。
+
+build、typecheck、bundle、相关 core/CLI 定向测试与审查已通过；单测另覆盖冲突/非法物理记录、读取快照变化、严格写失败、projection 变化及 UI 切换前拒绝。7 组 E2E 不包含这些全部故障的真实进程复现，也不证明完整 Hooks、fork/rewind 或默认替换完成。测试使用可控 localhost 模型响应，工具和持久化走真实实现。运行期间冻结源码与构建，115 项定向源码/包 dist/入口指纹一致；分块 bundle 另有测试后摘要，不能将它称为全部分块的测试前后指纹证明。原始验收与边界记录在本地 `.qwen/issues/managed-session-engine-verification.md`。
 
 ## 不变量
 
