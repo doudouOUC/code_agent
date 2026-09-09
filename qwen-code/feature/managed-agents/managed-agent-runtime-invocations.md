@@ -193,3 +193,7 @@ macOS 五组真实完整 host 验收通过：A 父未用文件工具而子 Read/
 新构建的 `fixed-1788901760083` 实际 HTTP 验收连续三次通过：每次都收到带正确 lease 的 v2 终结回执，再放行已解析的首条 manifest；等待生产路由处理结束后确认没有重建，合计 spawn=3、close=3、manifest=0，测试 Session 均不存在。此探针仍使用计数 Bridge，不把测试标记当作实际 ACP writer 证明。
 
 完整 host 的 `registry-default-memory-1788901782552` 四组再次通过，实际 worker 入口收到并返回 v2 release 200/released:true；主模型执行 Read/Write/Shell 后正常结束，两个真实记忆提取 Agent 也完成。worker、ACP、Shell、自有端口和临时目录全部回收，没有超时或备用强杀。37 个构建摘要前后及回读一致；迟到 HTTP 探针的 5 个摘要同样一致。完整 build/bundle/typecheck、变更文件 lint/格式通过；本切片实施期间去重累计 29 文件 3227 项测试通过（非全仓套件，Core client 的记忆/关闭筛选另有 372 项未运行）。上述终结释放切片当时未验证记忆实际写入与子作用域；后续五组结果见前一节。完整初始化和普通 daemon 默认切换继续实施。
+
+## Glob 与可选 LS 后续接线
+
+[搜索工具方案](managed-agent-search-tools.md)在同一 v2 invocation 链加入 Glob/LS，共享原生声明且不在 Gateway 构造或执行这两个本地工具。已有 bind-history DTO 增加可选执行上下文，实际新 producer 总是携带父子各自的目录、过滤、记忆根和 LS opt-in；Runtime 派生视图执行并保持原权限与共享父历史。macOS 四组真实搜索验收和既有子任务 prior-read 回归通过。没有新增公共路由或宽松 fallback；未识别上下文的旧 worker 明确报错。配置热更新、其他工具、完整初始化及三处默认 factory 替换继续实施。

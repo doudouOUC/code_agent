@@ -205,4 +205,10 @@ host 初始化、ACP 连接读循环及异步请求后代、资源清理使用 `
 
 五组 macOS 真实进程验收覆盖子首次 Read/Write、父子读取记录隔离、后台跨轮次重复写入、默认自动记忆在原 trusted 根的真实写入，以及旧 worker 退出后 loadSession 在新 Runtime 中读取原备份。完整 build/bundle/typecheck 与本阶段去重 2,191 项定向测试通过；各组共用 42 项基础构建摘要，补充依赖后联合 57 项保持一致，全部自有进程、端口及临时目录完成清理。当前 4170 预览未访问或重启。
 
-下一步先迁移 Glob 和可选 LS，再处理 Grep 后端声明、NotebookEdit/媒体、MCP/Skills/Hooks、后台进程/Git 与物理历史入口，同时接入可信工作区初始化快照。当前共享 owner 串行执行的并发限制、8 MiB 历史额度、external-v1 子任务、不同 cwd/故障组合和完整客户端兼容仍是默认切换前的条件。本阶段不改变三处普通会话 factory，不将冷加载备份可达误记为完整 rewind/branch 或旧会话迁移完成。
+Glob 和可选 LS 的后续迁移已完成下述限定验收；接着处理 Grep 后端声明、NotebookEdit/媒体、MCP/Skills/Hooks、后台进程/Git 与物理历史入口，同时接入可信工作区初始化快照。当前共享 owner 串行执行的并发限制、8 MiB 历史额度、external-v1 子任务、不同 cwd/故障组合和完整客户端兼容仍是默认切换前的条件。本阶段不改变三处普通会话 factory，不将冷加载备份可达误记为完整 rewind/branch 或旧会话迁移完成。
+
+### 2026-09-09 Glob/LS 搜索与执行上下文验收补充
+
+[搜索工具方案](managed-agent-search-tools.md)已将 Glob 和显式启用的 LS 接入共享声明、Gateway 代理及 owned Runtime。Read/Write/Edit/Shell 继续复用同一调用链。每个父子作用域在 bind 中传递实际目录列表、文件过滤、记忆根和 LS 启用状态；同 cwd 也派生独立工具视图，保留 custom ignore、目录权限和读取缓存。配置变化后既有绑定拒绝继续活动调用，清理仍可执行；同会话热更新与完整有效 CLI 配置对齐尚待补足。
+
+四组真实搜索验收覆盖默认 Glob、argv LS、注册 worktree 子任务/附加目录/custom ignore，以及 memory allow 与外目录 ask/reject；另用既有真实子任务 prior-read 组验证独立读取记录和备份。全部自有进程、端口及临时根完成清理；build/bundle/typecheck 和本阶段去重 322 项定向测试通过。此记录不替代此前子任务验收，也不代表完整默认切换：三个普通 factory、完整消费者及其余工具和初始化边界仍须完成。
