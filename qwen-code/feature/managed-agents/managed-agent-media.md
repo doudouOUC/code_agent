@@ -2,13 +2,13 @@
 
 状态：2026-09-09，基于 `3c6556e70b` 实施 M1，限定真实验收、两轮自审及独立最终源码审查通过。基于 `429d780beb` 继续补齐 M2 的 PDF 物理取消，构建与真实复验通过；Gateway 转写接口及 M3 仍待实现。完整目标仍为 [daemon 默认替换](managed-agent-daemon-default.md)，此文不代表完整多媒体或默认替换已验收。三处 workspace factory 加自有嵌入入口共四处，尚未切换；4170 预览与用户数据保持原状。
 
-2026-09-10 文档核对：M2 的 PDF 物理取消已有限定验收，Gateway 模型转写仍仅设计，M3 客户端展示与产物访问待实现；不得将整个 M2 标为完成。当前按[首阶段计划](managed-agent-daemon-default-plan.md)优先接默认引擎和普通 Web Shell/SDK，保留已验证媒体路径，完整媒体扩展后置。
+2026-09-10 文档核对：M2 的 PDF 物理取消已有限定验收，Gateway 模型转写仍仅设计，M3 客户端展示与产物访问待实现；不得将整个 M2 标为完成。当前按[全局架构](managed-agent-session-harness-runtime.md)先设计 Session/Harness/Runtime 拆分，随后按[首阶段计划](managed-agent-daemon-default-plan.md)接默认引擎和普通 Web Shell/SDK；保留已验证媒体路径，完整媒体扩展后置。
 
 ## 迁移前差距
 
 首阶段范围遵循[默认替换方案的用户调整](managed-agent-daemon-default.md)：MCP、Hooks、Channels 的新增接入与迁移延期。媒体和取消仍继续；文中 Hook 检查指现有执行回执不回归，不要求在本阶段补齐完整 Hook 能力。
 
-最新优先级先进入创建时的执行引擎选择和持久化 owner 分派。当前 PDF 物理取消已完成收尾，Gateway PDF 转写设计继续保留，完整媒体与 M3 展示不作为开始该项的前置门槛；兼容性未知或依赖延期能力的会话在创建时保留旧路径。
+最新优先级先完成三层全局设计；后续先建立 Session 权威存储、完整 Harness 接缝与持久恢复，再接创建时的执行引擎选择和 owner 分派。当前 PDF 物理取消已完成收尾，Gateway PDF 转写设计继续保留，完整媒体与 M3 展示不作为开始该项的前置门槛；兼容性未知或依赖延期能力的会话在创建时保留旧路径。
 
 Read 已在所属 Runtime 执行，但 fileUtils 读取 ContentGeneratorConfig.modalities；Tool-only Config 没有 Gateway 完成认证与模型解析后的能力。文本模型的图片/PDF候选也不会保留：Tool-only 的 getDefaultVisionBridgeModel 明确返回 undefined。这个禁止推理的保护必须保留，不能把 Gateway 的模型选择或凭据灌入 worker 解除它。
 

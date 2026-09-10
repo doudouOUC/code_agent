@@ -2,7 +2,9 @@
 
 ## 目标与当前缺口
 
-本项完整范围见[默认替换总方案](managed-agent-daemon-default.md)，优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。先让同一工作区的普通 daemon 会话按创建时确定的执行引擎运行，再扩大 Managed 默认适用范围。完整媒体展示、Skills、后台任务和历史迁移继续延期，已验证能力保留。
+本项完整范围见[默认替换总方案](managed-agent-daemon-default.md)，优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。用户最新要求先完成[Session / Harness / Runtime 全局设计](managed-agent-session-harness-runtime.md)；后续先实现 Session 独立权威、完整 Harness 接入与持久恢复，再完成本文件尚未接通的四处普通 factory。固定引擎和共享 Bridge 成果保留，完整媒体展示、Skills、后台任务和历史迁移继续延期。
+
+本文件已验收的物理 writer 当前位于 ACP host，未来移交 Session 服务是单独的 R2.S2 切片，须排空、封存、校验再接管，不能把现有 writer 保护描述为已经完成三层拆分。下文第 3 片仍定义配置和路由的局部顺序，不覆盖新增 R2.S1～R2.S3 的全局前置。
 
 历史调查基线 `bbeaf24bdb` 的 Bridge 只有一个可复用 channel，创建来源在取得 channel 后才传入，不能仅替换 factory 保留旧会话和 Channel 路径。2026-09-10 复核 `a836081466`：配对 Bridge 已实现双通道；普通三处 workspace factory 加直接嵌入入口，共四处，仍使用原启动路径，尚未配置共同 selector 和 executionEngines。
 

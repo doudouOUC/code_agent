@@ -154,7 +154,7 @@ ReadFile 内部的 PDF 视觉转换也属于模型调用。Tool-only Session 的
 
 Remote provider 复用已认证 endpoint/lease，在 owned worker 的工具调用、文件历史和终结释放 v2 路由上保持同一 Session 身份。execute 只发送一次，丢失响应由代理通过原引用 status/cancel 恢复，不重发或降级 v1。AutoLocal 每 Session 保存一次 use/client；释放先封住新调用，等待远端 Session 关闭，再释放 use。若 worker 已丢失，则必须等待 activator 提供的真实进程退出结果；失败保留 retiring binding，阻止复用而允许清理重试。单个 Session 释放不应提前停止同 generation 的其他 Session。
 
-这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。该注册切片当时尚未接通子作用域；其后实现与验收见下文。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移及物理撤销仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。当前改为先完成兼容配置与四处默认 factory 接线，在已验收范围有限启用，再按总方案逐项扩展；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
+这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。该注册切片当时尚未接通子作用域；其后实现与验收见下文。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移及物理撤销仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。当前先按[全局架构](managed-agent-session-harness-runtime.md)完成 Session 独立权威、完整 Harness 与恢复接缝，再完成兼容配置与四处默认 factory 接线，在已验收范围有限启用并逐项扩展；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
 
 ### 完整 host 与默认记忆验收（2026-09-09）
 

@@ -4,23 +4,26 @@
 
 更新日期：2026-09-10；本轮源码核对基线：`a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。目标是将 Managed Agent 替换为 daemon 的默认执行实现，复用现有 Agent 能力，兼容普通 Web Shell、SDK、Channels、定时任务及旧会话。独立 Managed 页面保留为实验和诊断入口。独立 CLI/TUI 的默认引擎、Kubernetes/VM 部署和生产多租户调度不属于本次 daemon 默认替换的前置要求。
 
-本文件是完整范围、能力状态和验收要求的总入口；[首阶段实施计划](managed-agent-daemon-default-plan.md)决定当前执行顺序；[执行引擎详细设计](managed-session-execution-engine.md)定义固定 owner、双通道和兼容选择。工具、媒体与子任务细节由下文链接的专项设计负责。原总方案的逐次调查、失败与验收记录完整保留在[历史记录](managed-agent-daemon-default-history.md)，其中的旧顺序和“下一步”不再作为当前计划。D1～D5 是历史切片命名，当前顺序以首阶段计划为准。
+本文件是完整产品范围、能力状态和验收要求的总入口；[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)定义用户最新要求的三层拆分；[首阶段实施计划](managed-agent-daemon-default-plan.md)决定当前执行顺序；[执行引擎详细设计](managed-session-execution-engine.md)定义固定 owner、双通道和兼容选择。工具、媒体与子任务细节由下文链接的专项设计负责。原总方案的逐次调查、失败与验收记录完整保留在[历史记录](managed-agent-daemon-default-history.md)，其中的旧顺序和“下一步”不再作为当前计划。D1～D5 是历史切片命名，当前顺序以首阶段计划为准。
 
 普通默认入口尚未切换。当前已有完整 Agent host、独立 Tool-only Runtime、若干工具与子作用域、持久 owner、配对 Bridge、严格 settings/项目 MCP 读取；相应限定验收不能代替普通入口的完整验收。本轮只调研和整理文档，没有新增生产实现或重跑历史产品测试。
 
-首阶段先接普通 Web Shell/SDK，完成必要故障验收后有限启用。MCP、Hooks、Channels 的 Managed 迁移后置；完整媒体展示、Skills/工作区初始化、后台能力和历史操作按后续阶段补齐，已验证行为保留。正确 cwd、信任、模型、权限、有效依赖识别和最小持久恢复是当前必需项。定时任务及后置能力始终属于完整目标，有限启用不能作为全部完成的证据。
+用户最新要求先做全局设计，目标是独立的 Session、Harness、Runtime 三层。后续施工先建立权威 Session 接口、完整 Harness 读写与可恢复等待，再接普通 Web Shell/SDK，完成必要故障验收后有限启用；仅拆出工具 Runtime 或替换 factory 不算架构完成。MCP、Hooks、Channels 的 Managed 迁移后置；完整媒体展示、Skills/工作区初始化、后台能力和历史操作按后续阶段补齐，已验证行为保留。正确 cwd、信任、模型、权限、有效依赖识别和持久恢复是当前必需项。定时任务及后置能力始终属于完整目标，有限启用不能作为全部完成的证据。
 
 ## 架构与不变量
 
-普通客户端继续使用现有 Session/Prompt/ACP/REST 契约。所属工作区的一个 Bridge 管理两种执行通道，服务端在创建时选择并持久化引擎；后续操作沿 Session 的实际 owner 分派。Managed Gateway 复用完整 ACP Agent 的模型循环、提示词、压缩、权限与停止语义，工作区文件和原生工具在独立 Runtime 执行。模型状态与 Runtime 生命周期分离，不另养一套精简 Agent，也不让 Tool-only worker 推进模型。
+以下为目标接线，尚未完成。普通客户端继续使用现有 Session/Prompt/ACP/REST 契约。所属工作区的一个 Bridge 管理两种执行通道，服务端在创建时选择并持久化引擎；后续操作沿 Session 的实际 owner 分派。Session 服务持有权威事件与恢复依据；Managed Harness 复用完整 ACP Agent 的模型循环、提示词、压缩、权限与停止语义，通过 Session client 读写；工作区文件和原生工具在独立 Runtime 执行。三个生命周期独立，不另养一套精简 Agent，也不让 Tool-only worker 推进模型。
 
 ```mermaid
 flowchart LR
     C[普通客户端与内部调用者] --> B[所属工作区 Bridge]
     B --> O[创建时选择 / 恢复时读持久 owner]
     O --> L[legacy ACP 通道]
-    O --> G[Managed 完整 Agent host]
-    G --> M[模型与逻辑会话历史]
+    O --> S[Session 服务：权威状态与事件]
+    O --> A[准入与 activation 调度]
+    A --> S
+    A --> G[Managed Harness：完整 Agent host]
+    G --> S
     G --> R[独立 Tool-only Runtime]
     R --> W[所属工作区工具与本地进程]
 ```
@@ -32,6 +35,7 @@ flowchart LR
 5. cancel ACK、HTTP abort 和根 PID 消失不单独证明副作用已结束。写调用回执不确定时查询或清理原调用，不自动重放；清理失败保留占用、writer 和错误。
 6. 同一 Bridge 继续共享 Session 总量、ID reservation、事件和权限账本；两种通道不能翻倍资源预算。Runtime 容量、根进程、后代进程、驻留 Config 和 Session 分别计量。
 7. 当前 4170 预览和用户数据不作为夹具；使用自有目录、端口和配置。每次发布代码与方案同步到授权分支，未验收条目不得标为完成。
+8. Session 的权威状态不依赖活 host。物理 writer、Harness activation 与 Runtime lease 分开校验；输入、正式事件和工具回执先持久化再确认，目录/展示/模型检查点为可核对的投影。旧 epoch 不能推进，原调用结果不明时不重放。
 
 ## 入口清单与执行归属
 
@@ -80,7 +84,11 @@ flowchart LR
 
 专项设计与证据：[执行引擎](managed-session-execution-engine.md)、[Runtime invocation v2](managed-agent-runtime-invocations.md)、[子任务及历史](managed-agent-child-scopes.md)、[搜索](managed-agent-search-tools.md)、[Grep](managed-agent-grep-tools.md)、[Notebook](managed-agent-notebook-tools.md)、[媒体](managed-agent-media.md)、[P9a](managed-agent-local-runtime-activation-p9a.md)、[实验展示](managed-agent-session-surfaces.md)。历史数字及平台范围在专项文档保留，不累计成一个“全量通过”数字。
 
-## 当前切片：配置兼容与四处工厂
+## 当前设计：先拆分 Session，再接普通入口
+
+新增的全局架构设计明确了 `ManagedPromptService` 的控制层职责、统一 Session 事件/检查点、物理 writer 交接、完整 Harness 接入、持久等待与恢复、旧数据兼容和三层关闭顺序。R2.S1～R2.S3 为后续施工前半段，均待实现；既有 R1 和严格配置成果保留。本轮只交付方案，不开始生产重构或普通默认切换。
+
+### 拆分之后的配置兼容与四处工厂
 
 共同 selector 读取服务端实际用途、canonical cwd、信任、环境、argv、settings、全部 MCP/Hooks 来源、扩展状态及动态注入。不能将 default source、零 toolCount、部分空 cache 或读取失败解释为兼容。bare/safe、disable、allow/exclude 和 top-tier 输入按真实消费规则判断，不能另造一套设置解释器。
 
@@ -106,13 +114,13 @@ reload 暂停本代新 Managed 启动，处理在途创建与现存 host，待�
 
 ## 实施顺序与完成门槛
 
-| 阶段                             | 当前状态                                | 交付与退出条件                                                                                                                     |
-| -------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| R1 固定 owner 和配对 Bridge      | 已有专项实现与验收                      | 维持固定归属、共享准入和真实 ACK，作为接线基础，不单独声明默认替换                                                                 |
-| R2 有效配置与四处 factory        | 严格 settings/项目 MCP 完成，其余待实现 | 空扩展、全来源依赖/用途、动态保护、协调器及生命周期接通；四入口有真实 Managed 正向及 legacy/未知/恢复负向证据                      |
-| R3 普通 Web Shell/SDK 和必要故障 | 待接线后验收                            | 完成总表首阶段适用项：普通 create/prompt/events/history/permission/cancel/reconnect，核对写入、owner、物理清理与平台边界           |
-| R4 有限范围默认启用              | 未开始                                  | 新建兼容范围确实默认 Managed 且不依赖实验页；延期入口保留 legacy，旧 owner 不变，无失败后重跑；分支与方案一致                      |
-| R5 定时及后置能力逐项扩大        | 按专项推进，未整体验收                  | 补齐 C06～C13、内部入口及剩余平台/历史/故障；每项有独立接口、迁移和普通入口验收后扩大范围；C01～C18 适用要求全部有证据才完成总目标 |
+| 阶段                                | 当前状态                                          | 交付与退出条件                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R1 固定 owner 和配对 Bridge         | 已有专项实现与验收                                | 维持固定归属、共享准入和真实 ACK，作为接线基础，不单独声明默认替换                                                                                     |
+| R2 三层拆分、有效配置与四处 factory | 严格 settings/项目 MCP 完成，三层拆分及其余待实现 | 先完成 R2.S1～R2.S3 的 Session 权威存储、完整 Harness 接入与恢复证明；再接空扩展、用途、协调器及四处入口，具备 Managed 正向及 legacy/未知/恢复负向证据 |
+| R3 普通 Web Shell/SDK 和必要故障    | 待接线后验收                                      | 完成总表首阶段适用项：普通 create/prompt/events/history/permission/cancel/reconnect，核对写入、owner、物理清理与平台边界                               |
+| R4 有限范围默认启用                 | 未开始                                            | 新建兼容范围确实默认 Managed 且不依赖实验页；延期入口保留 legacy，旧 owner 不变，无失败后重跑；分支与方案一致                                          |
+| R5 定时及后置能力逐项扩大           | 按专项推进，未整体验收                            | 补齐 C06～C13、内部入口及剩余平台/历史/故障；每项有独立接口、迁移和普通入口验收后扩大范围；C01～C18 适用要求全部有证据才完成总目标                     |
 
 完整验收至少覆盖普通无工具轮、原生读写及 final、审批允许/拒绝/修改、取消与迟到结果、首轮失败后继续、队列/重复请求、冷恢复、旧 owner、跨工作区/代际隔离、reload/remove/撤信任、手动/自动调度、默认关闭和版本回退。需要同时核对模型请求、物理结果、持久历史与客户端事件，不能以 UI idle 或测试清单存在替代行为证据。
 

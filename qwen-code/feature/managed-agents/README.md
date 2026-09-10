@@ -3,7 +3,7 @@
 > 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [a836081466](https://github.com/doudouOUC/qwen-code/commit/a8360814668b3dfdff72ad3d99cbcaf26dd009a9)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-10。
 
-> 当前产品目标：让 Managed Agent 替换 daemon 默认执行实现。用户最新明确首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
+> 当前产品目标：按 Claude 的 Session/Harness/Runtime 三层拆分，让 Managed Agent 替换 daemon 默认执行实现。用户最新要求先完成[全局方案设计](managed-agent-session-harness-runtime.md)，再分阶段施工；首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
 >
 > 此前完成 [Glob 与可选 LS](managed-agent-search-tools.md)：父子各自的目录、ignore、记忆根和 LS opt-in 进入 owned Runtime，Gateway 复用共享声明及原权限调度。四组真实搜索验收与既有 prior-read 子任务回归通过，共 31 次本地模型请求；53 项产物摘要、9 个生产源码摘要及 bundle 一致，测试进程、端口和临时根已清理。完整 build/bundle/typecheck、变更 lint/格式与两轮人工自审及独立审查通过；本阶段去重 17 文件 322 项定向测试通过（非全仓套件）。权限夹具初次失败与一次 HTTP 状态码异常均保留在验证记录，未通过修改产品绕过。
 >
@@ -19,15 +19,17 @@
 >
 > 执行引擎归属第一片已完成：完整物理 owner 读取、writer lease 内严格落盘、Config/CLI/UI 恢复保护和实际 ACP 回执，7 组真实进程验收通过。第二片同一 Bridge 的双通道与归属绑定已完成：885 项定向测试、build/typecheck/bundle、两轮自审和独立审查通过。两组真实 host 验收覆盖共存、双向模型流取消、普通关闭后冷恢复与活会话交接，合计 10 次原生 Read/final、22 次模型 HTTP；物理资源和 writer 凭据已独立核对。本次补齐严格 settings/项目 MCP 读取：不迁移落盘或重置坏配置，损坏的祖先软链接也明确拒绝；659 项相关单测、604 项 ACP 回归和三组最终真实验证通过，涵盖十六次配置拒绝与修复后原会话恢复 Read。有效配置兼容选择与普通默认入口尚待接线；详细证据和未覆盖范围见[执行引擎方案](managed-session-execution-engine.md)。
 >
-> 普通默认入口尚未切换，4170 预览未访问或重启。最新优先顺序是创建时选择引擎并持久化执行所有者，发送/取消/恢复按所有者分派，接通普通 Web Shell/SDK，再完成必要故障验收和有限范围默认启用。完整图片展示/产物、工作区/Skills 配置迁移、后台/子任务/自动记忆补齐、文件历史/撤销/分支迁移暂缓，已验证能力保留。正确 cwd、信任、模型权限配置、有效 MCP/Hooks 依赖及 Channels 来源识别和最小恢复仍是必要基础。旧会话和兼容性未知的会话在创建时固定旧路径，运行中不换引擎，Managed 失败不隐式降级重跑。局部工具验收不代表全部默认替换完成；定时任务核心链路和延期能力仍在总目标范围。
+> 普通默认入口尚未切换，4170 预览未访问或重启。最新优先顺序是先完成三层全局设计，随后建立权威 Session 接口、完整 Harness 读写与持久等待恢复，再完成创建时兼容选择和四处普通接线，接通 Web Shell/SDK，经过必要故障验收后有限启用。完整图片展示/产物、工作区/Skills 配置迁移、后台/子任务/自动记忆补齐、文件历史/撤销/分支迁移暂缓，已验证能力保留。正确 cwd、信任、模型权限配置、有效 MCP/Hooks 依赖及 Channels 来源识别和最小恢复仍是必要基础。旧会话和兼容性未知的会话在创建时固定旧路径，运行中不换引擎，Managed 失败不隐式降级重跑。局部工具验收不代表全部默认替换完成；定时任务核心链路和延期能力仍在总目标范围。
 
 ## 当前方案入口
 
-本次方案对应代码仓库文档提交 [35ca7352dd](https://github.com/doudouOUC/qwen-code/commit/35ca7352dd79f37f6870b3c6c2307e805a852037)，生产源码基线仍为上方的 `a836081466`。
+新增[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)：明确三层职责与部署、现有组件归位、定义和三类 lease、Session 逻辑接口、单一 transcript 权威、检查点与事件投影、工具回执及断点恢复、扩展能力、全部入口与旧数据迁移。ManagedPromptService 归控制层，默认 Harness 复用完整 ACP Agent；R2.S1～R2.S3 为拆分施工前半段，尚未实现。本轮只设计，未修改生产代码或运行产品。
+
+本次方案对应代码仓库文档提交 [0da10a9c58](https://github.com/doudouOUC/qwen-code/commit/0da10a9c58f7602647c016fc801e3acae2f23ca4)，生产源码基线仍为上方的 `a836081466`。
 
 2026-09-10 已按代码 `a836081466` 重新核对并统一[默认替换总方案](managed-agent-daemon-default.md)：补齐 C01～C18 能力/入口/状态/验收总表，覆盖四处普通 factory、Web Shell/SDK、Channels、手动与自动定时、Live/Conversations/Goal、子任务、媒体、历史、平台与资源。双通道和严格配置读取已有限定实现；共同 selector、空扩展只读输入与四处普通接线尚待实现。空 store 的真实基线和 host-before-worker 清理/reload 结论已并入[执行引擎设计](managed-session-execution-engine.md)，不再只留在本地调查文件。
 
-[首阶段计划](managed-agent-daemon-default-plan.md)以 R1～R5 明确当前顺序和后续完整目标，R2 细分为输入、用途策略、协调器接线及普通复验。MCP/Hooks/Channels 和其他约定后置项继续保留，有限默认不能替代完整迁移。旧总方案全文移入[历史调查与验收记录](managed-agent-daemon-default-history.md)，保留原证据与失败但不再使用其中的旧“下一步”指挥开发。本次仅更新文档，未新增生产功能或重跑历史产品测试；普通默认仍未切换，预览和用户数据保持原状。
+[首阶段计划](managed-agent-daemon-default-plan.md)以 R1～R5 明确当前顺序和后续完整目标，R2 先完成新增的 Session 权威接口、完整 Harness 和持久等待恢复，再执行原输入、用途策略、协调器接线及普通复验。MCP/Hooks/Channels 和其他约定后置项继续保留，有限默认不能替代完整迁移。旧总方案全文移入[历史调查与验收记录](managed-agent-daemon-default-history.md)，保留原证据与失败但不再使用其中的旧“下一步”指挥开发。本次仅更新文档，未新增生产功能或重跑历史产品测试；普通默认仍未切换，预览和用户数据保持原状。
 
 ## 分阶段设计文档
 
@@ -46,6 +48,7 @@ P0～P9a 和 D1～D5 保留为历史专题编号；当前默认替换的执行�
 | P8                  | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                                                                        |
 | P8 后续             | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md)                  | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制                                           |
 | P9a                 | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md)               | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收                                          |
+| R2.S1～R2.S3 全局架构 | [Session / Harness / Runtime 三层拆分](managed-agent-session-harness-runtime.md) | 当前设计：权威状态与事件、完整 Harness、独立 Runtime、恢复与迁移，尚未实现 |
 | 总方案              | [daemon 默认执行替换](managed-agent-daemon-default.md)                               | 当前完整范围、18 类能力、入口状态与验收门槛；普通默认未切换                                                 |
 | R1～R5 首阶段计划   | [默认替换首阶段计划](managed-agent-daemon-default-plan.md)                           | 用户调整后的范围、兼容选择边界和剩余验收                                                                    |
 | R1/R2 执行引擎      | [会话执行引擎选择与持久化](managed-session-execution-engine.md)                      | 归属、双通道及严格配置读取基础已实现并验收；全来源兼容选择与普通默认入口待完成                              |
@@ -55,6 +58,8 @@ P0～P9a 和 D1～D5 保留为历史专题编号；当前默认替换的执行�
 | D1～D5 搜索后端     | [Grep 与进程生命周期](managed-agent-grep-tools.md)                                   | 16 组限定验收通过：原生搜索、作用域/权限、取消与释放、版本超时和系统回退；Windows 等边界待完成              |
 | D1～D5 Notebook     | [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md)                         | 原生 Runtime 编辑、完整内容修改与父备份限定验收通过；用户编辑器及其他故障组合继续验证                       |
 | D1～D5 多媒体       | [媒体与调用配置](managed-agent-media.md)                                             | M1 及 M2 PDF 物理取消限定验收通过；Gateway 转写与 M3 展示待实施                                             |
+
+> 以下第 1 节起保留早期 Gateway/Runtime 两层方案作为历史背景；其中的部署和实施顺序不覆盖当前三层全局架构与 R1～R5 计划。
 
 ## 1. 结论
 
