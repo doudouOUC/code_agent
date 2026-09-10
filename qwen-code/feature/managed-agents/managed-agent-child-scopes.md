@@ -2,9 +2,11 @@
 
 状态：2026-09-09，本阶段实现及下列 macOS 验收已完成；daemon 默认入口尚未切换。代码基线为 `174e072ac4`，本文件随其后续实现提交。完整迁移目标见 [daemon 默认替换方案](managed-agent-daemon-default.md)，工具调用契约见 [Runtime invocation v2](managed-agent-runtime-invocations.md)。
 
+2026-09-10 三层设计调整：逻辑父/子 Session、历史与结果归 Session authority；完整父/子模型编排归 Harness；实际工具、独立读取缓存与原父文件历史 owner 归 Runtime。coordinator 保留稳定 binding 和清理责任，接管不重新生成原 Runtime ID。详见[Harness](managed-agent-harness.md)、[私有协议](managed-agent-control-protocol.md)和[coordinator](managed-agent-coordinator.md)。下文 Gateway 表述及冷恢复生成新 UUID 是既有终结后重建行为，不能套用到未决原调用的 Harness 接管；新可恢复 child/后台能力仍按后续范围验收。
+
 ## 目标与实际入口
 
-父 Agent 只调用 Agent 工具时，子任务也必须能通过独立 Runtime 读写文件。Gateway 继续负责模型、对话、权限交互和最终回复；每个实际子任务有自己的执行 Session、读取缓存和关闭责任，文件历史仍归属持久的父会话。
+父 Agent 只调用 Agent 工具时，子任务也必须能通过独立 Runtime 读写文件。Harness 继续负责模型、权限交互和最终回复，通过 Session client 提交对话；每个实际子任务有自己的执行 Session、读取缓存和关闭责任，文件历史仍归属持久的父会话。
 
 独立作用域已接入 AgentTool 的前台、后台和 fork、后台 cold resume、InProcessBackend、带工具的 runForkedAgent（包括自动记忆），以及 SubagentManager 的直接调用。先建立作用域，再重建绑定工具的 registry。权限、模型等配置 overlay 继承所属作用域；调用者已经提供作用域时不重复分配。热继续沿用作用域，冷恢复或 respawn 在旧资源清理成功后使用新 UUID。本文的真实进程验收范围见后表，其余入口另有定向单元测试，不能把两者混为同一种证据。
 

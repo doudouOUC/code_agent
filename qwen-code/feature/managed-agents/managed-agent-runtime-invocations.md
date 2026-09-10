@@ -2,17 +2,19 @@
 
 状态更新：2026-09-10，源码复核基线 `a836081466`。阶段 1 的本地 macOS 验收与阶段 2 已记录的 Core/ACP 调度、独立子作用域、父文件历史结果保留；当前注册九种工具代理（Read/Write/Edit/Shell、Glob/可选 LS、Grep、NotebookEdit、Zoom），各自证据见[总方案能力表](managed-agent-daemon-default.md)及专项文档，不能将注册等同全部语义验收。四处普通默认入口与共同兼容 selector 尚未接线；当前先实施[首阶段计划](managed-agent-daemon-default-plan.md)，MCP/Hooks/Channels 迁移及完整初始化/媒体/后台/历史能力后置。下文按切片保留当时结果，“四类工具”等指历史注册切片，不是当前总能力清单。
 
-目标是让普通 daemon 的完整 Agent 留在常驻 Gateway，并把工作区工具真实执行交给独立 Tool-only Runtime worker。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
+目标是让普通 daemon 复用完整 Agent，由 Harness 推进模型、Session 服务持有会话权威状态，独立 Tool-only Runtime 执行工作区工具。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
 
 ## 责任边界
 
-| Gateway                                                                    | 独立 Runtime worker                                                                     |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 模型循环、会话/历史、工具调度、L4/L5 权限与用户交互、最终执行授权          | 工作区工具真实构造/build、参数校验与规范化、工具固有权限 L3、确认数据与真实 `onConfirm` |
-| 模型侧 task/subagent、Goal/计划/会话状态、ask-user、结构化输出、ToolSearch | 文件/Shell/Git/worktree、MCP 发现与执行、文件检查点、工具 Hook 和子进程                 |
-| 模型输出转换、图片模型处理、客户端事件、持久化结果索引                     | 原始工具输出、进度、产物与受控资源读取                                                  |
+| Session 服务与控制层                                                                  | Harness                                                                 | 独立 Runtime worker                                                    |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 输入、正式历史、领域决策、等待/终态与恢复依据；coordinator 管 activation 与原 binding | 完整模型循环、工具编排、L4/L5 权限交互和最终授权请求                    | 原生 build、参数规范化、工具固有权限 L3、确认数据与真实 onConfirm      |
+| Goal/Todo/问答领域提交、父子血缘及结算引用                                            | task/subagent、Goal/计划、ask-user、结构化输出、ToolSearch 的模型侧编排 | 文件/Shell/Git/worktree、文件检查点、子进程；MCP/Hook 按原后置范围迁移 |
+| 正式结果与受控资源持久引用、客户端投影                                                | 模型输出转换、图片模型处理、客户端能力适配                              | 原始工具输出、进度、产物与受控资源读取                                 |
 
-Skill 由 Runtime 读取文件/运行脚本，Gateway 负责模型展开和模型覆盖；TaskStop 分别取消 Gateway 的 Agent 与 Runtime 的后台 Shell。不能仅按工具 `Kind` 决定归属。Session/Prompt Hook 的工作区脚本也需要远端执行，模型参与的决策仍在 Gateway；只迁移 Pre/PostToolUse 不构成完整 Hook 兼容。
+Skill 文件和脚本在 Runtime，模型展开及模型覆盖在 Harness；TaskStop 区分 Agent 与后台 Shell 的 owner。不能仅按工具 Kind 决定归属。Session/Prompt Hook 的工作区脚本也须按作用域迁移，模型决策仍在 Harness；只迁移 Pre/PostToolUse 不构成完整 Hook 兼容，首阶段不新增完整 Hook/MCP 接入。
+
+本表是目标责任，尚未完成独立 Session/Harness 拆分。下文历史切片中的 Gateway 指当时合并承载状态和模型的 host，不是未来模型与历史的共同权威。普通接入及可恢复 Harness 采用[Harness 契约](managed-agent-harness.md)、[私有控制协议](managed-agent-control-protocol.md)和[coordinator](managed-agent-coordinator.md)：原 v2 payload 保持兼容，activation 门禁须覆盖所有副作用入口；恢复使用原 invocation，detach 不 terminal release。当前 Map 幂等不证明跨 worker 重启恢复。
 
 ## 已验证的实际入口
 
@@ -77,7 +79,7 @@ Runtime 绝对路径不是 Gateway 本地路径。产物使用绑定当前 invoc
 
 ## 初始化与生产接入约束
 
-Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipFileCheckpointing 后仍初始化本地工具。需要在已有 host profile 下避免 FileService、extensions.refreshCache、ripgrep 探测、warmAll、过期 Agent worktree 清理及本地 MCP 文件读取；对应功能由 Runtime 接管，不能静默删去。Gateway 保留自身会话持久化与模型鉴权，不允许 LocalManagedRuntimeProvider 退回 Gateway 注册表执行。
+Gateway Config 不能只设置 skipMcpDiscovery/skipHooks/skipSkillManager/skipFileCheckpointing 后仍初始化本地工具。需要在已有 host profile 下避免 FileService、extensions.refreshCache、ripgrep 探测、warmAll、过期 Agent worktree 清理及本地 MCP 文件读取；对应功能由 Runtime 接管，不能静默删去。目标 Harness 保留模型鉴权，通过 Session client 提交会话历史，Session authority 持有物理 writer；不允许 LocalManagedRuntimeProvider 退回 Harness 注册表执行。
 
 配置由已解析 workspace/generation、信任状态及显式环境快照产生。Runtime 自行加载该工作区获准的工具配置；Gateway 不读其他 workspace 的 .env/MCP/Skill 文件补缺。信任撤销、配置 revision 变化及关闭应先封住新调用，再按现有 generation drain 规则取消/回收。普通 create/prompt 必须通过真实 Bridge/ChannelFactory 使用此注册表，接口单测或未被生产调用的 host option 不算接入完成。
 

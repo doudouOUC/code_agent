@@ -2,6 +2,8 @@
 
 更新日期：2026-09-10；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。本附录是[兼容接口与实现串联](managed-agent-session-compatibility.md)的逐项替换依据，配合[三层全局架构](managed-agent-session-harness-runtime.md)使用。所有“适配/增强/迁移”均为设计状态；本轮只核对源码和文档，没有新增生产实现或产品验收。
 
+完整 Harness 内部的模型、工具、恢复、队列和 dispose 接缝另见[Harness 专项方法映射](managed-agent-harness.md)；不混入本附录的公开声明计数。
+
 ## 清单范围与读法
 
 TypeScript AST 枚举下列 11 个声明的公开成员（含隐式 public、可选成员、泛型和 v2 映射类型，不含构造器、private/protected）。合计 **268 项：258 个方法、10 个属性**。每个限定名在方法表恰好一行；同类共享契约在不同方法行重复列出，差异以该行返回类型和具体说明为准。Bridge 的 2 个继承方法单独列出，不重复计入其本体 119 项。此计数是声明覆盖，不是全部功能实现、全部调用点枚举或验收通过率。
@@ -29,7 +31,7 @@ TypeScript AST 枚举下列 11 个声明的公开成员（含隐式 public、可
 
 返回签名中 Promise 不证明持久提交，也不能据此把非 async 实现改成 async。同步 throw、异步 rejection、boolean、undefined/null、部分成功分别保留。可选方法继续可选，外部注入的旧 Bridge 不能被补成假能力。验收栏均为后续实施要求，可结合主方案 T01～T12 执行；只读查询的宽松结果不能借作严格准入证明。
 
-消费者缩写：Core `Config`=`packages/core/src/config/config.ts`、`client`=`packages/core/src/core/client.ts`、`llm-chat`=`packages/core/src/core/llm-chat.ts`；`core/` 路径前缀展开为 `packages/core/src/`，`vscode-ide-companion/` 展开为 `packages/vscode-ide-companion/`；CLI 默认前缀 `packages/cli/src/`，`ACP`=`acp-integration/acpAgent.ts`、`Session`=`acp-integration/Session.ts`、`route`/`routes/session.ts`=`serve/routes/session.ts`、`standalone`=`serve/conversations/standalone-session-service.ts`、`archive`=`serve/server/session-archive.ts`、`list`=`serve/server/session-list.ts`、`dispatch`=`acp-http/dispatch.ts`、`UI`=`ui/`、`live`=`serve/live/`；`bridge.ts` 为 `packages/acp-bridge/src/bridge.ts`。行号均指上述基线，不是后续实现位置；同文件只列代表调用处，内部含类内调用。
+消费者缩写：Core `Config`=`packages/core/src/config/config.ts`、`client`=`packages/core/src/core/client.ts`、`llm-chat`=`packages/core/src/core/llm-chat.ts`；`core/` 路径前缀展开为 `packages/core/src/`，`vscode-ide-companion/` 展开为 `packages/vscode-ide-companion/`；CLI 默认前缀 `packages/cli/src/`，`ACP`=`acp-integration/acpAgent.ts`、`Session`=`acp-integration/session/Session.ts`、`route`/`routes/session.ts`=`serve/routes/session.ts`、`standalone`=`serve/conversations/standalone-session-service.ts`、`archive`=`serve/server/session-archive.ts`、`list`=`serve/server/session-list.ts`、`dispatch`=`acp-http/dispatch.ts`、`UI`=`ui/`、`live`=`serve/live/`；`bridge.ts` 为 `packages/acp-bridge/src/bridge.ts`。行号均指上述基线，不是后续实现位置；同文件只列代表调用处，内部含类内调用。
 
 ## SessionService
 

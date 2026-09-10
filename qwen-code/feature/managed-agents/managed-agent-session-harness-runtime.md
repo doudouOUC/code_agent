@@ -2,13 +2,15 @@
 
 ## 决策、范围与当前状态
 
-2026-09-10 用户明确要求按 Claude Managed Agents 拆分，并先完成全局方案设计。本文件定义目标架构；其中新增接口、统一事件存储、Harness 恢复与实施阶段均为待实现设计。当前生产源码基线为 `a836081466`，已有文档基线为 `35ca7352dd`；本次不改生产代码、不构建启动、不触碰 4170 预览或用户数据。
+2026-09-10 用户明确要求按 Claude Managed Agents 拆分，并先完成全局方案设计。本文件定义目标架构；其中新增接口、统一事件存储、Harness 恢复与实施阶段均为待实现设计。当前生产源码基线为 `a836081466`，前一版文档基线为 `4dc4a90dcc`；本次不改生产代码、不构建启动、不触碰 4170 预览或用户数据。
 
 目标是在保持普通 daemon 契约和现有 Agent 能力的前提下，将会话状态、模型执行和工具环境分成三个独立职责。Session 可以在没有活 Harness 或 Runtime 时被查询；Harness 可以从持久状态重建；Runtime 的退出不会删除会话。默认执行替换继续是产品目标，独立 Managed 页面作为实验和诊断入口保留。
 
 Anthropic 公开架构将 Session 定义为持久追加事件日志，由 Harness 读取历史、组织模型上下文并派发工具，Sandbox 执行本地工作；三者通过接口独立替换。本文沿用这些职责边界。下文的文件布局、租约、兼容策略和阶段是 Qwen Code 的设计，不代表已知的 Claude 内部实现。[官方架构说明](https://www.anthropic.com/engineering/managed-agents)
 
 本文件决定全局分层；[默认替换总方案](managed-agent-daemon-default.md)维护 C01～C18 的产品范围和证据；[首阶段计划](managed-agent-daemon-default-plan.md)维护执行顺序；[执行引擎设计](managed-session-execution-engine.md)维护固定 owner 与兼容准入。先完成本轮设计，后续施工先建立 Session 权威存储与完整 Harness 接缝，再接四处普通 factory；不再将只接 factory 视作架构拆分完成。
+
+专项契约现已补齐：[Session 兼容与方法映射](managed-agent-session-compatibility.md)、[完整 Harness 接口和检查点](managed-agent-harness.md)、[私有消息与 Runtime 接管协议](managed-agent-control-protocol.md)、[coordinator 调度和四处装配](managed-agent-coordinator.md)。这些文档给出可实施的责任与字段约束，尚不代表接口已经编码或故障验收通过。
 
 ## 1. 全局拓扑与职责
 
@@ -35,22 +37,22 @@ Gateway/Bridge 和调度器是接入与控制组件，不成为另一套 Agent �
 | Harness         | 复用完整 Agent 的提示词、模型循环、压缩、权限决策、工具编排与停止逻辑；持有一次 activation 的执行资格 | 不成为唯一历史持有者，不直接写 Session 存储文件，不以 Runtime 生命周期定义会话生命 |
 | Runtime         | 绑定工作区与执行作用域，执行获准工具，维护实际调用回执、文件备份和自有进程，支持取消与可验证释放      | 不持有模型凭据，不推进模型，不决定用户会话终态，不直接改 Session 权威日志          |
 
-Session Service 中的“服务”首先是接口与生命周期边界。首个本地实现由 daemon 承载持久存储，完整 ACP host 作为 Harness 通过私有通道访问；Tool-only worker 使用已有独立进程。即使开发时使用同进程适配器，也必须能独立销毁并重建 Harness，且存储不被它释放。后续可独立部署 Session 服务和 Harness 池；本轮不引入 Kubernetes、消息中间件或分布式数据库作为前置依赖。
+Session Service 中的“服务”首先是接口与生命周期边界。首个本地实现由 daemon 承载持久存储，完整 ACP host 作为 Harness 通过受控 Session client 访问；当前 Managed factory 使用 in-memory ACP host，Tool-only worker 使用已有独立进程。逻辑 handle 与可共享的物理 host 分别计量。即使开发时使用同进程适配器，也必须能独立销毁并重建 Harness，且存储不被它释放。后续可独立部署 Session 服务和 Harness 池；本轮不引入 Kubernetes、消息中间件或分布式数据库作为前置依赖。
 
 ## 2. 当前组件如何归位
 
-| 当前组件                                                  | 已有能力 / 缺口                                                                                               | 目标归属与处理                                                                                          |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `ManagedPromptService`                                    | 实验 Gateway 的完整输入准入、去重、绑定、调度和取消；只接受 bootstrap/continuation，不能等同完整 Session 服务 | 留在控制层，组合 Session 的提交接口和调度器；逐步移出独立的会话状态、历史和终态事实                     |
-| `FileManagedSessionInbox`                                 | 持久输入、processing fence、终态；不是完整模型与工具事件日志                                                  | 复用校验、幂等和持久化语义；输入与状态进入统一 Session 写入口，旧格式仅通过明确适配器读取               |
-| `FileManagedActivationStore` / `EmbeddedHarnessScheduler` | 激活队列、租约、续租和有界并发                                                                                | 保留调度职责；持久唤醒意图由 Session 提供，队列可通过对账补齐，不作为第二份会话状态权威                 |
-| `ManagedGatewaySessionEvents`                             | 独立持久展示事件和会话目录                                                                                    | 变为 Session 事件的可重建投影；展示缓存不负责判定是否执行或恢复                                         |
-| `FileManagedGatewayConversationStore`                     | 实验模型循环在成功轮次提交模型历史                                                                            | 迁移为 Harness 检查点/上下文投影，不另存一份可以覆盖 Session 事实的历史                                 |
-| `ResidentManagedGatewayModelRunner`                       | 实验受限模型循环，仍有其专用预算和续轮条件                                                                    | 保留实验兼容；默认 Harness 复用完整 ACP Agent，不将这套精简循环升级成第二套默认 Agent                   |
-| 完整 `QwenAgent` / `Session` / recorder                   | 模型、工具调度、队列、录制、上下文和部分生命周期集中在 host                                                   | 保留原 Agent 行为，抽出存储读写和持久等待接缝；用 Session client 替换直接文件写入，避免一次性重写整个类 |
-| 普通 turn ledger / `turn_result`                          | Bridge live overlay、terminal sidecar 和部分 transcript 终态目前是 best-effort                                | 新 Managed 提交定义权威终态，旧 ledger 成为兼容投影；不能将现有完成回执当作强持久保证                   |
-| core `SessionService` / transcript reader / writer lease  | 既有目录、历史解析、归档和严格 owner 证明                                                                     | 复用历史适配和物理 writer 保护，避免另造同名平行服务；新职责通过清晰接口接入                            |
-| `ManagedRuntimeProvider` / owned v2 / tool session        | 工具执行、子作用域、备份、取消与释放已有局部验证                                                              | 保留已验证协议；补跨 Harness 恢复时原调用查询与回执交付，不把进程内 Map 当跨重启证明                    |
+| 当前组件                                                  | 已有能力 / 缺口                                                                                               | 目标归属与处理                                                                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ManagedPromptService`                                    | 实验 Gateway 的完整输入准入、去重、绑定、调度和取消；只接受 bootstrap/continuation，不能等同完整 Session 服务 | 留在控制层，组合 Session 的提交接口和调度器；逐步移出独立的会话状态、历史和终态事实                                            |
+| `FileManagedSessionInbox`                                 | 持久输入、processing fence、终态；不是完整模型与工具事件日志                                                  | 复用校验、幂等和持久化语义；输入与状态进入统一 Session 写入口，旧格式仅通过明确适配器读取                                      |
+| `FileManagedActivationStore` / `EmbeddedHarnessScheduler` | 激活队列、租约、续租和有界并发                                                                                | 普通 Session authority 提交 activation 与唤醒事实，调度器通过窄适配读取；原 File store 只保留实验后端，不成为第二个 epoch 权威 |
+| `ManagedGatewaySessionEvents`                             | 独立持久展示事件和会话目录                                                                                    | 变为 Session 事件的可重建投影；展示缓存不负责判定是否执行或恢复                                                                |
+| `FileManagedGatewayConversationStore`                     | 实验模型循环在成功轮次提交模型历史                                                                            | 迁移为 Harness 检查点/上下文投影，不另存一份可以覆盖 Session 事实的历史                                                        |
+| `ResidentManagedGatewayModelRunner`                       | 实验受限模型循环，仍有其专用预算和续轮条件                                                                    | 保留实验兼容；默认 Harness 复用完整 ACP Agent，不将这套精简循环升级成第二套默认 Agent                                          |
+| 完整 `QwenAgent` / `Session` / recorder                   | 模型、工具调度、队列、录制、上下文和部分生命周期集中在 host                                                   | 保留原 Agent 行为，抽出存储读写和持久等待接缝；用 Session client 替换直接文件写入，避免一次性重写整个类                        |
+| 普通 turn ledger / `turn_result`                          | Bridge live overlay、terminal sidecar 和部分 transcript 终态目前是 best-effort                                | 新 Managed 提交定义权威终态，旧 ledger 成为兼容投影；不能将现有完成回执当作强持久保证                                          |
+| core `SessionService` / transcript reader / writer lease  | 既有目录、历史解析、归档和严格 owner 证明                                                                     | 复用历史适配和物理 writer 保护，避免另造同名平行服务；新职责通过清晰接口接入                                                   |
+| `ManagedRuntimeProvider` / owned v2 / tool session        | 工具执行、子作用域、备份、取消与释放已有局部验证                                                              | 保留已验证协议；补跨 Harness 恢复时原调用查询与回执交付，不把进程内 Map 当跨重启证明                                           |
 
 现有普通引擎和实验 Gateway 两条路径必须分别调查。实验 Inbox/展示/对话文件和普通 ACP transcript 不能因为含有同一类消息就被直接合并，更不能据此声称当前已做到单一 Session 权威。
 
@@ -78,17 +80,17 @@ Session Service 中的“服务”首先是接口与生命周期边界。首个�
 
 Session Service 在追加时同时验证存储 writer、命令授权和所需 activation fence。客户端输入/取消与 Harness 执行事件采用不同命令权限：用户发送消息不要求持有 Harness lease，Harness 也不能伪造用户审批。替换 Harness 必须先隔离旧执行权；租约过期不是旧工具已停止的证明，原 invocation 仍由原执行账本约束。
 
-工具的新派发也受 activation 资格约束，不能只在 Session append 时检查 epoch。可信 dispatcher/执行端在 prepare/execute 的副作用准入前校验 Session、当前 activation、Runtime lease、invocation 和输入/权限版本；相同 Runtime 仍存活时也必须拒绝旧 Harness 的迟到新调用。交接先撤销旧派发资格并建立执行端可验证的屏障，再发布新推进者；无法确认屏障时保持阻塞，不能依赖旧 host 自觉停发。已准入的原调用仍允许 status/cancel/回执结算，重复 execute 只能查询原执行结果，不能重启副作用。当前 owned v2 不自动提供上述完整 activation 派发屏障，具体接线需在 R2.S1/R2.S3 实现并验收。
+工具的新派发也受 activation 资格约束，不能只在 Session append 时检查 epoch。可信 dispatcher/执行端在 beginTurn、history bind/checkpoint、prepare/build、confirm、preflight/Hook、execute 等实际副作用准入前校验 Session、当前 activation、Runtime lease、invocation 和输入/权限版本；相同 Runtime 仍存活时也必须拒绝旧 Harness 的迟到新调用。交接采用 installing → stageGate → authority 安装提交 → enableGate ACK，再把可运行 grant 交给新 Harness；无法确认屏障时保持阻塞，不能依赖旧 host 自觉停发。已准入的原调用仍允许 status/cancel/回执结算，重复 execute 只能查询原执行结果，不能重启副作用。当前 owned v2 不自动提供上述完整 activation 派发屏障，具体接线需在 R2.S1～R2.S3 实现并验收。
 
 ## 4. Session 的最小逻辑接口
 
-以下是语义契约，不声明已有同名 API；精确 TypeScript DTO、私有传输方法与版本在各切片设计时冻结。保持 Core 不依赖 ACP/Express 或完整 Config，传输适配留在 CLI/Bridge。
+以下是语义契约，不声明已有同名 API；字段、私有方法与版本见[协议专项](managed-agent-control-protocol.md)，实现前将其展开为可编译的 DTO/validator 并核对实际限额。保持 Core 不依赖 ACP/Express 或完整 Config，传输适配留在 CLI/Bridge。
 
 | 接口                              | 输入和保证                                                                                                                                                                     |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | create / get / list               | create 校验用途、工作区和定义，在副作用前持久化固定 engine；创建空会话不触发模型；get/list 不要求有活 host                                                                     |
 | submitInput                       | 稳定幂等 ID、完整规范化内容、来源与期限；内容及唤醒意图持久化后返回受理回执，同 ID 不同内容报冲突                                                                              |
-| appendExecution                   | 身份、activation fence、expectedSequence、稳定 eventId 和事件；条件追加并 flush 后回 ACK，重复调用返回原提交，序列冲突要求重读                                                 |
+| appendExecution                   | 身份、activation fence、expectedSequence、稳定 eventId 和事件；按私有协议条件追加并完成文件同步后回 ACK，重复调用返回原提交，序列冲突要求重读                                  |
 | readEvents / subscribe            | 有界 cursor 分页/增量订阅，返回已提交事件；重连先补历史再追新事件，消费端按 eventId/sequence 去重；cursor 有命名空间/版本，普通 Bridge eventEpoch 与实验整数 cursor 不直接互换 |
 | readCheckpoint / commitCheckpoint | checkpoint 绑定已提交 sequence、schema 和状态摘要；不能越过未持久化事件或代替原始事实，失败可从上个已验证检查点重建                                                            |
 | requestCancel / resolveAction     | 定位原 turn/invocation/approval，先持久化请求，再唤醒其 owner；审批绑定实际输入版本，重复或迟到决策不得授权另一调用                                                            |
@@ -106,7 +108,7 @@ Session Service 在追加时同时验证存储 writer、命令授权和所需 ac
 
 首期选定现有普通 transcript 作为权威载体，复用 JSONL、ChatRecord 与严格 writer，通过版本化记录增加准入、执行和恢复事实；同一逻辑事实只经一个事务入口提交。保留 parentUuid、压缩边界、工具关系、Goal、artifact、文件历史和通知，reader 继续提供完整 SessionRestoreProjection。精确记录 subtype/schema 和序列兼容在 R2.S1 冻结，不默认增加独立 owner 文件或多份互相覆盖的 transcript；若消费者调查证明需要新容器，先修订迁移设计再施工。大媒体、文件备份和大工具输出使用持久引用及哈希，不能引用将随 Runtime 回收删除的临时路径。
 
-输入事件和待调度意图在同一提交边界持久化。Activation 队列允许单独持久化，但可根据权威输入与等待记录对账；队列追加失败或丢 ACK 时重试原 ID，不重复追加输入。展示缓存、目录索引、模型 checkpoint 均带来源 sequence，可删除重建；投影失败不得回滚已提交的成功或发出第二次工具调用。物理多文件更新不声称具有跨文件原子性。
+输入事件和待调度意图在同一提交边界持久化。Activation 候选队列允许单独缓存，但可根据权威输入与等待记录对账；claim/renew/release 仍只能由 Session authority 提交，不使用实验 store 的第二套 epoch；队列追加失败或丢 ACK 时重试原 ID，不重复追加输入。展示缓存、目录索引和纯模型上下文投影带来源 sequence，可由完整事实重建；包含执行阶段、稳定调用映射和未决引用的 Harness checkpoint 是恢复依据，必须持久保留到替代 checkpoint 及所需事实完整提交；投影失败不得回滚已提交的成功或发出第二次工具调用。物理多文件更新不声称具有跨文件原子性。
 
 输入受理与进入模型上下文是同一 message ID 的不同阶段，投影不能生成两个用户消息。当前 core client、llm-chat、工具调度器、Session 终态、模型设置、Goal/记忆及文件历史的 recorder 写入都须迁移到受控 sink；只修改 `ManagedPromptService` 或 final callback 不足以建立统一权威。普通终态 sidecar/`turn_result` 的 best-effort 行为需要显式迁移，不能静默改变 legacy 原失败语义。
 
@@ -124,8 +126,11 @@ sequenceDiagram
     C->>S: 提交完整输入与幂等 ID
     S->>S: 提交输入与唤醒意图
     S-->>C: 受理 ACK
-    Q->>S: 领取 activation 并取得 epoch
-    Q->>H: 从 checkpoint / 事件恢复
+    Q->>S: 领取 installing activation
+    Q->>R: stageGate 关闭旧派发并核对原调用
+    Q->>S: 提交安装证明
+    Q->>R: enableGate 并等待 ACK
+    Q->>H: 可运行 grant 与 checkpoint / 事件恢复
     H->>S: 提交模型结果、工具意图与权限状态
     H->>R: 执行已授权的 invocation
     R-->>S: 经可信回执入口提交原调用结果
@@ -204,22 +209,24 @@ reload/remove/撤信任都先封闭原 generation。reload 对已有会话按已
 
 ## 11. 分阶段实施与验收门槛
 
-本轮停留在全局设计。R1 已有成果保留，新增拆分工作纳入 R2 的前半段，保留既有 R2.1～R2.4 编号以便追踪。
+本轮停留在方案设计，专项接口、状态机和故障矩阵已补充。R1 已有成果保留，新增拆分工作纳入 R2 的前半段，保留既有 R2.1～R2.4 编号以便追踪。
 
-| 切片                             | 产物                                                                                                    | 必须证明                                                                                                                                                |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R2.S1 Session 权威接口与存储接缝 | 冻结首批事件/命令、全部读写消费者、单一日志格式选择、幂等与 writer/fence、旧格式适配设计并实现          | 无活 Harness 时 create/get/read 正常；重复输入唯一；重启补队列；旧 epoch/跨 workspace 写入拒绝；不改旧用户数据                                          |
-| R2.S2 完整 Harness 接入          | 完整 Agent 通过 Session client 读写，上下文 checkpoint 和正式事件归位，展示改投影，物理 writer 安全交接 | 普通 Agent 语义不变；关闭/替换 host 后历史、owner、配置与下一轮保留；首轮失败可继续；没有两份权威历史或第二套模型循环                                   |
-| R2.S3 持久等待与断点恢复         | 工具/审批等待点、原 invocation 查询与幂等回执、派发资格交接屏障、Harness detach 与 Session close 分离   | 工具完成但 ACK 丢失不重写；旧 host 迟到的新 prepare/execute 无副作用；等待释放槽位后换 host 不取消原调用；不确定副作用明确阻塞；丢 Runtime 不丢 Session |
-| R2.1～R2.4 配置与普通接线        | 原严格扩展/用途设计、统一 coordinator、四处 factory、默认关闭状态下的普通入口复验                       | 真实兼容新会话可走 Managed；旧/延期/未知走固定原路径；同工作区共存、跨代隔离及关闭/reload 成立                                                          |
-| R3 / R4 普通验收与有限默认       | Web Shell/SDK 全链、故障矩阵、明确平台和能力范围                                                        | 前三项拆分证据与 C01～C18 首阶段适用项满足，才启用新默认；不以实验页面通过替代                                                                          |
-| R5 完整能力扩大                  | 定时、Channels/MCP/Hooks、Skills、媒体、后台与历史等逐项接入                                            | 各调用者使用统一状态与恢复边界；延期范围逐项消除，有独立证据后扩大默认，不把有限默认当完整目标完成                                                      |
+| 切片                             | 产物                                                                                                  | 必须证明                                                                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R2.S1 Session 权威接口与存储接缝 | 冻结首批事件/命令、全部读写消费者、单一日志格式选择、幂等与 writer/fence、旧格式适配设计并实现        | 无活 Harness 时 create/get/read 正常；重复输入唯一；重启补队列；旧 epoch/跨 workspace 写入拒绝；不改旧用户数据                                         |
+| R2.S2 完整 Harness 接入          | 完整 Agent 通过 Session client 读写，A/D 检查点和基础门禁、正式事件/展示投影及 writer 安全交接        | 普通 Agent 语义不变；关闭/替换 host 后历史、owner、配置与下一轮保留；首轮失败可继续；没有两份权威历史或第二套模型循环                                  |
+| R2.S3 持久等待与断点恢复         | 工具/审批等待点、原 invocation 查询与幂等回执、派发资格交接屏障、Harness detach 与 Session close 分离 | 工具完成但 ACK 丢失不重写；旧 host 迟到的所有副作用入口均拒绝新工作；等待释放槽位后换 host 不取消原调用；不确定副作用明确阻塞；丢 Runtime 不丢 Session |
+| R2.1～R2.4 配置与普通接线        | 原严格扩展/用途设计、统一 coordinator、四处 factory、默认关闭状态下的普通入口复验                     | 真实兼容新会话可走 Managed；旧/延期/未知走固定原路径；同工作区共存、跨代隔离及关闭/reload 成立                                                         |
+| R3 / R4 普通验收与有限默认       | Web Shell/SDK 全链、故障矩阵、明确平台和能力范围                                                      | 前三项拆分证据与 C01～C18 首阶段适用项满足，才启用新默认；不以实验页面通过替代                                                                         |
+| R5 完整能力扩大                  | 定时、Channels/MCP/Hooks、Skills、媒体、后台与历史等逐项接入                                          | 各调用者使用统一状态与恢复边界；延期范围逐项消除，有独立证据后扩大默认，不把有限默认当完整目标完成                                                     |
 
 核心故障验收必须同时观测模型请求、工具物理结果、权威日志和客户端事件，覆盖：输入/调度/事件 ACK 丢失，模型中断，工具执行前后杀 Harness，等待时替换 host，Runtime 丢失，审批重连，cancel 与完成竞争，存储失败，旧 epoch 迟到，跨 workspace/reload，旧格式冷恢复及版本回退。所有产品测试使用自有目录、端口和配置；本轮未执行这些未来测试。
 
 ## 12. 实施前需冻结的细节与源码范围
 
-全局责任、复用普通 transcript 的存储方向和先后顺序在本方案中确定。现有公开方法与消费链的兼容映射见[专项方案](managed-agent-session-compatibility.md)。R2.S1 开工前还需冻结事件类型/内容块兼容表、记录 subtype/schema、关键生产者的可等待提交接线、checkpoint 的完整状态字段与 schema、私有 Session client 传输和 writer 交接协议；R2.S3 冻结 invocation 查询的可信未执行证明、回执保留周期和唤醒去重。没有这些细节时不能先关闭保守恢复保护。
+全局责任、普通 transcript 权威载体与施工顺序已确定。现有公开方法见[兼容方案](managed-agent-session-compatibility.md)；Harness 状态机、九组 checkpoint 字段、实际 ACP 内部接缝和 A～E 安全点见[Harness 专项](managed-agent-harness.md)；消息、事务可见性、文件同步 ACK、派发安装/撤销、原调用结算和引用保留见[私有协议](managed-agent-control-protocol.md)；调度 authority、容量、四处 factory 和 generation drain 见[coordinator 专项](managed-agent-coordinator.md)。
+
+R2.S1/S2/S3 实现前仍需把记录 subtype、复用内容 union、checkpoint 与 envelope 展开成编译通过的 schema/validator，并冻结实际字节/条数/深度限制、生产者可等待接线和平台同步证据。恢复先支持 coordinator 与原 worker 存活时更换 Harness；worker/daemon 丢失且有未决副作用保持 blocked，未来跨 worker 重启的持久回执后端另行实施。不能因字段设计已补齐就关闭保守恢复保护。
 
 | 区域            | 预计涉及的现有接缝                                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

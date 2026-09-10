@@ -131,7 +131,7 @@ Managed authority 是唯一物理 writer；既有记录内容和 reader 保持�
 
 ## 7. 实施切片与仍需冻结的细节
 
-R2.S1 先按附录建立本地接口和适配的一致性基准，保持旧行为；再冻结首批命令/记录 schema、输入规范化与幂等范围、提交标记及耐久等级、checkpoint 状态、私有 client 和 writer 交接。随后实现单一 authority 和可等待 ACK，所有被增强的关键生产者/消费者成对修改。方法清单与责任归位已经补齐，精确 DTO 和崩溃一致性协议仍须在该切片开工前冻结。
+R2.S1 先按附录建立本地接口和适配的一致性基准，保持旧行为，再实现单一 authority 和可等待 ACK，所有被增强的关键生产者/消费者成对修改。[私有协议](managed-agent-control-protocol.md)已补命令字段、幂等、事务可见性、同步 ACK 和 Runtime 安装/接管；[Harness 专项](managed-agent-harness.md)补完整状态及内部方法接缝；[coordinator 专项](managed-agent-coordinator.md)补 activation authority、调度、装配与 drain。编码前仍需将复用 DTO 展开为可编译 schema/validator、冻结实际载荷限额并验证平台同步和崩溃边界，不将本稿当作这些检查已经通过。
 
 R2.S2 接入完整 Harness，迁移正式记录和恢复上下文，验证普通会话首轮/后续/失败继续与历史兼容。R2.S3 实现持久等待、原调用查询结算、旧 activation 派发屏障、可恢复 detach 和限权 drain。之后才进入有效配置检查、四处普通 factory 和有限默认启用；方法已映射不代表功能已实现或能力可默认启用。
 

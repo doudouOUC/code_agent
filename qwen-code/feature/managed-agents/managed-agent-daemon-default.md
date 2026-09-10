@@ -10,6 +10,8 @@
 
 用户最新要求先做全局设计，目标是独立的 Session、Harness、Runtime 三层。后续施工先建立权威 Session 接口、完整 Harness 读写与可恢复等待，再接普通 Web Shell/SDK，完成必要故障验收后有限启用；仅拆出工具 Runtime 或替换 factory 不算架构完成。MCP、Hooks、Channels 的 Managed 迁移后置；完整媒体展示、Skills/工作区初始化、后台能力和历史操作按后续阶段补齐，已验证行为保留。正确 cwd、信任、模型、权限、有效依赖识别和持久恢复是当前必需项。定时任务及后置能力始终属于完整目标，有限启用不能作为全部完成的证据。
 
+本轮同时补齐三份待实现专项：[Harness 接口、状态机与恢复检查点](managed-agent-harness.md)、[三层私有协议、派发门禁与回执保留](managed-agent-control-protocol.md)、[coordinator 调度、四处 factory 与关闭顺序](managed-agent-coordinator.md)。它们与 Session 方法映射共同约束实施；先支持原 coordinator/worker 存活时替换 Harness，worker 丢失的未决操作继续阻塞，不自动重跑。
+
 ## 架构与不变量
 
 以下为目标接线，尚未完成。普通客户端继续使用现有 Session/Prompt/ACP/REST 契约。所属工作区的一个 Bridge 管理两种执行通道，服务端在创建时选择并持久化引擎；后续操作沿 Session 的实际 owner 分派。Session 服务持有权威事件与恢复依据；Managed Harness 复用完整 ACP Agent 的模型循环、提示词、压缩、权限与停止语义，通过 Session client 读写；工作区文件和原生工具在独立 Runtime 执行。三个生命周期独立，不另养一套精简 Agent，也不让 Tool-only worker 推进模型。

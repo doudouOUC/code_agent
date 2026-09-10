@@ -4,31 +4,33 @@
 
 2026-09-10 文档核对：M2 的 PDF 物理取消已有限定验收，Gateway 模型转写仍仅设计，M3 客户端展示与产物访问待实现；不得将整个 M2 标为完成。当前按[全局架构](managed-agent-session-harness-runtime.md)先设计 Session/Harness/Runtime 拆分，随后按[首阶段计划](managed-agent-daemon-default-plan.md)接默认引擎和普通 Web Shell/SDK；保留已验证媒体路径，完整媒体扩展后置。
 
+当前目标责任：Session authority 持久保存输入、正式结果及受控媒体引用；Harness 负责认证后的模型路由、Vision/PDF 模型工作和客户端适配；Runtime 负责原生读取、渲染、裁剪和物理取消。下文当前设计使用 Harness 指模型 owner，历史验证中的 Gateway 保留原名称。媒体参数与结果接管遵循[私有协议](managed-agent-control-protocol.md)，模型工作及关闭边界遵循[Harness](managed-agent-harness.md)和[coordinator](managed-agent-coordinator.md)。
+
 ## 迁移前差距
 
 首阶段范围遵循[默认替换方案的用户调整](managed-agent-daemon-default.md)：MCP、Hooks、Channels 的新增接入与迁移延期。媒体和取消仍继续；文中 Hook 检查指现有执行回执不回归，不要求在本阶段补齐完整 Hook 能力。
 
-最新优先级先完成三层全局设计；后续先建立 Session 权威存储、完整 Harness 接缝与持久恢复，再接创建时的执行引擎选择和 owner 分派。当前 PDF 物理取消已完成收尾，Gateway PDF 转写设计继续保留，完整媒体与 M3 展示不作为开始该项的前置门槛；兼容性未知或依赖延期能力的会话在创建时保留旧路径。
+最新优先级先完成三层全局设计；后续先建立 Session 权威存储、完整 Harness 接缝与持久恢复，再接创建时的执行引擎选择和 owner 分派。当前 PDF 物理取消已完成收尾，Harness PDF 转写设计继续保留，完整媒体与 M3 展示不作为开始该项的前置门槛；兼容性未知或依赖延期能力的会话在创建时保留旧路径。
 
-Read 已在所属 Runtime 执行，但 fileUtils 读取 ContentGeneratorConfig.modalities；Tool-only Config 没有 Gateway 完成认证与模型解析后的能力。文本模型的图片/PDF候选也不会保留：Tool-only 的 getDefaultVisionBridgeModel 明确返回 undefined。这个禁止推理的保护必须保留，不能把 Gateway 的模型选择或凭据灌入 worker 解除它。
+Read 已在所属 Runtime 执行，但 fileUtils 读取 ContentGeneratorConfig.modalities；Tool-only Config 没有 Harness 完成认证与模型解析后的能力。文本模型的图片/PDF候选也不会保留：Tool-only 的 getDefaultVisionBridgeModel 明确返回 undefined。这个禁止推理的保护必须保留，不能把 Harness 的模型选择或凭据灌入 worker 解除它。
 
-迁移前 ZoomImage 由 Gateway 构造与执行，要求有效 image 能力，工作区权限、忽略规则、原生 sharp 解码和归一化裁剪都必须迁移。其延迟声明、searchHint、参数和错误保持原样。DisplayImage 同时检查 fork 作用域、工作区 PNG、尺寸与终端渲染器；daemon 非交互入口原本没有终端渲染支持。不能因为拿到 worker 路径就向用户报告已展示。
+迁移前 ZoomImage 由 Harness 构造与执行，要求有效 image 能力，工作区权限、忽略规则、原生 sharp 解码和归一化裁剪都必须迁移。其延迟声明、searchHint、参数和错误保持原样。DisplayImage 同时检查 fork 作用域、工作区 PNG、尺寸与终端渲染器；daemon 非交互入口原本没有终端渲染支持。不能因为拿到 worker 路径就向用户报告已展示。
 
-普通图片的 Vision Bridge 原本在 Gateway 调度器/Session 后处理；PDF 转写则位于原生 Read.execute 内，在错误分类、读取缓存、telemetry 和 PostToolUse 之前。把 PDF 候选放入一个已经 settled 的工具结果再后处理，会改变失败、取消和 Hook 语义，并误走普通图片允许的整轮模型切换。
+普通图片的 Vision Bridge 原本在 Harness 调度器/Session 后处理；PDF 转写则位于原生 Read.execute 内，在错误分类、读取缓存、telemetry 和 PostToolUse 之前。把 PDF 候选放入一个已经 settled 的工具结果再后处理，会改变失败、取消和 Hook 语义，并误走普通图片允许的整轮模型切换。
 
 迁移前 HTTP v2 execute/status/cancel 沿用 8 MiB 响应限制，进度只保留 1 MiB。原生 Zoom 输出最多 9 MiB 编码前字节；Read 原始媒体约 9.9 MiB，PDF渲染通常限制为 25 MiB base64，但保留首张页面存在例外。daemon ACP 原有单帧和队列上限为 64 MiB。不能用小图成功证明整个媒体链路可用，也不能把媒体塞进进度或静默截断。
 
 ## 调用快照
 
-把纯媒体决策放在私有 prepare 元数据中，与模型工具 input 分离。第一步只包含解析后的 inputModalities（image/pdf/audio/video 布尔值）；PDF桥接与终端阶段再增加实际使用的字段，不提前写未使用开关。Gateway 在每个 invocation 首次 prepare 时采集并保留快照；重试、用户确认、预检与执行继续同一快照。后续调用重新采集，支持完成认证后的能力及同一 prompt 内的模型切换。
+把纯媒体决策放在私有 prepare 元数据中，与模型工具 input 分离。第一步只包含解析后的 inputModalities（image/pdf/audio/video 布尔值）；PDF桥接与终端阶段再增加实际使用的字段，不提前写未使用开关。Harness 在每个 invocation 首次 prepare 时采集并保留快照；重试、用户确认、预检与执行继续同一快照。后续调用重新采集，支持完成认证后的能力及同一 prompt 内的模型切换。
 
 不能绑定到现有 immutable file-history executionContext：它在认证前就可能捕获。也不把整轮 beginTurn 固定为唯一媒体配置，因为普通图片可以触发同一 prompt 的 full-turn vision reroute。快照参与准备摘要，Runtime Entry 保留它；相同调用重试但快照变化必须拒绝，不把已批准引用热替换。现有 invocationId、Session、prompt、call、policy 和参数引用继续构成调用身份。
 
-Runtime 根据已准入的原生工具生成该调用的 Config 视图，读取解析后的能力，保留同一工作区、读取缓存和父文件历史。不要全局修改 Config，也不扩展现有严格 InvocationContextV1 wire 的字段。只接受实际支持媒体上下文的工具，跨 Session、未知字段、错误布尔类型和未经绑定的能力都失败；省略元数据的旧私有调用不获得额外能力。Gateway 不通过这个快照传模型 ID、endpoint、密钥或用户 Prompt。
+Runtime 根据已准入的原生工具生成该调用的 Config 视图，读取解析后的能力，保留同一工作区、读取缓存和父文件历史。不要全局修改 Config，也不扩展现有严格 InvocationContextV1 wire 的字段。只接受实际支持媒体上下文的工具，跨 Session、未知字段、错误布尔类型和未经绑定的能力都失败；省略元数据的旧私有调用不获得额外能力。Harness 不通过这个快照传模型 ID、endpoint、密钥或用户 Prompt。
 
 ## 原生工具与传输
 
-Read 的物理读取仍使用 processSingleFileContent；给它显式传递有效输入能力，使 Tool-only 视图不必伪造 ContentGeneratorConfig。普通调用省略该选项时保留现有行为。ZoomImage 抽取共享公共声明，Gateway 使用 Runtime proxy，Runtime 按原生 registry 准入，复用原生校验、权限、解码和返回内容，不复制图像算法。
+Read 的物理读取仍使用 processSingleFileContent；给它显式传递有效输入能力，使 Tool-only 视图不必伪造 ContentGeneratorConfig。普通调用省略该选项时保留现有行为。ZoomImage 抽取共享公共声明，Harness 使用 Runtime proxy，Runtime 按原生 registry 准入，复用原生校验、权限、解码和返回内容，不复制图像算法。
 
 第一版采用独立的 v2 媒体响应预算和结构检查，不引入尚无必要的 artifact/chunk 生命周期。execute、settled status、settled cancel 都要处理媒体；manifest、历史和其他控制、v1 的上限保持原边界。只对原生工具结果 llmContent 中合法 inlineData 扣除媒体字节，普通文本/metadata 继续原控制预算，组合上限不得超过已有 64 MiB ACP 帧能力并预留 envelope。校验字段类型、base64、媒体聚合字节和包络，边读边限制实际字节，不信任 Content-Length。保留原生尺寸限制与可观察错误，不额外截断图片/PDF页。首张 PDF 例外和接近原有帧上限的行为必须在定向测试中明确，不能把 25 MiB 当作无条件硬上限。
 
@@ -44,13 +46,13 @@ ACP 的 64 MiB 单帧限制不等于并发队列容量保证：接收队列也�
 
 ## PDF 模型调用
 
-给原生 Read 注入专用 PDF bridge executor。普通实例继续调用现有 runVisionBridge；Managed 实例生成受控的 Gateway 工作请求并等待答复。原生 transcribePdfCandidate 在 Runtime 保留 renderedRange、continuation、fallback、Stats、完整转写检查、unsafe media 拒绝、notice、错误分类和缓存记录，随后再结束 native execute，执行既有 Hook。这样无需复制 PDF 回退算法或事后回滚错误的成功记录。
+给原生 Read 注入专用 PDF bridge executor。普通实例继续调用现有 runVisionBridge；Managed 实例生成受控的 Harness 工作请求并等待答复。原生 transcribePdfCandidate 在 Runtime 保留 renderedRange、continuation、fallback、Stats、完整转写检查、unsafe media 拒绝、notice、错误分类和缓存记录，随后再结束 native execute，执行既有 Hook。这样无需复制 PDF 回退算法或事后回滚错误的成功记录。
 
-pending 请求属于已批准 invocation，带完整引用、requestId 和摘要。status 只公布小型请求标识；专用私有读取获取原生图片和 PDF sourceContext，专用完成操作回传有界 VisionBridgeResult。所有层按 live-session-owner 作用域验证同一工作区/lease；不接受 Runtime 指定模型、URL、凭据、提示词或新预算。Gateway 使用原 runVisionBridge/runSideQuery 与绑定 Config 的路由规则，并按请求幂等，避免重连重复调用模型。普通图片继续既有 Gateway 后处理与整轮换模行为。
+pending 请求属于已批准 invocation，带完整引用、requestId 和摘要。status 只公布小型请求标识；专用私有读取获取原生图片和 PDF sourceContext，专用完成操作回传有界 VisionBridgeResult。所有层按 live-session-owner 作用域验证同一工作区/lease；不接受 Runtime 指定模型、URL、凭据、提示词或新预算。Harness 使用原 runVisionBridge/runSideQuery 与绑定 Config 的路由规则，并按请求幂等，避免重连重复调用模型。普通图片继续既有 Harness 后处理与整轮换模行为。
 
-模型准备能力与实际模型选择由 Gateway 保留。每个 invocation 的取消需要联动原 Gateway turn，同时转写计数继续共享原 turn 的图片预算身份；不能每次 HTTP/status 都生成一个新预算信号。实现时需要把服务的预算身份与单次取消信号明确分开并验证，保持默认路径原义。
+模型准备能力与实际模型选择由 Harness 保留。每个 invocation 的取消需要联动原 Harness turn，同时转写计数继续共享原 turn 的图片预算身份；不能每次 HTTP/status 都生成一个新预算信号。实现时需要把服务的预算身份与单次取消信号明确分开并验证，保持默认路径原义。
 
-pending bridge 时工具仍 executing。cancel/release 先封新执行并取消模型请求，允许已经接纳的工作答复作为 drain 回传；等待 Gateway 查询终结、Runtime 原生取消/结果处理、Hook 与 execute 结算，再确认释放。cancelAndDrain 不能停止服务已有回传而死锁，也不能用 Promise.race 提前宣告排空。Gateway 查询在取消前尚未开始时也必须有确定的未执行答复；失联/超时只按明确的失败规则结算，不猜测成功或重复收费。
+pending bridge 时工具仍 executing。cancel/release 先封新执行并取消模型请求，允许已经接纳的工作答复作为 drain 回传；等待 Harness 查询终结、Runtime 原生取消/结果处理、Hook 与 execute 结算，再确认释放。cancelAndDrain 不能停止服务已有回传而死锁，也不能用 Promise.race 提前宣告排空。Harness 查询在取消前尚未开始时也必须有确定的未执行答复；失联/超时只按明确的失败规则结算，不猜测成功或重复收费。
 
 修改前的 PDF 物理取消链存在缺口：extractPDFText 支持 signal，但 Read 的调用点未传；页面渲染函数也没有 signal 参数。后续全局 CLI 正向基线和五阶段 Managed 反例已完成，不能把模型取消当作 pdftoppm 已退出。
 
@@ -60,31 +62,31 @@ ManagedToolRuntime 已在原生 invocation.execute 的第三参数传递 require
 
 可用性探测的旧全局 in-flight promise 不能由某一个 Managed 调用取消，也不能让取消调用依赖另一个调用的未排空进程。因此 Managed 的探测按调用执行并遵循其 signal；普通探测仍共享旧缓存。元数据、探测、提取和渲染每个 await 后先检查取消，取消后不继续下一种回退或新建 PDF 模型请求。渲染输出读取也检查 signal；完成所属命令退出后才清理临时渲染目录。Managed 清理失败必须作为错误可见，不能默默声称清理完成。
 
-这一步只为完整 M2 建立物理生命周期条件；Gateway PDF executor、转写请求/答复、共享 turn 预算和 drain 回传仍须继续实施。先用原生 CLI 和冻结 Managed 构建证明具体取消反例，再变更源码；验收需记录取消前真实命令/进程、取消后的退出与最终回执、未启动后续阶段、无错误缓存/成功 Hook、临时目录清理，以及未取消读取的原生内容回归。
+这一步只为完整 M2 建立物理生命周期条件；Harness PDF executor、转写请求/答复、共享 turn 预算和 drain 回传仍须继续实施。先用原生 CLI 和冻结 Managed 构建证明具体取消反例，再变更源码；验收需记录取消前真实命令/进程、取消后的退出与最终回执、未启动后续阶段、无错误缓存/成功 Hook、临时目录清理，以及未取消读取的原生内容回归。
 
-### M2 Gateway 实施接缝（待实现）
+### M2 Harness 实施接缝（待实现）
 
-源码调查选择由 RuntimeBackedInvocation 唯一持有 PDF 模型工作、取消 controller、结果与完成回执状态；ManagedToolSession 复用现有 executions 登记并在 release 前等待该 invocation 的 cancelAndDrain。Session 不接管模型路由，也不新增独立的模型轮询服务。登记必须同步先于 execute dispatch 并检查 Session 准入，关闭后不能新增调用；原 execute RPC 或远端 settled 先到达时，也不能删除尚未结束的本地模型工作。关闭重试只重试已有结果的交付与状态确认，不重新发起转写。
+源码调查选择由 Harness 内 RuntimeBackedInvocation 持有 PDF 模型工作、取消 controller、结果与完成回执状态；新 coordinator 持有稳定原 invocation 和交付/清理责任，复用现有 executions 登记语义。Session authority 不接管模型路由，只提交状态和持久结果，也不新增模型轮询服务。原 ManagedToolSession 终结式 release 仍须等待 cancelAndDrain；可恢复 detach 使用独立的移交协议。登记必须同步先于 execute dispatch 并检查 Session 准入，关闭后不能新增调用；原 execute RPC 或远端 settled 先到达时，也不能删除尚未结束的本地模型工作。关闭重试只重试已有结果的交付与状态确认，不重新发起转写。
 
 新私有读取/完成操作按完整 invocation reference 和 requestId 校验身份。Runtime status 只公开小型 pending 标记；候选读取单独校验原生图片和 PDF sourceContext，完成操作只接受有界的原生转写结果投影，不传 provider 原始错误或可执行的路由配置。两项操作均须接通 Core、CLI provider、HTTP worker 和 ACP 的现有 live-session-owner 及 drain 规则。取消时不关闭已经接纳的完成回传，否则原生 Read 和 release 会互相等待。
 
-Gateway 的执行循环启动并保存同一个转写 Promise，同时继续观察小型 status，看到 cancelRequested 即取消所属模型工作。预算使用 prepare 捕获的原 turn signal，实际请求使用单调用取消信号；服务增加进程内 budgetSignal，默认仍用原 signal，不增加 worker 预算权限。模型调用在原 invocation 的运行视图下启动，close 回调不能借用另一个异步作用域的默认 Config。Read 的桥接能力快照同时保留普通图片候选与 PDF 候选，仍禁止 Tool-only Config 创建模型生成器。
+Harness 的执行循环启动并保存同一个转写 Promise，同时继续观察小型 status，看到 cancelRequested 即取消所属模型工作。预算使用 prepare 捕获的原 turn signal，实际请求使用单调用取消信号；服务增加进程内 budgetSignal，默认仍用原 signal，不增加 worker 预算权限。模型调用在原 invocation 的运行视图下启动，close 回调不能借用另一个异步作用域的默认 Config。Read 的桥接能力快照同时保留普通图片候选与 PDF 候选，仍禁止 Tool-only Config 创建模型生成器。
 
-后续验收包括原生 fallback/notice 等价、真实 worker 到 Gateway 的 PDF 图片、同 turn 与并发预算、模型进行中和丢失完成 ACK 时的取消、直接 Session.close、跨身份拒绝、超过 8 MiB 的候选读取及完成重试不重发模型。本节是确定的实施设计，当前尚未接通这些接口。
+后续验收包括原生 fallback/notice 等价、真实 worker 到 Harness 的 PDF 图片、同 turn 与并发预算、模型进行中和丢失完成 ACK 时的取消、直接 Session.close、跨身份拒绝、超过 8 MiB 的候选读取及完成重试不重发模型。本节为后续实施设计，当前尚未接通这些接口。模型转写仍在运行或结果尚未受控保存时，Harness 保持驻留并占槽；除非完成该模型 attempt 与原 Runtime 回传等待的专门移交验收，不能把通用“工具等待可 detach”直接应用到 PDF 模型工作。
 
 ## 用户展示
 
-DisplayImage 的主/子作用域来自 Gateway 的实际调用位置，不能以 worker 缺少 fork AsyncLocal 状态作为允许执行的依据。非交互客户端延续准确的渲染不支持结果；对支持展示的客户端，Gateway 必须使用该客户端的真实能力，并经现有产物/附件机制取得所属 Runtime 的内容和可展示引用。native 工作区与 PNG 检查留在 Runtime，不能传一个仅在 worker 可读的绝对路径给远端 UI 后报告成功。仅声明 registry 或伪造 available=true 不算展示接通。
+DisplayImage 的主/子作用域来自 Harness 的实际调用位置，不能以 worker 缺少 fork AsyncLocal 状态作为允许执行的依据。非交互客户端延续准确的渲染不支持结果；对支持展示的客户端，Harness 必须使用该客户端的真实能力，并经现有产物/附件机制取得所属 Runtime 的内容和可展示引用。native 工作区与 PNG 检查留在 Runtime，不能传一个仅在 worker 可读的绝对路径给远端 UI 后报告成功。仅声明 registry 或伪造 available=true 不算展示接通。
 
 ## 分阶段实施和验收
 
 | 阶段 | 实际交付                                                             | 关键验收                                                                                                                                                   |
 | ---- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1   | invocation 媒体快照、Read 有效模态、原生 Zoom proxy、v2 媒体响应预算 | 认证后能力、同 prompt 后续调用换模、旧引用稳定；真实 Read/Zoom/原生 PDF 图像返回；大于 8 MiB 媒体跨完整链路，普通超限文本仍拒绝；权限/父子缓存和关闭不回退 |
-| M2   | 原生 PDF executor 注入与 Gateway bridge 请求/答复                    | 成功与每种原生 fallback/notice 一致；失败/取消的缓存与 Hook；零 worker 模型请求；共享 turn 图片预算、重连不重复；模型和 PDF 进程取消/释放真实排空          |
+| M2   | 原生 PDF executor 注入与 Harness bridge 请求/答复                    | 成功与每种原生 fallback/notice 一致；失败/取消的缓存与 Hook；零 worker 模型请求；共享 turn 图片预算、重连不重复；模型和 PDF 进程取消/释放真实排空          |
 | M3   | DisplayImage 调用作用域、真实客户端能力和产物路径                    | fork 执行禁止、非交互失败准确、支持客户端实际可见且不泄露私有路径；身份与关闭时的产物可达性                                                                |
 
-各阶段包括设计、E2E计划、全局 CLI 基线、隔离完整 host 反例与修复验收，相关包定向测试、build/typecheck/bundle、两次自审和独立审查。M1 已实施、限定验收见下文；M2 的物理取消已补齐，其 Gateway 接口及 M3 待实施。M1 是完整多媒体迁移的依赖，不替代 M2/M3，也不把本阶段约定的默认入口、客户端或旧会话迁移改为可选项。
+各阶段包括设计、E2E计划、全局 CLI 基线、隔离完整 host 反例与修复验收，相关包定向测试、build/typecheck/bundle、两次自审和独立审查。M1 已实施、限定验收见下文；M2 的物理取消已补齐，其 Harness 接口及 M3 待实施。M1 是完整多媒体迁移的依赖，不替代 M2/M3，也不把本阶段约定的默认入口、客户端或旧会话迁移改为可选项。
 
 主要代码涉及 core 的 managed protocol/runtime/proxy/session、Read/Zoom/Display 与共享声明、fileUtils、PDF/Vision Bridge 服务；CLI 的 Managed Session、Local/Remote/AutoLocal provider、私有 worker routes、ACP dispatcher；ACP Bridge 方法和转发；各文件的原生与定向回归。改动前列出每个新增字段和方法的完整消费链，逐层验证准入、响应等待与 drain 所有权。
 

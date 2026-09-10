@@ -18,7 +18,7 @@ R1/R2 原对应旁支十项清单的第 6 项，R3 对应其第 7 项普通 Web 
 
 首阶段不新增 MCP、Hooks、Channels 的 Managed 接入迁移。旁支第 2～5 项的完整迁移也暂缓：图片展示/产物访问；工作区初始化、Skills 与有效配置；后台进程/子任务/自动记忆；文件历史/撤销/分支/历史迁移。已经验证通过的现有实现保留。最小配置和 owner 恢复属于当前必要基础，与这些完整迁移区分。
 
-当前 PDF 物理取消修复及在途验证已经收尾；Gateway PDF 转写等媒体设计保留，不把完整媒体迁移作为开始执行引擎选择调查或实现的额外门槛。依赖延期能力或兼容性不明的会话在创建时固定 legacy。旧实现的保留是明确的入口/配置兼容策略，不是失败后的隐式降级；运行中配置变化不能悄悄更换 owner。
+当前 PDF 物理取消修复及在途验证已经收尾；Harness PDF 转写等媒体设计保留，不把完整媒体迁移作为开始执行引擎选择调查或实现的额外门槛。依赖延期能力或兼容性不明的会话在创建时固定 legacy。旧实现的保留是明确的入口/配置兼容策略，不是失败后的隐式降级；运行中配置变化不能悄悄更换 owner。
 
 ## 当前证据与下一步
 
@@ -44,7 +44,9 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 
 逐方法兼容清单已补齐，见[接口与实现串联](managed-agent-session-compatibility.md)及[方法映射附录](managed-agent-session-method-map.md)。R2.S1 先建立现有实现与本地接口的一致性基准，再接入可等待的持久提交；每个增强点必须同时迁移实际生产者和消费者，保留 sendPrompt/onPromptAdmitted、审批 boolean 与 best-effort 记录的旧契约。
 
-R2.S1 开工前冻结具体 schema、提交标记与耐久等级、checkpoint 必需状态、私有传输和 writer 交接协议；R2.S3 冻结调用结果查询与回执保留。设计参见全局架构，未取得恢复证明时保留现有 `recovery_ambiguous` 保护。
+施工按三份专项细化：[Harness](managed-agent-harness.md)定义完整循环与九组 checkpoint；[私有协议](managed-agent-control-protocol.md)定义消息、文件同步 ACK、activation 安装、原调用结算和引用保留；[coordinator](managed-agent-coordinator.md)定义单一 authority 调度与四处装配。R2.S1 将 activation 事实并入 authority，以窄适配复用 scheduler，保留实验 store；输入与唤醒一起提交。R2.S2 先实现 A/D 安全点、基础 activation 门禁及完整 Agent 读写，排空旧 handle 后再替换；禁止绕过实际 ACP Session→LlmChat/runTool 的接缝。R2.S3 再实现 B/C 工具和审批等待，在同一 installing/stage/enable/revoke 协议上支持在途交接、原 Runtime 接管与可恢复 detach；handler 返回不得再等同 turn 完成。
+
+字段与时序已有专项契约；编码前仍需可编译 schema/validator、实际限额表及平台文件同步/崩溃证据。恢复首版限定 coordinator 和原 worker 存活时替换 Harness；worker/daemon 丢失且未决时保持 blocked，跨 worker 重启回执后端单列后续工作。未取得恢复证明时保留现有 `recovery_ambiguous` 保护。
 
 | 步骤                       | 本步产物                                                                                                      | 验收边界                                                                                                                                                           |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
