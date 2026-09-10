@@ -36,7 +36,9 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 
 ## R2 的具体施工与验收顺序
 
-以下均为后续施工设计，不因本次文档更新变为已交付。本轮停在设计阶段；施工时先按新增三片完成 Session 独立权威与恢复，再执行原 R2.1～R2.4；每步保留可审查的变更和证据。
+R2.S1 已进入施工，其余两片仍是设计。R2.S1 拆为 R2.S1a 记录格式与 R2.S1b 权威追加路径：**R2.S1a 已交付**，`packages/core/src/managed-runtime/managed-session-records.ts` 按[存储规范](managed-agent-session-storage.md)实现 §1 的三个 ChatRecord subtype 与 header 字段、§2 的 StableId/Sequence/Digest/Time/SessionKey/DurableRef 共用规则、§3 的 15 项封闭 kind union 及逐 kind 必需字段与四类 actor 资格、§3.1 的 30 个封闭 domain、§5 的记录与事务限额，并含原始 JSON 重复键拒绝（`JSON.parse` 会静默折叠它）。证据：43 项定向单测通过，`chatRecordingService` 原 126 项无回归，仓库 build/typecheck、该包 prettier/eslint 通过。
+
+**R2.S1a 的边界必须一起写清**：它只是格式与校验层，**没有任何生产调用者**——authority、writer lease 换锁、投影与幂等提交都属于未开始的 R2.S1b，因此这批绿色测试证明的是 schema 判定正确，不证明任何权威事件被追加过，也不改变 R1 在默认路径上仍等于 no-op 的结论。§2 的 RestoreBundle 与 §2.1 资源仓库落盘规则不在本片内，随恢复与资源切片交付。下一步是 R2.S1b：单 writer 队列、事务提交与 commit marker、schema 3 锁的认证换锁，再执行原 R2.1～R2.4；每步保留可审查的变更和证据。
 
 | 新增步骤                | 本步产物                                                                             | 验收边界                                                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |

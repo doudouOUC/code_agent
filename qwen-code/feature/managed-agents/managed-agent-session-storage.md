@@ -1,6 +1,6 @@
 # Managed Session：记录格式、提交与协议限额
 
-更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项；新增格式、适配器和限额尚未实现或验收。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
+更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3/§3.1 的封闭 kind 与 domain、§5 的记录与事务限额已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地并有定向单测，但**尚无生产调用者**；writer 队列与事务提交、lock schema 3 认证换锁、§2.1 资源仓库、RestoreBundle、各适配器与投影仍未实现或验收。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
 
 ## 1. 唯一载体与版本决策
 
