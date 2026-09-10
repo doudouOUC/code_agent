@@ -106,7 +106,7 @@ Session Service 在追加时同时验证存储 writer、命令授权和所需 ac
 
 原始事实、模型上下文和展示投影分开。压缩保留原事件，追加压缩结果和覆盖范围；模型上下文由完整 Harness 的原有算法从事件/检查点组装。流式 delta 可以作为临时预览，正式消息和终态持久化后才成为可重放记录；预览中断不能伪造成完整模型结果。工具回执先持久化，再被后续模型步骤消费。
 
-首期选定现有普通 transcript 作为权威载体，复用 JSONL、ChatRecord 与严格 writer，通过版本化记录增加准入、执行和恢复事实；同一逻辑事实只经一个事务入口提交。保留 parentUuid、压缩边界、工具关系、Goal、artifact、文件历史和通知，reader 继续提供完整 SessionRestoreProjection。精确记录 subtype/schema 和序列兼容在 R2.S1 冻结，不默认增加独立 owner 文件或多份互相覆盖的 transcript；若消费者调查证明需要新容器，先修订迁移设计再施工。大媒体、文件备份和大工具输出使用持久引用及哈希，不能引用将随 Runtime 回收删除的临时路径。
+首期选定现有普通 transcript 作为权威载体，复用 JSONL、ChatRecord 与严格 writer，通过版本化记录增加准入、执行和恢复事实；同一逻辑事实只经一个事务入口提交。保留 parentUuid、压缩边界、工具关系、Goal、artifact、文件历史和通知，reader 继续提供完整 SessionRestoreProjection。精确 subtype、lock schema 3、序列兼容、事件和限额已在[存储规范](managed-agent-session-storage.md)确定，R2.S1 按规范实现；不增加竞争 owner 文件或多份互相覆盖的 transcript。大媒体、文件备份和大工具输出使用持久引用及哈希，不能引用将随 Runtime 回收删除的临时路径。
 
 输入事件和待调度意图在同一提交边界持久化。Activation 候选队列允许单独缓存，但可根据权威输入与等待记录对账；claim/renew/release 仍只能由 Session authority 提交，不使用实验 store 的第二套 epoch；队列追加失败或丢 ACK 时重试原 ID，不重复追加输入。展示缓存、目录索引和纯模型上下文投影带来源 sequence，可由完整事实重建；包含执行阶段、稳定调用映射和未决引用的 Harness checkpoint 是恢复依据，必须持久保留到替代 checkpoint 及所需事实完整提交；投影失败不得回滚已提交的成功或发出第二次工具调用。物理多文件更新不声称具有跨文件原子性。
 
@@ -222,11 +222,11 @@ reload/remove/撤信任都先封闭原 generation。reload 对已有会话按已
 
 核心故障验收必须同时观测模型请求、工具物理结果、权威日志和客户端事件，覆盖：输入/调度/事件 ACK 丢失，模型中断，工具执行前后杀 Harness，等待时替换 host，Runtime 丢失，审批重连，cancel 与完成竞争，存储失败，旧 epoch 迟到，跨 workspace/reload，旧格式冷恢复及版本回退。所有产品测试使用自有目录、端口和配置；本轮未执行这些未来测试。
 
-## 12. 实施前需冻结的细节与源码范围
+## 12. 全量专项与实施源码范围
 
 全局责任、普通 transcript 权威载体与施工顺序已确定。现有公开方法见[兼容方案](managed-agent-session-compatibility.md)；Harness 状态机、九组 checkpoint 字段、实际 ACP 内部接缝和 A～E 安全点见[Harness 专项](managed-agent-harness.md)；消息、事务可见性、文件同步 ACK、派发安装/撤销、原调用结算和引用保留见[私有协议](managed-agent-control-protocol.md)；调度 authority、容量、四处 factory 和 generation drain 见[coordinator 专项](managed-agent-coordinator.md)。
 
-R2.S1/S2/S3 实现前仍需把记录 subtype、复用内容 union、checkpoint 与 envelope 展开成编译通过的 schema/validator，并冻结实际字节/条数/深度限制、生产者可等待接线和平台同步证据。恢复先支持 coordinator 与原 worker 存活时更换 Harness；worker/daemon 丢失且有未决副作用保持 blocked，未来跨 worker 重启的持久回执后端另行实施。不能因字段设计已补齐就关闭保守恢复保护。
+[全量覆盖表](managed-agent-full-design.md)已将 C01～C18 映射到配置/Skills/MCP/Hooks、工具/媒体/历史、自动任务/Channels/子任务/记忆、普通客户端及恢复/平台/性能专项；[存储规范](managed-agent-session-storage.md)固定记录与数值契约。R2.S1/S2/S3 实现 schema/validator、实际生产消费接线并取得故障证据；跨 worker 的 RuntimeReceiptStore 与远端挑战按[运行专项](managed-agent-recovery-operations.md)实施。首个恢复交付仍限原 coordinator/worker 存活，未决副作用不能因设计已定就绕过 blocked 保护。
 
 | 区域            | 预计涉及的现有接缝                                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

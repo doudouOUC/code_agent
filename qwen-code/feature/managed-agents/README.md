@@ -3,9 +3,9 @@
 > 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [a836081466](https://github.com/doudouOUC/qwen-code/commit/a8360814668b3dfdff72ad3d99cbcaf26dd009a9)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
 > 更新日期：2026-09-10。
 
-> 本轮方案补齐完整 Harness、私有控制协议及 coordinator，统一工具/媒体/子任务的三层责任。恢复先支持原 coordinator 与 worker 存活时替换 Harness；worker 丢失且有未决副作用时保持阻塞，不自动重跑。仅更新设计，普通默认入口尚未切换。
+> 本轮补齐 [C01～C18 全量详细设计](managed-agent-full-design.md)：存储格式/限额、配置/Skills/MCP/Hooks、全工具/媒体/历史、自动任务/Channels/子任务/记忆、普通客户端、重启/平台/性能均有接口、状态、失败恢复、迁移和验收。设计已补齐，新增代码与产品验收尚未完成；首阶段延期范围保留，普通默认入口尚未切换。
 >
-> 当前产品目标：按 Claude 的 Session/Harness/Runtime 三层拆分，让 Managed Agent 替换 daemon 默认执行实现。用户最新要求先完成[全局方案设计](managed-agent-session-harness-runtime.md)，再分阶段施工；首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
+> 当前产品目标：按 Claude 的 Session/Harness/Runtime 三层拆分，让 Managed Agent 替换 daemon 默认执行实现。用户要求先完成[全量详细设计](managed-agent-full-design.md)，再分阶段施工；首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
 >
 > 此前完成 [Glob 与可选 LS](managed-agent-search-tools.md)：父子各自的目录、ignore、记忆根和 LS opt-in 进入 owned Runtime，Gateway 复用共享声明及原权限调度。四组真实搜索验收与既有 prior-read 子任务回归通过，共 31 次本地模型请求；53 项产物摘要、9 个生产源码摘要及 bundle 一致，测试进程、端口和临时根已清理。完整 build/bundle/typecheck、变更 lint/格式与两轮人工自审及独立审查通过；本阶段去重 17 文件 322 项定向测试通过（非全仓套件）。权限夹具初次失败与一次 HTTP 状态码异常均保留在验证记录，未通过修改产品绕过。
 >
@@ -21,15 +21,17 @@
 >
 > 执行引擎归属第一片已完成：完整物理 owner 读取、writer lease 内严格落盘、Config/CLI/UI 恢复保护和实际 ACP 回执，7 组真实进程验收通过。第二片同一 Bridge 的双通道与归属绑定已完成：885 项定向测试、build/typecheck/bundle、两轮自审和独立审查通过。两组真实 host 验收覆盖共存、双向模型流取消、普通关闭后冷恢复与活会话交接，合计 10 次原生 Read/final、22 次模型 HTTP；物理资源和 writer 凭据已独立核对。本次补齐严格 settings/项目 MCP 读取：不迁移落盘或重置坏配置，损坏的祖先软链接也明确拒绝；659 项相关单测、604 项 ACP 回归和三组最终真实验证通过，涵盖十六次配置拒绝与修复后原会话恢复 Read。有效配置兼容选择与普通默认入口尚待接线；详细证据和未覆盖范围见[执行引擎方案](managed-session-execution-engine.md)。
 >
-> 普通默认入口尚未切换，4170 预览未访问或重启。最新优先顺序是先完成三层全局设计，随后建立权威 Session 接口、完整 Harness 读写与持久等待恢复，再完成创建时兼容选择和四处普通接线，接通 Web Shell/SDK，经过必要故障验收后有限启用。完整图片展示/产物、工作区/Skills 配置迁移、后台/子任务/自动记忆补齐、文件历史/撤销/分支迁移暂缓，已验证能力保留。正确 cwd、信任、模型权限配置、有效 MCP/Hooks 依赖及 Channels 来源识别和最小恢复仍是必要基础。旧会话和兼容性未知的会话在创建时固定旧路径，运行中不换引擎，Managed 失败不隐式降级重跑。局部工具验收不代表全部默认替换完成；定时任务核心链路和延期能力仍在总目标范围。
+> 普通默认入口尚未切换，4170 预览未访问或重启。全量详细设计已补齐，实施顺序仍是先建立权威 Session 接口、完整 Harness 读写与持久等待恢复，再完成创建时兼容选择和四处普通接线，接通 Web Shell/SDK，经过必要故障验收后有限启用。完整图片展示/产物、工作区/Skills 配置迁移、后台/子任务/自动记忆补齐、文件历史/撤销/分支迁移暂缓，已验证能力保留。正确 cwd、信任、模型权限配置、有效 MCP/Hooks 依赖及 Channels 来源识别和最小恢复仍是必要基础。旧会话和兼容性未知的会话在创建时固定旧路径，运行中不换引擎，Managed 失败不隐式降级重跑。局部工具验收不代表全部默认替换完成；定时任务核心链路和延期能力仍在总目标范围。
 
 ## 当前方案入口
+
+先读[全量设计与交付覆盖表](managed-agent-full-design.md)：18类能力全部有专项契约和验收索引，原先待定的 schema/RootSnapshot/领域交付/worker恢复/历史转换/平台门槛已有明确决定。R5 拆成 F1～F8 实施片，保留 R2.S1～S3 先建立 Session authority 与完整 Harness 的顺序。
 
 新增[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)：明确三层职责与部署、现有组件归位、定义和三类 lease、Session 逻辑接口、单一 transcript 权威、检查点与事件投影、工具回执及断点恢复、扩展能力、全部入口与旧数据迁移。ManagedPromptService 归控制层，默认 Harness 复用完整 ACP Agent；R2.S1～R2.S3 为拆分施工前半段，尚未实现。本轮只设计，未修改生产代码或运行产品。
 
 此前补齐 [Session 兼容接口与实现串联](managed-agent-session-compatibility.md)及[逐方法映射](managed-agent-session-method-map.md)：覆盖 11 个声明的 268 项公开成员，明确返回/错误时机、消费者、适配实现和验收；方法已设计不表示持久提交或可恢复 Harness 已实现。
 
-本次方案对应代码仓库文档提交 [4cacfbd0ed](https://github.com/doudouOUC/qwen-code/commit/4cacfbd0edebc9e99c70fd26cac32e2dafa82216)，生产源码基线仍为上方的 `a836081466`。
+本次方案对应代码仓库文档提交 [1cfeeb3ddc](https://github.com/doudouOUC/qwen-code/commit/1cfeeb3ddc12c55237eff7a0c13431227f4760dd)，生产源码基线仍为上方的 `a836081466`。
 
 2026-09-10 已按代码 `a836081466` 重新核对并统一[默认替换总方案](managed-agent-daemon-default.md)：补齐 C01～C18 能力/入口/状态/验收总表，覆盖四处普通 factory、Web Shell/SDK、Channels、手动与自动定时、Live/Conversations/Goal、子任务、媒体、历史、平台与资源。双通道和严格配置读取已有限定实现；共同 selector、空扩展只读输入与四处普通接线尚待实现。空 store 的真实基线和 host-before-worker 清理/reload 结论已并入[执行引擎设计](managed-session-execution-engine.md)，不再只留在本地调查文件。
 
@@ -39,32 +41,39 @@
 
 P0～P9a 和 D1～D5 保留为历史专题编号；当前默认替换的执行顺序以 R1～R5 首阶段计划为准。
 
-| 阶段                | 文档                                                                                 | 主题                                                                                                        |
-| ------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| P0                  | [Managed Agent Runtime P0](managed-agent-runtime-p0.md)                              | Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型                                                      |
-| P1                  | [Managed Agent Activation P1](managed-agent-activation-p1.md)                        | durable activation journal、lease fencing 与有界调度                                                        |
-| P2                  | [Managed Agent Prompt Admission P2](managed-agent-prompt-admission-p2.md)            | 完整用户消息持久化、幂等准入与恢复                                                                          |
-| P3                  | [Managed Agent Live Prompt P3](managed-agent-live-prompt-p3.md)                      | 首个实验 Managed Prompt 接入 live daemon                                                                    |
-| P4                  | [Managed Agent Gateway Bootstrap P4](managed-agent-gateway-bootstrap-p4.md)          | 非权威 bootstrap 与 Runtime 并行启动的过渡方案                                                              |
-| P5                  | [Managed Agent Multi-Turn Continuity P5](managed-agent-multi-turn-p5.md)             | 多轮绑定、顺序所有权与 Runtime resume                                                                       |
-| P6                  | [Managed Agent Tool-only Runtime P6](managed-agent-tool-runtime-p6.md)               | Gateway 模型所有权与 Tool-only ACP Runtime                                                                  |
-| P7                  | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime                                                                |
-| P8                  | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                                                                        |
-| P8 后续             | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md)                  | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制                                           |
-| P9a                 | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md)               | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收                                          |
-| R2.S1～R2.S3 全局架构 | [Session / Harness / Runtime 三层拆分](managed-agent-session-harness-runtime.md) | 当前设计：权威状态与事件、完整 Harness、独立 Runtime、恢复与迁移，尚未实现 |
-| 总方案              | [daemon 默认执行替换](managed-agent-daemon-default.md)                               | 当前完整范围、18 类能力、入口状态与验收门槛；普通默认未切换                                                 |
-| R1～R5 首阶段计划   | [默认替换首阶段计划](managed-agent-daemon-default-plan.md)                           | 用户调整后的范围、兼容选择边界和剩余验收                                                                    |
-| R1/R2 执行引擎      | [会话执行引擎选择与持久化](managed-session-execution-engine.md)                      | 归属、双通道及严格配置读取基础已实现并验收；全来源兼容选择与普通默认入口待完成                              |
-| D1～D5 工具边界     | [Runtime invocation v2](managed-agent-runtime-invocations.md)                        | 阶段 2：Read/Write/Edit/Shell 及 Glob/可选 LS/Grep、owned v2 绑定与子作用域已接通；其余工具及初始化继续实施 |
-| D1～D5 子任务与历史 | [子任务与持久文件历史](managed-agent-child-scopes.md)                                | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份                           |
-| D1～D5 搜索工具     | [Glob 与可选 LS](managed-agent-search-tools.md)                                      | 真实父子 worker 搜索、独立目录与 ignore、记忆及外路径权限，四组加 prior-read 回归通过                       |
-| D1～D5 搜索后端     | [Grep 与进程生命周期](managed-agent-grep-tools.md)                                   | 16 组限定验收通过：原生搜索、作用域/权限、取消与释放、版本超时和系统回退；Windows 等边界待完成              |
-| D1～D5 Notebook     | [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md)                         | 原生 Runtime 编辑、完整内容修改与父备份限定验收通过；用户编辑器及其他故障组合继续验证                       |
-| D1～D5 多媒体       | [媒体与调用配置](managed-agent-media.md)                                             | M1 及 M2 PDF 物理取消限定验收通过；Harness 转写与 M3 展示待实施                                             |
-| R2.S2/S3 Harness | [完整 Harness 的装配与可恢复执行](managed-agent-harness.md) | 接口、状态机、九组 checkpoint、完整 ACP 内部接缝与安全点；待实现 |
-| R2.S1/S3 私有协议 | [Session / Harness / Runtime 私有协议](managed-agent-control-protocol.md) | 消息与提交、activation 门禁、原调用接管、引用保留与恢复范围；待实现 |
-| R2.S1/S3/R2.3 调度与装配 | [Managed coordinator](managed-agent-coordinator.md) | 单一 activation authority、队列和容量、四处 factory、detach/close/drain；待实现 |
+| 阶段                     | 文档                                                                                 | 主题                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| P0                       | [Managed Agent Runtime P0](managed-agent-runtime-p0.md)                              | Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型                                                      |
+| P1                       | [Managed Agent Activation P1](managed-agent-activation-p1.md)                        | durable activation journal、lease fencing 与有界调度                                                        |
+| P2                       | [Managed Agent Prompt Admission P2](managed-agent-prompt-admission-p2.md)            | 完整用户消息持久化、幂等准入与恢复                                                                          |
+| P3                       | [Managed Agent Live Prompt P3](managed-agent-live-prompt-p3.md)                      | 首个实验 Managed Prompt 接入 live daemon                                                                    |
+| P4                       | [Managed Agent Gateway Bootstrap P4](managed-agent-gateway-bootstrap-p4.md)          | 非权威 bootstrap 与 Runtime 并行启动的过渡方案                                                              |
+| P5                       | [Managed Agent Multi-Turn Continuity P5](managed-agent-multi-turn-p5.md)             | 多轮绑定、顺序所有权与 Runtime resume                                                                       |
+| P6                       | [Managed Agent Tool-only Runtime P6](managed-agent-tool-runtime-p6.md)               | Gateway 模型所有权与 Tool-only ACP Runtime                                                                  |
+| P7                       | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime                                                                |
+| P8                       | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                                                                        |
+| P8 后续                  | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md)                  | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制                                           |
+| P9a                      | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md)               | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收                                          |
+| R2.S1～R2.S3 全局架构    | [Session / Harness / Runtime 三层拆分](managed-agent-session-harness-runtime.md)     | 当前设计：权威状态与事件、完整 Harness、独立 Runtime、恢复与迁移，尚未实现                                  |
+| 全量设计                 | [C01～C18 全量设计与交付覆盖](managed-agent-full-design.md)                          | 所有能力的详细设计、决定清单和 F1～F8 顺序；设计完成不等同实现完成                                          |
+| 存储                     | [记录格式、提交与限额](managed-agent-session-storage.md)                             | ChatRecord/lock schema、事件字段、事务可见性、恢复和具体预算                                                |
+| 配置与扩展               | [RootSnapshot、Skills、MCP、Hooks](managed-agent-config-extensions.md)               | 来源、版本、原生语义与模型/Runtime归属                                                                      |
+| 自动任务与交付           | [Channels、调度、子任务和记忆](managed-agent-automation.md)                          | 持久准入、outbox、父接受/消费、取消和去重                                                                   |
+| 工具与历史               | [全工具、媒体、产物与历史](managed-agent-tools-history.md)                           | 47项注册归位、内容生命周期、物理rewind和双向转换                                                            |
+| 普通客户端               | [入口、交互与事件投影](managed-agent-client-surfaces.md)                             | REST/ACP/SDK/Web Shell、Send/取消/重连/通知与能力协商                                                       |
+| 恢复与运行               | [持久回执、平台与性能](managed-agent-recovery-operations.md)                         | worker/daemon/远端接管、进程owner、profile和故障/压力门槛                                                   |
+| 总方案                   | [daemon 默认执行替换](managed-agent-daemon-default.md)                               | 当前完整范围、18 类能力、入口状态与验收门槛；普通默认未切换                                                 |
+| R1～R5 首阶段计划        | [默认替换首阶段计划](managed-agent-daemon-default-plan.md)                           | 用户调整后的范围、兼容选择边界和剩余验收                                                                    |
+| R1/R2 执行引擎           | [会话执行引擎选择与持久化](managed-session-execution-engine.md)                      | 归属、双通道及严格配置读取基础已实现并验收；全来源兼容选择与普通默认入口待完成                              |
+| D1～D5 工具边界          | [Runtime invocation v2](managed-agent-runtime-invocations.md)                        | 阶段 2：Read/Write/Edit/Shell 及 Glob/可选 LS/Grep、owned v2 绑定与子作用域已接通；其余工具及初始化继续实施 |
+| D1～D5 子任务与历史      | [子任务与持久文件历史](managed-agent-child-scopes.md)                                | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份                           |
+| D1～D5 搜索工具          | [Glob 与可选 LS](managed-agent-search-tools.md)                                      | 真实父子 worker 搜索、独立目录与 ignore、记忆及外路径权限，四组加 prior-read 回归通过                       |
+| D1～D5 搜索后端          | [Grep 与进程生命周期](managed-agent-grep-tools.md)                                   | 16 组限定验收通过：原生搜索、作用域/权限、取消与释放、版本超时和系统回退；Windows 等边界待完成              |
+| D1～D5 Notebook          | [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md)                         | 原生 Runtime 编辑、完整内容修改与父备份限定验收通过；用户编辑器及其他故障组合继续验证                       |
+| D1～D5 多媒体            | [媒体与调用配置](managed-agent-media.md)                                             | M1 及 M2 PDF 物理取消限定验收通过；Harness 转写与 M3 展示待实施                                             |
+| R2.S2/S3 Harness         | [完整 Harness 的装配与可恢复执行](managed-agent-harness.md)                          | 接口、状态机、九组 checkpoint、完整 ACP 内部接缝与安全点；待实现                                            |
+| R2.S1/S3 私有协议        | [Session / Harness / Runtime 私有协议](managed-agent-control-protocol.md)            | 消息与提交、activation 门禁、原调用接管、引用保留与恢复范围；待实现                                         |
+| R2.S1/S3/R2.3 调度与装配 | [Managed coordinator](managed-agent-coordinator.md)                                  | 单一 activation authority、队列和容量、四处 factory、detach/close/drain；待实现                             |
 
 > 以下第 1 节起保留早期 Gateway/Runtime 两层方案作为历史背景；其中的部署和实施顺序不覆盖当前三层全局架构与 R1～R5 计划。
 

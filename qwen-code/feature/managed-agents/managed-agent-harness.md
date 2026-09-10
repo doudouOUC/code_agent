@@ -128,3 +128,15 @@ Session close 的完整顺序由 coordinator 文档约束。关闭共享 host �
 R2.S1 先交付 Session client、唯一 writer、稳定工具身份及提交记录；R2.S2 接 Factory、基础 activation 门禁和 A/D 安全点，验证旧 handle 已排空再替换；R2.S3 再接 B/C 的持久等待、在途门禁交接和原调用接管。基础门禁不能等到 S3 才接，否则 S2 的 RunnableGrant 与跨 host 替换缺少执行端证明。完整可恢复 child/后台、MCP/Hooks/Channels、Skills/本地初始化与完整媒体等按原后置阶段逐项验收；已实现功能不因本次抽象被删掉。不支持的等待必须有明确驻留/阻塞策略，不能空实现后报告恢复成功。
 
 本轮仅设计。实现前将上述 checkpoint/continuation 字段与实际恢复入口形成编译可验证的 schema，补齐隔离 E2E 操作和失败注入；通过定向与真实行为验收后，才在能力表标记可恢复 Harness。
+
+## 8. 全量领域与运行视图
+
+全量输入和执行域见[覆盖表](managed-agent-full-design.md)。[配置与扩展](managed-agent-config-extensions.md)定义 RootSnapshot、EffectiveConfigBundle、Skill/MCP/Hook revision；checkpoint 引用这些已提交视图与动态注册状态，恢复不能重放初始化副作用。[自动任务](managed-agent-automation.md)定义 Goal/Live、schedule、child、parent acceptance 和 memory 的领域记录；Harness 只消费 authority 已受理的输入和结果。[工具与历史](managed-agent-tools-history.md)列出全部注册工具与混合工具分段，模型阶段留在 Harness，物理阶段必须有原 Runtime 回执。
+
+上述专项细化已有九组 checkpoint，不引入第二份 Harness 日志。来源/根与不可恢复回调缺失仍按安全点能力声明拒绝 detach；已提交领域发送和历史维护可由 OperationGrant 完成，不为这些动作启动空模型轮。首阶段保留的驻留和延期行为仅是实现阶段，不代表这些领域尚无设计。
+
+### 生命周期 prompt Hook 的全量激活分型
+
+首版上述 turn 接口保留；全量 Factory 的 RunnableGrant/RestoreBundle 增加私有协议的 ActivationSubject 分型，run 接受 `turn` 或已受理 `hook_operation` 引用。后者装配已绑定 Config/Session client 与原 PromptHookRunner，恢复原 occurrence，不重新触发 SessionStart/Goal/cron 或建立主 Agent 推理轮。共享同 Session epoch/模型槽位，普通 turn 的 prompt Hook 继续在原有效 activation 内执行。
+
+无活 turn 的 Notification/SessionEnd/SessionDelete 等 prompt Hook 由受限 hook-purpose activation 运行。其 boundary 增加 `hook_complete {operationId,occurrenceId,hookReceiptRef,commitReceipt,activationId}`，不使用 turn_complete，不生成普通最终回复或通知；pending 模型期间不声明 durable_wait。关闭/删除先完成或明确阻塞该维护 Hook，再释放 writer、模型凭据、provider 与最后内容 pin。OperationGrant 仅授权领域/物理 phase，不可替代这个模型资格。

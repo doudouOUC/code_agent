@@ -2,7 +2,7 @@
 
 ## 目标与当前缺口
 
-本项完整范围见[默认替换总方案](managed-agent-daemon-default.md)，优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。用户最新要求先完成[Session / Harness / Runtime 全局设计](managed-agent-session-harness-runtime.md)；后续先实现 Session 独立权威、完整 Harness 接入与持久恢复，再完成本文件尚未接通的四处普通 factory。固定引擎和共享 Bridge 成果保留，完整媒体展示、Skills、后台任务和历史迁移继续延期。
+本项完整范围见[默认替换总方案](managed-agent-daemon-default.md)，优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。用户要求先完成[Session / Harness / Runtime 全局设计](managed-agent-session-harness-runtime.md)；后续先实现 Session 独立权威、完整 Harness 接入与持久恢复，再完成本文件尚未接通的四处普通 factory。固定引擎和共享 Bridge 成果保留，完整媒体展示、Skills、后台任务和历史迁移延期实施，详细设计已在文末全量专项中补齐。
 
 本文件已验收的物理 writer 当前位于 ACP host，未来移交 Session 服务是单独的 R2.S2 切片，须排空、封存、校验再接管，不能把现有 writer 保护描述为已经完成三层拆分。下文第 3 片仍定义配置和路由的局部顺序，不覆盖新增 R2.S1～R2.S3 的全局前置。
 
@@ -179,3 +179,7 @@ workspace reload 当前只发送 legacy 控制命令，Managed factory 当前冻
 主要涉及 core 的 SessionService、transcript reader、ChatRecordingService、Config，CLI 的配置加载、ACP Session 创建/恢复与 managed channel，ACP Bridge 的通道生命周期和 Session 类型，以及 daemon 四处入口。新增 system subtype 同时进入共享 transcript schema，避免被结构校验记作未知类型。按上述顺序交付，避免只增加未被实际调用的字段。
 
 测试先用全局 CLI 与当前 bundle 建立隔离基线，再验证本地构建。重点覆盖创建回执丢失、写失败、预读与 lease 之间变化、非 leased ACP/CLI 接管、压缩后 recent replay、同工作区两种引擎并发、单引擎故障和 shutdown。当前 4170 预览、用户配置和用户历史不作为夹具。
+
+## 全量能力与来源绑定设计
+
+[全量覆盖表](managed-agent-full-design.md)为 C01～C18 给出专项设计；[配置与扩展](managed-agent-config-extensions.md)固定 RootSnapshot 和有效配置/目录 revision，显式贯通原 settings、env、argv、extension、Skills、MCP、Hooks 的真实消费者。当前空扩展正向只读证明和用途 gate 仍是首阶段前置，不能用全量文档替代 capability 的实际实现。后置项已有接口、状态、失败和迁移设计，实施顺序见 F1～F8；未支持或未知配置的新会话仍选择 legacy，已有 owner 不变。

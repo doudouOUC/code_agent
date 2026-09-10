@@ -1,6 +1,6 @@
 # Managed daemon 默认实现：首阶段实施计划
 
-更新日期：2026-09-10；代码核对基线 `a836081466`。完整范围与 C01～C18 能力/入口/状态/验收总表见[默认替换总方案](managed-agent-daemon-default.md)，三层责任与接口见[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)。历史 D1～D5 不再单独决定当前执行顺序。用户最新要求先完成全局设计，本轮不开始实现。后续在保留当前 4170 预览、用户数据和已验证能力的前提下，先抽出权威 Session 服务并接入完整 Harness，再完成创建时的兼容选择与普通 factory，让兼容范围明确的新 daemon 会话使用 Managed 默认实现。保持现有 Agent 行为，不把局部验收扩大为全部默认替换完成。
+更新日期：2026-09-10；代码核对基线 `a836081466`。完整范围与 C01～C18 能力/入口/状态/验收总表见[默认替换总方案](managed-agent-daemon-default.md)，三层责任与接口见[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)。历史 D1～D5 不再单独决定当前执行顺序。用户最新要求补齐[全量详细设计](managed-agent-full-design.md)，本轮不开始实现。后续在保留当前 4170 预览、用户数据和已验证能力的前提下，先抽出权威 Session 服务并接入完整 Harness，再完成创建时的兼容选择与普通 factory，让兼容范围明确的新 daemon 会话使用 Managed 默认实现。保持现有 Agent 行为，不把局部验收扩大为全部默认替换完成。
 
 ## 当前优先顺序
 
@@ -46,7 +46,7 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 
 施工按三份专项细化：[Harness](managed-agent-harness.md)定义完整循环与九组 checkpoint；[私有协议](managed-agent-control-protocol.md)定义消息、文件同步 ACK、activation 安装、原调用结算和引用保留；[coordinator](managed-agent-coordinator.md)定义单一 authority 调度与四处装配。R2.S1 将 activation 事实并入 authority，以窄适配复用 scheduler，保留实验 store；输入与唤醒一起提交。R2.S2 先实现 A/D 安全点、基础 activation 门禁及完整 Agent 读写，排空旧 handle 后再替换；禁止绕过实际 ACP Session→LlmChat/runTool 的接缝。R2.S3 再实现 B/C 工具和审批等待，在同一 installing/stage/enable/revoke 协议上支持在途交接、原 Runtime 接管与可恢复 detach；handler 返回不得再等同 turn 完成。
 
-字段与时序已有专项契约；编码前仍需可编译 schema/validator、实际限额表及平台文件同步/崩溃证据。恢复首版限定 coordinator 和原 worker 存活时替换 Harness；worker/daemon 丢失且未决时保持 blocked，跨 worker 重启回执后端单列后续工作。未取得恢复证明时保留现有 `recovery_ambiguous` 保护。
+[存储格式与限额](managed-agent-session-storage.md)已定稿；编码按此实现 schema/validator、实际接线并取得平台文件同步/崩溃证据。恢复首版限定 coordinator 和原 worker 存活时替换 Harness；worker/daemon 丢失且未决时保持 blocked，跨 worker 重启回执后端按[恢复与运行专项](managed-agent-recovery-operations.md)单列后续实施。未取得恢复证明时保留现有 `recovery_ambiguous` 保护。
 
 | 步骤                       | 本步产物                                                                                                      | 验收边界                                                                                                                                                           |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -59,6 +59,23 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 
 ## 后续阶段与完整完成条件
 
-R4 仅是兼容范围的有限默认，不结束总目标。R5 继续手动/自动定时、内部自动执行、媒体/产物、Skills/本地初始化、MCP/Hooks/Channels、后台 Shell/PTY/子任务/记忆、物理历史与全部客户端/平台组合。每项开始前补实际调用者、协议和状态转换、迁移/失败策略及可执行验收计划；完成后更新总表状态和允许范围。
+R4 仅是兼容范围的有限默认，不结束总目标。R5 继续手动/自动定时、内部自动执行、媒体/产物、Skills/本地初始化、MCP/Hooks/Channels、后台 Shell/PTY/子任务/记忆、物理历史与全部客户端/平台组合。各项调用者、协议、状态转换和迁移/失败策略已经补齐；实施时落实相应 validator、适配与可执行验收计划，完成后更新总表状态和允许范围。
 
 最终逐项核对 C01～C18 的要求、证据、平台与入口。历史兼容可按固定 legacy owner 保留，但不能把大量未迁移新用途一直走 legacy 视为完整默认替换。旧数据不变、无跨引擎重跑、当前预览保留、代码和方案推送一致都是交付条件。与部署载体相关的 P9b/Kubernetes 继续独立规划，不阻挡本地默认替换。
+
+## R5 全量能力切片
+
+下表各片已有详细设计，当前均未整体验收；F 编号只拆解 R5，不改变 R1～R4 的顺序。能力通过才扩大普通默认范围，绝不因调试入口通过或方案已写就全量放开。
+
+| 切片 | 设计和工作范围                                                                                                 | 依赖与退出证据                                                                             |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| F1   | [配置与扩展](managed-agent-config-extensions.md)：RootSnapshot、初始化、上下文/Skills、动态 revision | R2 来源证明与 authority；E01～E03，全部真实消费者取同一视图，配置漂移不重放原调用          |
+| F2   | [工具与历史](managed-agent-tools-history.md)：全工具、混合模型阶段、媒体/产物/资源                   | F1 视图和 Runtime gate；T01～T04，47项注册归位及真实完整结果/取消/GC                       |
+| F3   | [自动任务](managed-agent-automation.md)：定时/Goal/Live、child/background/记忆                       | 持久 input/domain/outbox、原 owner；A03～A07，派发不重复、父接受不丢失、未知回执不回父重跑 |
+| F4   | [MCP](managed-agent-config-extensions.md)：transport、tool/resource/prompt、鉴权和动态版本           | F1、共享池与原物理 phase；E04/E05，完整内容、授权/取消和连接 owner                         |
+| F5   | [Hooks](managed-agent-config-extensions.md)：来源 fallback、执行矩阵、once/async、热更新             | F1、模型/Runtime 分段及回执；E06/E07，原事件顺序与结果合并保持，未知效果不补跑             |
+| F6   | [Channels](managed-agent-automation.md)：来源路由、附件、delivery outbox                             | F3 领域收件和客户端正式终态；A01/A02，接收/发送各自去重，不把 HTTP ACK 当外部交付          |
+| F7   | [历史与转换](managed-agent-tools-history.md)：物理 rewind、fork、双向转换、目录维护                  | F2 内容/备份、OperationGrant/barrier；T05～T07，源不变、目标闭包、部分失败可恢复           |
+| F8   | [恢复与运行](managed-agent-recovery-operations.md)：worker/daemon、远端、平台和性能                  | 持久 phase、原 owner 与 storage profile；O01～O07，三种故障分层及各平台独立实证            |
+
+F8 的基础物理账本可以先于其他片实施以提供公共恢复接缝；F1/F2/F3 内按具体依赖拆 PR，不要求一片包含全域重构。全部 C 项和普通客户端 U01～U07、存储 S01～S06 与旧268项兼容检查共同构成全量完成条件。

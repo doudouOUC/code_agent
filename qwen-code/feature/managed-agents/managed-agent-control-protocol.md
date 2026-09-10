@@ -12,19 +12,25 @@
 
 ## 2. 公共数据结构
 
+精确编码、ChatRecord subtype/lock schema、事件字段分型和数值限额以[存储规范](managed-agent-session-storage.md)为准；全量配置、领域与平台契约从[全量覆盖表](managed-agent-full-design.md)索引。这里的首版恢复范围不限制后续专项的设计覆盖。
+
 以下是字段契约；实现时生成明确的 TypeScript discriminated union 与对应 validator，禁止以任意 JSON 代替已知记录类型。既有内容 union、模型历史、权限 DTO 和工具结果继续复用。
 
-| 结构                | 必需字段与约束                                                                                                                                                                                                                                                                                    |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SessionKey`        | `tenantId, workspaceId, sessionId`；沿用服务端规范化身份，存储位置不依赖端口或 host 启动 ID                                                                                                                                                                                                       |
-| `CommandMeta`       | `v:1, commandId, sessionKey`；写命令另有稳定操作内容摘要，执行提交有 `expectedSequence`。连接 actor 不放入可由模型填写的 payload                                                                                                                                                                  |
-| `ActivationGrant`   | `activationId, epoch, workerId, turnId, definitionRevision, leaseDurationMs, expiresAt, installationState`；绑定完整 SessionKey 与 workspace generation；epoch 由 authority 按 Session 单调颁发；安装结果为 installing/active，给 Harness 的 RunnableGrant 还必须含全部必要 enable ACK 的核对引用 |
-| `CommitReceipt`     | `commandId, firstSequence, lastSequence, eventIds, duplicate`；ACK 仅在逻辑提交完成后返回；重复请求返回原位置，不制造新事件                                                                                                                                                                       |
-| `EventEnvelope`     | `v:1, sequence, eventId, sessionKey, kind, occurredAt, payload`；执行事实另含 turn/scope/activation；sequence 由 authority 分配，客户端不能覆盖                                                                                                                                                   |
-| `DurableRef`        | `resourceId, kind, schemaVersion, byteLength, digest`；由所属 Session 解析、授权和验证；不接收任意绝对路径、URL 或将回收的临时文件作为恢复引用                                                                                                                                                    |
-| `InvocationBinding` | 完整 `ManagedToolInvocationReference`、逻辑 session/turn/scope、稳定 `runtimeBindingId`、原 Runtime Session ID、lease/generation、媒体/权限快照摘要；工具参数不能改写这些字段                                                                                                                     |
-| `ToolOutcomeRef`    | 按来源分型：runtime 含已接收 InvocationBinding/receipt；domain 含 action/Goal/Todo 等领域提交回执；orchestration 含注册的编排结果或 child 结算引用。三者共享稳定 executionCallId、输入摘要和批次位置，不能伪造另一来源的回执                                                                      |
-| `WakeIntent`        | `wakeId, reason, turnId, sourceEventId, requiredSequence`；reason 为 input/action_resolved/tool_settled/recovery，定时及子任务扩展按相应用途验收后启用；不等同允许重放副作用                                                                                                                      |
+| 结构                | 必需字段与约束                                                                                                                                                                                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SessionKey`        | `tenantId, workspaceId, sessionId`；沿用服务端规范化身份，存储位置不依赖端口或 host 启动 ID                                                                                                                                                                                                        |
+| `CommandMeta`       | `v:1, commandId, sessionKey`；写命令另有稳定操作内容摘要，执行提交有 `expectedSequence`。连接 actor 不放入可由模型填写的 payload                                                                                                                                                                   |
+| `ActivationGrant`   | `activationId, epoch, workerId, subject, definitionRevision, leaseDurationMs, expiresAt, installationState`；绑定完整 SessionKey 与 workspace generation；epoch 由 authority 按 Session 单调颁发；安装结果为 installing/active，给 Harness 的 RunnableGrant 还必须含全部必要 enable ACK 的核对引用 |
+| `CommitReceipt`     | `commandId, firstSequence, lastSequence, eventIds, duplicate`；ACK 仅在逻辑提交完成后返回；重复请求返回原位置，不制造新事件                                                                                                                                                                        |
+| `EventEnvelope`     | `v:1, sequence, eventId, sessionKey, kind, occurredAt, payload`；执行事实另含 turn/scope/activation；sequence 由 authority 分配，客户端不能覆盖                                                                                                                                                    |
+| `DurableRef`        | `resourceId, kind, schemaVersion, byteLength, digest`；由所属 Session 解析、授权和验证；不接收任意绝对路径、URL 或将回收的临时文件作为恢复引用                                                                                                                                                     |
+| `InvocationBinding` | 完整 `ManagedToolInvocationReference`、逻辑 session/turn/scope、稳定 `runtimeBindingId`、原 Runtime Session ID、lease/generation、媒体/权限快照摘要；工具参数不能改写这些字段                                                                                                                      |
+| `ToolOutcomeRef`    | 按来源分型：runtime 含已接收 InvocationBinding/receipt；domain 含 action/Goal/Todo 等领域提交回执；orchestration 含注册的编排结果或 child 结算引用。三者共享稳定 executionCallId、输入摘要和批次位置，不能伪造另一来源的回执                                                                       |
+| `WakeIntent`        | `wakeId, reason, subject, sourceEventId, requiredSequence`；reason 为 input/action_resolved/tool_settled/recovery，定时及子任务扩展按相应用途验收后启用；不等同允许重放副作用                                                                                                                      |
+
+`ActivationSubject` 是封闭 union：`{kind:'turn',turnId}` 或 `{kind:'hook_operation',operationId,occurrenceId,event,phase,originTurnId?}`；普通旧 turn DTO 仍从前者投影原 turnId，不添加假用户轮次。WakeIntent 与执行事件携带相同 subject。无活 turn 的 prompt Hook 使用后者，仍共享同 Session 单调 epoch、唯一模型推进者、Harness 槽位和模型预算；OperationGrant 本身不授予模型调用权。
+
+hook-purpose claim 只接受已持久 Hook occurrence 与固定 plan/input/model policy。关闭和删除封普通新 activation 后，仅可在原维护操作受理范围内领取其生命周期 Hook activation，不能借此受理新用户输入或启动主 Agent、工具/Goal/cron。复用原 PromptHookRunner，提交 model.attempt 和 hook_execution 结果；以 hook_complete 释放 activation，不生成 turn.settled 或任务完成通知。模型请求不明仍保留独立 attempt/费用不确定事实，不自动重放。writer、模型凭据及必要 Runtime 资源保留到该 Hook phase 实际结算；无合法恢复能力明确 blocked，不能默默跳过 Hook。
 
 commandId 的幂等范围是 SessionKey + operation + commandId；同一范围内相同 ID 不同操作内容冲突。expectedSequence 是并发前置条件，不因重试换值形成新的业务内容。可信相同 actor 的重复查询先返回原提交；无历史命中才校验当前 fence/sequence 并执行。对于旧 epoch 的已提交重复请求，最多返原 receipt，不能据此获取新推进权。
 
@@ -42,10 +48,16 @@ commandId 的幂等范围是 SessionKey + operation + commandId；同一范围�
 | `resolveAction`                                   | 原权限/用户问答仲裁入口                | requestId、action kind、原 invocation/input/policy 版本与合法结果；同决策幂等，冲突或迟到按原协议处理；最终决策提交后才能推动调用                                                                  |
 | `requestCancel`                                   | 用户入口或受控生命周期 owner           | 精确 turn/scope/invocation、原因；先持久请求再执行取消。与队列撤销、物理工具退出、最终 turn settlement 分开                                                                                        |
 | `claimActivation` / `renewActivation`             | coordinator/scheduler                  | 按候选状态条件领取与续租；claim 初始为 installing，只有门禁回执核对后才能发布有效 grant；同一 Session 只有一个有效推进者                                                                           |
-| `completeActivationInstall` / `releaseActivation` | coordinator                            | 前者提交所有所需门禁安装证明；后者提交 waiting/turn_settled/blocked 原因与边界引用。释放不自动完成 turn                                                                                            |
+| `completeActivationInstall` / `releaseActivation` | coordinator                            | 前者提交所有所需门禁安装证明；后者提交 waiting/turn_settled/hook_complete/blocked 原因与边界引用。释放不自动完成 turn                                                                              |
 | `acceptRuntimeReceipt`                            | 原 binding 的可信 coordinator 回执入口 | 原 InvocationBinding、原生结果/进度终态、输出 refs 和 history revision；验证并去重后追加，必要时同时形成 WakeIntent                                                                                |
 
 首版不增加通用 `executeMethod(name, args)` 或可绕过 actor 的任意 append API。领域命令内部可以共用 transaction helper，但不能把其存在暴露为用户或 Harness 的无限写权限。
+
+全量领域命令通过注册表按 domain/version 校验 payload，唯一正式事件为 `domain.committed {domain,version,operationId,recordRef}`；领域状态保存在 recordRef 的受控资源中。对已提交的 delivery outbox、配置安装、历史维护等，authority 可在校验原 operation revision、lifecycle、trust 和资源范围后签发 `OperationGrant {sessionKey,operationId,domain,operationRevision,ownerId,workspaceGeneration,resourceScope,leaseDurationMs,expiresAt}`。它仅允许原计划中的明确 phase，不授权模型推进或任意新业务；不是第二个 Session activation/epoch。模型侧首次提交意图仍需 ActivationGrant。
+
+需要物理操作的 OperationGrant 在所属 Runtime 安装独立 per-operation 单调 gate，重复安装/撤销按 operation revision 幂等处理；撤销后不可重开同 revision，下一 revision 先关闭旧准入并核验原 phase。新操作均受 maintenance barrier、共享容量和生命周期约束；status/cancel/结算保留原资格，不能因模型 turn 已结束而丢失交付或维护回执。一次性阶段以 effectId/effectRevision 固定原参数身份，operationRevision 只控制条件更新/门禁；稳定 phaseOperationId 不随 grant 重领而改变，unknown 不借新资格重跑。Channels 发送由有目标凭据的领域适配执行，workspace 文件/命令仍必须进 Runtime。
+
+没有 Session 的 workspace Git/PR/目录管理使用 `WorkspaceOperationGrant {workspaceKey:{tenantId,workspaceId},workspaceGeneration,operationId,domain,operationRevision,ownerId,resourceScope,leaseDurationMs,expiresAt}` 分型。所属 workspace 控制 owner 保存维护操作意图和结果，Runtime 保留原物理回执；不捏造 Session、模型 activation 或 primary Session 归属。这些记录是无 Session 工作区操作的权威，不复制任何 Session 事实。它使用相同 per-operation gate、共享预算、信任和维护 barrier；与其他 Session 写入冲突时先按已声明范围拒绝或排空，不能后台跨 owner 改文件。
 
 工具来源由可信工具定义和注册适配器决定，不接受 Harness 任意声明“本地成功”。AskUserQuestion 以 actionRequest/最终 decision 形成答案结果，无需伪造 Runtime prepare；Todo/Goal 状态变更必须有对应领域提交。Agent/子任务结算须带原 scope/result 引用，尚不能持久接管的编排保持驻留或阻塞 detach。每一类都保留原 ToolResult/错误语义与稳定调用 ID；工作区工具不能经 orchestration 分支绕过 Runtime。
 
@@ -65,19 +77,19 @@ Runtime lease 只证明原工具环境身份；现有 `ManagedToolCallIdentity` 
 
 Runtime 在 SessionKey + binding incarnation 内保存单调 gate revision、最大 epoch 和已撤销状态。stage/enable/renew/revoke 均条件更新并幂等返回原 ACK；enable 仅能开启同安装 ID 尚未撤销的 staged gate，renew 仅延长仍 active 的同一 gate。撤销同 epoch 后不可重开，stage 下一 epoch 后不可接受旧 epoch 的迟到 enable/续租；重复查询不能恢复旧权限。Runtime 若丢失这些门禁状态，原 binding 必须判为 lost 并拒绝工作，不能重启后以空状态接受旧 grant。
 
-Runtime 以受控有效期限制门禁：expiry 来自 authority grant，不能被 Harness 延长；coordinator 续租后才续 gate。首版本地部署使用同主机时间，Runtime 仍逐次检查期限；网络分区、超期、时钟来源无法信任时停止新派发。跨主机时钟与分布式 fencing 另行验证，不能仅把本地时间假设复制到远端。
+Runtime 以受控有效期限制门禁：expiry 来自 authority grant，不能被 Harness 延长；coordinator 续租后才续 gate。首版本地部署使用同主机时间，Runtime 仍逐次检查期限；网络分区、超期、时钟来源无法信任时停止新派发。跨主机采用[恢复与运行专项](managed-agent-recovery-operations.md)的单调挑战期限和原 binding 屏障；实现与验证前不开放该 profile，不能把本地时间假设复制到远端。
 
 当前由 Config 工厂随机创建的 Runtime Session ID、文件历史 owner、执行引用 Map 和未决 Promise 要移交 coordinator。新 Harness 通过已持久 binding 查原 Runtime，不能再次运行 factory 生成新 UUID 充当恢复。原 Config 的 shutdown 和 runTool 的 finally 不得在可恢复 detach 中 terminal release 已转交的调用。
 
 ## 5. 回执、资源和恢复保证
 
-| 场景                                          | 首版保证与边界                                                                                                                                                    |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Harness 替换，coordinator 与原 Runtime 仍存活 | 按原 invocation/status 继续取回结果，结果及持久资源提交 Session 后推进模型；不重发 execute，不取消已经转交的原工作                                                |
-| 工具完成但 Session ACK 丢失                   | 使用原结果 digest 和 commandId 查询/重交付，得到相同 receipt；保留成功事实及原 toolUseId/Hook 结果，不重新执行工具或 Hook                                         |
-| 原 worker 丢失，Session 已持久接受结果        | 从 Session 已提交结果恢复；不依赖 worker 内存 Map 或临时输出目录                                                                                                  |
-| 原 worker/daemon 丢失，尚有未决副作用         | 缺失/404/Map 空/IPC 断开都不是未执行证明，保持 recovery_blocked。仅凭新接口不承诺重建原进程或跨 worker 重启自动续跑                                               |
-| 将来支持 worker 重启后结果恢复                | 另需 outputRoot 之外的受控执行回执持久后端、启动前意图/实际开始/原生终态记录、完整扫描与旧进程隔离证明；started 但无终态仍为未知，不能承诺外部副作用 exactly-once |
+| 场景                                          | 首版保证与边界                                                                                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Harness 替换，coordinator 与原 Runtime 仍存活 | 按原 invocation/status 继续取回结果，结果及持久资源提交 Session 后推进模型；不重发 execute，不取消已经转交的原工作                                                       |
+| 工具完成但 Session ACK 丢失                   | 使用原结果 digest 和 commandId 查询/重交付，得到相同 receipt；保留成功事实及原 toolUseId/Hook 结果，不重新执行工具或 Hook                                                |
+| 原 worker 丢失，Session 已持久接受结果        | 从 Session 已提交结果恢复；不依赖 worker 内存 Map 或临时输出目录                                                                                                         |
+| 原 worker/daemon 丢失，尚有未决副作用         | 缺失/404/Map 空/IPC 断开都不是未执行证明，保持 recovery_blocked。仅凭新接口不承诺重建原进程或跨 worker 重启自动续跑                                                      |
+| 全量 worker 重启后结果恢复                    | 按[恢复与运行专项](managed-agent-recovery-operations.md)实现独立持久 RuntimeReceiptStore、phase 日志与旧 owner 核验；started 无终态仍未知，不承诺外部副作用 exactly-once |
 
 首版先完成可恢复 Harness 分离，未决 worker 重启继续保守拒绝；这是明确的能力范围，不把“worker 丢失不丢会话”误写成“worker 丢失可以重放所有操作”。当前 worker 会在父 IPC 断开后关闭，activator 在退出后清 outputRoot，因此 daemon 重启不能假定原 worker 仍可接管。
 
@@ -91,11 +103,11 @@ history revision 由原父 owner 产生；coordinator 先持久提交 snapshot/r
 
 sequence_conflict 重读后用同业务 ID 核对，不自动再做副作用；stale_activation 停止推进；storage_unavailable 先查提交结论；Runtime unknown 保留恢复阻塞。retryable 只指重试协议查询或同 ID 命令的资格，不授予工具重新执行权。
 
-Session control 请求、分页和事件批次必须有字节/条数/深度上限，并在初始握手公布实际限制。首版复用现有对应内容协议的限制和预算来源；新增 envelope 开销单独计数，不悄悄放大工具/媒体/文件历史额度。大 checkpoint/模型历史和输出用 DurableRef 加有界分页，不能截断后宣称可恢复。具体数值与当前调用者的最大合法载荷须在实现前形成一份可执行限额表；超限不会回成功 ACK，不能把 limits 字段设成无人消费的开关。
+Session control 请求、分页和事件批次必须有字节/条数/深度上限，并在初始握手公布实际限制。首版复用现有对应内容协议的限制和预算来源；新增 envelope 开销单独计数，不悄悄放大工具/媒体/文件历史额度。大 checkpoint/模型历史和输出用 DurableRef 加有界分页，不能截断后宣称可恢复。具体数值与兼容行为以[存储规范的限额表](managed-agent-session-storage.md#5-首版固定限额与兼容路径)为准，实现须把该表变为实际执行的 validator 与预算检查；超限不会回成功 ACK，不能把 limits 字段设成无人消费的开关。
 
 用户 cancel、lease loss、transport EOF、deadline、Harness detach、Session close 使用不同 reason。cancel ACK 只表示已提交请求；模型流的未提交 delta 不进入正式历史，原工具晚成功保留成功回执。deadline 可以结束客户端等待，但未决执行仍保留并阻挡不安全后续；完整规则见兼容方案。新模型 attempt 要记录独立 ID，不能承诺精确续流或只发生一次计费。
 
-## 7. 协议验收与冻结项
+## 7. 协议验收与实现门槛
 
 | 编号 | 必须验证                                                                                                                                                                                                   |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -106,4 +118,4 @@ Session control 请求、分页和事件批次必须有字节/条数/深度上�
 | P05  | 杀 Harness 与杀 worker/daemon 分开；前者接管成功，后者未决时明确 blocked；原已提交结果仍可读                                                                                                               |
 | P06  | cursor 过期、批次/媒体/深度超限、坏 digest、跨 Session ref；既不静默截断恢复状态，也不越权读取                                                                                                             |
 
-本稿已确定命令集、字段分工、提交可见性、安装屏障和恢复范围。实现前仍需把复用 DTO 展开为编译通过的 schema/validator、冻结实际限额表和平台同步证据；这些是 R2.S1/S2/S3 的编码前检查项，不要求重新选择三层架构，也不以文档存在代替通过验收。
+本稿和存储专项已确定命令集、字段分型、限额、提交可见性、安装屏障和恢复范围。R2.S1/S2/S3 按此实现编译通过的 schema/validator 与成对生产消费接线，再取得平台同步、崩溃和进程实证；设计已定不表示这些检查通过。领域 OperationGrant、跨 worker 回执及远端 profile 按全量计划逐项实现验收。

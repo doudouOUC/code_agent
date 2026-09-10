@@ -100,3 +100,11 @@ Session 与 Harness 初期可同进程承载，仍须分开生命周期；Tool-o
 R2.S1 实现 authority activation 事实与队列适配；R2.S2 接完整 Harness 的 boundary 回执与基础 activation 门禁，在 A/D 点先排空旧 handle 再替换；R2.S3 在同一门禁协议上增加在途调用移交、等待/接管和可恢复 detach；R2.1～R2.4 再完成有效配置与四处装配。上述验收本轮未运行，正式实现按仓库流程编写隔离 E2E 计划、建立基线、执行定向测试和真实进程验证。
 
 源码依据：`packages/core/src/managed-runtime/embedded-harness-scheduler.ts`、`managed-activation-store.ts`；CLI `serve/managed-prompt-service.ts`、`managed-agent-channel.ts`、`run-qwen-serve.ts`、`server.ts`、workspace registry 与 provider。精确 DTO 和兼容版本采用私有协议文档，禁止通过原实验 descriptor 的 replay_safe 字段扩大工具重放范围。
+
+## 8. 全量领域工作与恢复
+
+[自动任务专项](managed-agent-automation.md)规定 Channels、手动/自动定时、Goal/Live、子任务和记忆的准入、outbox、去重和取消；coordinator 只消费已提交候选，不再从默认 source 字符串推断普通用途。模型推进使用 ActivationGrant；模型轮结束后的交付、配置安装和历史维护使用[私有协议](managed-agent-control-protocol.md)的窄 OperationGrant，两者不产生竞争的 Session epoch。领域工作引用共享容量、原 Runtime 和同一生命周期 barrier，不在 Harness detach 时被丢弃。
+
+worker/daemon 重启及远端接管按[恢复与运行专项](managed-agent-recovery-operations.md)的持久 phase、认证 attach 和 unknown 分类处理；完整恢复扫描先于任何自动派发。活进程配额与未决结果分别统计，明确退出的进程可释放槽位，但未知结果不能据此当作未执行。全量顺序及 C01～C18 对应见[覆盖表](managed-agent-full-design.md)。
+
+生命周期 prompt Hook 的调度使用统一 ActivationSubject 的 hook_operation 分型，和普通 turn 共用唯一 epoch 与槽位；不能在普通 turn 活跃时并起第二模型推进者。Session closing/deleting 的新准入屏障保留一个窄例外：仅受理该已提交维护操作的固定 Hook occurrence，拒绝用户/Goal/cron 等新工作。它完成原 PromptHookRunner 后按 hook_complete 结算，不创建用户 turn、普通回复或完成通知；Hook request/attempt/phase 不明时保留原 owner 与恢复状态。真正 deleted 只在 Delete Hook、其他物理工作和资源清理都结算后提交，维护 tombstone 保留幂等证明。

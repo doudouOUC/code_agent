@@ -92,7 +92,7 @@ Recorder 的 beginClose 同步封闭写准入；handoff flush 失败会保留锁
 
 Managed authority 是唯一物理 writer；既有记录内容和 reader 保持可用，新增记录采用版本化 schema。每条命令带 Session/workspace 身份、稳定命令 ID；执行命令另带 activation fence 与 expectedSequence。成功回执包含已提交位置与原操作标识，相同 ID 的重试返回原回执，不重复写业务事实。
 
-需要多条物理记录表达一次逻辑提交时，读者只暴露带完整提交标记且校验通过的事务；未完成尾部不能唤醒 Harness。具体 subtype、批次边界和旧 reader 的拒绝策略在 R2.S1 冻结并测试。单机文件后端保证其定义的 flush/崩溃恢复范围，不凭接口名宣称跨主机事务或断电耐久性；storage durability 等级须写入实现验收，不能把 await write 自动等同 fsync。
+需要多条物理记录表达一次逻辑提交时，读者只暴露带完整提交标记且校验通过的事务；未完成尾部不能唤醒 Harness。具体 subtype、批次边界和旧 reader 拒绝策略采用[存储规范](managed-agent-session-storage.md)，R2.S1 按规范实现并测试。单机文件后端保证其定义的 flush/崩溃恢复范围，不凭接口名宣称跨主机事务或断电耐久性；storage durability 等级须写入实现验收，不能把 await write 自动等同 fsync。
 
 执行检查点包含恢复所需完整上下文与引用，绑定已提交 sequence；仅保存展示文本、最后 UUID 或摘要不够。Runtime 调用结果先按原 invocation 落入 Session，再推动模型；新 activation 发起新 prepare/execute 前验证派发资格，旧代只能查询、取消和结算已准入调用。没有可靠“未执行”证明时保持 `recovery_ambiguous`，不通过重试 execute 消除未知。
 
@@ -129,10 +129,10 @@ Managed authority 是唯一物理 writer；既有记录内容和 reader 保持�
 | T11 Runtime       | invocation 身份、输入版本、父子 history、物理执行/取消、ACK 丢失、worker 丢失与旧 activation；无重复副作用，未知执行保持阻塞                                                                             |
 | T12 入口一致性    | 普通 Web Shell/REST/ACP/SDK 与初始/后续/内部 prompt；逐入口记录实际引擎、持久受理、工具和 final，延期入口回归 legacy，不用实验入口代替普通入口                                                           |
 
-## 7. 实施切片与仍需冻结的细节
+## 7. 实施切片与全量专项
 
-R2.S1 先按附录建立本地接口和适配的一致性基准，保持旧行为，再实现单一 authority 和可等待 ACK，所有被增强的关键生产者/消费者成对修改。[私有协议](managed-agent-control-protocol.md)已补命令字段、幂等、事务可见性、同步 ACK 和 Runtime 安装/接管；[Harness 专项](managed-agent-harness.md)补完整状态及内部方法接缝；[coordinator 专项](managed-agent-coordinator.md)补 activation authority、调度、装配与 drain。编码前仍需将复用 DTO 展开为可编译 schema/validator、冻结实际载荷限额并验证平台同步和崩溃边界，不将本稿当作这些检查已经通过。
+R2.S1 先按附录建立本地接口和适配的一致性基准，保持旧行为，再实现单一 authority 和可等待 ACK，所有被增强的关键生产者/消费者成对修改。[私有协议](managed-agent-control-protocol.md)已补命令字段、幂等、事务可见性、同步 ACK 和 Runtime 安装/接管；[Harness 专项](managed-agent-harness.md)补完整状态及内部方法接缝；[coordinator 专项](managed-agent-coordinator.md)补 activation authority、调度、装配与 drain。[存储规范](managed-agent-session-storage.md)已固定 subtype/schema/限额，[全量专项](managed-agent-full-design.md)补齐其他领域的接口和恢复决定；编码时实现 validator 与实际接线并验证平台同步和崩溃边界，不把设计当作检查通过。
 
 R2.S2 接入完整 Harness，迁移正式记录和恢复上下文，验证普通会话首轮/后续/失败继续与历史兼容。R2.S3 实现持久等待、原调用查询结算、旧 activation 派发屏障、可恢复 detach 和限权 drain。之后才进入有效配置检查、四处普通 factory 和有限默认启用；方法已映射不代表功能已实现或能力可默认启用。
 
-完成每片后更新附录的适配状态、实际消费者和对应验收证据。第一版保留最小本地组合；远端部署、跨主机 lease 和公开 Session API 只在有明确消费者与后端保证时另行设计。
+完成每片后更新附录的适配状态、实际消费者和对应验收证据。第一版保留最小本地组合；远端 Runtime 和跨主机 lease 按[恢复与运行专项](managed-agent-recovery-operations.md)的已定契约实施验收。公网 Session 服务或 SaaS 部署属于本轮边界外，普通公开 API 继续保持兼容。

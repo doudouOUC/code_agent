@@ -8,9 +8,9 @@
 
 普通默认入口尚未切换。当前已有完整 Agent host、独立 Tool-only Runtime、若干工具与子作用域、持久 owner、配对 Bridge、严格 settings/项目 MCP 读取；相应限定验收不能代替普通入口的完整验收。本轮只调研和整理文档，没有新增生产实现或重跑历史产品测试。
 
-用户最新要求先做全局设计，目标是独立的 Session、Harness、Runtime 三层。后续施工先建立权威 Session 接口、完整 Harness 读写与可恢复等待，再接普通 Web Shell/SDK，完成必要故障验收后有限启用；仅拆出工具 Runtime 或替换 factory 不算架构完成。MCP、Hooks、Channels 的 Managed 迁移后置；完整媒体展示、Skills/工作区初始化、后台能力和历史操作按后续阶段补齐，已验证行为保留。正确 cwd、信任、模型、权限、有效依赖识别和持久恢复是当前必需项。定时任务及后置能力始终属于完整目标，有限启用不能作为全部完成的证据。
+用户最新要求补齐全量详细设计，目标是独立的 Session、Harness、Runtime 三层。后续施工先建立权威 Session 接口、完整 Harness 读写与可恢复等待，再接普通 Web Shell/SDK，完成必要故障验收后有限启用；仅拆出工具 Runtime 或替换 factory 不算架构完成。MCP、Hooks、Channels 的 Managed 迁移后置；完整媒体展示、Skills/工作区初始化、后台能力和历史操作按后续阶段补齐，已验证行为保留。正确 cwd、信任、模型、权限、有效依赖识别和持久恢复是当前必需项。定时任务及后置能力始终属于完整目标，有限启用不能作为全部完成的证据。
 
-本轮同时补齐三份待实现专项：[Harness 接口、状态机与恢复检查点](managed-agent-harness.md)、[三层私有协议、派发门禁与回执保留](managed-agent-control-protocol.md)、[coordinator 调度、四处 factory 与关闭顺序](managed-agent-coordinator.md)。它们与 Session 方法映射共同约束实施；先支持原 coordinator/worker 存活时替换 Harness，worker 丢失的未决操作继续阻塞，不自动重跑。
+全量详细设计现从[C01～C18 覆盖表](managed-agent-full-design.md)统一进入。在原 Harness、私有协议、coordinator 和268项方法映射上，补齐[存储格式与限额](managed-agent-session-storage.md)、[配置与扩展](managed-agent-config-extensions.md)、[自动任务与交付](managed-agent-automation.md)、[工具/媒体/历史](managed-agent-tools-history.md)、[普通客户端](managed-agent-client-surfaces.md)、[恢复/平台/性能](managed-agent-recovery-operations.md)。原先延期的能力本轮也完成设计，实施仍分阶段；首个恢复交付先覆盖原 coordinator/worker 存活时替换 Harness。
 
 ## 架构与不变量
 
@@ -128,16 +128,15 @@ reload 暂停本代新 Managed 启动，处理在途创建与现存 host，待�
 
 横向组合至少区分新建/热 attach/冷恢复、root/child/background、primary/secondary/replacement/embedded、REST/ACP/SDK/Web Shell，以及 macOS/Linux/Windows；支持、准确拒绝和未测试分别记录。工具边界核对声明、prepare/build、确认、execute、进度、终态、产物、恢复和释放，不能只验证 execute 而漏掉 Gateway 校验、fallback 与初始化中的本地操作。
 
-故障验证覆盖 acquire/prepare/execute/commit/cleanup 各边界的失败与恢复；写入可能已执行而回执不确定时不重放。取消成功要求原调用结算或原进程树退出，容量和 writer 不提前释放。性能验证记录可复现基线与实际数值；当前没有设定或验证新的硬内存限制、吞吐和延迟 SLO。
+故障验证覆盖 acquire/prepare/execute/commit/cleanup 各边界的失败与恢复；写入可能已执行而回执不确定时不重放。取消成功要求原调用结算或原进程树退出，容量和 writer 不提前释放。性能的基线方法、目标阈值与平台适用范围已在恢复专项确定，均待实测；没有新增生产生效的硬内存限制，不把设计门槛写成已测SLO。
 
-后置能力进入实施时补具体 DTO、调用者清单、状态转换及真实脚本；总表不冒充这些细节已完成。源码新增入口或能力时同步扩表。每轮沿用设计、定向验证、自审、独立审查和授权发布。本轮纯文档检查源码对应、状态、链接与镜像，不运行无关产品测试。
+全量专项已给出后置能力的 DTO、调用者、状态、失败恢复和迁移决定；实施时据此编写 validator、适配器与可执行验收脚本，补新增消费者和实测证据。源码新增入口或能力时同步扩表。每轮沿用设计、定向验证、自审、独立审查和授权发布。本轮纯文档检查源码对应、状态、链接与镜像，不运行无关产品测试。
 
-## 待收敛的设计决定
+## 全量设计状态
 
-1. 全局 settings、extension、Skills 与 runtimeEnvironment 的来源绑定：统一真实根，或对不能证明一致的组合保持首阶段 legacy；不能只改 settings reader 而让实际 Config 仍读另一个根。
-2. 自动定时和内部继续的接缝：确认调度 owner、锁、父接受与失败恢复；尤其为 fresh child 创建的回执不明与已有回父 task Session 路径建立去重规则，不能把 child 可能已执行的工作再运行一次。不把模型 scheduler 搬进 Tool-only worker。
-3. 后置扩展能力的模型侧/Runtime 侧边界和动态版本：随 C07～C09 的专项设计确定，严格探测不等于能力迁移完成。
-4. 跨引擎转换、Managed fork/rewind、跨平台进程所有权及压力门槛：各自需要证据，现阶段保留明确不支持和原路径，不凭局部测试推定兼容。
+此前来源绑定、自动派发回执不明、扩展版本、历史转换和平台门槛已由[全量覆盖表的决定清单](managed-agent-full-design.md#4-此前待定问题的决定)逐项定稿。RootSnapshot 固定真实根，领域工作通过唯一 authority 和 outbox 串联，工具分段执行，Runtime 用持久 phase 账本恢复；文件回滚与跨引擎转换各有独立可恢复操作。
+
+设计完成与迁移完成分开：首阶段延期能力保持原实现；跨 worker、Windows 原生后端、远端门禁和性能仍需编码与实证。任何未知副作用继续 blocked，默认范围只按已通过组合扩大。全量实施在 R5 分为 F1～F8，不能因本次设计已覆盖就直接打开全部能力。
 
 ## 本次调研的源码与证据
 
