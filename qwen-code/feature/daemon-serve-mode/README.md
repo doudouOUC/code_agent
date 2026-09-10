@@ -21,9 +21,9 @@
 | 08 | [扩展端点 recap/btw/tasks/shell/rewind/hooks/extensions/settings/logger](08-extension-endpoints.md) | 控制面端点、诊断端点、workspace skill status read model（#8080）、sessionless `POST /language`（#10554 merged）、绕过 prompt FIFO、shell `this`-binding 隐患 |
 | 09 | [路线图、覆盖矩阵与当前缺口](09-roadmap-coverage-and-gaps.md) | 以 #3803/#4175 为 spec 的阶段路线图 + PR→文档覆盖矩阵 + 未建设/未文档化缺口（已回填 #4490 mainline 合入和 #5144 daemon docs refresh） |
 | 10 | [客户端适配器与 SDK](10-client-adapters-and-sdk.md) | DaemonSessionClient、typed events、client identity、TUI/channels/IDE spike、daemon-managed channel worker、跨客户端协调、trust v2 SDK surface、SSE request cleanup、epoch-aware TS cursor、Java daemon transport alpha 与 #7603 reliability follow-up、TS daemon file read cursor paging（#8002）、REST SSE stream id / connect reason / lineage（#8572 merged）、restoreSession timeout derivation（#8691 merged）、same-session refresh diagnostics（#8939/#8990 merged）、ACP pre-attach counters（#9007 merged）、Web Shell file metadata（#9180 merged）、workspace session live-state SDK surface（#9261 merged）、child heap/live-state optional fields（#9380/#9396 merged）、selective restore compatibility（#9055 merged）、`setUserLanguage`（#10554 merged）、standalone options validator（#10719 merged）、turn-navigation SDK（#10751 merged）、worktree metadata（#10643 merged）与 worktree reset SDK（#11015 open） |
-| 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754）、live journal repair（#8414 merged）、ACP textual tool-result projection（#8450 merged）、WebUI SSE reconnect reason（#8572 merged）、restore request/watchdog timeout（#8691 merged）、transactional attachment/restore/session catalog work（#8833/#8882/#8891/#8931/#8933/#8939/#8955/#8990 merged）、transactional resync/repair（#9048 closed observation）、selective restore（#9055 merged）、text file attachments（#9180 merged）、workspace live-state route/consumer/activity（#9261/#9366/#9396/#9476 merged）、internal Conversations runtime guard（#9181 merged）、ACP HTTP pre-attach budget（#9007 merged）、`--open-with-auth` handoff（#9738 merged）、current-session scheduled-task selector（#9838 merged）、workspace/standalone/Live context与runtime（#10418/#10514 merged）、standalone model options（#10719/#10824 merged）、turn-navigation Phase 1（#10751 merged）、Phase 2 design/2A（#11020/#11054 merged）、closed flat-store方案（#11053/#11143）、writer-blocked恢复（#11207 merged）、连续历史与compact rail（#11208 merged）、generic MCP参数preview（#11311 merged）、浏览器通知基础（#11398 merged）与内容/点击增强（#11447 open） |
+| 11 | [WebUI 库与 ACP 传输层](11-webui-and-transport.md) | @qwen-code/webui、context-usage API、ACP Streamable HTTP、WebSocket transport、trust hot reload applying/failed UI state、workspace-scoped Web Shell Voice（#7754）、live journal repair（#8414 merged）、ACP textual tool-result projection（#8450 merged）、WebUI SSE reconnect reason（#8572 merged）、restore request/watchdog timeout（#8691 merged）、transactional attachment/restore/session catalog work（#8833/#8882/#8891/#8931/#8933/#8939/#8955/#8990 merged）、transactional resync/repair（#9048 closed observation）、selective restore（#9055 merged）、text file attachments（#9180 merged）、workspace live-state route/consumer/activity（#9261/#9366/#9396/#9476 merged）、internal Conversations runtime guard（#9181 merged）、ACP HTTP pre-attach budget（#9007 merged）、`--open-with-auth` handoff（#9738 merged）、current-session scheduled-task selector（#9838 merged）、workspace/standalone/Live context与runtime（#10418/#10514 merged）、standalone model options（#10719/#10824 merged）、turn-navigation Phase 1（#10751 merged）、Phase 2 design/2A（#11020/#11054 merged）、closed flat-store方案（#11053/#11143）、writer-blocked恢复（#11207 merged）、连续历史与compact rail（#11208 merged）、generic MCP参数preview（#11311 merged）、浏览器通知基础（#11398 merged）与内容/点击增强（#11447 open），以及WebShell显式submitted prompt producer（#11455 merged） |
 | 12 | [daemon / SDK 可靠性审计](12-daemon-sdk-reliability-audit.md) | epoch、可靠终态、targeted cancel、snapshot/resync、transport、消费者与两个 Java SDK 的问题清单，以及 #7458/#7463/#7603/#7622/#7812/#7821/#7886/#7975/#7976 已合入状态 |
-| 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 closed draft 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，#8245 已合入的 daemon memory budget reporting，#8423 已合入的 memory pressure observe mode，#8462 已合入的 active ACP child RSS aggregate，#8508/#9380 已合入的 child heap partition/status measurement model，#8911 已合入的 daemon ACP NDJSON buffers、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget，以及 #11428 已合入的workspace注册/child建模/Channel事务预算解耦 |
+| 13 | [资源预算与公平调度](13-resource-budgeting.md) | #8093 closed draft 的 process-wide `ResourceBudget`、completion reserve、emergency pool、bulk/spawn/process fair scheduler、buffered process runner foundations，#8245 已合入的 daemon memory budget reporting，#8423 已合入的 memory pressure observe mode，#8462 已合入的 active ACP child RSS aggregate，#8508/#9380 已合入的 child heap partition/status measurement model，#8911 已合入的 daemon ACP NDJSON buffers、#8947 已合入的 ACP transport resource guard、#9007 已合入的 ACP HTTP pre-attach buffer byte budget、#11428 已合入的容量owner解耦，以及 #11515 已合入的默认256注册/800 session/25 Channel owner边界 |
 
 ---
 
@@ -42,7 +42,7 @@ qwen-code 的原始形态是一次性 CLI 进程：用户在终端启动 `qwen`�
 - **shutdown 必须释放 exact-owned writer locks（#7812）**：daemon shutdown 时先关闭 session/turn admission，drain 已接受 transcript work，再原子 retire exact-owned writer locks；managed runtime 不再凭 hostname/age/PID 抢 existing owner。
 - **Todo Stop Guard continuation 必须 owner-scoped（#7821）**：bridge invocation prompt id claim/release continuation ordering，防止 Guard prompt 与用户输入、workspace relocation、session disposal 或 overlapping prompt 交错。
 - **只读 status 不应触发重扫描（#8080）**：workspace skill status 读取只消费已提交 snapshot，mutation 通过显式 refresh reason 更新 settings/content/extension-derived skills；daemon 侧用 TTL、generation guard、single-flight、ETag 与 mutation invalidation 控制可见性。
-- **资源预算 foundation 与容量owner分层（#8093 closed draft，#8245/#8423/#8462/#8508/#9380/#11428 merged）**：#8093 关闭前 draft 只提供 `ResourceBudget`、fair schedulers 与 buffered process runner primitives，不接生产路由、不广告 capability，也不改变 daemon 行为；#8245/#8423 只补 status denominator/pressure observation；#8462 已把 active ACP child RSS aggregate 接入 status 观测；#8508 已发布 observe-only child heap partition model，#9380 已补 daemon-owned ACP child old-generation peak measurement。#11428又把workspace注册、child建模与Channel事务预算拆成独立常量owner，仍保持25注册、observe-only child和既有timeout，不实现256/LRU/enforcement。
+- **资源预算 foundation 与容量owner分层（#8093 closed draft，#8245/#8423/#8462/#8508/#9380/#11428/#11515 merged）**：#8093 关闭前 draft 只提供 `ResourceBudget`、fair schedulers 与 buffered process runner primitives，不接生产路由、不广告 capability，也不改变 daemon 行为；#8245/#8423 只补 status denominator/pressure observation；#8462 已把 active ACP child RSS aggregate 接入 status 观测；#8508 已发布 observe-only child heap partition model，#9380 已补 daemon-owned ACP child old-generation peak measurement。#11428先把workspace注册、child建模与Channel事务预算拆成独立常量owner；#11515随后把默认注册policy提升到256，并独立限制total session为800、Channel owner为25，但仍不实现LRU或内存enforcement。
 - **多客户端协作**：同一 session 可被多个客户端 attach，事件通过 SSE 扇出，权限通过仲裁器协调。
 - **协议向后兼容**：能力通过 `/capabilities` 的 `features[]` 标签协商，客户端 **gate on features 而非 mode**；老 daemon 缺失新标签即静默降级。
 
@@ -626,6 +626,8 @@ sequenceDiagram
 | #11398 | browser task notifications | 已合入standalone WebShell default-off本地偏好、background terminal通知与pane/tab去重；不含closed-page push。 |
 | #11428 | workspace capacity policy decoupling | 已合入注册25、observe-only child模型25与Channel事务预算的独立owner，旧公开常量deprecated兼容；256/LRU未实现。 |
 | #11447(open) | browser notification details/navigation | 当前diff加入有界title/prompt/reply、图标、instance-scoped目标导航和embed branding；内置standalone无保存偏好时默认开启，尚未合入。 |
+| #11455 | ACP submitted prompt provenance | 已合入WebShell逐请求public声明、daemon/bridge private trust转发及fresh非channel Hook发布；缺失时不从request/display推断。 |
+| #11515 | configurable 256-workspace registration | 已合入默认256及1–256 operator配置，扩容模式默认800 total sessions，store支持255条secondary/8 MiB，Channel owner独立限25；runtime仍eager且无LRU。 |
 
 ---
 
@@ -929,6 +931,7 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 | #11398 | browser task notifications | 已合入default-off origin-local开关、mounted chat terminal观察和跨pane/tab去重。 |
 | #11428 | workspace capacity constant decoupling | 已合入CLI注册、ACP child建模与Channel控制deadline独立常量owner，保留既有值与公开导入兼容。 |
 | #11447(open) | browser notification details/navigation | 当前diff加入turn内容摘要、Qwen Code图标、context-safe点击导航与可选嵌入品牌；尚非`main`能力。 |
+| #11515 | configurable 256-workspace registration | 已合入默认256注册、operator覆盖、800 global session默认、扩展store与25 Channel owner准入；不含dormant runtime/LRU。 |
 | #9055 | selective session restore runtime | cold restore 按 indexed union records 读取 runtime resume state 与请求 replay projection，避免先 full materialize 再按 `historyPageSize` 裁剪。 |
 | #8469 | repeated ACP tool execution failure guard | 基于 execution outcome 识别同类前台 ACP 工具执行失败循环，warn/enforce 可注入纠偏或停止自动续跑。 |
 | #6716 | persistent workspace registration | dynamic workspace desired-state store、启动恢复与 registration list/forget API。 |
@@ -959,7 +962,7 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 7. **`/health` deep 探针非真实 liveness**。`?deep=1` 只读 Map-size getter（`sessionCount`/`pendingPermissionCount`）和 #8588/#9042 已合入的 `activeWork` 状态，包含 background Agent、terminal notification 和 background shell hold，但仍不 ping 各子进程。它能阻止“仍有后台 Agent/terminal notification/shell 时被当作空闲重启”，但检测不出"wedged 但仍计数/仍 active"的会话，真实 liveness 仍应靠 TCP/进程/trace/log 等观测。
 
-8. **open/draft diff 不能写成 main 已落地能力**。#8093/#8824 为 closed draft，#9048/#10286/#10786/#11053/#11143 为 closed，只能作为历史前身或替代方案记录。#11015/#11447仍为open，只能作为当前diff记录。#10828/#11020虽为docs-only design，但#10828核心runtime已由#11207承接，#11020 Phase 2数据/UI已由#11054/#11208承接；#11308/#11309/#11311/#11322/#11323/#11337/#11339/#11398/#11428已合入，需按最终diff记录。#11053/#11143的flat-store ledger不能叠加到已合入的separate-store架构。#8743已由#9055 runtime PR承接。
+8. **open/draft diff 不能写成 main 已落地能力**。#8093/#8824 为 closed draft，#9048/#10286/#10786/#11053/#11143 为 closed，只能作为历史前身或替代方案记录。#11015/#11447仍为open，只能作为当前diff记录。#10828/#11020虽为docs-only design，但#10828核心runtime已由#11207承接，#11020 Phase 2数据/UI已由#11054/#11208承接；#11308/#11309/#11311/#11322/#11323/#11337/#11339/#11398/#11428/#11515已合入，需按最终diff记录。#11053/#11143的flat-store ledger不能叠加到已合入的separate-store架构。#8743已由#9055 runtime PR承接。
 
 ## 2026-09-10 follow-up：worktree收口、历史交互、live-state轮询、浏览器通知与容量owner
 
@@ -971,6 +974,12 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 #11398已合入standalone WebShell浏览器通知。默认关闭、origin-local、跨tab同步的UI偏好只在用户显式开启时请求权限；后台仍挂载chat的完成/失败terminal发通用通知，Web Locks+storage可用时跨tab claim，取消、历史与前台已消费terminal静默。它不新增daemon route/settings/SDK，也不支持closed-page push或未挂载chat。
 
-#11447仍为open增强方案：按`promptId`从投影后transcript提取有界会话标题、本轮提问/回复，加入图标与workspace/standalone/Live目标；点击在所属实例验证context后打开原会话。`WebShellWithProviders`可配置默认值/品牌/图标，内置standalone当前diff对未保存偏好默认开启但不自动申请权限。通知正文会进入系统通知中心/锁屏，该方案尚非`main`能力。
+#11447仍为open增强方案：按`promptId`从投影后transcript提取有界会话标题、本轮提问/回复，加入图标与workspace/standalone/Live目标；点击在所属实例验证context后打开原会话并清理split状态。`WebShellWithProviders`可配置默认值/品牌/图标，内置standalone当前diff只在storage确认没有保存偏好时默认开启，storage不可读保持关闭且不自动申请权限；文本清理保留泛型、比较符与围栏HTML。通知正文会进入系统通知中心/锁屏，该方案尚非`main`能力。
 
-#11428已合入行为保持型容量常量解耦。CLI注册仍限25，ACP child partition仍以私有25做observe-only建模，Channel控制默认deadline仍为2,130,000ms；deprecated `MAX_DAEMON_WORKSPACES`只保留导入兼容。随附256测量和LRU设计没有实现注册扩容、runtime休眠、eviction或heap enforcement。
+#11428已合入行为保持型容量常量解耦。该阶段CLI注册仍限25，ACP child partition仍以私有25做observe-only建模，Channel控制默认deadline仍为2,130,000ms；deprecated `MAX_DAEMON_WORKSPACES`只保留导入兼容。随附256测量和LRU设计本身没有实现注册扩容、runtime休眠、eviction或heap enforcement。
+
+#11515随后已交付P1注册扩容：默认256，并支持operator-only `QWEN_SERVE_MAX_WORKSPACES=1..256`或embedded option；启动、完整持久化恢复、dynamic/scratch admission与store write共享同一boot-time上限。容量大于25时标准daemon默认总session限800；schema v1 store支持255条secondary与8 MiB，Channel控制独立限制25个含recovery保留项的owner并在capabilities/status公布。runtime仍eager构建，dormant/LRU、child内存enforcement与256 active workspace资源保证均未提供。
+
+#11455也已把WebShell原始composer文本作为逐请求public声明送入daemon。REST/ACP route和bridge剥离可伪造metadata，只沿trusted context重建private声明；Session仅对fresh、非channel、非空白声明发布`UserPromptSubmit.submitted_prompt`，不会从request text或display projection推断。generic action、manual scheduled run、retry与server-restored queue继续省略。
+
+_生成于 2026-06-03；按个人 PR 口径更新于 2026-09-11_

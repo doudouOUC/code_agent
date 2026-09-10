@@ -18,6 +18,7 @@
 | [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | ✅ merged | feat(web-shell): add opt-in browser task notifications | [pr-11398.md](pr-11398.md) |
 | [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | ✅ merged | refactor(serve): decouple workspace capacity policies | [pr-11428.md](pr-11428.md) |
 | [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | 🟡 open | feat(web-shell): enrich browser notifications and open target sessions | [pr-11447.md](pr-11447.md) |
-| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | 🟡 open | fix(acp): Preserve submitted prompt provenance for auto recall | [pr-11455.md](pr-11455.md) |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | ✅ merged | fix(acp): Preserve submitted prompt provenance for auto recall | [pr-11455.md](pr-11455.md) |
+| [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | ✅ merged | feat(serve): support 256 workspaces by default | [pr-11515.md](pr-11515.md) |
 
-_按个人 PR 口径更新于 2026-09-10_
+_按个人 PR 口径更新于 2026-09-11_

@@ -2,13 +2,13 @@
 
 > 本文件已整理 2026-09-07 至 2026-09-13（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: relaxed Conversations ownership runtime 切换、WebShell 历史浏览/轮询/浏览器通知与点击导航、CI/housekeeping 稳定性、Mem0 Auto Recall/写入/删除、ACP submitted prompt provenance、Channel worktree 路由恢复与删除回收、workspace 容量策略解耦
+**主题**: relaxed Conversations ownership runtime 切换、WebShell 历史浏览/轮询/浏览器通知与点击导航、CI/housekeeping 稳定性、Mem0 Auto Recall/写入/删除、ACP submitted prompt provenance、Channel worktree 路由恢复与删除回收、workspace 容量策略解耦与256注册扩容
 
-**PR 统计**: 17 PRs - 15 merged / 2 open / 0 closed
-**当前已合并 PR 代码量**: +21,054 / -754，205 个文件变更
-**全量代码量**: +22,900 / -910，228 个文件变更
-**类型分布**: feat ×8, fix ×7, refactor ×1, perf ×1
-**范围 (scope)**: serve/daemon ×7, web-shell ×8, channels ×2, external-context ×5, core/writer-lease ×1, ci ×1, docs/design ×11
+**PR 统计**: 18 PRs - 17 merged / 1 open / 0 closed
+**当前已合并 PR 代码量**: +23,655 / -1,000，276 个文件变更
+**全量代码量**: +25,920 / -1,175，299 个文件变更
+**类型分布**: feat ×9, fix ×7, refactor ×1, perf ×1
+**范围 (scope)**: serve/daemon ×8, web-shell ×9, channels ×3, external-context ×5, core/writer-lease ×1, ci ×1, docs/design ×12
 
 ---
 
@@ -31,8 +31,9 @@
 | [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | ✅ merged | @doudouOUC | fix(external-context): Align deletion responses with Mem0 SDK | +92/-77 | 6 | 09-08 15:51 | 09-09 07:09 |
 | [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | ✅ merged | @doudouOUC | feat(web-shell): add opt-in browser task notifications | +1530/-54 | 12 | 09-08 15:53 | 09-09 05:46 |
 | [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | ✅ merged | @doudouOUC | refactor(serve): decouple workspace capacity policies | +2293/-12 | 12 | 09-09 03:13 | 09-09 06:25 |
-| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | 🟡 open | @doudouOUC | feat(web-shell): enrich browser notifications and open target sessions | +1632/-155 | 19 | 09-09 06:51 | — |
-| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | 🟡 open | @doudouOUC | fix(acp): Preserve submitted prompt provenance for auto recall | +214/-1 | 4 | 09-09 07:57 | — |
+| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | 🟡 open | @doudouOUC | feat(web-shell): enrich browser notifications and open target sessions | +2265/-175 | 23 | 09-09 06:51 | — |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | ✅ merged | @doudouOUC | fix(acp): Preserve submitted prompt provenance for auto recall | +744/-71 | 38 | 09-09 07:57 | 09-10 15:18 |
+| [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | ✅ merged | @doudouOUC | feat(serve): support 256 workspaces by default | +1857/-175 | 33 | 09-10 02:23 | 09-10 11:57 |
 
 ---
 
@@ -55,8 +56,9 @@
 | [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | #11337 对DELETE英文message与额外字段做固定匹配，真实Holo已删除目标却因回执 `Memory <id> deleted successfully.` 被报为unknown。 | 最终接受任意成功HTTP状态并要求1MiB内严格UTF-8 JSON可解析，不再解释provider字段；仍只有精确post-delete GET确认absence才报deleted，空/204、坏JSON、非成功状态与目标仍存在均unknown且不重试。 | 已更新 External Context 的最终兼容口径。完整实现见 [implementations/pr-11397.md](implementations/pr-11397.md)。 |
 | [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | 已离开WebShell窗口的用户只能靠侧栏未读状态发现任务完成，浏览器没有本地、显式opt-in的终态提醒。 | 最终在standalone WebShell设置中加入默认关闭、origin-local且跨tab同步的开关；只对后台已观察的完成/失败turn发通用通知，以pane/page和可用时Web Locks+storage去重，取消、历史和前台已消费终态静默。 | 已更新 WebUI transport 的浏览器通知最终实现。完整实现见 [implementations/pr-11398.md](implementations/pr-11398.md)。 |
 | [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | 单个 `MAX_DAEMON_WORKSPACES` 同时控制注册准入、ACP child建模和Channel控制超时，单纯扩容会意外改变三个独立契约。 | 最终保留三个现有值但拆分所有权：CLI注册仍限25，child模型仍最多25且只观测，Channel默认事务预算仍为2,130,000ms；旧公开常量保留为deprecated兼容导出，256注册与LRU只留在后续设计。 | 已更新 daemon资源预算与总览。完整实现见 [implementations/pr-11428.md](implementations/pr-11428.md)。 |
-| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | #11398通用通知不能辨认具体任务，点击也只聚焦原窗口，用户仍需手工找到原会话。 | 当前open diff加入会话标题、本轮提问/回复有界纯文本摘要和图标，并携带workspace/standalone/Live目标；点击通过实例内事件验证上下文后打开原会话。内置standalone在无保存偏好时改为默认开启，但仍不自动申请权限；尚未进入`main`。 | 已在 WebUI transport 登记open增强方案。完整观察见 [implementations/pr-11447.md](implementations/pr-11447.md)。 |
-| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | daemon/ACP fresh turn调用 `UserPromptSubmit` 时只有model-bound `prompt`，缺少Auto Recall要求的 `submitted_prompt`，显式配置也不会检索。 | 当前open diff在resource/slash/model-only扩展前取trusted display projection或ACP text blocks，只对fresh且非空提交附加已有optional字段；retry、空display和非文本内容不回退或伪造provenance。尚未进入`main`。 | 已在 Hooks 与 External Context 登记open ACP生产者修复。完整观察见 [implementations/pr-11455.md](implementations/pr-11455.md)。 |
+| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | #11398通用通知不能辨认具体任务，点击也只聚焦原窗口，用户仍需手工找到原会话。 | 当前open diff加入会话标题、本轮提问/回复有界纯文本摘要和图标，并携带workspace/standalone/Live目标；点击通过实例内事件验证上下文后打开原会话。最新修正让storage不可读时保持关闭，保留泛型/比较符/围栏HTML并清理split状态；尚未进入`main`。 | 已在 WebUI transport 登记open增强方案。完整观察见 [implementations/pr-11447.md](implementations/pr-11447.md)。 |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | daemon/ACP fresh turn原来只有model-bound `prompt`，缺少Auto Recall要求的 `submitted_prompt`；直接从所有fresh请求推断又会误召回scheduled/sub-session/Live机器输入。 | 最终由WebShell及显式opt-in客户端逐请求声明扩展前原文；REST/ACP/bridge剥离可伪造public/private metadata，只沿trusted context转成private声明，Session仅对fresh、非channel、非空白声明发布字段，不从request/display回退。 | 已更新 Hooks 与 External Context 的最终producer/trust边界。完整实现见 [implementations/pr-11455.md](implementations/pr-11455.md)。 |
+| [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | 25个注册工作区上限阻塞多仓库用户，直接改常量又会联动放大session、Channel事务和持久化边界。 | 最终默认注册容量提升为256并支持operator环境覆盖；启动/恢复/dynamic/scratch/store共享同一上限，扩容模式默认总session限800，store支持255条secondary/8 MiB，Channel owner仍独立限25并公布capacity。 | 已更新 daemon资源预算、总览与feature索引。完整实现见 [implementations/pr-11515.md](implementations/pr-11515.md)。 |
 
 ## PR 对应 feature 覆盖
 
@@ -66,10 +68,10 @@
 | [daemon ACP bridge and permission](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #11207(merged) | 将 global owner cutover 与 mandatory session writer fence 的关系更新为已落地。 |
 | [Scheduled Tasks](../../feature/scheduled-tasks.md) | #11207(merged) | 更新relaxed ownership cutover后mandatory lease、唯一controller binding与at-least-once边界。 |
 | [capabilities and protocol](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) | #11339(merged) | 登记optional live-state interval capability与旧daemon五秒fallback。 |
-| [WebUI and transport](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #11207/#11208/#11311/#11322/#11323/#11339/#11398(merged), #11447(open) | 登记writer-blocked恢复、连续历史/rail、generic MCP参数预览、导航timer/首帧请求修复、live-state协商、浏览器通知最终实现与open内容/点击增强。 |
+| [WebUI and transport](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #11207/#11208/#11311/#11322/#11323/#11339/#11398/#11455(merged), #11447(open) | 登记writer-blocked恢复、连续历史/rail、generic MCP参数预览、导航timer/首帧请求修复、live-state协商、浏览器通知最终实现/open增强，以及WebShell显式submitted prompt producer。 |
 | [Channel adapters](../../feature/channel-adapters.md) | #11308(merged), #11309(merged) | 更新worktree route managed restore与ownership-verified delete cleanup最终实现。 |
-| [daemon resource budgeting](../../feature/daemon-serve-mode/13-resource-budgeting.md) | #11428(merged) | 登记注册准入、child建模与Channel控制事务预算的行为保持型常量解耦，以及256/LRU未落地边界。 |
-| [Direct External Context](../../feature/external-context-provider.md) | #11246/#11311/#11337/#11397(merged), #11455(open) | 增补configurable Mem0 Auto Recall、writer、显式删除及DELETE兼容最终实现，并登记open ACP submitted prompt生产者修复。 |
-| [Hooks / submitted prompt provenance](../../feature/hooks.md) | #11455(open) | 登记ACP fresh turn补充已有optional `submitted_prompt`的当前方案与省略边界。 |
+| [daemon resource budgeting](../../feature/daemon-serve-mode/13-resource-budgeting.md) | #11428/#11515(merged) | 区分行为保持型容量owner解耦与P1默认256注册扩容，记录800 total-session、255条secondary/8 MiB store和25个Channel owner边界。 |
+| [Direct External Context](../../feature/external-context-provider.md) | #11246/#11311/#11337/#11397/#11455(merged) | 增补configurable Mem0 Auto Recall、writer、显式删除、DELETE兼容及显式ACP/daemon submitted prompt producer最终实现。 |
+| [Hooks / submitted prompt provenance](../../feature/hooks.md) | #11455(merged) | 登记逐请求public声明、bridge private转发、fresh非channel hook发布及缺失时不推断的最终边界。 |
 
-_按个人 PR 口径更新于 2026-09-10_
+_按个人 PR 口径更新于 2026-09-11_

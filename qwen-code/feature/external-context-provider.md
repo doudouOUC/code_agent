@@ -156,11 +156,11 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 
 #11397最终把DELETE回执与Mem0 SDK的HTTP层口径对齐：接受任意成功HTTP状态并要求1MiB内严格UTF-8 JSON可解析，不再解释message/status/event/cascade/error字段。仍只有exact final GET确认absence才报deleted；空/204、坏JSON、非成功状态或target仍存在均unknown且不retry。该兼容调整已进入`main`，但不放宽删除前ID/scope/全文、repository binding、审批或deadline边界。
 
-### 3.14 daemon/ACP Auto Recall submission provenance（#11455 open）
+### 3.14 daemon/ACP Auto Recall submission provenance（#11455 merged）
 
-#11455当前open diff补齐ACP session producer。普通daemon提问目前运行`UserPromptSubmit`时只传model-bound `prompt`，导致#11246的v3 Auto Recall因缺少`submitted_prompt`直接返回`{}`。当前方案在resource、slash command和model-only扩展前，优先使用trusted `promptDisplayText`，否则连接ACP request中的text blocks；只对既有`isFreshUserTurn`且projection非空白的turn附加已有optional字段。
+#11455已补齐WebShell到ACP Session的显式producer链。WebShell在host preparation、slash command改写和附件展开前捕获composer文本，通过public `_meta["qwen.submittedPrompt"]`逐请求声明；普通和本地queued user submission保留声明，generic action、手动scheduled run、retry及server-restored queue不生成。其它ACP/daemon客户端也必须逐请求opt in，不能由transport全局推断。
 
-显式空display不会回退到内部channel指令，retry、tool continuation、resource/image/audio内容与model-only delegation也不制造provenance。legacy `prompt`、hook执行策略、default extension registration及单profile repository/scope绑定均不变。该字段仍是用户可控文本而非认证或DLP边界；#11455尚未合入，当前`main`中的daemon/ACP Auto Recall缺口仍存在。
+REST/ACP admission排除channel-worker输入并把合格声明放入bridge context；bridge删除请求里的public/private键，只沿trusted context重建private声明。Session仅在fresh、非channel且声明非空白时发布`submitted_prompt`，缺失或非法值不会回退request text、display projection、resource或model-only内容。legacy `prompt`、hook执行策略、default extension registration及单profile repository/scope绑定均不变；该字段仍是caller声明的用户可控文本，不是认证或DLP边界。
 
 ---
 
@@ -178,7 +178,7 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 - #11311 声明Mem0 package 182项、WebShell 67项、daemon integration、18个合成服务场景、build/typecheck/bundle/lint/format与真实Chrome审批展示通过；真实Holo preflight仍为403，本次未独立复跑。
 - #11337 声明Mem0 package 330项、WebShell 67项、daemon integration、170项协议/package测试、21个daemon场景与真实Chrome 4000-codepoint审批通过；真实Holo未验证，本次只复核merged diff与最新`main`。
 - #11397 声明本地provider复现Holo回执后12个daemon场景、package tests、root build/typecheck/bundle与package lint通过；未做fresh真实Holo/PolarDB验收，本次只核对最终head与最新`main`落点。
-- #11455 当前open diff声明869项session测试、root build/bundle/typecheck、focused lint/format，以及loopback provider与真实Holo各四个场景通过；本次只核对open head与当前`main`差异，未连接真实provider。
+- #11455 最终声明root build/bundle/typecheck/lint/format、五个WebShell suite共1,383项、50项定向backend测试及重建daemon九个声明边界场景通过；早期869项Session与Holo结果早于显式声明修正，仅作历史证据。本次只核对merged head与最新`main`，未连接真实provider。
 
 ---
 
@@ -191,7 +191,7 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 - #11246 已合入独立v3 Auto Recall Hook，但不会修改默认v2 MCP manifest；启用后sanitized prompt会发送到管理员provider，sanitizer不是DLP。
 - #11311 已合入v4 daemon writer、write dialect和generic MCP完整参数preview；真实provider兼容与不确定写入后的人工核对仍由部署方负责。
 - #11337 已合入v5 exact-get/forget显式删除，#11397已将DELETE响应收敛为成功HTTP+有界JSON+post-delete absence，不解释provider-specific回执字段。
-- #11455仍是open ACP producer修复；在其合入前，普通daemon/ACP fresh turn不会为#11246 Auto Recall提供`submitted_prompt`。
+- #11455已合入显式ACP/daemon producer；没有逐请求声明的客户端、scheduled/sub-session/Live机器输入及所有channel marker turn仍不会为#11246 Auto Recall提供`submitted_prompt`。
 - 默认实现仍是只读检索；auto recall 也只注入 untrusted context。#8507 的 `context_remember` 只覆盖 Mem0 Direct Import 单条写入，不包含删除、审批、policy、management API 或 Generic knowledge-base writes。
 - Mem0 write 是非幂等外部操作；timeout/断线后 provider 可能已接受请求，重复批准相同内容可能产生重复记忆。
 - 内容确认 Hook 是 best-effort UX，不是不可绕过授权边界。
@@ -218,6 +218,6 @@ query唯一来源是 `submitted_prompt`，不读取扩展后的model prompt；�
 | [#11311](https://github.com/QwenLM/qwen-code/pull/11311) | MERGED | daemon memory writer | 最终新增独立v4 writer与closed create dialect，单次提交exact text并区分stored/accepted/unknown；WebShell显示generic MCP完整参数。 |
 | [#11337](https://github.com/QwenLM/qwen-code/pull/11337) | MERGED | explicit daemon memory deletion | 最终新增独立v5 delete profile与exact get/forget工具，删除前核验ID/scope/全文，只提交一次并在DELETE回执后GET确认absence。 |
 | [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | MERGED | Mem0 DELETE response compatibility | 最终接受成功HTTP与有界严格JSON而不解释provider字段，仍需post-delete exact GET确认absence。 |
-| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | OPEN | ACP submitted prompt provenance | 当前diff让ACP fresh nonblank turn补充已有optional `submitted_prompt`，使显式配置的Auto Recall可运行；尚非`main`能力。 |
+| [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | MERGED | ACP submitted prompt provenance | WebShell及显式opt-in客户端逐请求声明扩展前原文，transport建立public/private trust边界，Session只对fresh、非channel、非空白声明发布字段。 |
 
-_按个人 PR 口径更新于 2026-09-10_
+_按个人 PR 口径更新于 2026-09-11_
