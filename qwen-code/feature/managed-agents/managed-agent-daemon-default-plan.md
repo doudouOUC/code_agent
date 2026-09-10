@@ -36,7 +36,7 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 
 ## R2 的具体施工与验收顺序
 
-R2.S1 已进入施工，其余两片仍是设计。R2.S1 拆为 R2.S1a 记录格式与 R2.S1b 权威追加路径：**R2.S1a 已交付**，`packages/core/src/managed-runtime/managed-session-records.ts` 按[存储规范](managed-agent-session-storage.md)实现 §1 的三个 ChatRecord subtype 与 header 字段、§2 的 StableId/Sequence/Digest/Time/SessionKey/DurableRef 共用规则、§3 的 15 项封闭 kind union 及逐 kind 必需字段与四类 actor 资格、§3.1 的 30 个封闭 domain、§5 的记录与事务限额，并含原始 JSON 重复键拒绝（`JSON.parse` 会静默折叠它）。证据：43 项定向单测通过，`chatRecordingService` 原 126 项无回归，仓库 build/typecheck、该包 prettier/eslint 通过。
+R2.S1 已进入施工，其余两片仍是设计。R2.S1 拆为 R2.S1a 记录格式与 R2.S1b 权威追加路径：**R2.S1a 已交付**，`packages/core/src/managed-runtime/managed-session-records.ts` 按[存储规范](managed-agent-session-storage.md)实现 §1 的三个 ChatRecord subtype 与 header 字段、§2 的 StableId/Sequence/Digest/Time/SessionKey/DurableRef 共用规则、§3 的 15 项封闭 kind union 及逐 kind 必需字段与四类 actor 资格、§3.1 的 30 个封闭 domain、§5 的记录与事务限额，并含原始 JSON 重复键拒绝（`JSON.parse` 会静默折叠它）。证据：57 项定向单测通过，`chatRecordingService` 原 126 项与 `managed-runtime` 全部 212 项无回归，仓库 build/typecheck、该包 prettier/eslint 通过。独立审查发现格式层无法表达规范允许的「输入投影适配」生产者——承载用户输入的 `message.committed` 与 `input.accepted` 同事务提交，此时尚无 activation，却被强制要求 activation subject；已把该要求移到知道 actor 的资格检查处。同轮修复：事务摘要原先只覆盖事件身份（被替换的正文仍可匹配 marker），现覆盖完整内容；自由形态 payload 子树原先不校验，现按 §2 编码规则拒绝非有限数字、循环与超深结构，并拒绝原始 JSON 的 `__proto__` 键；SessionKey 三元组现约束为单一路径段。
 
 **R2.S1a 的边界必须一起写清**：它只是格式与校验层，**没有任何生产调用者**——authority、writer lease 换锁、投影与幂等提交都属于未开始的 R2.S1b，因此这批绿色测试证明的是 schema 判定正确，不证明任何权威事件被追加过，也不改变 R1 在默认路径上仍等于 no-op 的结论。§2 的 RestoreBundle 与 §2.1 资源仓库落盘规则不在本片内，随恢复与资源切片交付。下一步是 R2.S1b：单 writer 队列、事务提交与 commit marker、schema 3 锁的认证换锁，再执行原 R2.1～R2.4；每步保留可审查的变更和证据。
 
