@@ -2,9 +2,9 @@
 
 ## 目标与当前缺口
 
-本项优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。先让同一工作区的普通 daemon 会话按创建时确定的执行引擎运行，再扩大 Managed 默认适用范围。完整媒体展示、Skills、后台任务和历史迁移继续延期，已验证能力保留。
+本项完整范围见[默认替换总方案](managed-agent-daemon-default.md)，优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。先让同一工作区的普通 daemon 会话按创建时确定的执行引擎运行，再扩大 Managed 默认适用范围。完整媒体展示、Skills、后台任务和历史迁移继续延期，已验证能力保留。
 
-调查基线为 `bbeaf24bdb`。普通 daemon 的三处 workspace factory 和直接嵌入入口仍启动 ACP 子进程。完整 Managed host 已存在，但同一 Bridge 只有一个可复用 channel，创建来源在取得 channel 后才传入。仅替换 factory 无法保留同工作区中的旧会话和 Channel 路径。
+历史调查基线 `bbeaf24bdb` 的 Bridge 只有一个可复用 channel，创建来源在取得 channel 后才传入，不能仅替换 factory 保留旧会话和 Channel 路径。2026-09-10 复核 `a836081466`：配对 Bridge 已实现双通道；普通三处 workspace factory 加直接嵌入入口，共四处，仍使用原启动路径，尚未配置共同 selector 和 executionEngines。
 
 当前 `sourceType` 表示创建来源；`managed-gateway` 专用于禁止 Prompt 的 Tool-only Session；工作区 `runtime-owner.json` 表示进程所有权；writer lease 表示写入资格。这些字段都不能兼作会话执行引擎。普通 Prompt 和 Cancel 已使用 SessionEntry 的 connection，可以复用其队列和事件契约。
 
@@ -123,6 +123,47 @@ selector 和实际 Managed bootstrap/new/load/resume 使用同一兼容规则和
 普通资源接线还必须覆盖 shutdown、workspace drain/revoke、generation 失效和环境重载。现有本地 Runtime activator 自带进程 registry，接入共享资源管理时要区分释放自身资源与关闭整个 daemon registry；不能让一个工作区释放掉另一个引擎的进程。legacy 子进程、worker 进程树、驻留 Config 和会话数按实际口径计数；现有 child heap 观测不是硬内存限额，不能在状态中宣称新增硬限制。四处工厂统一沿现有 CLI 选项转换，当前应保留 LSP 与恢复提问开关，不重新解析宿主 argv。
 
 第 3 片先验证严格配置输入和普通 legacy 基线，再实施共同兼容策略与实际 host 保护，随后接四处工厂和变更入口。验收必须包含普通无延期依赖配置真正选中 Managed、有效/未知依赖保留 legacy、两种 owner 冷恢复、选择后配置变化、热 attach 与动态注入边界，以及同工作区两种引擎和多工作区隔离。该节是待实现设计，第二片的两组 host 验收不能用作这里的完成证据。
+
+### 2026-09-10 补充：空扩展输入与实际消费
+
+以下为已核对源码及空 store 基线后的实施设计，尚未实现。现有 `ExtensionStore.readConsistent` 会加锁并进入初始化/恢复；`ExtensionManager.refreshCacheWithSnapshot` 使用它加载并替换 cache。不得将现有刷新当作 selector 的无副作用探测。实际基线首次刷新产生 state、基础 lock、空 staging/rollback/transactions 和 enablement；第二次刷新仍改变元数据。普通 `lock` 文件不表示正在持锁，真实标记是 `lock.lock` 目录。
+
+第一片只接受已证明安装集合为空的输入，包含全新无目录与正常初始化空 store；已安装但 disabled 的扩展暂不做完整 activation/manifest 推导，新建仍走 legacy。后续需要支持该组合时另扩展有效配置算法，不伪造空 cache。
+
+| 输入                       | 只读判定要求                                                                                                                                                                      |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| extensions 目录            | 完整列举，目录或指向目录的链接是安装候选；普通文件不直接视为扩展，已知 enablement/preferences/marketplaces 控制文件保留来源检查；坏链接、特殊文件、I/O 错误或无法解释布局不可放行 |
+| store 元数据               | 接受有效空 state、普通基础 lock 和空事务目录；当前 state 有效时 previous 备份可存在；只有 previous 无 state、真实持锁、非空事务、异常类型均为 unknown，不执行恢复                 |
+| state 与 legacy projection | 复用现有 schema/parser/hash；extensions、旧启停策略及 remainder 必须为空，projectionHash 一致；损坏/未知版本或需 reconciliation 不改写修复                                        |
+| 读取一致性                 | 严格区分真正缺省与悬空文件/祖先链接；读前后检查路径/身份/清单、已读内容与事务状态，变化即 unknown；此为保守乐观读取，不声称跨文件原子事务                                         |
+| 数据残留                   | store 下 plugin-data 不能单独证明安装了扩展，但不能用它掩盖 state/安装候选/事务；不加载其内容或创建新的 plugin data                                                               |
+
+建议在 Store 内提供只读 empty-snapshot 结果，复用原验证器；Config 内部参数真实传给同一个 ExtensionManager，绑定来源路径及空状态。该 manager 的两次初始化 refresh、source/status revalidation、显式 refresh 和 refreshTools 共用复核；绑定后禁止管理 mutation，并覆盖 install/commit 的内部非 emitMutation 路径，防止直接填 cache。未绑定的 legacy Manager 仍使用原流程。具体 API 名称以实现为准，本节不声明已存在可用接口。
+
+CLI 实际 Managed 配置加载必须取得并传入该证明，覆盖 channel bootstrap、host bootstrap 与 new/load/resume；Core 初始化在 Hook/extension 消费前再检查，safe/bare 跳过普通刷新时也不遗漏验证。selector 与实际 host 读同一类来源并用同一规则；默认选择未知时可选 legacy，已经选择 Managed 后复核失败只能准确拒绝，不能失败后切引擎。
+
+最少真实验收包括正常初始化空 store 的正向、探测前后字节与元数据不写、坏 state/锁/事务/链接的拒绝、绑定后外部安装和刷新拒绝、无 MCP/Hook/plugin-data 副作用、原 legacy 加载/管理行为保留。已有 `63217 / exit 0` 仅为空 store 读取有写入的基线；新 reader 与绑定 fixed 验收待实现。
+
+### 2026-09-10 补充：四处 factory 与资源生命周期
+
+| 入口                | 基线源码位置                                | 必须继承                                                                            |
+| ------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| primary             | run-qwen-serve factory 5238 / Bridge 5680   | primary cwd/runtime base/env/trust/generation，原进程 registry、child policy 与诊断 |
+| 启动时 secondary    | 同文件 6130 / 6242                          | secondary 自有有效配置与 guard，同一个 daemon 预算                                  |
+| dynamic/replacement | 同文件 7100 / 7234                          | 新 runtime 对象/guard；不能按同 cwd 复用旧代 factory                                |
+| 自有嵌入入口        | server 默认 Bridge 1109 / 条件 factory 1139 | 无注入 Bridge/registry 才接管；原默认隐式 spawn 也改为显式配对，注入者保留自有责任  |
+
+行号只锚定 `a836081466`。共同 CLI 内部协调器返回 legacy/managed/select 配对；原 Bridge 的 owner index、权限、文件 guard、sub-session/schedule 回调和 admission 留在既有位置。普通资源不依赖 experimentalManagedAgents/experimentalManagedRuntimeAutoLocal 展示配置；Tool-only worker 标记与 ownedManagedRuntime 必须排除递归。实验远端 provider 不被普通本地接线擅自替换。
+
+registry 在 Bridge 之后形成（run 的约 6450、server 的约 1296）；协调器构造无进程副作用，通过 getter 在第一次 channel start 延迟绑定唯一 provider。尚未绑定时明确失败，不能回退 primary 或另造 registry。保留每代同一个 Managed factory 的 previousTeardown；新启动采实际最新有效环境时也不能重建 factory 丢失前驱失败屏障。
+
+共享 ProcessRegistry 时，activator 的 close/killAllSync 只清理自有 children；daemon 唯一 owner 最后关闭共享 registry。worker root 与 legacy ACP root 可共用资源记账，但 worker 后代不自动计作多个根，Config/Session 数亦不能混用。保留现有 reserve/attach 与 child heap 观测，不新增未实现的硬内存保证。
+
+ManagedToolSession.close 还需要活 provider 完成 cancel/status 到 settled、history 同步和 terminal release。普通关闭必须先 seal 新 admission，await 所属 Bridge/host，再 revoke worker 并等待实际退出，最后 dispose provider/共享 registry。当前实验清理路径中提前 shutdown registry、dispose provider 或 revoke-before-Bridge 的顺序必须在普通接线时调整；启动失败、移除、撤信任、replacement、信号及嵌入 app drain 都需遵守唯一清理所有权，失败保留错误并执行 containment。
+
+workspace reload 当前只发送 legacy 控制命令，Managed factory 当前冻结构造时环境。实现须暂停本代新启动、等待在途/活 host 安全退役后停止 worker，成功发布新环境后解封；失败保持暂停。不能让活 Managed host 继续用旧快照而声称全量刷新，也不能先停 provider 使其无从清理。首片若尚无 host retirement，可准确拒绝活 Managed reload；这仅是阶段限制，完整替换还需补齐。相同 cwd 的旧代晚到结果不能绑定新代。
+
+验收须同时证明：无实验 flag 的四入口正向、绑定前零启动、并发只建一个对应 provider/worker、一个 workspace 清理不杀另一引擎/工作区、实际工具与 writer/history 先清理再物理退出、reload 后新环境且失败不解封。旧双 host test-script 不能替代这些普通资源组合。
 
 ## 实施与验收顺序
 

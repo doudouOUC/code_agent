@@ -58,4 +58,4 @@ Runtime 通过单调 revision 回传快照。Gateway 原 ChatRecordingService �
 
 本阶段没有迁移 Gateway 的物理 snapshots/diff/rewind、分支备份复制和删除；E 仅证明真实 cold load、索引与备份可达，不证明回滚或分支完成。自动记忆的 scaffold、索引重建等既有文件操作仍在 Gateway；D 只证明工具写入的身份、原路径和完成结果，未覆盖 USER/team memory、Dream 或全部越界规则。
 
-继续迁移搜索工具（先 Glob 与可选 LS，再处理 Grep 后端声明）、NotebookEdit、多媒体、MCP/Skills/Hooks、后台进程及 Git/物理历史；同时完成可信工作区初始化快照。还需实际验证 cold background resume、不同 cwd 的完整组合、并发长 Shell、故障恢复及普通 Web Shell/SDK/Channels/cron/旧会话。Windows/Linux 真实进程行为未验收。三处普通会话 factory 的默认切换在这些兼容条件满足后进行。
+2026-09-10 状态校正：Glob/可选 LS、Grep、NotebookEdit、媒体 M1 与 PDF 物理取消已有后续专项实现及限定验收；完整清单见[默认替换总方案](managed-agent-daemon-default.md)。子作用域仍需实际验证 cold background resume、不同 cwd 的完整组合、并发长 Shell、external-v1 guard、USER/team memory/Dream/scaffold/index，以及后台 Shell/PTY/TaskStop 和 Git/物理历史等未覆盖边界。当前先完成有效配置与四处普通入口（三处 workspace factory 加自有嵌入入口）的兼容接线及有限启用；MCP/Skills/Hooks 和其余完整迁移按后续阶段推进。既有五组验收不证明这些剩余项或普通默认切换完成。

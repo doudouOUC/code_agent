@@ -1,7 +1,7 @@
 # Qwen Code Managed Agents 方案
 
 > 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [a836081466](https://github.com/doudouOUC/qwen-code/commit/a8360814668b3dfdff72ad3d99cbcaf26dd009a9)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
-> 更新日期：2026-09-09。
+> 更新日期：2026-09-10。
 
 > 当前产品目标：让 Managed Agent 替换 daemon 默认执行实现。用户最新明确首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
 >
@@ -21,30 +21,40 @@
 >
 > 普通默认入口尚未切换，4170 预览未访问或重启。最新优先顺序是创建时选择引擎并持久化执行所有者，发送/取消/恢复按所有者分派，接通普通 Web Shell/SDK，再完成必要故障验收和有限范围默认启用。完整图片展示/产物、工作区/Skills 配置迁移、后台/子任务/自动记忆补齐、文件历史/撤销/分支迁移暂缓，已验证能力保留。正确 cwd、信任、模型权限配置、有效 MCP/Hooks 依赖及 Channels 来源识别和最小恢复仍是必要基础。旧会话和兼容性未知的会话在创建时固定旧路径，运行中不换引擎，Managed 失败不隐式降级重跑。局部工具验收不代表全部默认替换完成；定时任务核心链路和延期能力仍在总目标范围。
 
+## 当前方案入口
+
+本次方案对应代码仓库文档提交 [35ca7352dd](https://github.com/doudouOUC/qwen-code/commit/35ca7352dd79f37f6870b3c6c2307e805a852037)，生产源码基线仍为上方的 `a836081466`。
+
+2026-09-10 已按代码 `a836081466` 重新核对并统一[默认替换总方案](managed-agent-daemon-default.md)：补齐 C01～C18 能力/入口/状态/验收总表，覆盖四处普通 factory、Web Shell/SDK、Channels、手动与自动定时、Live/Conversations/Goal、子任务、媒体、历史、平台与资源。双通道和严格配置读取已有限定实现；共同 selector、空扩展只读输入与四处普通接线尚待实现。空 store 的真实基线和 host-before-worker 清理/reload 结论已并入[执行引擎设计](managed-session-execution-engine.md)，不再只留在本地调查文件。
+
+[首阶段计划](managed-agent-daemon-default-plan.md)以 R1～R5 明确当前顺序和后续完整目标，R2 细分为输入、用途策略、协调器接线及普通复验。MCP/Hooks/Channels 和其他约定后置项继续保留，有限默认不能替代完整迁移。旧总方案全文移入[历史调查与验收记录](managed-agent-daemon-default-history.md)，保留原证据与失败但不再使用其中的旧“下一步”指挥开发。本次仅更新文档，未新增生产功能或重跑历史产品测试；普通默认仍未切换，预览和用户数据保持原状。
+
 ## 分阶段设计文档
 
-| 阶段 | 文档                                                                                 | 主题                                                   |
-| ---- | ------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| P0   | [Managed Agent Runtime P0](managed-agent-runtime-p0.md)                              | Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型 |
-| P1   | [Managed Agent Activation P1](managed-agent-activation-p1.md)                        | durable activation journal、lease fencing 与有界调度   |
-| P2   | [Managed Agent Prompt Admission P2](managed-agent-prompt-admission-p2.md)            | 完整用户消息持久化、幂等准入与恢复                     |
-| P3   | [Managed Agent Live Prompt P3](managed-agent-live-prompt-p3.md)                      | 首个实验 Managed Prompt 接入 live daemon               |
-| P4   | [Managed Agent Gateway Bootstrap P4](managed-agent-gateway-bootstrap-p4.md)          | 非权威 bootstrap 与 Runtime 并行启动的过渡方案         |
-| P5   | [Managed Agent Multi-Turn Continuity P5](managed-agent-multi-turn-p5.md)             | 多轮绑定、顺序所有权与 Runtime resume                  |
-| P6   | [Managed Agent Tool-only Runtime P6](managed-agent-tool-runtime-p6.md)               | Gateway 模型所有权与 Tool-only ACP Runtime             |
-| P7   | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime           |
-| P8   | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                   |
-| P8 后续 | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md) | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制 |
-| P9a | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md) | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收 |
-| D1～D5 | [daemon 默认执行替换](managed-agent-daemon-default.md) | 实施中：完整 host、工作区快照与可等待的通道清理已落地；其余工具边界、普通入口和默认切换待完成 |
-| D1～D5 首阶段计划 | [默认替换首阶段计划](managed-agent-daemon-default-plan.md) | 用户调整后的范围、兼容选择边界和剩余验收 |
-| D1～D5 执行引擎 | [会话执行引擎选择与持久化](managed-session-execution-engine.md) | 归属、双通道及严格配置读取基础已实现并验收；全来源兼容选择与普通默认入口待完成 |
-| D1～D5 工具边界 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 阶段 2：Read/Write/Edit/Shell 及 Glob/可选 LS/Grep、owned v2 绑定与子作用域已接通；其余工具及初始化继续实施 |
-| D1～D5 子任务与历史 | [子任务与持久文件历史](managed-agent-child-scopes.md) | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份 |
-| D1～D5 搜索工具 | [Glob 与可选 LS](managed-agent-search-tools.md) | 真实父子 worker 搜索、独立目录与 ignore、记忆及外路径权限，四组加 prior-read 回归通过 |
-| D1～D5 搜索后端 | [Grep 与进程生命周期](managed-agent-grep-tools.md) | 16 组限定验收通过：原生搜索、作用域/权限、取消与释放、版本超时和系统回退；Windows 等边界待完成 |
-| D1～D5 Notebook | [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md) | 原生 Runtime 编辑、完整内容修改与父备份限定验收通过；用户编辑器及其他故障组合继续验证 |
-| D1～D5 多媒体 | [媒体与调用配置](managed-agent-media.md) | M1 及 M2 PDF 物理取消限定验收通过；Gateway 转写与 M3 展示待实施 |
+P0～P9a 和 D1～D5 保留为历史专题编号；当前默认替换的执行顺序以 R1～R5 首阶段计划为准。
+
+| 阶段                | 文档                                                                                 | 主题                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| P0                  | [Managed Agent Runtime P0](managed-agent-runtime-p0.md)                              | Harness/Runtime 边界、同轮 Tool 等待与部署中立资源模型                                                      |
+| P1                  | [Managed Agent Activation P1](managed-agent-activation-p1.md)                        | durable activation journal、lease fencing 与有界调度                                                        |
+| P2                  | [Managed Agent Prompt Admission P2](managed-agent-prompt-admission-p2.md)            | 完整用户消息持久化、幂等准入与恢复                                                                          |
+| P3                  | [Managed Agent Live Prompt P3](managed-agent-live-prompt-p3.md)                      | 首个实验 Managed Prompt 接入 live daemon                                                                    |
+| P4                  | [Managed Agent Gateway Bootstrap P4](managed-agent-gateway-bootstrap-p4.md)          | 非权威 bootstrap 与 Runtime 并行启动的过渡方案                                                              |
+| P5                  | [Managed Agent Multi-Turn Continuity P5](managed-agent-multi-turn-p5.md)             | 多轮绑定、顺序所有权与 Runtime resume                                                                       |
+| P6                  | [Managed Agent Tool-only Runtime P6](managed-agent-tool-runtime-p6.md)               | Gateway 模型所有权与 Tool-only ACP Runtime                                                                  |
+| P7                  | [Managed Agent Eager Authoritative Turn P7](managed-agent-eager-authoritative-p7.md) | 权威模型立即开始，只在 Tool 边界等待 Runtime                                                                |
+| P8                  | [Managed Agent Remote Runtime P8](managed-agent-remote-runtime-p8.md)                | Gateway/Runtime 双进程和私有 HTTP v1                                                                        |
+| P8 后续             | [Managed Agent Session Surfaces](managed-agent-session-surfaces.md)                  | Gateway 会话目录、持久展示历史、独立状态、恢复流与 Web Shell 控制                                           |
+| P9a                 | [本地 Runtime 自动激活](managed-agent-local-runtime-activation-p9a.md)               | 已实现实验功能：自动启动、工作区复用、lease 校验、取消与可等待回收                                          |
+| 总方案              | [daemon 默认执行替换](managed-agent-daemon-default.md)                               | 当前完整范围、18 类能力、入口状态与验收门槛；普通默认未切换                                                 |
+| R1～R5 首阶段计划   | [默认替换首阶段计划](managed-agent-daemon-default-plan.md)                           | 用户调整后的范围、兼容选择边界和剩余验收                                                                    |
+| R1/R2 执行引擎      | [会话执行引擎选择与持久化](managed-session-execution-engine.md)                      | 归属、双通道及严格配置读取基础已实现并验收；全来源兼容选择与普通默认入口待完成                              |
+| D1～D5 工具边界     | [Runtime invocation v2](managed-agent-runtime-invocations.md)                        | 阶段 2：Read/Write/Edit/Shell 及 Glob/可选 LS/Grep、owned v2 绑定与子作用域已接通；其余工具及初始化继续实施 |
+| D1～D5 子任务与历史 | [子任务与持久文件历史](managed-agent-child-scopes.md)                                | 五组限定验收通过：独立子执行、父快照归属、默认记忆真实写入及新 Runtime 冷加载备份                           |
+| D1～D5 搜索工具     | [Glob 与可选 LS](managed-agent-search-tools.md)                                      | 真实父子 worker 搜索、独立目录与 ignore、记忆及外路径权限，四组加 prior-read 回归通过                       |
+| D1～D5 搜索后端     | [Grep 与进程生命周期](managed-agent-grep-tools.md)                                   | 16 组限定验收通过：原生搜索、作用域/权限、取消与释放、版本超时和系统回退；Windows 等边界待完成              |
+| D1～D5 Notebook     | [NotebookEdit 与多媒体边界](managed-agent-notebook-tools.md)                         | 原生 Runtime 编辑、完整内容修改与父备份限定验收通过；用户编辑器及其他故障组合继续验证                       |
+| D1～D5 多媒体       | [媒体与调用配置](managed-agent-media.md)                                             | M1 及 M2 PDF 物理取消限定验收通过；Gateway 转写与 M3 展示待实施                                             |
 
 ## 1. 结论
 

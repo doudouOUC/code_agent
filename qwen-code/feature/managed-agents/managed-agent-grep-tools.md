@@ -1,8 +1,8 @@
 # Managed Grep：公共声明与真实后端
 
-状态：2026-09-09，基于 `dc840f8a88` 实现，已完成下述 macOS 本机限定验收。继续 [daemon 默认替换](managed-agent-daemon-default.md)，沿用 [Glob/LS 的执行上下文](managed-agent-search-tools.md) 与已有 v2 invocation/父子历史绑定。本阶段仍不切换三处普通会话 factory。
+状态：2026-09-09，基于 `dc840f8a88` 实现，已完成下述 macOS 本机限定验收。继续 [daemon 默认替换](managed-agent-daemon-default.md)，沿用 [Glob/LS 的执行上下文](managed-agent-search-tools.md) 与已有 v2 invocation/父子历史绑定。该阶段未切换普通 factory；2026-09-10 核对共四处入口（三处 workspace factory 加自有嵌入入口），按[首阶段计划](managed-agent-daemon-default-plan.md)继续接线。
 
-公共声明、Gateway 离线注册、Runtime 原生后端选择、配置继承及 POSIX 进程组等待已实现。完整 build/bundle/typecheck、变更 lint 和去重 517 项定向测试通过；16 组隔离验收覆盖下述搜索、权限、父子作用域、取消、释放与后端选择。该阶段推进默认替换，尚不代表三处普通入口或全平台兼容已经完成。
+公共声明、Gateway 离线注册、Runtime 原生后端选择、配置继承及 POSIX 进程组等待已实现。完整 build/bundle/typecheck、变更 lint 和去重 517 项定向测试通过；16 组隔离验收覆盖下述搜索、权限、父子作用域、取消、释放与后端选择。该阶段推进默认替换，尚不代表普通四入口或全平台兼容已经完成。
 
 ## 问题与目标
 

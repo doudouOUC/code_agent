@@ -1,6 +1,6 @@
 # Managed Agent：Runtime invocation v2
 
-状态：阶段 1 的本地 macOS 验收通过；阶段 2 已接通 Core/ACP Session 调度、四类工具的生产注册与远端绑定，以及独立子作用域和持久父文件历史。子读写、读取隔离、后台跨父轮次、默认记忆实际写入和 cold load 五组真实验收通过，详见 [子任务与文件历史](managed-agent-child-scopes.md)。其余工具、初始化、物理历史操作和客户端兼容仍在实施，普通 daemon 默认实现尚未替换。
+状态更新：2026-09-10，源码复核基线 `a836081466`。阶段 1 的本地 macOS 验收与阶段 2 已记录的 Core/ACP 调度、独立子作用域、父文件历史结果保留；当前注册九种工具代理（Read/Write/Edit/Shell、Glob/可选 LS、Grep、NotebookEdit、Zoom），各自证据见[总方案能力表](managed-agent-daemon-default.md)及专项文档，不能将注册等同全部语义验收。四处普通默认入口与共同兼容 selector 尚未接线；当前先实施[首阶段计划](managed-agent-daemon-default-plan.md)，MCP/Hooks/Channels 迁移及完整初始化/媒体/后台/历史能力后置。下文按切片保留当时结果，“四类工具”等指历史注册切片，不是当前总能力清单。
 
 目标是让普通 daemon 的完整 Agent 留在常驻 Gateway，并把工作区工具真实执行交给独立 Tool-only Runtime worker。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
 
@@ -18,18 +18,18 @@ Skill 由 Runtime 读取文件/运行脚本，Gateway 负责模型展开和模�
 
 下表行号来自阶段 1 开始时的代码基线 `824e92d84f41fc9ab19d1130385b491a8f37c466`，后续实现会移动行号；审查当前实现应按符号定位。
 
-| 源码锚点                                                                                                                                       | 当前约束与改动位置                                                                                                            |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [Config.createToolRegistry](../../packages/core/src/config/config.ts#L9078)                                                                    | 两处执行器共用 DeclarativeTool 注册表；在此替换工作区工具工厂，不能先本地 build 再替换 execute。                              |
-| [ToolInvocation](../../packages/core/src/tools/tools.ts#L20)                                                                                   | DeclarativeTool.build 产生 invocation，再调用 getDefaultPermission、getConfirmationDetails、execute；确认回调不能直接序列化。 |
-| [CoreToolScheduler](../../packages/core/src/core/coreToolScheduler.ts#L2078)                                                                   | build 后进入权限/确认；setArgsInternal（1749）会重建 invocation，执行前 guard 在 4648，execute 在 4853。                      |
-| [Session.runTool](../../packages/cli/src/acp-integration/session/Session.ts#L10989)                                                            | 独立的完整执行路径：build（11380）、权限（11439）、确认（12158）、guard（12344）、execute（12505），必须同时接线。            |
-| [现有 Runtime 执行](../../packages/cli/src/acp-integration/acpAgent.ts#L11698)                                                                 | 当前 manifest（845）限制只读，execute（11791）复用完整非交互调度器；不能直接作为 v2 的执行内核。                              |
-| [非交互执行器](../../packages/core/src/core/nonInteractiveToolExecutor.ts#L30)                                                                 | 会再次运行 CoreToolScheduler；非交互 ask 被拒绝，且其结果处理可能调用图片模型。                                               |
-| [ToolResult](../../packages/core/src/tools/tools.ts#L486) / [v1 返回值](../../packages/acp-bridge/src/bridgeTypes.ts#L127)                     | v1 responseParts/status/error 不能完整表达原始 ToolResult、产物和输出文件。                                                   |
-| [Config 初始化](../../packages/core/src/config/config.ts#L3038) / [子 Agent 配置](../../packages/core/src/subagents/subagent-manager.ts#L1024) | 初始化及派生 Config 会建立本地服务/重建注册表；远端工具边界必须由真实 host producer 传入并继承。                              |
+| 源码锚点                                                                                                                                                                                                                                                                                                     | 当前约束与改动位置                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| [Config.createToolRegistry](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/config/config.ts#L9078)                                                                                                                                                   | 两处执行器共用 DeclarativeTool 注册表；在此替换工作区工具工厂，不能先本地 build 再替换 execute。                              |
+| [ToolInvocation](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/tools.ts#L20)                                                                                                                                                                  | DeclarativeTool.build 产生 invocation，再调用 getDefaultPermission、getConfirmationDetails、execute；确认回调不能直接序列化。 |
+| [CoreToolScheduler](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/core/coreToolScheduler.ts#L2078)                                                                                                                                                  | build 后进入权限/确认；setArgsInternal（1749）会重建 invocation，执行前 guard 在 4648，execute 在 4853。                      |
+| [Session.runTool](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/cli/src/acp-integration/session/Session.ts#L10989)                                                                                                                                           | 独立的完整执行路径：build（11380）、权限（11439）、确认（12158）、guard（12344）、execute（12505），必须同时接线。            |
+| [现有 Runtime 执行](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/cli/src/acp-integration/acpAgent.ts#L11698)                                                                                                                                                | 当前 manifest（845）限制只读，execute（11791）复用完整非交互调度器；不能直接作为 v2 的执行内核。                              |
+| [非交互执行器](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/core/nonInteractiveToolExecutor.ts#L30)                                                                                                                                                | 会再次运行 CoreToolScheduler；非交互 ask 被拒绝，且其结果处理可能调用图片模型。                                               |
+| [ToolResult](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/tools.ts#L486) / [v1 返回值](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/acp-bridge/src/bridgeTypes.ts#L127)                     | v1 responseParts/status/error 不能完整表达原始 ToolResult、产物和输出文件。                                                   |
+| [Config 初始化](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/config/config.ts#L3038) / [子 Agent 配置](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/subagents/subagent-manager.ts#L1024) | 初始化及派生 Config 会建立本地服务/重建注册表；远端工具边界必须由真实 host producer 传入并继承。                              |
 
-文件校验和确认本身已有工作区访问，例如 [ReadFile 参数校验](../../packages/core/src/tools/read-file.ts#L573) 和 [Edit 确认/diff](../../packages/core/src/tools/edit.ts#L408)。因此远端边界从真实 build 开始。
+文件校验和确认本身已有工作区访问，例如 [ReadFile 参数校验](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/read-file.ts#L573) 和 [Edit 确认/diff](https://github.com/doudouOUC/qwen-code/blob/824e92d84f41fc9ab19d1130385b491a8f37c466/packages/core/src/tools/edit.ts#L408)。因此远端边界从真实 build 开始。
 
 ## v2 最小协议
 
@@ -154,7 +154,7 @@ ReadFile 内部的 PDF 视觉转换也属于模型调用。Tool-only Session 的
 
 Remote provider 复用已认证 endpoint/lease，在 owned worker 的工具调用、文件历史和终结释放 v2 路由上保持同一 Session 身份。execute 只发送一次，丢失响应由代理通过原引用 status/cancel 恢复，不重发或降级 v1。AutoLocal 每 Session 保存一次 use/client；释放先封住新调用，等待远端 Session 关闭，再释放 use。若 worker 已丢失，则必须等待 activator 提供的真实进程退出结果；失败保留 retiring binding，阻止复用而允许清理重试。单个 Session 释放不应提前停止同 generation 的其他 Session。
 
-这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。该注册切片当时尚未接通子作用域；其后实现与验收见下文。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移及物理撤销仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。生产默认三处 channel factory 在这些功能与消费者验收完成后统一切换；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
+这一切片首先接通四种内置工具及完整 ACP host，不能据此声明默认迁移或完整初始化边界已经达成。该注册切片当时尚未接通子作用域；其后实现与验收见下文。Gateway 的文件/Skill/MCP/Hook 初始化、其他工具迁移及物理撤销仍需继续实现。父子 Agent 不能共享当前只允许单 prompt 的 Runtime client，也不能仅放开并发而破坏 FileHistory 快照。当前改为先完成兼容配置与四处默认 factory 接线，在已验收范围有限启用，再按总方案逐项扩展；真实验收必须通过 create/prompt 模型循环，禁止测试手工替换注册表冒充生产接线。
 
 ### 完整 host 与默认记忆验收（2026-09-09）
 
@@ -196,4 +196,4 @@ macOS 五组真实完整 host 验收通过：A 父未用文件工具而子 Read/
 
 ## Glob 与可选 LS 后续接线
 
-[搜索工具方案](managed-agent-search-tools.md)在同一 v2 invocation 链加入 Glob/LS，共享原生声明且不在 Gateway 构造或执行这两个本地工具。已有 bind-history DTO 增加可选执行上下文，实际新 producer 总是携带父子各自的目录、过滤、记忆根和 LS opt-in；Runtime 派生视图执行并保持原权限与共享父历史。macOS 四组真实搜索验收和既有子任务 prior-read 回归通过。没有新增公共路由或宽松 fallback；未识别上下文的旧 worker 明确报错。配置热更新、其他工具、完整初始化及三处默认 factory 替换继续实施。
+[搜索工具方案](managed-agent-search-tools.md)在同一 v2 invocation 链加入 Glob/LS，共享原生声明且不在 Gateway 构造或执行这两个本地工具。已有 bind-history DTO 增加可选执行上下文，实际新 producer 总是携带父子各自的目录、过滤、记忆根和 LS opt-in；Runtime 派生视图执行并保持原权限与共享父历史。macOS 四组真实搜索验收和既有子任务 prior-read 回归通过。没有新增公共路由或宽松 fallback；未识别上下文的旧 worker 明确报错。后续 Grep、NotebookEdit、媒体 M1/PDF 物理取消已有各自限定验收；配置热更新、其余工具、本地初始化和物理历史仍须补齐。三处 workspace factory 加自有嵌入入口共四处，当前按首阶段计划接入，不将后置能力作为有限启用的无条件前置。
