@@ -96,6 +96,8 @@ Session Service 在追加时同时验证存储 writer、命令授权和所需 ac
 
 不增加无消费者的公共 API。列表、归档和历史适配复用现有 SessionService；新增接口先服务实际输入、完整 host 的读写/恢复和普通客户端投影。其余管理方法随现有调用者逐项迁移。
 
+逐方法接缝已补充到[兼容接口与实现串联](managed-agent-session-compatibility.md)和[完整方法映射](managed-agent-session-method-map.md)：区分旧接口行为与 Managed 持久增强，明确同步准入、审批投票、best-effort 记录、维护资格和 Harness detach 的适配方式。方法已归位不表示新接口已实现。
+
 ## 5. 事件、检查点与存储
 
 每个 Session 有一个权威追加流。最小 envelope 包含版本、session 身份、单调 sequence、eventId、时间、来源和类型；执行事件另带 turn/scope/invocation 与 fence。类型覆盖输入受理、模型请求边界与正式内容、工具意图/审批/回执、持久等待、配置变更、取消请求、turn 终态和关闭。复用既有结构化内容块，不将媒体、权限、stopReason 或用量压成纯文本。
@@ -217,7 +219,7 @@ reload/remove/撤信任都先封闭原 generation。reload 对已有会话按已
 
 ## 12. 实施前需冻结的细节与源码范围
 
-全局责任、复用普通 transcript 的存储方向和先后顺序在本方案中确定。R2.S1 开工前还需冻结事件类型/内容块兼容表、记录 subtype/schema、所有写入消费者、checkpoint 的完整状态字段与 schema、私有 Session client 传输和 writer 交接协议；R2.S3 冻结 invocation 查询的可信未执行证明、回执保留周期和唤醒去重。没有这些细节时不能先关闭保守恢复保护。
+全局责任、复用普通 transcript 的存储方向和先后顺序在本方案中确定。现有公开方法与消费链的兼容映射见[专项方案](managed-agent-session-compatibility.md)。R2.S1 开工前还需冻结事件类型/内容块兼容表、记录 subtype/schema、关键生产者的可等待提交接线、checkpoint 的完整状态字段与 schema、私有 Session client 传输和 writer 交接协议；R2.S3 冻结 invocation 查询的可信未执行证明、回执保留周期和唤醒去重。没有这些细节时不能先关闭保守恢复保护。
 
 | 区域            | 预计涉及的现有接缝                                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

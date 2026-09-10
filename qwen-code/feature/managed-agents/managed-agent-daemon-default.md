@@ -86,7 +86,7 @@ flowchart LR
 
 ## 当前设计：先拆分 Session，再接普通入口
 
-新增的全局架构设计明确了 `ManagedPromptService` 的控制层职责、统一 Session 事件/检查点、物理 writer 交接、完整 Harness 接入、持久等待与恢复、旧数据兼容和三层关闭顺序。R2.S1～R2.S3 为后续施工前半段，均待实现；既有 R1 和严格配置成果保留。本轮只交付方案，不开始生产重构或普通默认切换。
+新增的全局架构设计明确了 `ManagedPromptService` 的控制层职责、统一 Session 事件/检查点、物理 writer 交接、完整 Harness 接入、持久等待与恢复、旧数据兼容和三层关闭顺序。R2.S1～R2.S3 为后续施工前半段，均待实现；既有 R1 和严格配置成果保留。本轮只交付方案，不开始生产重构或普通默认切换。[Session 兼容方案](managed-agent-session-compatibility.md)及[逐方法映射](managed-agent-session-method-map.md)进一步明确现有服务的接口组合、适配实现、语义差异和验收，区分已完成设计与待实现增强。
 
 ### 拆分之后的配置兼容与四处工厂
 

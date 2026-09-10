@@ -25,7 +25,9 @@
 
 新增[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)：明确三层职责与部署、现有组件归位、定义和三类 lease、Session 逻辑接口、单一 transcript 权威、检查点与事件投影、工具回执及断点恢复、扩展能力、全部入口与旧数据迁移。ManagedPromptService 归控制层，默认 Harness 复用完整 ACP Agent；R2.S1～R2.S3 为拆分施工前半段，尚未实现。本轮只设计，未修改生产代码或运行产品。
 
-本次方案对应代码仓库文档提交 [0da10a9c58](https://github.com/doudouOUC/qwen-code/commit/0da10a9c58f7602647c016fc801e3acae2f23ca4)，生产源码基线仍为上方的 `a836081466`。
+本轮补齐 [Session 兼容接口与实现串联](managed-agent-session-compatibility.md)及[逐方法映射](managed-agent-session-method-map.md)：覆盖 11 个声明的 268 项公开成员，明确返回/错误时机、消费者、适配实现和验收；方法已设计不表示持久提交或可恢复 Harness 已实现。
+
+本次方案对应代码仓库文档提交 [4dc4a90dcc](https://github.com/doudouOUC/qwen-code/commit/4dc4a90dccc4351f68a4c433a25020ac52353fb5)，生产源码基线仍为上方的 `a836081466`。
 
 2026-09-10 已按代码 `a836081466` 重新核对并统一[默认替换总方案](managed-agent-daemon-default.md)：补齐 C01～C18 能力/入口/状态/验收总表，覆盖四处普通 factory、Web Shell/SDK、Channels、手动与自动定时、Live/Conversations/Goal、子任务、媒体、历史、平台与资源。双通道和严格配置读取已有限定实现；共同 selector、空扩展只读输入与四处普通接线尚待实现。空 store 的真实基线和 host-before-worker 清理/reload 结论已并入[执行引擎设计](managed-session-execution-engine.md)，不再只留在本地调查文件。
 
