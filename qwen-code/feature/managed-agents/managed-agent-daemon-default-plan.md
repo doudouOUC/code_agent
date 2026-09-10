@@ -72,9 +72,13 @@ R2.S1 已进入施工，其余两片仍是设计。R2.S1 拆为 R2.S1a 记录格
 
 **第二个被映射的形态：`turn_result` → `turn.settled`**：turn 的终态是事件而不是消息内容，因此 sink 直接提交 `turn.settled`（turnId ← `promptId`，outcome ← `state`，stopReason 无则为 null），并把整条记录作为 `resultRef` 正文发布，使 payload 里的错误明细与时间戳不因只取索引字段而丢失。缺 `promptId` 或 `state` 时拒绝，不猜。**这条落地后 Managed 会话可以走到 turn 终态**。证据：新增用例断言提交出恰好一条 `turn.settled` 且 turnId/outcome/stopReason 正确、该记录**不出现在消息投影里**、`resultRef` 读回等于原记录；另一条断言缺字段被拒。`managed-runtime` 与 `packages/core/src/services` 全量合计 2882 项通过、21 项跳过，仓库 build/typecheck 与 eslint 通过。
 
-**尚未包含**：仍未映射的形态——`chat_compression`→`context.compacted`、`goal_state`/`goal_runtime` 与 `file_history_snapshot`→各自 domain（这些 domain 未在 `MANAGED_SESSION_ENABLED_DOMAINS` 启用），它们目前仍被 sink 拒绝。更关键的是**尚无生产装配为 Managed 会话绑定 sink**，所以以上接缝都还没有真实调用者；UI 投影与物理 writer 安全交接、R2.S3 的持久等待与原调用恢复、lock schema 3、§2.1 删除状态机与跨 Session 引用/pin 保留同样未做。四处普通 factory 未接线，因此 R1 在默认路径上仍等于 no-op，daemon 尚未默认使用 Managed。
+**尚未包含**：仍未映射的形态——`chat_compression`→`context.compacted`、`goal_state`/`goal_runtime` 与 `file_history_snapshot`→各自 domain（这些 domain 未在 `MANAGED_SESSION_ENABLED_DOMAINS` 启用），它们目前仍被 sink 拒绝。更关键的是**装配虽已存在（见下）但尚未接到真实入口**，所以以上接缝仍没有生产调用者；UI 投影与物理 writer 安全交接、R2.S3 的持久等待与原调用恢复、lock schema 3、§2.1 删除状态机与跨 Session 引用/pin 保留同样未做。四处普通 factory 未接线，因此 R1 在默认路径上仍等于 no-op，daemon 尚未默认使用 Managed。
 
-**下一步（恢复起点）**：做生产装配——为一个 Managed 会话构造 authority + 资源仓库 + sink 并绑定到 `ChatRecordingService`，再让一整轮真实执行走通。选它作为起点的理由是：R2.S1 与本轮几片接缝都已通过定向验收，但**全部没有真实调用者**，装配是把它们从库代码变成活写入路径的唯一一步，也是 R2.3 四处 factory 接线（以及 R1 停止等于 no-op）的前置。装配打通后再按顺序补 `chat_compression`/`goal_state`/`file_history_snapshot` 的映射、UI 投影与物理 writer 交接，然后进 R2.S3。
+**生产装配已交付**：`managed-session-assembly.ts` 的 `openManagedSession()` 把三样东西作为一个整体打开——writer（经 `acquireWriter`，即认证接管自己的封存锁）、存放事件正文的资源仓库、以及 recorder 写入所经的 sink。合起来的理由是生命周期容易搞错：手工组装很可能 `release()` 而不是 `close()`（那就丢掉静止期屏障），或让资源仓库指向与 reader 不同的根。actor 由 `activation()` 回调按记录逐次读取而非一次捕获——**没有 activation 时归可信入口，有则归 harness**，正好对应规范里 `message.committed` 的两类生产者：尚无 Harness 推进时的受理输入，和模型面记录。open 失败时 writer 走 `release()` 而非封存，避免留下一把背后没有会话的锁。证据：3 项定向单测，主用例**跑通一整轮**——受理输入（可信入口，无 activation）→ coordinator 提交 activation → assistant 记录（harness，带 activation subject）→ 标题 → `turn_result`；断言恰好一条 `turn.settled` 且 outcome 正确、消息投影只含两条消息记录（标题与终态不混入消息通道）、关闭后重开投影不变且标题经会话目录可读；另两条断言关闭后普通 acquire 被封存锁拒绝，以及 open 失败后 writer 未被占住。`managed-runtime` 174 项通过，仓库 build/typecheck 与 eslint 通过。
+
+**一处测试稳定性需留意**：全量并跑 74 个套件时 `session-writer-lease` 的「elects exactly one certified replacement for a sealed session」曾在 10s 超时失败，**单独跑该套件 99 项全绿**。该用例 fork 子进程抢锁且超时较紧，而本轮新增套件都是真实 lease + 真实文件 I/O，因此**更可能是我加重并行争用把它顶过超时**，而非逻辑被破坏。上 CI 前建议给它放宽超时或串行化，不要当成无关抖动忽略。
+
+**下一步**：把装配接到真实入口——为 Managed 会话在 `ChatRecordingService` 上调用 `bindManagedSink()`，再按 R2.3 接四处普通 factory（primary／启动时 secondary／dynamic replacement／直接嵌入 daemon），R1 才会不再等于 no-op。之后补 `chat_compression`/`goal_state`/`file_history_snapshot` 映射、UI 投影与物理 writer 交接，然后进 R2.S3。
 
 **给恢复者的两点提醒**：一是本文件每片都同时写了证据与边界，包括两处我中途撤回的判断（rename 并未被引擎守卫覆盖；lock schema 3 不是屏障主体，sealing 才是），复核时以边界描述为准而不是只看通过数；二是本轮四个缺陷是靠测试或独立审查发现而非推理得出的（并发提交损坏日志、恢复删掉 header、引擎读取器把 Managed 误判为已验证 legacy、运行时 subtype 未注册），因此建议保持同样的小切片 + 每片独立审查节奏，不要为省时间合并成大片。
 
