@@ -1,6 +1,6 @@
 # Managed Session：记录格式、提交与协议限额
 
-更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3/§3.1 的封闭 kind 与 domain、§5 的记录与事务限额已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地并有定向单测，但**尚无生产调用者**；writer 队列与事务提交、lock schema 3 认证换锁、§2.1 资源仓库、RestoreBundle、各适配器与投影仍未实现或验收。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
+更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3/§3.1 的封闭 kind 与 domain、§5 的记录与事务限额已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地；§4 的事务提交（先事件后 marker、`previousCommitDigest` 链、幂等键、写失败停止推进、完整前缀恢复扫描）由 `managed-session-authority.ts` 的 `LocalManagedSessionAuthority` 通过既有 `SessionWriterLease` 实现并有定向单测。仍未实现或验收：lock schema 3 的认证换锁、§2.1 资源仓库、RestoreBundle、坏尾截断的 lease 能力、目录/标题等各适配器与投影，以及四处普通 factory 接线。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
 
 ## 1. 唯一载体与版本决策
 
@@ -140,7 +140,7 @@ Action 请求的来源与资格固定如下。`requestAction` 只允许注册领
 3. 连续追加 event records，再追加 commit marker。初版沿用现有 writer 的逐行 sync，不另实现未经证明的批处理提速；单 authority 队列保证不穿插其他事务。header/首次目录创建及必要改名同步父目录。逐行 sync 与“单事务最多 256 event”相乘决定最坏延迟：一次满额事务是 257 次 sync，单 Session 串行、且整个 authority 队列被它占住。因此 v1 加两条约束：一次逻辑事务的事件数应保持在个位数（典型 1～3 条，如 input+wake、model.attempt+message.committed），256 只是硬上限而非常规批量；满额事务的提交延迟预算按部署 profile 实测记录，超过 2 秒即视为该 profile 不适合逐行 sync，此时先降低单事务事件数或把内容移入资源，不得改为无证明的批量 sync，也不得为提速跳过 marker 前的同步。
 4. 仅 marker 与全部事件/资源核对并完成同步后提升可见 committedSequence、投影和 ACK。现有 writer 的 strict append 已有文件 sync；新保证主要是多记录事务可见性、引用闭包与全部关键生产者等待，不能将其误写成原 writer 完全没有 sync。
 5. ACK 丢失按原 commandId 找 marker；写失败停止新推进。完整已落盘 marker 可在恢复核验后确认，半行/无 marker 不构成受理或终态。
-6. 读取完整已提交前缀，不把损坏中段或未知已提交 kind 跳过继续执行。尾部不完整事务只在独占 writer 下、确认没有 marker 且有完整前缀证明时截断；保留坏尾诊断副本。只读 owner/兼容探测不能触发修复。
+6. 读取完整已提交前缀，不把损坏中段或未知已提交 kind 跳过继续执行。尾部不完整事务只在独占 writer 下、确认没有 marker 且有完整前缀证明时截断；保留坏尾诊断副本。只读 owner/兼容探测不能触发修复。**实测补充（2026-09-11）**：现有 `SessionWriterLease.acquire` 会以 `SessionTranscriptChangedError` 拒绝在活动 writer 之外被改动过的 transcript，因此截断不能由 authority 直接改文件实现，必须作为 lease 能力提供（在同一独占屏障内截断并更新其 transcript proof）。该能力落地前，authority 对「事件已落盘但无 marker」的尾部保持 blocked，不复用这些序号；外部撕裂的尾部由 lease 在更低层先行拒绝，不进入 authority 的判定。
 7. 不完整输入未 ACK 可由原 ID 重试；已经允许物理操作但回执未提交时，恢复查原执行账本，不能根据 Session 尾部缺失推导未执行。
 
 Node 的 filehandle.sync 是文件同步操作；目录、文件系统和硬件的保证仍须按部署 profile 验证，不能宣称覆盖任意断电设备。[Node.js 22 文件 API](https://nodejs.org/docs/latest-v22.x/api/fs.html#filehandlesync)
