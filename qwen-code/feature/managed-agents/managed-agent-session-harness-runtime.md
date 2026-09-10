@@ -108,7 +108,7 @@ Session Service 在追加时同时验证存储 writer、命令授权和所需 ac
 
 首期选定现有普通 transcript 作为权威载体，复用 JSONL、ChatRecord 与严格 writer，通过版本化记录增加准入、执行和恢复事实；同一逻辑事实只经一个事务入口提交。保留 parentUuid、压缩边界、工具关系、Goal、artifact、文件历史和通知，reader 继续提供完整 SessionRestoreProjection。精确 subtype、lock schema 3、序列兼容、事件和限额已在[存储规范](managed-agent-session-storage.md)确定，R2.S1 按规范实现；不增加竞争 owner 文件或多份互相覆盖的 transcript。大媒体、文件备份和大工具输出使用持久引用及哈希，不能引用将随 Runtime 回收删除的临时路径。
 
-输入事件和待调度意图在同一提交边界持久化。Activation 候选队列允许单独缓存，但可根据权威输入与等待记录对账；claim/renew/release 仍只能由 Session authority 提交，不使用实验 store 的第二套 epoch；队列追加失败或丢 ACK 时重试原 ID，不重复追加输入。展示缓存、目录索引和纯模型上下文投影带来源 sequence，可由完整事实重建；包含执行阶段、稳定调用映射和未决引用的 Harness checkpoint 是恢复依据，必须持久保留到替代 checkpoint 及所需事实完整提交；投影失败不得回滚已提交的成功或发出第二次工具调用。物理多文件更新不声称具有跨文件原子性。
+输入事件和待调度意图在同一提交边界持久化。Activation 候选队列允许单独缓存，但可根据权威输入与等待记录对账；claim/renew/release 由 coordinator 发起、只能由 Session authority 校验并提交（发起者与写入者的分工见[存储规范](managed-agent-session-storage.md)§3），不使用实验 store 的第二套 epoch；队列追加失败或丢 ACK 时重试原 ID，不重复追加输入。展示缓存、目录索引和纯模型上下文投影带来源 sequence，可由完整事实重建；包含执行阶段、稳定调用映射和未决引用的 Harness checkpoint 是恢复依据，必须持久保留到替代 checkpoint 及所需事实完整提交；投影失败不得回滚已提交的成功或发出第二次工具调用。物理多文件更新不声称具有跨文件原子性。
 
 输入受理与进入模型上下文是同一 message ID 的不同阶段，投影不能生成两个用户消息。当前 core client、llm-chat、工具调度器、Session 终态、模型设置、Goal/记忆及文件历史的 recorder 写入都须迁移到受控 sink；只修改 `ManagedPromptService` 或 final callback 不足以建立统一权威。普通终态 sidecar/`turn_result` 的 best-effort 行为需要显式迁移，不能静默改变 legacy 原失败语义。
 
@@ -149,6 +149,10 @@ sequenceDiagram
 
 恢复依据是已提交事件及实际 invocation 回执，不是“曾经请求过执行”。客户端可以重试提交，调度器可以重复唤醒，工具副作用不因此获得自动重放许可。
 
+**本设计选择为完整 Agent 持久化 checkpoint，再与后续事件和原回执对账续跑。** 现有展示/领域事件不足以唯一重建 `QwenAgent`/`Session`/`LlmChat` 的内部续轮游标、压缩上下文、工具批次、权限与队列状态，因此这些状态必须进入 checkpoint。checkpoint 同属 Session 的持久恢复资产，不能只留在 Harness 内存；采用 checkpoint 本身不等于原 handle 必须存活，也不能仅据此认定 Harness 有无外部可恢复状态。
+
+续跑已承诺的 continuation 时，checkpoint 缺失、损坏或与目标不匹配必须 blocked，不能偷偷从更旧状态或空历史开始。例外是有明确证明的初始化起点：新建及已提交 history_rewind/history_copy/format_upgrade 可以按[存储 §2.2](managed-agent-session-storage.md#22-恢复基础与空检查点)返回 null，下一有效 Harness 从完整已验证基础先生成 checkpoint 再执行。合作式替换在安全点交接；突发崩溃按下表隔离旧 epoch、对账原调用，不承诺任意 token 续流或重演工具。daemon/worker 跨进程接管还需要持久 binding 与门禁账本（见 §9 与恢复专项）；这项要求来自物理执行身份与副作用，不是 checkpoint 与事件日志二选一的结果。
+
 | 故障点                                 | 恢复行为与完成证明                                                                                                                      |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | 输入持久化前失败                       | 没有成功受理；客户端使用原幂等 ID 重试，不能伪造最终回复                                                                                |
@@ -187,7 +191,7 @@ sequenceDiagram
 
 正常关闭顺序是：封闭新输入/activation → 取消并结算模型和工具 → 提交终态/checkpoint 并等待投影必要交付 → 排空 Harness → 终结并确认 Runtime 自有进程退出 → 封存/释放存储 writer → 由 daemon owner 关闭共享资源。Session 服务和 Runtime provider 在排空期间保持可用；存储日志和持久产物不因关闭进程删除。各步失败保留责任归属和可重试清理，不误报安全交接。
 
-上述完整 drain 用于 Session/daemon 关闭；回收或替换 Harness 是独立的 detach 操作。Runtime binding 和未决 invocation 由随持久 Session 存活的 coordinator 持有，恢复与回执入口不依赖原 host。持久等待后的 detach 只撤销原 activation/新派发资格并停止其模型与 Session client，不 terminal release 将由下一 Harness 接管的 Runtime，也不取消已准入的原调用。当前 host dispose 会沿 Config.closeManagedToolSession 释放工具 Session，因此不能直接复用为可恢复 detach；R2.S2/R2.S3 必须拆出这条生命周期接缝。用户 cancel/close 与 Runtime 自身故障才按各自原因结算和释放。
+上述完整 drain 用于 Session/daemon 关闭；回收或替换 Harness 是独立的 detach 操作。Runtime binding 和未决 invocation 由 coordinator 持有，**它的存活范围是 daemon 进程，不是持久 Session**：v1 的 coordinator 是 daemon 内对象，Runtime 的派发门禁状态也在 Runtime 进程内存中，所以“恢复与回执入口不依赖原 Harness host”这一保证只覆盖**原 coordinator 与原 Runtime binding 仍存活**时更换 Harness handle/host 的情形。daemon 或 Runtime worker 自身重启后，未决副作用按[恢复与运行专项](managed-agent-recovery-operations.md)保持 recovery_blocked，不承诺自动接管；跨进程接管所需的持久 binding 与门禁账本属于该专项的后续切片。持久等待后的 detach 只撤销原 activation/新派发资格并停止其模型与 Session client，不 terminal release 将由下一 Harness 接管的 Runtime，也不取消已准入的原调用。当前 host dispose 会沿 Config.closeManagedToolSession 释放工具 Session，因此不能直接复用为可恢复 detach；R2.S2/R2.S3 必须拆出这条生命周期接缝。用户 cancel/close 与 Runtime 自身故障才按各自原因结算和释放。
 
 reload/remove/撤信任都先封闭原 generation。reload 对已有会话按已接受的配置版本处理，只有成功安装新配置并排空不兼容 host 后才能发布新 generation；失败保持暂停或明确原版本状态。一个 workspace 的清理只终止自身资源，不关闭共享 ProcessRegistry。状态、日志和指标必须区分逻辑 Session 数、活 host、activation 槽位、等待数、Runtime 数与真实进程树，不能以提高单一上限代替容量设计。
 
@@ -211,14 +215,16 @@ reload/remove/撤信任都先封闭原 generation。reload 对已有会话按已
 
 本轮停留在方案设计，专项接口、状态机和故障矩阵已补充。R1 已有成果保留，新增拆分工作纳入 R2 的前半段，保留既有 R2.1～R2.4 编号以便追踪。
 
-| 切片                             | 产物                                                                                                  | 必须证明                                                                                                                                               |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| R2.S1 Session 权威接口与存储接缝 | 冻结首批事件/命令、全部读写消费者、单一日志格式选择、幂等与 writer/fence、旧格式适配设计并实现        | 无活 Harness 时 create/get/read 正常；重复输入唯一；重启补队列；旧 epoch/跨 workspace 写入拒绝；不改旧用户数据                                         |
-| R2.S2 完整 Harness 接入          | 完整 Agent 通过 Session client 读写，A/D 检查点和基础门禁、正式事件/展示投影及 writer 安全交接        | 普通 Agent 语义不变；关闭/替换 host 后历史、owner、配置与下一轮保留；首轮失败可继续；没有两份权威历史或第二套模型循环                                  |
-| R2.S3 持久等待与断点恢复         | 工具/审批等待点、原 invocation 查询与幂等回执、派发资格交接屏障、Harness detach 与 Session close 分离 | 工具完成但 ACK 丢失不重写；旧 host 迟到的所有副作用入口均拒绝新工作；等待释放槽位后换 host 不取消原调用；不确定副作用明确阻塞；丢 Runtime 不丢 Session |
-| R2.1～R2.4 配置与普通接线        | 原严格扩展/用途设计、统一 coordinator、四处 factory、默认关闭状态下的普通入口复验                     | 真实兼容新会话可走 Managed；旧/延期/未知走固定原路径；同工作区共存、跨代隔离及关闭/reload 成立                                                         |
-| R3 / R4 普通验收与有限默认       | Web Shell/SDK 全链、故障矩阵、明确平台和能力范围                                                      | 前三项拆分证据与 C01～C18 首阶段适用项满足，才启用新默认；不以实验页面通过替代                                                                         |
-| R5 完整能力扩大                  | 定时、Channels/MCP/Hooks、Skills、媒体、后台与历史等逐项接入                                          | 各调用者使用统一状态与恢复边界；延期范围逐项消除，有独立证据后扩大默认，不把有限默认当完整目标完成                                                     |
+| 切片                             | 产物                                                                                                                                                                                                                      | 必须证明                                                                                                                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R2.S1 Session 权威接口与存储接缝 | 冻结首批事件/命令、全部读写消费者、单一日志格式选择、旧格式适配，以及 writer/fence **机制**：authority 侧唯一物理 writer、schema 3 锁、条件提交与 activation fence 校验，新建 Managed 会话从 create 起就由 authority 持锁 | 无活 Harness 时 create/get/read 正常；重复输入唯一；重启补队列；旧 epoch/跨 workspace 写入拒绝；不改旧用户数据                                                                                                                                       |
+| R2.S2 完整 Harness 接入          | 完整 Agent 通过 Session client 读写，A/D 检查点和基础门禁、正式事件/展示投影，以及 writer **交接**：把已由 ACP host 直接持有的物理 writer 按封存—claim 屏障内核验与换锁—提交后释放 claim 的顺序移交 authority             | 普通 Agent 语义不变；关闭/替换 host 后历史、owner、配置与下一轮保留；首轮失败可继续；没有两份权威历史或第二套模型循环                                                                                                                                |
+| R2.S3 持久等待与断点恢复         | 工具/审批等待点、原 invocation 查询与幂等回执、派发资格交接屏障、Harness detach 与 Session close 分离                                                                                                                     | 工具完成但 ACK 丢失不重写；旧 host 迟到的所有副作用入口均拒绝新工作；等待释放槽位后换 host 不取消原调用；不确定副作用明确阻塞；丢 Runtime 不丢 Session；另需正向证明：等待被唤醒后由新 handle 真的完成该 turn 并产生客户端可见终态，全程阻塞不算通过 |
+| R2.1～R2.4 配置与普通接线        | 原严格扩展/用途设计、统一 coordinator、四处 factory、默认关闭状态下的普通入口复验                                                                                                                                         | 真实兼容新会话可走 Managed；旧/延期/未知走固定原路径；同工作区共存、跨代隔离及关闭/reload 成立                                                                                                                                                       |
+| R3 / R4 普通验收与有限默认       | Web Shell/SDK 全链、故障矩阵、明确平台和能力范围                                                                                                                                                                          | 前三项拆分证据与 C01～C18 首阶段适用项满足，才启用新默认；不以实验页面通过替代                                                                                                                                                                       |
+| R5 完整能力扩大                  | 定时、Channels/MCP/Hooks、Skills、媒体、后台与历史等逐项接入                                                                                                                                                              | 各调用者使用统一状态与恢复边界；延期范围逐项消除，有独立证据后扩大默认，不把有限默认当完整目标完成                                                                                                                                                   |
+
+S1 与 S2 的 writer 责任按会话来源划分，不是同一件事做两遍：新建 Managed 会话在 S1 就由 authority 从 create 起持锁，全程不经过 host 直写；已经由 ACP host 持有物理 writer 的路径在 S2 才按[存储规范](managed-agent-session-storage.md)§1 的封存—claim 屏障内核验与换锁—提交后释放 claim 的顺序移交。因此 S1 结束时可以存在“authority 持锁的新会话”与“host 仍直写的既有会话”两类并存，但任一会话在任一时刻只有一个物理 writer；[Harness 专项](managed-agent-harness.md)§7 中“R2.S1 先交付 Session client、唯一 writer”指的是前者的机制，不代表 S1 已完成后者的交接。
 
 核心故障验收必须同时观测模型请求、工具物理结果、权威日志和客户端事件，覆盖：输入/调度/事件 ACK 丢失，模型中断，工具执行前后杀 Harness，等待时替换 host，Runtime 丢失，审批重连，cancel 与完成竞争，存储失败，旧 epoch 迟到，跨 workspace/reload，旧格式冷恢复及版本回退。所有产品测试使用自有目录、端口和配置；本轮未执行这些未来测试。
 

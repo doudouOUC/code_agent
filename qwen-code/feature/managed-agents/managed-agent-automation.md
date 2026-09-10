@@ -1,6 +1,6 @@
 # Managed 自动任务、Channels 与子任务交付
 
-更新日期：2026-09-10；生产源码基线 `a836081466`，前版设计 `4cacfbd0ed`。本文定义[全量设计](managed-agent-full-design.md)的 C10/C11/C12：Channels 入站和交付，定时与内部继续，child/background/memory。以下新增协议、持久记录和恢复流程均待实现，已有实验或限定场景验证不证明本稿完成。首阶段仍延期这些能力的完整迁移；全量设计在本文给出，不延期决定其职责和失败语义。
+更新日期：2026-09-11；生产源码基线 `a836081466`，前版设计 `4cacfbd0ed`。本文定义[全量设计](managed-agent-full-design.md)的 C10/C11/C12：Channels 入站和交付，定时与内部继续，child/background/memory。以下新增协议、持久记录和恢复流程均待实现，已有实验或限定场景验证不证明本稿完成。首阶段仍延期这些能力的完整迁移；全量设计在本文给出，不延期决定其职责和失败语义。
 
 记录采用[Session 存储](managed-agent-session-storage.md)，执行与关闭采用[coordinator](managed-agent-coordinator.md)和[私有控制协议](managed-agent-control-protocol.md)。worker/daemon 重启与平台保证采用[恢复规范](managed-agent-recovery-operations.md)，不由领域账本推断物理成功。
 
@@ -26,6 +26,8 @@
 ## 2. 领域记录、授权与共用限制
 
 所有 Session 业务事实只通过所属 authority 的单 writer 条件事务提交，领域事件固定为 `domain.committed {domain,version:1,operationId,recordRef}`。recordRef 的内容按下表封闭 schema 验证，不提供任意 append 或任意方法调用。
+
+本表以及 §5 的 Goal/Todo/plan、§6.1 的 team/session_message 共 15 个 domain，均按[存储 §3.1](managed-agent-session-storage.md#31-domain-注册索引)注册，正文使用 `kind=managed-<domain>, schemaVersion=1`。不把 goal_state/child_run/memory_job 改写为未定义的同义名；各阶段只启用已验收的用途和 schema。
 
 | domain           | authority 内的权威内容                                | 生产者与消费者                                 |
 | ---------------- | ----------------------------------------------------- | ---------------------------------------------- |
@@ -94,15 +96,15 @@ scheduled 唯一键为 scheduleId+revision+slot；manual 使用客户端 command
 
 ### 4.2 精确派发分支与客户端兼容
 
-| 入口/条件                                                          | 目标                                                                        |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| 手动 per_run                                                       | fresh child；登记 run 与子输入准入可查询                                    |
-| 手动 persistent                                                    | 既有绑定 task Session；未迁移 unbound 任务沿 legacy 选择行为                |
-| 自动 token 限制停用；missed autonomous                             | 保留现停用/跳过策略，不形成执行原 prompt 的新输入                           |
-| 自动非 missed + per_run + 非 @wakeup + 无 delivery + 非 autonomous | fresh child                                                                 |
-| 其他已接纳自动任务，包括 @wakeup、delivery、autonomous             | 现 task Session 队列                                                        |
-| missed one-shot                                                    | 确认通知进入控制 Session，等待 action；确认后才产生有因果引用的新执行 input |
-| 自动 fresh child 确定无法受理                                      | 原子封闭派发后允许既有父队列 fallback；unknown 保留原 run 查询              |
+| 入口/条件                                                          | 目标                                                                                                                                                                      |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 手动 per_run                                                       | fresh child；登记 run 与子输入准入可查询                                                                                                                                  |
+| 手动 persistent                                                    | 既有绑定 task Session；未迁移 unbound 任务沿 legacy 选择行为                                                                                                              |
+| 自动 token 限制停用；missed autonomous                             | 保留现停用/跳过策略，不形成执行原 prompt 的新输入                                                                                                                         |
+| 自动非 missed + per_run + 非 @wakeup + 无 delivery + 非 autonomous | fresh child                                                                                                                                                               |
+| 其他已接纳自动任务，包括 @wakeup、delivery、autonomous             | 现 task Session 队列                                                                                                                                                      |
+| missed one-shot                                                    | 调度适配器对原 run/occurrence 经 requestAction 在实际控制 Session 提交 automation_run 确认；无活 Harness 也可等待并重连。合法最终决定提交后才产生有因果引用的新执行 input |
+| 自动 fresh child 确定无法受理                                      | 原子封闭派发后允许既有父队列 fallback；unknown 保留原 run 查询                                                                                                            |
 
 公开能力固定为 `scheduled_task_server_run_v1`，它只表示服务器理解新调用；每个目标 task/workspace 仍校验实际支持。新 Web/SDK **在呈现或调用 Run 之前**完成协商，并在该次请求带 `runProtocol:'server_owned_v1'` 与稳定 commandId。返回 `{dispatchOwner:'server',runId,state,sessionId?,inputId?}`，客户端不再调用 onRunPrompt。轮询和网络重试继续使用同 commandId，不生成新 fire。
 
@@ -150,6 +152,8 @@ root history owner 由 coordinator 保留，长于 parent turn/Harness；child �
 当前 `packages/core/src/tools/team-create.ts:85` 用 team name、leadSessionId/leadPid 持久归属；`task-update.ts:470–567` 先写任务再派发分配，可能出现“更新成功、派发失败”，未变 owner/status 不重复派发；`team-plan-approval.ts` 和 `request-shutdown.ts` 校验 leader；`task-list.ts` 还会消费 leader 未读信箱。全量迁移复用 `agents/team/TeamManager.ts`、tasks、mailbox 与 identity 的规则，不把这七项工具仅映射成内存服务。
 
 新增四种注册 domain（version=1，recordRef.kind=managed-<domain>）：`team_state` 保存 leader、成员/childRunId、membershipRevision 和生命周期；`team_task` 保存任务字段、依赖图 revision 和 assignment outbox；`team_message` 保存原 sender/recipient 绑定、每个收件/消费位置；`team_plan` 保存 plan 请求、目标 child/plan revision 与决定。团队 domain 的权威在 leadSessionKey 的单一 Session 事务中，其他子 Session 通过身份受控命令和跨 Session outbox 串联。send_message 的无团队路由另按下面的 recipient 分型选择发送方 authority，不借用或创建 team。成员不能因共享 team name、workspace 或模型自报 leader 获得管理权限。
+
+team_plan 确认由可信团队计划适配器依据原已提交计划经 requestAction 创建，仍校验 child/planRevision 和真实 leader 路由；跨 Session 使用原接收去重。它不能伪造模型计划或自动批准。最终决定走 resolveAction 的原仲裁，resolveTeamPlan 只在有效决定持久后交付原 child；不为恢复确认界面启动新 Harness。
 
 | 受控命令                                                    | 固定输入与返回                                                                                                                                                                                                               | 提交、消费与恢复                                                                                                                                                                                                                              |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

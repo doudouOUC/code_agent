@@ -1,9 +1,9 @@
 # Qwen Code Managed Agents 方案
 
 > 状态：P0～P8、Managed 会话展示与控制、P9a 本地 Runtime 自动激活实验实现已推送到 [doudouOUC/qwen-code 的 feature/managed-agents-p0-p8 分支](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8)，当前代码锚点为 [a836081466](https://github.com/doudouOUC/qwen-code/commit/a8360814668b3dfdff72ad3d99cbcaf26dd009a9)。尚未进入 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main`；P9a 通过显式开关启用，macOS 已完成下述有限验收，Windows/Linux 未实测。生产调度、Kubernetes 接入与完整安全隔离仍是后续工作。
-> 更新日期：2026-09-10。
+> 更新日期：2026-09-11。
 
-> 本轮补齐 [C01～C18 全量详细设计](managed-agent-full-design.md)：存储格式/限额、配置/Skills/MCP/Hooks、全工具/媒体/历史、自动任务/Channels/子任务/记忆、普通客户端、重启/平台/性能均有接口、状态、失败恢复、迁移和验收。设计已补齐，新增代码与产品验收尚未完成；首阶段延期范围保留，普通默认入口尚未切换。
+> [C01～C18 全量详细设计](managed-agent-full-design.md)已有专项契约与验收索引。本轮修订统一领域名称、claim 保护下的锁升级、Session/workspace 资源归属、非工具确认入口与合法空检查点恢复。新增类型、接线及运行证据仍待实现与验收；268 项方法清单只覆盖外围声明，完整 ACP Session 的逐方法映射仍须在接入 Harness 前补齐。首阶段延期范围保留，普通默认入口尚未切换。
 >
 > 当前产品目标：按 Claude 的 Session/Harness/Runtime 三层拆分，让 Managed Agent 替换 daemon 默认执行实现。用户要求先完成[全量详细设计](managed-agent-full-design.md)，再分阶段施工；首阶段先不接入迁移 MCP、Hooks、Channels，相关会话保留原执行路径；继续内置工具、媒体、取消与恢复、旧会话及普通 Web Shell、SDK、定时任务核心链路。[首阶段实施计划](managed-agent-daemon-default-plan.md)记录当前任务与证据。[默认替换方案](managed-agent-daemon-default.md)记录完整范围；[Runtime invocation v2](managed-agent-runtime-invocations.md)与[子任务及持久文件历史](managed-agent-child-scopes.md)已接通完整 Agent、独立子作用域和持久父快照。
 >
@@ -31,7 +31,7 @@
 
 此前补齐 [Session 兼容接口与实现串联](managed-agent-session-compatibility.md)及[逐方法映射](managed-agent-session-method-map.md)：覆盖 11 个声明的 268 项公开成员，明确返回/错误时机、消费者、适配实现和验收；方法已设计不表示持久提交或可恢复 Harness 已实现。
 
-本次方案对应代码仓库文档提交 [1cfeeb3ddc](https://github.com/doudouOUC/qwen-code/commit/1cfeeb3ddc12c55237eff7a0c13431227f4760dd)，生产源码基线仍为上方的 `a836081466`。
+本次方案对应代码仓库文档提交 [32543e5273](https://github.com/doudouOUC/qwen-code/commit/32543e527348bc5400641267933d3da9d5f0313b)，包含上一版 `2ec07afb72` 的范围/证据校正及本轮五处契约修订；生产源码基线仍为上方的 `a836081466`。
 
 2026-09-10 已按代码 `a836081466` 重新核对并统一[默认替换总方案](managed-agent-daemon-default.md)：补齐 C01～C18 能力/入口/状态/验收总表，覆盖四处普通 factory、Web Shell/SDK、Channels、手动与自动定时、Live/Conversations/Goal、子任务、媒体、历史、平台与资源。双通道和严格配置读取已有限定实现；共同 selector、空扩展只读输入与四处普通接线尚待实现。空 store 的真实基线和 host-before-worker 清理/reload 结论已并入[执行引擎设计](managed-session-execution-engine.md)，不再只留在本地调查文件。
 

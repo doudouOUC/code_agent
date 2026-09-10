@@ -1,6 +1,6 @@
 # Managed daemon 默认实现：首阶段实施计划
 
-更新日期：2026-09-10；代码核对基线 `a836081466`。完整范围与 C01～C18 能力/入口/状态/验收总表见[默认替换总方案](managed-agent-daemon-default.md)，三层责任与接口见[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)。历史 D1～D5 不再单独决定当前执行顺序。用户最新要求补齐[全量详细设计](managed-agent-full-design.md)，本轮不开始实现。后续在保留当前 4170 预览、用户数据和已验证能力的前提下，先抽出权威 Session 服务并接入完整 Harness，再完成创建时的兼容选择与普通 factory，让兼容范围明确的新 daemon 会话使用 Managed 默认实现。保持现有 Agent 行为，不把局部验收扩大为全部默认替换完成。
+更新日期：2026-09-11；代码核对基线 `a836081466`。完整范围与 C01～C18 能力/入口/状态/验收总表见[默认替换总方案](managed-agent-daemon-default.md)，三层责任与接口见[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)。历史 D1～D5 不再单独决定当前执行顺序。用户最新要求补齐[全量详细设计](managed-agent-full-design.md)，本轮不开始实现。后续在保留当前 4170 预览、用户数据和已验证能力的前提下，先抽出权威 Session 服务并接入完整 Harness，再完成创建时的兼容选择与普通 factory，让兼容范围明确的新 daemon 会话使用 Managed 默认实现。保持现有 Agent 行为，不把局部验收扩大为全部默认替换完成。
 
 ## 当前优先顺序
 
@@ -26,6 +26,8 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 
 同一 Bridge 的双通道和 SessionEntry 归属绑定已实现并验收：共享会话限额、ID reservation、事件及资源账本，在创建/冷恢复时调用服务端 selector，核验实际引擎回执后绑定 entry；发送/取消/关闭沿已绑定通道运行。build/typecheck/bundle、885 项定向测试、自审和独立审查通过。两组真实 host 验收证明同工作区共存、双向模型流取消、关闭后冷恢复及活会话交接关闭；合计 10 次原生 Read/final、22 次模型 HTTP，物理资源和 writer 凭据已独立核对。该证据不代替默认入口及权限等未覆盖验收。
 
+上面两段 R1 证据的适用范围必须一起写清：`managed` 引擎的选择条件是配对 factory 存在（`packages/cli/src/config/config.ts:1909`），而唯一生产该 factory 的 `createManagedAgentChannelFactory`（`packages/cli/src/serve/managed-agent-channel.ts:70`）当前只被自己的单测引用，`packages/acp-bridge/src/bridge.ts` 的 `executionEngines` 也只在测试中注入。因此这些定向测试与真实进程验收都是在测试装配或分支内 staged host 下取得的，**证明的是机制与拒绝路径正确，不证明任何默认入口已经产生过 `managed` owner 记录**；复核这些数字时必须连同其装配方式一起复现。在 R2.3 完成普通 factory 接线之前，R1 的 enforcement 在默认路径上等于 no-op，不能据此把 R1 记为“默认已接通”。
+
 严格 settings 与项目 MCP 读取基础已实现，并接入实际 Managed host 的启动和 new/load/resume；旧版 settings 仅内存迁移，坏配置明确拒绝，悬空祖先目录不再误判缺失。构建、类型检查、定向单测和独立复审通过，真实验证证明十六次坏配置拒绝不改写配置/历史，修复配置后原会话可恢复并完成 Read。它保留原全局配置路径语义，尚不构成跨来源、跨 QWEN_HOME 的统一输入快照。
 
 当前先完成全局设计，后续按 R2.S1～R2.S3 抽出 Session 权威接口、接入完整 Harness、补齐持久等待与原调用恢复，再执行 extension 严格只读输入、全来源依赖/用途兼容和普通 factory 接线。三个普通 workspace factory 及直接嵌入入口尚未切换。MCP 包括 extension、runtime 和 Session 注入，Hooks 受 extension、trust 与 disable 设置影响；Channels 入口保持原执行路径，热 attach 也须校验用途。[执行引擎详细设计](managed-session-execution-engine.md)继续维护这部分消费范围，完整媒体等后置项不改变三层设计边界。
@@ -42,11 +44,13 @@ M1 已交付；PDF 物理取消已在五阶段真实基线中复现并修复。R
 | R2.S2 完整 Harness 接入 | 复用完整 Agent，Session client、checkpoint、正式事件与 UI 投影，物理 writer 安全交接 | 替换 host 后历史/owner/配置与下一轮保留；首轮失败可继续；原 Agent 行为保持，不升级实验精简 Runner 作为默认模型循环 |
 | R2.S3 持久等待与恢复    | 工具/审批等待、原 invocation 回执、派发资格屏障、detach 与 close 分离                | 换 host 不取消原调用；完成 ACK 丢失不重执行；旧代新派发无副作用；Runtime 丢失不丢 Session，未决副作用明确阻塞      |
 
-逐方法兼容清单已补齐，见[接口与实现串联](managed-agent-session-compatibility.md)及[方法映射附录](managed-agent-session-method-map.md)。R2.S1 先建立现有实现与本地接口的一致性基准，再接入可等待的持久提交；每个增强点必须同时迁移实际生产者和消费者，保留 sendPrompt/onPromptAdmitted、审批 boolean 与 best-effort 记录的旧契约。
+逐方法兼容清单只覆盖外围声明：见[接口与实现串联](managed-agent-session-compatibility.md)及[方法映射附录](managed-agent-session-method-map.md)，其中 268 项是 11 个外围声明（Session 读写、录制、桥接、目录、Runtime provider 等）的声明级归属，**不含真正承载执行的 `packages/cli/src/acp-integration/session/Session.ts`**——该类只有 Harness 专项的代表性接缝表。R2.S2 接入完整 Harness 前必须按附录同一规则枚举该类公开成员并逐项定归属，未完成该枚举不得声称清单已补齐。R2.S1 先建立现有实现与本地接口的一致性基准，再接入可等待的持久提交；每个增强点必须同时迁移实际生产者和消费者，保留 sendPrompt/onPromptAdmitted、审批 boolean 与 best-effort 记录的旧契约。
 
 施工按三份专项细化：[Harness](managed-agent-harness.md)定义完整循环与九组 checkpoint；[私有协议](managed-agent-control-protocol.md)定义消息、文件同步 ACK、activation 安装、原调用结算和引用保留；[coordinator](managed-agent-coordinator.md)定义单一 authority 调度与四处装配。R2.S1 将 activation 事实并入 authority，以窄适配复用 scheduler，保留实验 store；输入与唤醒一起提交。R2.S2 先实现 A/D 安全点、基础 activation 门禁及完整 Agent 读写，排空旧 handle 后再替换；禁止绕过实际 ACP Session→LlmChat/runTool 的接缝。R2.S3 再实现 B/C 工具和审批等待，在同一 installing/stage/enable/revoke 协议上支持在途交接、原 Runtime 接管与可恢复 detach；handler 返回不得再等同 turn 完成。
 
-[存储格式与限额](managed-agent-session-storage.md)已定稿；编码按此实现 schema/validator、实际接线并取得平台文件同步/崩溃证据。恢复首版限定 coordinator 和原 worker 存活时替换 Harness；worker/daemon 丢失且未决时保持 blocked，跨 worker 重启回执后端按[恢复与运行专项](managed-agent-recovery-operations.md)单列后续实施。未取得恢复证明时保留现有 `recovery_ambiguous` 保护。
+[存储格式与限额](managed-agent-session-storage.md)本轮已补齐 schema 3 锁与就地升级顺序、资源仓库与 `DurableRef` 的落盘形态、事件 union 的封闭集与扩展规则、写入/fsync 预算及新增验收；但平台文件同步与崩溃证据仍须在编码阶段取得，取得前不按“已定稿”引用它来关闭存储风险。编码按此实现 schema/validator、实际接线并取得平台文件同步/崩溃证据。恢复首版限定 coordinator 和原 worker 存活时替换 Harness；worker/daemon 丢失且未决时保持 blocked，跨 worker 重启回执后端按[恢复与运行专项](managed-agent-recovery-operations.md)单列后续实施。未取得恢复证明时保留现有 `recovery_ambiguous` 保护。
+
+2026-09-11 契约修订：存储 §3.1 统一 30 个全量 domain 的原名称，按实际 capability 启用子集；schema 3 通过旧 writer 已识别的 claim 屏障认证换锁，禁止先 release 变无锁；资源按 Session/workspace 实际 owner 保留，删除来源会话不删除配置或用户 pin；非工具确认由受控 requestAction 受理；RestoreBundle 区分 checkpoint 续跑与有完整证明的合法初始化。对应 S07～S12/H08 与各领域验收要求一起落实，文档静态一致性不等于运行时证明。R2.S1 先完成适用的 schema/资格/归属基础，R2.S2 验证初始 checkpoint 与完整 Harness，历史、自动化和扩展的正向用例仍随各自后续切片交付，不把全量注册表当提前接线。
 
 | 步骤                       | 本步产物                                                                                                      | 验收边界                                                                                                                                                           |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

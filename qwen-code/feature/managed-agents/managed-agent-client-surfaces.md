@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-更新日期：2026-09-10；基于源码 `a836081466` 和三层设计 `4cacfbd0ed`。本稿细化 C05/C14/C15/C18 的 Web Shell、REST、ACP、SDK 和管理路径；是待实现设计，现有公开接口仍按[兼容映射](managed-agent-session-method-map.md)逐项保留，独立 Managed 实验页不替代普通入口。
+更新日期：2026-09-11；基于源码 `a836081466` 和三层设计 `4cacfbd0ed`。本稿细化 C05/C14/C15/C18 的 Web Shell、REST、ACP、SDK 和管理路径；是待实现设计，现有公开接口仍按[兼容映射](managed-agent-session-method-map.md)逐项保留，独立 Managed 实验页不替代普通入口。
 
 ## 1. 入口与路由归属
 
@@ -45,6 +45,8 @@ Session authority是正式事件唯一来源；Bridge live bus是有界投影缓
 保留first-responder、consensus、local-only等已实现策略。`votePermission/respondToPermission`的同步boolean仍表示原协议的登记结果；最终决策持久化由内部异步仲裁门槛完成。Harness派发只消费最终decision receipt，不能据中间投票true执行工具。
 
 Action记录包含 `requestId, kind, source, inputRevision, optionsRef, policyRevision, createdAt, expiresAt?, state, decisionRef?`。source 是封闭 union：`tool_call {sourceCallId,executionCallId}`、`automation_run {runId,occurrenceId,targetRef}`、`team_plan {teamId,requestId,childRunId,planRevision}`、`user_operation {operationId,originClientRef}`；由已认证来源选择并校验原记录，不接受模型自报 scheduler/leader 身份。旧权限工具的 sourceCallId 从 tool_call 分型投影，非工具确认不造假 call ID。Runtime工具另带原prepare/ref；纯问答不创建Runtime。重连根据authority重建action和新连接waiter，不恢复旧Promise；重复响应查原decision，冲突、改参或过期按原协议返回拒绝。新参数必须新prepare/revision和重新审批，旧版票据不可升级。
+
+创建与决定分别校验：tool_call 由有效 Harness 经 appendExecution 请求；其余三类只由注册适配器经私有 requestAction 请求，actor/来源矩阵以[存储 §3](managed-agent-session-storage.md#3-事件-union-与生产消费链)为准。客户端没有任意创建 action 的权限，原用户操作入口由服务端适配；所有最终决定仍走 resolveAction 和原仲裁。UI 从已提交 requested 投影展示非工具确认，不依赖活 Harness、正在生成的 turn 或伪造 sourceCallId；重连/重复点击只消费原 requestId 与版本。
 
 无客户端时保持原用途的超时/自动拒绝规则：foreground需要交互的调用等待其原deadline或授权client重连；非交互明确不支持的询问准确失败；已持久支持detachable wait时可释放Harness。legacy ACP当前无live stream的拒绝行为保留；Managed新的持久等待通过协商能力接入，不能让不支持客户端永久挂住。关闭/取消先提交取消意图，再结束原waiter；与可恢复detach分别处理。
 

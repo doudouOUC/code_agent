@@ -1,6 +1,6 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
-更新日期：2026-09-10。生产源码基线为 `a836081466`，本次阅读 HEAD 为 `4cacfbd0edebc9e99c70fd26cac32e2dafa82216`，两者之间仅有文档变化。本稿覆盖[全量设计](managed-agent-full-design.md)的 C04/C06/C13/C14；第 2 节记录已核实源码，第 3～8 节是选定但尚未实现、尚未产品验收的完整契约。
+更新日期：2026-09-11。生产源码基线为 `a836081466`，本次修订基于方案 `2ec07afb727464ac2306282c9be2c086697f7768`，两者之间仅有文档变化。本稿覆盖[全量设计](managed-agent-full-design.md)的 C04/C06/C13/C14；第 2 节记录已核实源码，第 3～8 节是选定但尚未实现、尚未产品验收的完整契约。
 
 本稿复用[存储规范](managed-agent-session-storage.md)的唯一 Session 事实、[私有协议](managed-agent-control-protocol.md)的资格和回执，以及[完整 Harness](managed-agent-harness.md)的模型循环与 checkpoint。首阶段只启用已实际验收的范围，完整工具/内容与历史转换分别在 R5.F2、R5.F7 实施；延期的是实施，不是这些能力的设计。
 
@@ -18,15 +18,17 @@ Session 保存身份、授权决定、领域操作状态和资源引用；Harnes
 
 以下 domain 用于 Managed Session，event `version=1`；对应 `recordRef.kind='managed-<domain>'`、`schemaVersion=1`。每条正文包含 operationId、operationRevision、前一记录引用、明确 operation/phase、输入及结果引用；服务端按表中的 producer、合法状态转换、作用域和引用闭包校验。新名字必须新增显式 schema/producer/consumer，不开放任意 JSON append。legacy 原格式不追加这些事件；转换到 legacy 的创建控制见第 7.2 节。
 
-| domain              | 封闭正文与生产者                                                                                                                                                                       | 与原事实的关系                                                                                 |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| tool_stage          | `ToolStageRecord`：可信 stage plan、原 executionCallId、stageId/ordinal、输入摘要、planned/running/settled/unknown/cancelled、原 Runtime/model/domain outcome refs；注册工具编排适配   | 单工具的阶段协调；原生结果只引用原 receipt，模型请求引用原 attempt；不能用它宣称文件已写       |
-| resource            | `ResourceRecord`：admit/commit/pin/unpin/release/retire/collect，资源 manifest、访问 owner、持有者与 revision、保留配额证明；Session 资源适配                                          | 登记引用及保留状态；不重复保存 tool result，不以 metadata 代替实际内容                         |
-| publication         | `PublicationRecord`：prepare/publish/inspect/unpublish，sourceRef/destinationId/稳定发布 ID/授权摘要、原 provider 或 Runtime 回执、known/unknown 结论；发布适配                        | 工具阶段只引用该操作；取消请求与已发布事实独立                                                 |
-| workspace_operation | `WorkspaceOperationRecord`：Session 所属 worktree_create/worktree_remove/context_change，repo/worktree owner、HEAD/status proof、原物理阶段及目标 context revision；Session 工作区适配 | Shell Git 仍有原 tool.receipt；无 Session 的工作区路由按第 4.3 节独立归属，不伪造 Session 事件 |
-| history_rewind      | `RewindRecord`：prepare/apply/rollback/commit，原/目标历史 proof、planRef、物理回执、结果 projection refs、prepared/applying/rolled_back/committed/recovery_blocked；历史适配          | `commit` 是领域正文状态，唯一 event 仍是 domain.committed；新模型投影仅消费已 committed 的目标 |
-| history_copy        | `SessionCopyRecord`：fork/convert/import，源一致快照、目标身份/格式、ID 映射与资源 manifest、reserved/staged/published/aborted/recovery_blocked；复制适配                              | 目标 provenance 从该记录投影，不追加另一 owner；源 target 接收用稳定 ID 去重                   |
-| history_maintenance | `HistoryMaintenanceRecord`：title/archive/unarchive/delete/export，目标 scope、原文件 proof、资源引用变更与物理阶段；维护适配                                                          | lifecycle.changed 与必要领域记录同事务；批量逐 Session 提交，不承诺跨 Session 原子性           |
+本表七个 domain 纳入[存储 §3.1](managed-agent-session-storage.md#31-domain-注册索引)的唯一名称索引；具体阶段未实现时不因名称已注册就获得能力，history_operation 不是替代本表三种历史 domain 的别名。
+
+| domain              | 封闭正文与生产者                                                                                                                                                                       | 与原事实的关系                                                                                                                                                 |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| tool_stage          | `ToolStageRecord`：可信 stage plan、原 executionCallId、stageId/ordinal、输入摘要、planned/running/settled/unknown/cancelled、原 Runtime/model/domain outcome refs；注册工具编排适配   | 单工具的阶段协调；原生结果只引用原 receipt，模型请求引用原 attempt；不能用它宣称文件已写                                                                       |
+| resource            | `ResourceRecord`：admit/commit/pin/unpin/release/retire/collect，资源 manifest、访问 owner、持有者与 revision、保留配额证明；Session 资源适配                                          | 登记引用及保留状态；不重复保存 tool result，不以 metadata 代替实际内容                                                                                         |
+| publication         | `PublicationRecord`：prepare/publish/inspect/unpublish，sourceRef/destinationId/稳定发布 ID/授权摘要、原 provider 或 Runtime 回执、known/unknown 结论；发布适配                        | 工具阶段只引用该操作；取消请求与已发布事实独立                                                                                                                 |
+| workspace_operation | `WorkspaceOperationRecord`：Session 所属 worktree_create/worktree_remove/context_change，repo/worktree owner、HEAD/status proof、原物理阶段及目标 context revision；Session 工作区适配 | Shell Git 仍有原 tool.receipt；无 Session 的工作区路由按第 4.3 节独立归属，不伪造 Session 事件                                                                 |
+| history_rewind      | `RewindRecord`：prepare/apply/rollback/commit，原/目标历史 proof、planRef、物理回执、结果 projection refs、prepared/applying/rolled_back/committed/recovery_blocked；历史适配          | `commit` 是领域正文状态，唯一 event 仍是 domain.committed；新模型投影仅消费已 committed 的目标                                                                 |
+| history_copy        | `SessionCopyRecord`：fork/convert/import，源一致快照、目标身份/格式、ID 映射与资源 manifest、reserved/staged/published/aborted/recovery_blocked；复制适配                              | 目标 provenance 从该记录投影，不追加另一 owner；源 target 接收用稳定 ID 去重                                                                                   |
+| history_maintenance | `HistoryMaintenanceRecord`：title/archive/unarchive/delete/export/format_upgrade，目标 scope、原文件 proof、资源引用变更与物理阶段；维护适配                                           | lifecycle.changed 与必要领域记录同事务；title 引用 session_metadata 结果，format_upgrade 的 committed proof 引用原/新格式及源前缀；批量不承诺跨 Session 原子性 |
 
 `domain.committed` 表示该条领域事实已经可靠提交，不表示正文中的业务操作必然成功。例如 applying/unknown 是正式状态，不能映射为 rewind 或发布成功。内容先持久化，事件和 commit marker 再由同一 authority writer 条件提交；详情错误使用控制协议的有界错误与 recoveryRef。
 
@@ -134,13 +136,13 @@ enter_worktree 保留返回路径语义。只有明确 cwd 切换才提交 conte
 
 ### 5.1 内容身份和访问
 
-Session 资源表把 DurableRef 绑定 tenant/workspace/session、生产者 invocation/operation、原 Runtime generation、用途、访问策略、实际存储后端和持有引用。resourceId 不携带路径；digest 只证明 bytes，不是授权。不可猜测 ID 不代替权限检查，也不能以全局内容 hash 提供跨租户存在性查询。
+资源 registry 按存储 §2.1 把 DurableRef 绑定 session_owned 或 workspace_owned、生产者 invocation/operation、原 Runtime generation、用途、访问策略、实际后端和持有引用。Session 资源表保存自身私有资源及已获授权的 workspace 引用；workspace 配置和显式 pin 不从属于来源 Session 的生命周期。resourceId 不携带路径；digest 只证明 bytes，不是授权。不可猜测 ID 不代替权限检查，也不能以全局内容 hash 提供跨租户存在性查询。
 
 内部 `resource.read` 接收 ref、offset、length、purpose；从可信连接验证 owner/用途和当前保留状态。每片至多 1 MiB，manifest 每页最多 256 项/1 MiB，分片有摘要，完整读取校验总长度与 digest；range 不能错误声称已核验整个内容。旧小 inlineData 保留；大媒体/备份走已协商资源协议，不把原工具参数上限悄悄变成任意文件读取能力。
 
 新增普通 owner-routed `GET /session/:id/artifacts/:artifactId/content`，沿现有 client/Session 读授权与资源下载能力检查，参数不接受任意 path/URL。返回安全 MIME、Content-Disposition、range/总长；无法证明可读的 metadata 不返回下载成功。独立 HTML 预览 origin 与 sandbox CSP 防止生成脚本获得 daemon 受信 origin；不以 file:// 或 Runtime 路径代替浏览器内容 URL。新接口纳入[客户端适配](managed-agent-client-surfaces.md)，旧 artifact 列表/登记/删除及输入 attachments 接口不变。
 
-workspace/external_url/managed/published 四类仍有不同语义：workspace 表示当前文件身份，读取发现身份变化返回 changed，丢失返回 missing；managed 内容是不可变受控副本；external_url 只登记，不自动抓取；published 引用实际发布回执。metadata-only 恢复为 unverified，不能显示已可下载。文件 symlink、祖先目录和读中替换检查在真实 Runtime；同内容给另一 Session 使用必须增加授权引用，不能仅转发裸 ID。
+workspace/external_url/managed/published 四类仍有不同语义：workspace 表示当前文件身份，读取发现身份变化返回 changed，丢失返回 missing；managed 内容是不可变受控副本；external_url 只登记，不自动抓取；published 引用实际发布回执。metadata-only 恢复为 unverified，不能显示已可下载。文件 symlink、祖先目录和读中替换检查在真实 Runtime；同内容给另一 Session 使用时，私有内容建立目标独立副本，workspace_owned 内容建立目标独立授权持有项，不能仅转发裸 ID。这里的资源内容类型与 registry 的生命周期 owner 是不同维度。
 
 ### 5.2 媒体处理和预算
 
@@ -156,7 +158,7 @@ Runtime 负责 Read/Zoom 的物理校验、PDF info/text/render 和图像变换�
 
 资源状态为 staged→committed→retired→collected。staged 必须有 producer owner；Session 提交结果前先保全唯一内容。Runtime 在 Session 接收完整结果/必要媒体与备份、提交关联 checkpoint 且没有其他 child/等待引用前不得 release 唯一副本。release 解绑执行 lease，不删除用户 workspace 文件或已发布页面。
 
-全量目标明确实现有配额的 `pin/unpin`：ephemeral 随原 ephemeral owner；restorable 随可恢复 Session/分支；pinned 使用显式用户保留引用。pin 先把 workspace/临时内容校验并持久化为不可变受控副本，再在 resource domain 提交 pin；按实际长度计入所属 workspace 有效存储预算，无法预留则 resource_limit，不退化为空 metadata pin。外链不自动下载，无法取得实际内容的对象不可 pin 为“可恢复内容”。现有 capability 未启用时继续明确拒绝 pinned，不能仅放开旧 validator。
+全量目标明确实现有配额的 `pin/unpin`：ephemeral 随原 ephemeral owner；restorable 随可恢复 Session/分支；pinned 使用显式用户保留引用。pin 先由 workspace 内容 owner 校验并持久化不可变受控副本和用户保留项，再在 Session 的 resource domain 引用其 receipt；跨 owner 登记/ACK 丢失沿原 operationId 对账，不存在 Session 先 ACK 后资源尚未保全的窗口。按实际长度计入所属 workspace 有效存储预算，无法预留则 resource_limit，不退化为空 metadata pin。外链不自动下载，无法取得实际内容的对象不可 pin 为“可恢复内容”。现有 capability 未启用时继续明确拒绝 pinned，不能仅放开旧 validator。
 
 Session 关闭保留 restorable/pinned；archive 不削减引用。删除 Session 释放普通历史引用；pinned 只有显式 unpin 或用户明确选择连同已固定内容一起删除才释放。pin 的持有者从一开始就是所属 workspace 内容服务的用户保留项，Session domain 仅引用其 receipt；删除来源 Session 不删除该保留项。该内容服务提供受权的 list/read/unpin handle，模型外操作用 WorkspaceOperationGrant，不复制 Session 历史。取消、fork 或源 Session 删除不默默 unpin。下载/模型正在消费时先 retire、停止新读取，已有授权流排空后再回收；已撤销读取授权的流立即终止，其句柄实际退出后扣账。
 
@@ -177,7 +179,7 @@ GC 仅针对零持有引用、零 in-flight、无未决物理操作/恢复依赖
 1. 取得维护资格，核验唯一 writer、完整 source revision、目标 active boundary、Runtime history 和备份闭包；不能凭 turnIndex 猜压缩后的目标。conversation-only 同样固定原 revision，但不改工作区文件。
 2. 提交 history_rewind 的 prepared/applying 事实；Runtime 在每个效果前同步 intent、undo 副本和目标 staging。物理账本保存明确 phaseOperationId 与每个文件步骤，不以 Session 事件缺失推导未执行。
 3. 每个文件在相同文件系统内原子替换/删除并保存前后证明，目录变更同步；跨文件不是瞬时物理事务，外部程序可以看到中间状态。运行平台须满足恢复专项的身份/同步 profile，跨卷不能假装 rename 原子。
-4. 全部目标文件及必要 artifact/backup refs 核验完成后，authority 在同一 history_rewind 事务提交 committed 正文与目标 projection 绑定。仅可引用覆盖目标且不含已撤销状态的既有 checkpointRef；找不到则明确 null，并提供完整已验证的目标 active 历史/恢复基础。维护 OperationGrant 无权制造 checkpoint.committed，也不能重写旧 checkpoint 的 coveredSequence。旧聊天原始事实不物理截短；新分支只投影目标链，旧 continuation、待消费结果和被撤销 child/预算引用不得混入。下一合法 Harness 从该 RestoreBundle 恢复，切换模型 history、录制父链、文件历史和 artifact timeline 后才产生新的 checkpoint；原维护 barrier 在目标闭包已提交、现存视图已确认或已隔离后释放，不为生成 checkpoint 伪造模型 activation。
+4. 全部目标文件及必要 artifact/backup refs 核验完成后，authority 在同一 history_rewind 事务提交 committed 正文与目标 projection 绑定。仅可引用覆盖目标且不含已撤销状态的既有 checkpointRef；找不到且满足存储 §2.2 的已验证、无待续执行条件时，使用 checkpointRef=null、restoreBasis=history_rewind、restoreProofRef=该已提交操作 proof，提供完整目标 active 历史/恢复基础。不能把资源缺失或 checkpoint 读取损坏作为 null 的理由。维护 OperationGrant 无权制造 checkpoint.committed，也不能重写旧 checkpoint 的 coveredSequence。旧聊天原始事实不物理截短；新分支只投影目标链，旧 continuation、待消费结果和被撤销 child/预算引用不得混入。下一合法 Harness 切换模型 history、录制父链、文件历史和 artifact timeline 后，先提交 before_model checkpoint 再执行；原维护 barrier 在目标闭包已提交、现存视图已确认或已隔离后释放，不为生成 checkpoint 伪造模型 activation。
 5. 若物理阶段失败，聊天投影不先切换。Runtime 按 undo 补偿已更改文件；先比较当前文件是否仍等于本操作后像，发现外部新写就停止，保留 affected files 和 recovery_blocked，不覆盖用户后来内容。回滚全部完成仍是本次 rewind 失败，不是成功到达目标。
 6. prepared 尚未改文件时可结算取消；applying 中取消先持久请求，等原操作在安全阶段收敛为 committed、rolled_back 或 recovery_blocked。客户端 deadline 不释放 barrier/原物理 owner。确认已完成仍保留成功，而非把晚回执改成 cancelled。
 7. 崩溃恢复核验原 RuntimeReceiptStore、文件当前前后像、Session commit marker。物理已完成且未有 Session 提交时，只在目标仍完全匹配且 source revision 未改变时幂等补提交；否则阻塞，不重新覆盖文件。Session 已提交则恢复其投影；丢 ACK 按同 operationId 返回原结论，禁止新 restore。未知 owner 保持关闭/删除屏障。
@@ -220,10 +222,10 @@ legacy 继续原 best-effort 适配，既有 void rewindRecording 不被全局�
 1. 源由所属 authority/legacy 存储适配取得一次一致只读快照，包含文件身份/完整摘要或 committed revision、严格 owner、active branch、资源清单。owner 验证与内容读取必须使用同一 snapshot；活 writer 在安全边界提供 sealed proof，不能先校验再二次读取另一个时刻。只接受工具调用/结果完整的已完成边界，未决调用不能用合成结果补齐。
 2. CopyPlan 包含 sourceProofRef、源/目标 engine/format、目标 config/definition 兼容摘要、分支边界、history/schema/ID 映射与完整资源 manifest。坏 owner、冲突 owner、未知格式或损坏中段只能只读诊断，不能以转换修复为可执行会话。完整无 owner 的合法旧历史仍是 legacy。
 3. 复用 SessionService 的 active-chain/side-artifact/checkpoint/forkedFrom 逻辑，显式映射 session/prompt/call/child/artifact/backup owner 和父 UUID。历史原调用 ID 作为 provenance 保留，目标后续新执行使用新身份；provider resume/cache ID、pending permission、活 Monitor/cron/agent/workflow 不复制为可运行状态，完成记录只作为历史投影。源定时任务的迁移是单独调度域操作，不附带在 fork 中。
-4. 资源 complete 模式要求所有承诺的媒体/产物/备份可访问且 hash 一致，任何缺失拒绝发布完整目标；history_only 是显式选项，保留缺失 manifest 并标相应 artifact/rewind unavailable，不宣称可恢复闭包。目标有独立资源持有引用，原资源留在 source 时必须有跨 Session 授权和受控保留，不能靠原临时路径。
+4. 资源 complete 模式要求所有承诺的媒体/产物/备份可访问且 hash 一致，任何缺失拒绝发布完整目标；history_only 是显式选项，保留缺失 manifest 并标相应 artifact/rewind unavailable，不宣称可恢复闭包。Session 私有内容按目标独立副本重写 refs，workspace_owned 内容先登记目标独立授权持有项再引用；不得留下随来源 Session 删除的裸 ref，也不能靠原临时路径。
 5. 目标 reserve/no-clobber 后 staging 目标内容、sidecars 和资源，先同步内容与目录，再发布可用 transcript/marker。Managed 目标使用存储规范的 header、单 writer、schema 3 和 initial history_copy commit；legacy 目标使用严格 legacy 格式/目标 owner，新增 provenance 只通过已有可兼容字段投影。目标 owner 只出现一种；不得直接复制源 owner 记录造成双 engine。
 6. Managed 目标的 copy 正式状态由预留目标 authority 的 history_copy domain 投影；它在发布前持有同一目标日志，发布后继续该唯一日志，不另建 copy Session journal。legacy 目标不写 Managed event，其创建控制归属 workspace 维护 owner，以 WorkspaceOperationGrant/同 operation ID 和目标 proof 保存创建回执，Session 仍只含原 legacy 格式。Runtime 的跨文件复制/发布 journal 只记录物理步骤。源 Managed/legacy 均保持只读，不向源历史追加 copy outbox；需要跨 owner 取得内容引用时由资源服务按稳定目标 operation ID 授权/去重。目标的创建/资源接收不承诺跨存储原子事务，目标提交 ACK 丢失先按 reserved target ID/proof 查询，不能新建第二目标。恢复清理只删除本次未提交 staging，绝不覆盖已有目标或源。
-7. 目标发布前实际配置/能力做无执行校验，不运行 Hook/MCP/模型或旧工具；失败保留源不变。目标首次 bootstrap 重新验证绑定快照及真实初始化，漂移则明确 blocked，不回退引擎。目标取得适用 writer 后才能新 prompt；从标准历史开始新的模型请求，不冒充继续源 provider 请求。
+7. 目标发布前实际配置/能力做无执行校验，不运行 Hook/MCP/模型或旧工具；失败保留源不变。目标首次 bootstrap 重新验证绑定快照及真实初始化，漂移则明确 blocked，不回退引擎。Managed 目标无兼容 checkpoint 时，只有满足存储 §2.2 的完整可执行基础才返回 restoreBasis=history_copy、restoreProofRef=已提交 copy proof、checkpointRef=null；history_only 的缺失项不能被此路径洗成完整恢复能力。下一有效 Harness 先提交 before_model checkpoint 才执行新 prompt，不续源 provider 请求；legacy 目标沿原恢复协议。
 
 history_copy provenance 固定为 source Session/engine/revision/boundary/proof、target engine/format、copyMode、resource manifest 与 ID 映射引用，不新增 `session_conversion` ChatRecord subtype。历史可复用旧 sealed 前缀的情况遵从存储规范；若新 Session ID/owner 需要重编码，保留原 sourceProof 与不可变源副本引用，不声称目标每一行与源字节相同。既有 Managed 的容器升级可在原 owner 下保留字节前缀，属于存储格式升级，不能借此原地切换 engine。
 
@@ -231,7 +233,7 @@ history_copy provenance 固定为 source Session/engine/revision/boundary/proof�
 
 ### 7.3 目录、归档、删除、导入与导出
 
-列表/标题/历史从所属逻辑 Session 的持久目录投影；Tool-only Runtime 内部 Session 不作为普通会话重复出现。cold 查看不创建模型 loop；live 修改继续按 owner bridge/workspace 路由。title 用 history_maintenance 提交再投影为原 metadata，不写第二份可变标题权威。
+列表/标题/历史从所属逻辑 Session 的持久目录投影；Tool-only Runtime 内部 Session 不作为普通会话重复出现。cold 查看不创建模型 loop；live 修改继续按 owner bridge/workspace 路由。title 的唯一值由 session_metadata 提交并投影为原标题；若伴随物理维护，history_maintenance 与它在同事务关联结果，不保存第二份可变标题权威。
 
 archive/unarchive 保留 owner、全部资源持有引用和必要 sidecars；按存储 lifecycle 的 closed↔archived，不自动跑模型。批量逐项保留成功/errors 形状。活 Session 的 archive/delete 先 drain 其原工作并核验实际物理 owner；unknown 不能提前 closed/deleted。文件移动仍使用当前文件快照、assertCanMutate/assertCleanupOwned 与平台 no-clobber/身份检查，不能为新日志绕过这些保护。
 

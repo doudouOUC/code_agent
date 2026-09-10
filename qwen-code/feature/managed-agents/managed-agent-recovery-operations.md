@@ -78,6 +78,8 @@ Windows 的文件 flush 和移动操作按原生 API 的能力使用，设计中
 
 ## 5. 远端协议与凭据
 
+**阶段归属：** 远端 Runtime 与跨主机挑战属于 R5/F8，不是默认切换的前置条件。R2～R4 只使用本地 profile；未启用 remote provider 时本节的握手能力不参与装配，缺少它也不影响本地 Managed 的准入与恢复。写在这里是为了让本地 gate 的时窗与身份规则从一开始就兼容跨主机场景，不是把跨主机作为交付范围。
+
 复用现有RemoteManagedRuntimeProvider的可信endpoint和token入口，新增私有capability的协商，不新增面向模型的地址。endpoint由服务端配置绑定，禁用携带凭据的跨origin重定向；TLS验证默认必需，HTTP仅允许显式本机/受控开发配置。工具参数、Hook输出和网页内容不能更换endpoint、租户或凭据。
 
 跨主机的gate不直接比较两边墙钟。Runtime生成一次性install/renew挑战并从挑战创建时启动本地单调倒计时；authority在该挑战上条件提交grant/renewal，经已认证私有连接返回 challengeId/runtimeIncarnation/SessionKey/grantRevision/commitDigest；Runtime核对响应身份及剩余时窗后开启或续期，迟到应答不能把期限重新从收到时间开始计算。下一epoch仍必须取得原Runtime revoke/stage屏障；联系不上则不发新工作，超期本身不证明旧副作用结束。相同挑战重复只返原ACK，binding重启后旧挑战失效。所有资格仍由authority和Runtime各自的单调版本共同约束。

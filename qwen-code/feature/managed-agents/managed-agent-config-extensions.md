@@ -1,6 +1,6 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
-更新日期：2026-09-10；生产源码基线 `a836081466`，既有设计基线 `4cacfbd0ed`。本文定义[全量覆盖表](managed-agent-full-design.md)的 C03/C07/C08/C09，采用[Session 存储](managed-agent-session-storage.md)、[私有协议](managed-agent-control-protocol.md)、[完整 Harness](managed-agent-harness.md)与[coordinator](managed-agent-coordinator.md)的身份、提交和生命周期契约。第 1 节描述现有源码；其后新增类型、版本化适配与恢复保证均待实现和验收。
+更新日期：2026-09-11；生产源码基线 `a836081466`，既有设计基线 `4cacfbd0ed`。本文定义[全量覆盖表](managed-agent-full-design.md)的 C03/C07/C08/C09，采用[Session 存储](managed-agent-session-storage.md)、[私有协议](managed-agent-control-protocol.md)、[完整 Harness](managed-agent-harness.md)与[coordinator](managed-agent-coordinator.md)的身份、提交和生命周期契约。第 1 节描述现有源码；其后新增类型、版本化适配与恢复保证均待实现和验收。
 
 首阶段仍延期完整 Skills/MCP/Hooks 迁移，详细设计在本文完成。未具备相应能力的新 Session 按正向兼容证明固定 legacy；已存在 Managed 遇到不支持的变更明确拒绝或阻塞恢复，不切换引擎重跑。独立 CLI/TUI 与旧公开返回、错误时机和输入额度保持原兼容边界。
 
@@ -222,7 +222,7 @@ interface ConfigInstallStatus {
 }
 ```
 
-`DurableRef`、SessionKey、CommandMeta、CommitReceipt、ActivationGrant、InvocationBinding、OperationGrant 与 WorkspaceOperationGrant 采用私有协议与存储规范。`RootSnapshotRef` 明确约束资源 kind/version，资源正文是本节 RootSnapshot；字节长度、digest、归属和引用闭包由原资源验证器核对。RootSnapshot/非秘密配置与组件 snapshot 都走同一资源格式，workspace 资源由其可信控制 owner registry 解析，Session 通过已授权引用取得；不新建 Session journal。路径来自可信 root resolver，payload 不能任意指定其他 workspace 路径。SourceStamp 对 file/directory 保存一致快照身份证据，read 期间删除/替换/损坏拒绝；存在性不证明内容正确。完整文本/headers/env 不写 stamp、日志或索引；含 secret 的源使用 broker 的 opaque revision 或带密钥 fingerprint，避免对低熵凭据暴露裸 hash。
+`DurableRef`、SessionKey、CommandMeta、CommitReceipt、ActivationGrant、InvocationBinding、OperationGrant 与 WorkspaceOperationGrant 采用私有协议与存储规范。`RootSnapshotRef` 明确约束资源 kind/version，资源正文是本节 RootSnapshot；字节长度、digest、归属和引用闭包由原资源验证器核对。RootSnapshot/非秘密配置与组件 snapshot 都走同一资源格式，workspace 安装资产按存储 §2.1 的 workspace_owned 归属落盘，在 Session 创建前即可存在；Session 绑定先取得独立持久授权引用，再提交 config.bound。删除某个 Session 只释放其引用，不能删除仍安装的配置或其他 Session 正使用的 snapshot；Session 专用 snapshot 才使用 session_owned。不新建 Session journal。路径来自可信 root resolver，payload 不能任意指定其他 workspace 路径。SourceStamp 对 file/directory 保存一致快照身份证据，read 期间删除/替换/损坏拒绝；存在性不证明内容正确。完整文本/headers/env 不写 stamp、日志或索引；含 secret 的源使用 broker 的 opaque revision 或带密钥 fingerprint，避免对低熵凭据暴露裸 hash。
 
 固定根步骤：从 host launch cwd、osHome、启动 env/argv 得到 user-level home override→canonical RootSnapshot→冻结 host bootstrap env→按每个候选目录 trust 解析 workspace env→以该 env 解析 settings→受控 session/argv 覆盖→扩展与三个 catalog。对依赖 settings 的 env 排除项复用原解析阶段次序，不引入循环 fixpoint。现有 relative custom paths/--mcp-config 路径在原解析 cwd 归一化后记录。Tool-only worker 使用 Runtime view，绝不通过重新读全局 settings 获取模型凭据。Runtime 仅能取得明确授予它的 MCP/Hook/命令环境 secret；model-purpose handle 只授予 Harness。
 
@@ -455,6 +455,8 @@ function Hook 只能通过预注册 `RegisteredHandlerRef {handlerId,codeVersion
 动态 add/remove、Skill 注册与 agent 限定注册提交第 7 节 `domain.committed` 的 hook_registration 记录引用，Hook catalog revision 单调；已开始 occurrence 固定旧 plan，remove 只停止未来匹配，旧 receipts 可结算。复用 Session 唯一 journal 的 registered hook execution 记录，不另外保存一套可独立写入的 Session 历史。command/HTTP 即使外部效应不明也有结算状态，不得为了允许恢复造成功。
 
 ## 7. 领域记录与协议一致性
+
+本节七个 ExtensionDomain 与[存储 §3.1](managed-agent-session-storage.md#31-domain-注册索引)逐项对应；以本节定义正文，以存储索引校验完整名称集合。认识全部名称不提前启用 Skills/MCP/Hooks 或完整初始化，仍按各专项阶段与实际 capability 放行。
 
 所有写入 Session 的扩展领域事实只使用存储规范已有的 `kind='domain.committed'`。event payload 只携带 domain/version/operationId/recordRef，详细输入、状态、输出和错误先存为受控内容资源；不增加 skill.activated、hook.executed 等竞争 event kind。`config.bound` 是原协议的配置绑定事件，与 config_install 领域提交在同一 Session 事务内产生；不在它内联第二份领域内容。workspace scope 的配置/初始化先保存在 workspace 控制 owner 的操作元数据中，返回 WorkspaceConfigCommitReceipt，不产生 Session 事件；后续 Session 绑定只引用该安装结果，不再复制安装历史。
 
