@@ -1,0 +1,50 @@
+[
+  {
+    "runLabel": "soak-n256",
+    "count": 256,
+    "preheat": false,
+    "listenerMs": 627.6,
+    "readyMs": 1302,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "git": {
+        "calls": 256,
+        "totalMs": 264891,
+        "p50": 1038.5,
+        "p95": 1055.5,
+        "max": 1066.1
+      },
+      "capabilities": {
+        "p50": 3.3,
+        "max": 3.9
+      },
+      "statusFull": {
+        "p50": 70.4,
+        "max": 85.8
+      },
+      "git-after-soak": {
+        "calls": 256,
+        "totalMs": 264400,
+        "p50": 1037,
+        "p95": 1053.5,
+        "max": 1056.2
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 233344,
+      "daemonRssKiB": 233344,
+      "heapUsed": 137145808,
+      "fd": 33,
+      "inotifyInstances": 1,
+      "inotifyWatches": 257,
+      "acpChildren": 0
+    }
+  }
+]

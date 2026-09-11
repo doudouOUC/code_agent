@@ -1,0 +1,116 @@
+[
+  {
+    "runLabel": "children-n256-a6",
+    "count": 256,
+    "preheat": false,
+    "listenerMs": 628.2,
+    "readyMs": 1301.5,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "git": {
+        "calls": 256,
+        "totalMs": 6210,
+        "p50": 24.1,
+        "p95": 26,
+        "max": 29
+      },
+      "ensureMs": [
+        1045,
+        1026,
+        1006,
+        1001,
+        1002,
+        994
+      ],
+      "capabilities": {
+        "p50": 3.3,
+        "max": 3.6
+      },
+      "statusFull": {
+        "p50": 72.7,
+        "max": 75.6
+      },
+      "git-with-children": {
+        "calls": 256,
+        "totalMs": 6181,
+        "p50": 24,
+        "p95": 25.6,
+        "max": 49.7
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 1380304,
+      "daemonRssKiB": 232276,
+      "heapUsed": 136956400,
+      "fd": 183,
+      "inotifyInstances": 7,
+      "inotifyWatches": 896,
+      "acpChildren": 6
+    }
+  },
+  {
+    "runLabel": "children-n256-a8",
+    "count": 256,
+    "preheat": false,
+    "listenerMs": 641.3,
+    "readyMs": 1309.7,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "git": {
+        "calls": 256,
+        "totalMs": 6186,
+        "p50": 24,
+        "p95": 26,
+        "max": 28.4
+      },
+      "ensureMs": [
+        1003,
+        1011,
+        1023,
+        1001,
+        990,
+        992,
+        997,
+        997
+      ],
+      "capabilities": {
+        "p50": 3.1,
+        "max": 3.9
+      },
+      "statusFull": {
+        "p50": 71.8,
+        "max": 77.5
+      },
+      "git-with-children": {
+        "calls": 256,
+        "totalMs": 6157,
+        "p50": 23.9,
+        "p95": 25.6,
+        "max": 40.9
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 1773592,
+      "daemonRssKiB": 231524,
+      "heapUsed": 137324656,
+      "fd": 233,
+      "inotifyInstances": 9,
+      "inotifyWatches": 1110,
+      "acpChildren": 8
+    }
+  }
+]

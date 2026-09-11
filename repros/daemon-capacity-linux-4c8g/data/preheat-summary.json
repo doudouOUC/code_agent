@@ -1,0 +1,43 @@
+[
+  {
+    "runLabel": "preheat-n256",
+    "count": 256,
+    "preheat": true,
+    "listenerMs": 630,
+    "readyMs": 1307.9,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 3.8,
+        "max": 5.2
+      },
+      "statusFull": {
+        "p50": 72.7,
+        "max": 74
+      },
+      "git": {
+        "calls": 256,
+        "totalMs": 264528,
+        "p50": 1037.9,
+        "p95": 1054.1,
+        "max": 1061.1
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 232528,
+      "daemonRssKiB": 232528,
+      "heapUsed": 136543472,
+      "fd": 33,
+      "inotifyInstances": 1,
+      "inotifyWatches": 257,
+      "acpChildren": 0
+    }
+  }
+]

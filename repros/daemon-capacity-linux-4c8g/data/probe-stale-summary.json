@@ -1,0 +1,106 @@
+{
+  "steps": [
+    {
+      "step": "1. fast git, clean tree",
+      "status": 200,
+      "body": {
+        "v": 2,
+        "workspaceCwd": "/root/cap/repos/ws000",
+        "branch": "main",
+        "detached": false,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "conflicted": 0,
+        "hasUpstream": false,
+        "ahead": 0,
+        "behind": 0,
+        "stashCount": 0,
+        "computedAt": 1789057561665
+      },
+      "ms": 32
+    },
+    {
+      "step": "2. fast git, tree now dirty",
+      "status": 200,
+      "body": {
+        "v": 2,
+        "workspaceCwd": "/root/cap/repos/ws000",
+        "branch": "main",
+        "detached": false,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 1,
+        "conflicted": 0,
+        "hasUpstream": false,
+        "ahead": 0,
+        "behind": 0,
+        "stashCount": 0,
+        "computedAt": 1789057561692
+      },
+      "ms": 27
+    },
+    {
+      "step": "3. slow git, tree cleaned again",
+      "status": 200,
+      "body": {
+        "v": 2,
+        "workspaceCwd": "/root/cap/repos/ws000",
+        "branch": "main",
+        "detached": false,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 1,
+        "conflicted": 0,
+        "hasUpstream": false,
+        "ahead": 0,
+        "behind": 0,
+        "stashCount": 0,
+        "computedAt": 1789057561692
+      },
+      "ms": 5004
+    },
+    {
+      "step": "4. slow git, repeat",
+      "status": 200,
+      "body": {
+        "v": 2,
+        "workspaceCwd": "/root/cap/repos/ws000",
+        "branch": "main",
+        "detached": false,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 1,
+        "conflicted": 0,
+        "hasUpstream": false,
+        "ahead": 0,
+        "behind": 0,
+        "stashCount": 0,
+        "computedAt": 1789057561692
+      },
+      "ms": 5005
+    },
+    {
+      "step": "5. fast git restored",
+      "status": 200,
+      "body": {
+        "v": 2,
+        "workspaceCwd": "/root/cap/repos/ws000",
+        "branch": "main",
+        "detached": false,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
+        "conflicted": 0,
+        "hasUpstream": false,
+        "ahead": 0,
+        "behind": 0,
+        "stashCount": 0,
+        "computedAt": 1789057571733
+      },
+      "ms": 31
+    }
+  ],
+  "exitCode": 0,
+  "modelRequests": 0
+}

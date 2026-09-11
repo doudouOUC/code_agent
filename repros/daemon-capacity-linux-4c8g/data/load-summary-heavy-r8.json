@@ -1,0 +1,134 @@
+[
+  {
+    "concurrency": 1,
+    "readyMs": 902,
+    "baseline": {
+      "totalRssMiB": 215.1,
+      "childCount": 0,
+      "memAvailMiB": 6336
+    },
+    "settled": {
+      "totalRssMiB": 493.4,
+      "daemonRssMiB": 205.1,
+      "childCount": 1,
+      "memAvailMiB": 6115
+    },
+    "peakTreeRssMiB": 507.4,
+    "minMemAvailMiB": 6095,
+    "peakChildCount": 7,
+    "eventCounts": {
+      "replay_complete": 1,
+      "session_update": 6680,
+      "turn_complete": 4
+    },
+    "approvals": [],
+    "turns": [
+      {
+        "turn": 1,
+        "wallMs": 69094,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 69094,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 498.6,
+        "minMemAvailMiB": 6095,
+        "treeAfter": {
+          "totalRssMiB": 468.3,
+          "daemonRssMiB": 198.9,
+          "childCount": 1,
+          "fds": 52,
+          "loadavg": [
+            "0.28",
+            "0.17",
+            "0.11"
+          ]
+        }
+      },
+      {
+        "turn": 2,
+        "wallMs": 104791,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 104791,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 498.6,
+        "minMemAvailMiB": 6095,
+        "treeAfter": {
+          "totalRssMiB": 471.6,
+          "daemonRssMiB": 199.7,
+          "childCount": 1,
+          "fds": 51,
+          "loadavg": [
+            "0.31",
+            "0.18",
+            "0.11"
+          ]
+        }
+      },
+      {
+        "turn": 3,
+        "wallMs": 136961,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 136961,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 502.5,
+        "minMemAvailMiB": 6095,
+        "treeAfter": {
+          "totalRssMiB": 474.2,
+          "daemonRssMiB": 201.2,
+          "childCount": 1,
+          "fds": 50,
+          "loadavg": [
+            "0.13",
+            "0.14",
+            "0.10"
+          ]
+        }
+      },
+      {
+        "turn": 4,
+        "wallMs": 225345,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 225345,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 507.4,
+        "minMemAvailMiB": 6095,
+        "treeAfter": {
+          "totalRssMiB": 493.4,
+          "daemonRssMiB": 205.1,
+          "childCount": 1,
+          "fds": 52,
+          "loadavg": [
+            "0.12",
+            "0.11",
+            "0.09"
+          ]
+        }
+      }
+    ],
+    "exitCode": 0,
+    "oomLines": []
+  }
+]

@@ -1,0 +1,565 @@
+{
+  "runLabel": "ladder-n1",
+  "count": 1,
+  "readyCount": 1,
+  "preheat": false,
+  "startedAt": "2026-09-10T13:38:58.057Z",
+  "cli": "/root/qwen-code/dist/cli.js",
+  "node": "v22.23.2",
+  "system": {
+    "before": {
+      "memAvailableKiB": 6694916,
+      "memFreeKiB": 1622112,
+      "loadavg": [
+        "0.13",
+        "0.76",
+        "0.91"
+      ],
+      "inotifyMaxInstances": 128,
+      "inotifyMaxWatches": 58368
+    },
+    "after": {
+      "memAvailableKiB": 6669156,
+      "memFreeKiB": 1595800,
+      "loadavg": [
+        "0.15",
+        "0.73",
+        "0.89"
+      ],
+      "inotifyMaxInstances": 128,
+      "inotifyMaxWatches": 58368
+    }
+  },
+  "samples": [
+    {
+      "tag": "ready",
+      "at": "2026-09-10T13:38:59.921Z",
+      "elapsedMs": 1863,
+      "tree": {
+        "processCount": 1,
+        "daemon": {
+          "pid": 22887,
+          "command": "/usr/local/bin/node --inspect=127.0.0.1:0 /root/qwen-code/dist/cli.js serve --hostname 127.0.0.1 --port 0 --no-open --no-web --workspace /root/cap/repos/ws000",
+          "rssKiB": 211948,
+          "vmSizeKiB": 11885540,
+          "threads": 12,
+          "fdCount": 32,
+          "fdKinds": {
+            "file": 3,
+            "socket": 6,
+            "eventpoll": 4,
+            "anon": 4,
+            "pipe": 10,
+            "eventfd": 4,
+            "inotify": 1
+          },
+          "inotifyInstances": 1,
+          "inotifyWatches": 1
+        },
+        "children": [],
+        "total": {
+          "rssKiB": 211948,
+          "threads": 12,
+          "fdCount": 32,
+          "inotifyInstances": 1,
+          "inotifyWatches": 1
+        }
+      },
+      "heap": {
+        "memory": {
+          "rss": 217198592,
+          "heapTotal": 135577600,
+          "heapUsed": 100079000,
+          "external": 5085979,
+          "arrayBuffers": 1236167
+        },
+        "cpu": {
+          "user": 888303,
+          "system": 112038
+        },
+        "resources": [
+          "PipeWrap",
+          "PipeWrap",
+          "TCPServerWrap",
+          "TCPSocketWrap"
+        ]
+      },
+      "system": {
+        "memAvailableKiB": 6513112,
+        "memFreeKiB": 1439808,
+        "loadavg": [
+          "0.20",
+          "0.76",
+          "0.91"
+        ],
+        "inotifyMaxInstances": 128,
+        "inotifyMaxWatches": 58368
+      },
+      "registeredWorkspaces": 1,
+      "activeAcpChildren": 0,
+      "activeSessions": 0,
+      "limits": {
+        "maxRegisteredWorkspaces": 256,
+        "maxChannelControlWorkspaces": 25,
+        "maxSessions": 32,
+        "maxTotalSessions": 800,
+        "maxPendingPromptsPerSession": 5,
+        "listenerMaxConnections": 256,
+        "eventRingSize": 8000,
+        "compactedReplayMaxBytes": 4194304,
+        "maxJournalEvents": 10000,
+        "maxJournalBytes": 8388608,
+        "promptDeadlineMs": null,
+        "writerIdleTimeoutMs": null,
+        "channelIdleTimeoutMs": 0,
+        "sessionIdleTimeoutMs": 1800000,
+        "sessionPromptSettledCloseGraceMs": 0,
+        "acpConnectionCap": 64,
+        "acpPreAttachMaxFramesPerStream": 256,
+        "acpPreAttachMaxFramesPerConnection": 1024,
+        "acpPreAttachMaxFramesGlobal": 4096,
+        "acpPreAttachMaxPayloadBytesPerConnection": 67108864,
+        "acpPreAttachMaxPayloadBytesGlobal": 268435456,
+        "memory": {
+          "enforced": false,
+          "journalGrowth": {
+            "poolBytes": 189792256,
+            "hardCapBytes": 268435456,
+            "baselineMaxEvents": 10000,
+            "baselineMaxBytes": 8388608
+          },
+          "childHeap": {
+            "mode": "observe",
+            "maxConcurrentChildren": 6,
+            "perChildCeilingMb": 544,
+            "refusals": 0
+          },
+          "configuredBudgetMb": 3632,
+          "effectiveBudgetMb": 3632,
+          "budgetSource": "derived",
+          "availableMemoryMb": 7265,
+          "availableMemorySource": "host",
+          "insufficientMemory": false,
+          "modeled": {
+            "rootReserveMb": 363,
+            "childPoolMb": 3269,
+            "minChildHeapMb": 512,
+            "maxChildHeapMb": 16384,
+            "legacyChildCeilingMb": 3632
+          }
+        }
+      },
+      "startupPreheat": null
+    },
+    {
+      "tag": "git-warmed",
+      "at": "2026-09-10T13:39:04.360Z",
+      "elapsedMs": 6303,
+      "tree": {
+        "processCount": 1,
+        "daemon": {
+          "pid": 22887,
+          "command": "/usr/local/bin/node --inspect=127.0.0.1:0 /root/qwen-code/dist/cli.js serve --hostname 127.0.0.1 --port 0 --no-open --no-web --workspace /root/cap/repos/ws000",
+          "rssKiB": 213064,
+          "vmSizeKiB": 11885540,
+          "threads": 12,
+          "fdCount": 32,
+          "fdKinds": {
+            "file": 3,
+            "socket": 6,
+            "eventpoll": 4,
+            "anon": 4,
+            "pipe": 10,
+            "eventfd": 4,
+            "inotify": 1
+          },
+          "inotifyInstances": 1,
+          "inotifyWatches": 2
+        },
+        "children": [],
+        "total": {
+          "rssKiB": 213064,
+          "threads": 12,
+          "fdCount": 32,
+          "inotifyInstances": 1,
+          "inotifyWatches": 2
+        }
+      },
+      "heap": {
+        "memory": {
+          "rss": 217853952,
+          "heapTotal": 135839744,
+          "heapUsed": 106904904,
+          "external": 5388454,
+          "arrayBuffers": 1538642
+        },
+        "cpu": {
+          "user": 941599,
+          "system": 137940
+        },
+        "resources": [
+          "PipeWrap",
+          "PipeWrap",
+          "TCPServerWrap",
+          "TCPSocketWrap",
+          "FSEventWrap"
+        ]
+      },
+      "system": {
+        "memAvailableKiB": 6500060,
+        "memFreeKiB": 1426740,
+        "loadavg": [
+          "0.20",
+          "0.76",
+          "0.91"
+        ],
+        "inotifyMaxInstances": 128,
+        "inotifyMaxWatches": 58368
+      },
+      "registeredWorkspaces": 1,
+      "activeAcpChildren": 0,
+      "activeSessions": 0,
+      "limits": {
+        "maxRegisteredWorkspaces": 256,
+        "maxChannelControlWorkspaces": 25,
+        "maxSessions": 32,
+        "maxTotalSessions": 800,
+        "maxPendingPromptsPerSession": 5,
+        "listenerMaxConnections": 256,
+        "eventRingSize": 8000,
+        "compactedReplayMaxBytes": 4194304,
+        "maxJournalEvents": 10000,
+        "maxJournalBytes": 8388608,
+        "promptDeadlineMs": null,
+        "writerIdleTimeoutMs": null,
+        "channelIdleTimeoutMs": 0,
+        "sessionIdleTimeoutMs": 1800000,
+        "sessionPromptSettledCloseGraceMs": 0,
+        "acpConnectionCap": 64,
+        "acpPreAttachMaxFramesPerStream": 256,
+        "acpPreAttachMaxFramesPerConnection": 1024,
+        "acpPreAttachMaxFramesGlobal": 4096,
+        "acpPreAttachMaxPayloadBytesPerConnection": 67108864,
+        "acpPreAttachMaxPayloadBytesGlobal": 268435456,
+        "memory": {
+          "enforced": false,
+          "journalGrowth": {
+            "poolBytes": 189792256,
+            "hardCapBytes": 268435456,
+            "baselineMaxEvents": 10000,
+            "baselineMaxBytes": 8388608
+          },
+          "childHeap": {
+            "mode": "observe",
+            "maxConcurrentChildren": 6,
+            "perChildCeilingMb": 544,
+            "refusals": 0
+          },
+          "configuredBudgetMb": 3632,
+          "effectiveBudgetMb": 3632,
+          "budgetSource": "derived",
+          "availableMemoryMb": 7265,
+          "availableMemorySource": "host",
+          "insufficientMemory": false,
+          "modeled": {
+            "rootReserveMb": 363,
+            "childPoolMb": 3269,
+            "minChildHeapMb": 512,
+            "maxChildHeapMb": 16384,
+            "legacyChildCeilingMb": 3632
+          }
+        }
+      },
+      "startupPreheat": null
+    },
+    {
+      "tag": "settled",
+      "at": "2026-09-10T13:39:14.438Z",
+      "elapsedMs": 16380,
+      "tree": {
+        "processCount": 1,
+        "daemon": {
+          "pid": 22887,
+          "command": "/usr/local/bin/node --inspect=127.0.0.1:0 /root/qwen-code/dist/cli.js serve --hostname 127.0.0.1 --port 0 --no-open --no-web --workspace /root/cap/repos/ws000",
+          "rssKiB": 182164,
+          "vmSizeKiB": 11853796,
+          "threads": 12,
+          "fdCount": 31,
+          "fdKinds": {
+            "file": 3,
+            "socket": 5,
+            "eventpoll": 4,
+            "anon": 4,
+            "pipe": 10,
+            "eventfd": 4,
+            "inotify": 1
+          },
+          "inotifyInstances": 1,
+          "inotifyWatches": 2
+        },
+        "children": [],
+        "total": {
+          "rssKiB": 182164,
+          "threads": 12,
+          "fdCount": 31,
+          "inotifyInstances": 1,
+          "inotifyWatches": 2
+        }
+      },
+      "heap": {
+        "memory": {
+          "rss": 186294272,
+          "heapTotal": 100188160,
+          "heapUsed": 96056512,
+          "external": 4185913,
+          "arrayBuffers": 336101
+        },
+        "cpu": {
+          "user": 1153947,
+          "system": 162541
+        },
+        "resources": [
+          "PipeWrap",
+          "PipeWrap",
+          "TCPServerWrap",
+          "FSEventWrap"
+        ]
+      },
+      "system": {
+        "memAvailableKiB": 6538592,
+        "memFreeKiB": 1465248,
+        "loadavg": [
+          "0.17",
+          "0.74",
+          "0.90"
+        ],
+        "inotifyMaxInstances": 128,
+        "inotifyMaxWatches": 58368
+      },
+      "registeredWorkspaces": 1,
+      "activeAcpChildren": 0,
+      "activeSessions": 0,
+      "limits": {
+        "maxRegisteredWorkspaces": 256,
+        "maxChannelControlWorkspaces": 25,
+        "maxSessions": 32,
+        "maxTotalSessions": 800,
+        "maxPendingPromptsPerSession": 5,
+        "listenerMaxConnections": 256,
+        "eventRingSize": 8000,
+        "compactedReplayMaxBytes": 4194304,
+        "maxJournalEvents": 10000,
+        "maxJournalBytes": 8388608,
+        "promptDeadlineMs": null,
+        "writerIdleTimeoutMs": null,
+        "channelIdleTimeoutMs": 0,
+        "sessionIdleTimeoutMs": 1800000,
+        "sessionPromptSettledCloseGraceMs": 0,
+        "acpConnectionCap": 64,
+        "acpPreAttachMaxFramesPerStream": 256,
+        "acpPreAttachMaxFramesPerConnection": 1024,
+        "acpPreAttachMaxFramesGlobal": 4096,
+        "acpPreAttachMaxPayloadBytesPerConnection": 67108864,
+        "acpPreAttachMaxPayloadBytesGlobal": 268435456,
+        "memory": {
+          "enforced": false,
+          "journalGrowth": {
+            "poolBytes": 189792256,
+            "hardCapBytes": 268435456,
+            "baselineMaxEvents": 10000,
+            "baselineMaxBytes": 8388608
+          },
+          "childHeap": {
+            "mode": "observe",
+            "maxConcurrentChildren": 6,
+            "perChildCeilingMb": 544,
+            "refusals": 0
+          },
+          "configuredBudgetMb": 3632,
+          "effectiveBudgetMb": 3632,
+          "budgetSource": "derived",
+          "availableMemoryMb": 7265,
+          "availableMemorySource": "host",
+          "insufficientMemory": false,
+          "modeled": {
+            "rootReserveMb": 363,
+            "childPoolMb": 3269,
+            "minChildHeapMb": 512,
+            "maxChildHeapMb": 16384,
+            "legacyChildCeilingMb": 3632
+          }
+        }
+      },
+      "startupPreheat": null
+    },
+    {
+      "tag": "after-gc",
+      "at": "2026-09-10T13:39:14.857Z",
+      "elapsedMs": 16799,
+      "tree": {
+        "processCount": 1,
+        "daemon": {
+          "pid": 22887,
+          "command": "/usr/local/bin/node --inspect=127.0.0.1:0 /root/qwen-code/dist/cli.js serve --hostname 127.0.0.1 --port 0 --no-open --no-web --workspace /root/cap/repos/ws000",
+          "rssKiB": 179528,
+          "vmSizeKiB": 11850468,
+          "threads": 12,
+          "fdCount": 32,
+          "fdKinds": {
+            "file": 3,
+            "socket": 6,
+            "eventpoll": 4,
+            "anon": 4,
+            "pipe": 10,
+            "eventfd": 4,
+            "inotify": 1
+          },
+          "inotifyInstances": 1,
+          "inotifyWatches": 2
+        },
+        "children": [],
+        "total": {
+          "rssKiB": 179528,
+          "threads": 12,
+          "fdCount": 32,
+          "inotifyInstances": 1,
+          "inotifyWatches": 2
+        }
+      },
+      "heap": {
+        "memory": {
+          "rss": 183734272,
+          "heapTotal": 99926016,
+          "heapUsed": 95630512,
+          "external": 4177135,
+          "arrayBuffers": 336101
+        },
+        "cpu": {
+          "user": 1332530,
+          "system": 173674
+        },
+        "resources": [
+          "PipeWrap",
+          "PipeWrap",
+          "TCPServerWrap",
+          "FSEventWrap",
+          "TCPSocketWrap"
+        ]
+      },
+      "system": {
+        "memAvailableKiB": 6543568,
+        "memFreeKiB": 1470208,
+        "loadavg": [
+          "0.15",
+          "0.73",
+          "0.89"
+        ],
+        "inotifyMaxInstances": 128,
+        "inotifyMaxWatches": 58368
+      },
+      "registeredWorkspaces": 1,
+      "activeAcpChildren": 0,
+      "activeSessions": 0,
+      "limits": {
+        "maxRegisteredWorkspaces": 256,
+        "maxChannelControlWorkspaces": 25,
+        "maxSessions": 32,
+        "maxTotalSessions": 800,
+        "maxPendingPromptsPerSession": 5,
+        "listenerMaxConnections": 256,
+        "eventRingSize": 8000,
+        "compactedReplayMaxBytes": 4194304,
+        "maxJournalEvents": 10000,
+        "maxJournalBytes": 8388608,
+        "promptDeadlineMs": null,
+        "writerIdleTimeoutMs": null,
+        "channelIdleTimeoutMs": 0,
+        "sessionIdleTimeoutMs": 1800000,
+        "sessionPromptSettledCloseGraceMs": 0,
+        "acpConnectionCap": 64,
+        "acpPreAttachMaxFramesPerStream": 256,
+        "acpPreAttachMaxFramesPerConnection": 1024,
+        "acpPreAttachMaxFramesGlobal": 4096,
+        "acpPreAttachMaxPayloadBytesPerConnection": 67108864,
+        "acpPreAttachMaxPayloadBytesGlobal": 268435456,
+        "memory": {
+          "enforced": false,
+          "journalGrowth": {
+            "poolBytes": 189792256,
+            "hardCapBytes": 268435456,
+            "baselineMaxEvents": 10000,
+            "baselineMaxBytes": 8388608
+          },
+          "childHeap": {
+            "mode": "observe",
+            "maxConcurrentChildren": 6,
+            "perChildCeilingMb": 544,
+            "refusals": 0
+          },
+          "configuredBudgetMb": 3632,
+          "effectiveBudgetMb": 3632,
+          "budgetSource": "derived",
+          "availableMemoryMb": 7265,
+          "availableMemorySource": "host",
+          "insufficientMemory": false,
+          "modeled": {
+            "rootReserveMb": 363,
+            "childPoolMb": 3269,
+            "minChildHeapMb": 512,
+            "maxChildHeapMb": 16384,
+            "legacyChildCeilingMb": 3632
+          }
+        }
+      },
+      "startupPreheat": null
+    }
+  ],
+  "latency": {
+    "capabilities": {
+      "p50": 2.4,
+      "max": 2.5
+    },
+    "statusFull": {
+      "p50": 66,
+      "max": 67.3
+    },
+    "git": {
+      "calls": 1,
+      "totalMs": 27,
+      "p50": 27.4,
+      "p95": 27.4,
+      "max": 27.4
+    }
+  },
+  "events": [],
+  "pid": 22887,
+  "listenerMs": 474.9,
+  "readyMs": 1784.5,
+  "capabilities": {
+    "workspaces": 1,
+    "trusted": 1,
+    "limits": {
+      "maxRegisteredWorkspaces": 256,
+      "maxChannelControlWorkspaces": 25,
+      "maxPendingPromptsPerSession": 5,
+      "sessionRestoreTimeoutMs": 60000,
+      "maxWorkspaceFileUploadBytes": 52428800,
+      "maxSessionsPerWorkspace": 32,
+      "maxTotalSessions": 800
+    },
+    "ms": 2.8
+  },
+  "workspaceIds": [
+    "4c7d9b84dee1ceed"
+  ],
+  "modelRequests": 0,
+  "childrenBeforeStop": [],
+  "cleanup": {
+    "exitCode": 0,
+    "signalCode": null,
+    "portClosed": true,
+    "leftoverPids": [],
+    "daemonAlive": false
+  },
+  "finishedAt": "2026-09-10T13:39:15.461Z"
+}

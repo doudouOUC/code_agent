@@ -1,0 +1,410 @@
+[
+  {
+    "concurrency": 1,
+    "readyMs": 1213,
+    "baseline": {
+      "totalRssMiB": 247.4,
+      "childCount": 0,
+      "memAvailMiB": 6330
+    },
+    "settled": {
+      "totalRssMiB": 450.4,
+      "daemonRssMiB": 233.1,
+      "childCount": 1,
+      "memAvailMiB": 6175
+    },
+    "peakTreeRssMiB": 507,
+    "minMemAvailMiB": 6136,
+    "peakChildCount": 3,
+    "eventCounts": {
+      "replay_complete": 1,
+      "session_update": 2002,
+      "turn_complete": 2,
+      "followup_suggestion": 1
+    },
+    "turns": [
+      {
+        "turn": 1,
+        "wallMs": 91161,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 91161,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 507,
+        "minMemAvailMiB": 6136,
+        "treeAfter": {
+          "totalRssMiB": 445.4,
+          "daemonRssMiB": 230.8,
+          "childCount": 1,
+          "fds": 51,
+          "loadavg": [
+            "0.08",
+            "0.11",
+            "0.09"
+          ]
+        }
+      },
+      {
+        "turn": 2,
+        "wallMs": 21529,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 21529,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 507,
+        "minMemAvailMiB": 6136,
+        "treeAfter": {
+          "totalRssMiB": 450.3,
+          "daemonRssMiB": 233.1,
+          "childCount": 1,
+          "fds": 50,
+          "loadavg": [
+            "0.14",
+            "0.12",
+            "0.09"
+          ]
+        }
+      }
+    ],
+    "exitCode": 0,
+    "oomLines": []
+  },
+  {
+    "concurrency": 2,
+    "readyMs": 1209,
+    "baseline": {
+      "totalRssMiB": 246.7,
+      "childCount": 0,
+      "memAvailMiB": 6347
+    },
+    "settled": {
+      "totalRssMiB": 686.6,
+      "daemonRssMiB": 236,
+      "childCount": 2,
+      "memAvailMiB": 5984
+    },
+    "peakTreeRssMiB": 768.3,
+    "minMemAvailMiB": 5830,
+    "peakChildCount": 6,
+    "eventCounts": {
+      "session_update": 2090,
+      "replay_complete": 2,
+      "turn_complete": 4,
+      "followup_suggestion": 3
+    },
+    "turns": [
+      {
+        "turn": 1,
+        "wallMs": 48125,
+        "ok": 2,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 44124,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 1,
+            "ms": 48124,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 768.3,
+        "minMemAvailMiB": 5830,
+        "treeAfter": {
+          "totalRssMiB": 673.8,
+          "daemonRssMiB": 234.8,
+          "childCount": 2,
+          "fds": 79,
+          "loadavg": [
+            "0.66",
+            "0.29",
+            "0.15"
+          ]
+        }
+      },
+      {
+        "turn": 2,
+        "wallMs": 23532,
+        "ok": 2,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 23532,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 1,
+            "ms": 22235,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 768.3,
+        "minMemAvailMiB": 5830,
+        "treeAfter": {
+          "totalRssMiB": 686.5,
+          "daemonRssMiB": 236,
+          "childCount": 2,
+          "fds": 81,
+          "loadavg": [
+            "0.44",
+            "0.26",
+            "0.15"
+          ]
+        }
+      }
+    ],
+    "exitCode": 0,
+    "oomLines": []
+  },
+  {
+    "concurrency": 4,
+    "readyMs": 1208,
+    "baseline": {
+      "totalRssMiB": 247.1,
+      "childCount": 0,
+      "memAvailMiB": 6332
+    },
+    "settled": {
+      "totalRssMiB": 1277.9,
+      "daemonRssMiB": 254.5,
+      "childCount": 4,
+      "memAvailMiB": 5525
+    },
+    "peakTreeRssMiB": 1404,
+    "minMemAvailMiB": 5369,
+    "peakChildCount": 12,
+    "eventCounts": {
+      "session_update": 7020,
+      "replay_complete": 4,
+      "permission_request": 3,
+      "turn_complete": 8,
+      "followup_suggestion": 5,
+      "prompt_cancelled": 3,
+      "permission_resolved": 3,
+      "pending_prompt_added": 3,
+      "pending_prompt_started": 3,
+      "pending_prompt_completed": 3
+    },
+    "turns": [
+      {
+        "turn": 1,
+        "wallMs": 240002,
+        "ok": 1,
+        "failed": [
+          "This operation was aborted",
+          "This operation was aborted",
+          "This operation was aborted"
+        ],
+        "perPrompt": [
+          {
+            "i": 1,
+            "ms": 51189,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 1404,
+        "minMemAvailMiB": 5369,
+        "treeAfter": {
+          "totalRssMiB": 1232,
+          "daemonRssMiB": 243.3,
+          "childCount": 4,
+          "fds": 129,
+          "loadavg": [
+            "0.24",
+            "0.21",
+            "0.16"
+          ]
+        }
+      },
+      {
+        "turn": 2,
+        "wallMs": 99438,
+        "ok": 4,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 74952,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 1,
+            "ms": 34687,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 2,
+            "ms": 99438,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 3,
+            "ms": 58682,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 1404,
+        "minMemAvailMiB": 5369,
+        "treeAfter": {
+          "totalRssMiB": 1277.9,
+          "daemonRssMiB": 254.5,
+          "childCount": 4,
+          "fds": 131,
+          "loadavg": [
+            "0.04",
+            "0.15",
+            "0.14"
+          ]
+        }
+      }
+    ],
+    "exitCode": 0,
+    "oomLines": []
+  },
+  {
+    "concurrency": 6,
+    "readyMs": 1204,
+    "baseline": {
+      "totalRssMiB": 246.6,
+      "childCount": 0,
+      "memAvailMiB": 6312
+    },
+    "settled": {
+      "totalRssMiB": 1840.4,
+      "daemonRssMiB": 261.2,
+      "childCount": 6,
+      "memAvailMiB": 5068
+    },
+    "peakTreeRssMiB": 2028.6,
+    "minMemAvailMiB": 4913,
+    "peakChildCount": 18,
+    "eventCounts": {
+      "session_update": 7813,
+      "replay_complete": 6,
+      "permission_request": 1,
+      "turn_complete": 12,
+      "followup_suggestion": 10,
+      "prompt_cancelled": 1,
+      "permission_resolved": 1,
+      "pending_prompt_added": 1,
+      "pending_prompt_started": 1,
+      "pending_prompt_completed": 1
+    },
+    "turns": [
+      {
+        "turn": 1,
+        "wallMs": 240001,
+        "ok": 5,
+        "failed": [
+          "This operation was aborted"
+        ],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 85690,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 1,
+            "ms": 99610,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 2,
+            "ms": 62802,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 4,
+            "ms": 43768,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 5,
+            "ms": 26695,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 2028.6,
+        "minMemAvailMiB": 4913,
+        "treeAfter": {
+          "totalRssMiB": 1807.4,
+          "daemonRssMiB": 259.9,
+          "childCount": 6,
+          "fds": 179,
+          "loadavg": [
+            "0.20",
+            "0.21",
+            "0.17"
+          ]
+        }
+      },
+      {
+        "turn": 2,
+        "wallMs": 52842,
+        "ok": 6,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 30809,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 1,
+            "ms": 15283,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 2,
+            "ms": 37388,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 3,
+            "ms": 52842,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 4,
+            "ms": 32064,
+            "stopReason": "end_turn"
+          },
+          {
+            "i": 5,
+            "ms": 19484,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 2028.6,
+        "minMemAvailMiB": 4913,
+        "treeAfter": {
+          "totalRssMiB": 1840.4,
+          "daemonRssMiB": 261.2,
+          "childCount": 6,
+          "fds": 185,
+          "loadavg": [
+            "0.08",
+            "0.17",
+            "0.16"
+          ]
+        }
+      }
+    ],
+    "exitCode": 0,
+    "oomLines": []
+  }
+]

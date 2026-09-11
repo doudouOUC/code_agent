@@ -1,0 +1,70 @@
+[
+  {
+    "runLabel": "restore-n256-seed",
+    "count": 1,
+    "preheat": false,
+    "listenerMs": 461.9,
+    "readyMs": 1789.4,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "persistRegisterMs": 1978
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 212492,
+      "daemonRssKiB": 212492,
+      "heapUsed": 126893320,
+      "fd": 33,
+      "inotifyInstances": 1,
+      "inotifyWatches": 256,
+      "acpChildren": 0
+    }
+  },
+  {
+    "runLabel": "restore-n256-restart",
+    "count": 1,
+    "preheat": false,
+    "listenerMs": 528.4,
+    "readyMs": 2190,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 4,
+        "max": 4.9
+      },
+      "statusFull": {
+        "p50": 69.9,
+        "max": 72.8
+      },
+      "git": {
+        "calls": 256,
+        "totalMs": 264913,
+        "p50": 1038.7,
+        "p95": 1054.5,
+        "max": 1072.2
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 221368,
+      "daemonRssKiB": 221368,
+      "heapUsed": 128939456,
+      "fd": 33,
+      "inotifyInstances": 1,
+      "inotifyWatches": 257,
+      "acpChildren": 0
+    }
+  }
+]

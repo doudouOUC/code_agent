@@ -1,0 +1,54 @@
+[
+  {
+    "runLabel": "children-n2-a2",
+    "count": 2,
+    "preheat": false,
+    "listenerMs": 529.9,
+    "readyMs": 863.4,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "git": {
+        "calls": 2,
+        "totalMs": 55,
+        "p50": 28.1,
+        "p95": 28.1,
+        "max": 28.1
+      },
+      "ensureMs": [
+        1021,
+        1005
+      ],
+      "capabilities": {
+        "p50": 2.5,
+        "max": 3.5
+      },
+      "statusFull": {
+        "p50": 70.9,
+        "max": 71.5
+      },
+      "git-with-children": {
+        "calls": 2,
+        "totalMs": 52,
+        "p50": 26.5,
+        "p95": 26.5,
+        "max": 26.5
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 575092,
+      "daemonRssKiB": 190360,
+      "heapUsed": 103266272,
+      "fd": 83,
+      "inotifyInstances": 3,
+      "inotifyWatches": 214,
+      "acpChildren": 2
+    }
+  }
+]

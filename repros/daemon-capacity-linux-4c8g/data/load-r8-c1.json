@@ -1,0 +1,602 @@
+{
+  "label": "load-r8-c1",
+  "registered": 8,
+  "concurrency": 1,
+  "model": "qwen3.8-flash",
+  "startedAt": "2026-09-10T17:10:44.755Z",
+  "samples": [
+    {
+      "at": 6,
+      "totalRssKiB": 21956,
+      "daemonRssKiB": 21956,
+      "childCount": 0,
+      "totalFds": 3,
+      "memAvailableKiB": 6676784,
+      "loadavg": [
+        "0.10",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 2010,
+      "totalRssKiB": 491300,
+      "daemonRssKiB": 224024,
+      "childCount": 5,
+      "totalFds": 74,
+      "memAvailableKiB": 6320124,
+      "loadavg": [
+        "0.10",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 4012,
+      "totalRssKiB": 491400,
+      "daemonRssKiB": 228136,
+      "childCount": 3,
+      "totalFds": 61,
+      "memAvailableKiB": 6311148,
+      "loadavg": [
+        "0.09",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 6014,
+      "totalRssKiB": 488672,
+      "daemonRssKiB": 228388,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6311148,
+      "loadavg": [
+        "0.09",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 8016,
+      "totalRssKiB": 489000,
+      "daemonRssKiB": 228480,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6311148,
+      "loadavg": [
+        "0.08",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 10018,
+      "totalRssKiB": 451676,
+      "daemonRssKiB": 191072,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6303092,
+      "loadavg": [
+        "0.08",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 12021,
+      "totalRssKiB": 454912,
+      "daemonRssKiB": 193268,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6303152,
+      "loadavg": [
+        "0.08",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 14023,
+      "totalRssKiB": 455680,
+      "daemonRssKiB": 194012,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6303156,
+      "loadavg": [
+        "0.07",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 16026,
+      "totalRssKiB": 456268,
+      "daemonRssKiB": 194256,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6308200,
+      "loadavg": [
+        "0.07",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 18029,
+      "totalRssKiB": 420040,
+      "daemonRssKiB": 194272,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6315076,
+      "loadavg": [
+        "0.07",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 20032,
+      "totalRssKiB": 474620,
+      "daemonRssKiB": 194524,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6254200,
+      "loadavg": [
+        "0.07",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 22034,
+      "totalRssKiB": 474364,
+      "daemonRssKiB": 194524,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6254088,
+      "loadavg": [
+        "0.07",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 24036,
+      "totalRssKiB": 475188,
+      "daemonRssKiB": 194548,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6254092,
+      "loadavg": [
+        "0.06",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 26038,
+      "totalRssKiB": 475236,
+      "daemonRssKiB": 194572,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6254092,
+      "loadavg": [
+        "0.06",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 28041,
+      "totalRssKiB": 476488,
+      "daemonRssKiB": 194576,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6258616,
+      "loadavg": [
+        "0.06",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 30043,
+      "totalRssKiB": 476540,
+      "daemonRssKiB": 194584,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6268720,
+      "loadavg": [
+        "0.06",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 32045,
+      "totalRssKiB": 481712,
+      "daemonRssKiB": 199756,
+      "childCount": 3,
+      "totalFds": 59,
+      "memAvailableKiB": 6284056,
+      "loadavg": [
+        "0.06",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 34048,
+      "totalRssKiB": 466544,
+      "daemonRssKiB": 199756,
+      "childCount": 1,
+      "totalFds": 51,
+      "memAvailableKiB": 6294316,
+      "loadavg": [
+        "0.05",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 36050,
+      "totalRssKiB": 482568,
+      "daemonRssKiB": 199792,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299196,
+      "loadavg": [
+        "0.05",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 38052,
+      "totalRssKiB": 482888,
+      "daemonRssKiB": 199792,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299196,
+      "loadavg": [
+        "0.05",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 40054,
+      "totalRssKiB": 483160,
+      "daemonRssKiB": 199796,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299196,
+      "loadavg": [
+        "0.05",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 42057,
+      "totalRssKiB": 484052,
+      "daemonRssKiB": 199888,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299204,
+      "loadavg": [
+        "0.05",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 44059,
+      "totalRssKiB": 486552,
+      "daemonRssKiB": 199892,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299216,
+      "loadavg": [
+        "0.04",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 46062,
+      "totalRssKiB": 486612,
+      "daemonRssKiB": 199952,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299224,
+      "loadavg": [
+        "0.04",
+        "0.09",
+        "0.09"
+      ]
+    },
+    {
+      "at": 48064,
+      "totalRssKiB": 489260,
+      "daemonRssKiB": 199968,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6299232,
+      "loadavg": [
+        "0.12",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 50066,
+      "totalRssKiB": 489276,
+      "daemonRssKiB": 199980,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6300344,
+      "loadavg": [
+        "0.12",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 52069,
+      "totalRssKiB": 489292,
+      "daemonRssKiB": 199988,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6300344,
+      "loadavg": [
+        "0.12",
+        "0.10",
+        "0.09"
+      ]
+    },
+    {
+      "at": 54071,
+      "totalRssKiB": 490468,
+      "daemonRssKiB": 201128,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6300344,
+      "loadavg": [
+        "0.19",
+        "0.12",
+        "0.10"
+      ]
+    },
+    {
+      "at": 56074,
+      "totalRssKiB": 491552,
+      "daemonRssKiB": 201132,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6300344,
+      "loadavg": [
+        "0.19",
+        "0.12",
+        "0.10"
+      ]
+    },
+    {
+      "at": 58077,
+      "totalRssKiB": 494440,
+      "daemonRssKiB": 201532,
+      "childCount": 3,
+      "totalFds": 61,
+      "memAvailableKiB": 6301184,
+      "loadavg": [
+        "0.26",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 60080,
+      "totalRssKiB": 495464,
+      "daemonRssKiB": 201552,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301228,
+      "loadavg": [
+        "0.26",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 62082,
+      "totalRssKiB": 495736,
+      "daemonRssKiB": 201604,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301236,
+      "loadavg": [
+        "0.26",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 64084,
+      "totalRssKiB": 495756,
+      "daemonRssKiB": 201616,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301236,
+      "loadavg": [
+        "0.23",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 66086,
+      "totalRssKiB": 495768,
+      "daemonRssKiB": 201624,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301236,
+      "loadavg": [
+        "0.23",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 68089,
+      "totalRssKiB": 496040,
+      "daemonRssKiB": 201628,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301244,
+      "loadavg": [
+        "0.22",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 70092,
+      "totalRssKiB": 496048,
+      "daemonRssKiB": 201628,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301244,
+      "loadavg": [
+        "0.22",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 72094,
+      "totalRssKiB": 496048,
+      "daemonRssKiB": 201628,
+      "childCount": 3,
+      "totalFds": 60,
+      "memAvailableKiB": 6301100,
+      "loadavg": [
+        "0.22",
+        "0.13",
+        "0.10"
+      ]
+    },
+    {
+      "at": 74096,
+      "totalRssKiB": 481052,
+      "daemonRssKiB": 201628,
+      "childCount": 1,
+      "totalFds": 52,
+      "memAvailableKiB": 6301108,
+      "loadavg": [
+        "0.20",
+        "0.12",
+        "0.10"
+      ]
+    },
+    {
+      "at": 76100,
+      "totalRssKiB": 481084,
+      "daemonRssKiB": 201628,
+      "childCount": 1,
+      "totalFds": 52,
+      "memAvailableKiB": 6301108,
+      "loadavg": [
+        "0.20",
+        "0.12",
+        "0.10"
+      ]
+    },
+    {
+      "at": 78102,
+      "totalRssKiB": 481096,
+      "daemonRssKiB": 201636,
+      "childCount": 1,
+      "totalFds": 51,
+      "memAvailableKiB": 6301108,
+      "loadavg": [
+        "0.18",
+        "0.12",
+        "0.10"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "wallMs": 54955,
+      "ok": 1,
+      "failed": [],
+      "perPrompt": [
+        {
+          "i": 0,
+          "ms": 54955,
+          "stopReason": "end_turn"
+        }
+      ],
+      "peakTreeRssMiB": 480,
+      "minMemAvailMiB": 6108,
+      "treeAfter": {
+        "totalRssMiB": 468.5,
+        "daemonRssMiB": 198.1,
+        "childCount": 1,
+        "fds": 50,
+        "loadavg": [
+          "0.19",
+          "0.12",
+          "0.10"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "wallMs": 16919,
+      "ok": 1,
+      "failed": [],
+      "perPrompt": [
+        {
+          "i": 0,
+          "ms": 16919,
+          "stopReason": "end_turn"
+        }
+      ],
+      "peakTreeRssMiB": 484.4,
+      "minMemAvailMiB": 6108,
+      "treeAfter": {
+        "totalRssMiB": 469.8,
+        "daemonRssMiB": 196.9,
+        "childCount": 1,
+        "fds": 51,
+        "loadavg": [
+          "0.20",
+          "0.12",
+          "0.10"
+        ]
+      }
+    }
+  ],
+  "readyMs": 774,
+  "baseline": {
+    "totalRssMiB": 217.1,
+    "childCount": 0,
+    "memAvailMiB": 6360
+  },
+  "sessionsCreated": 1,
+  "settled": {
+    "totalRssMiB": 469.8,
+    "daemonRssMiB": 196.9,
+    "childCount": 1,
+    "memAvailMiB": 6153
+  },
+  "peakTreeRssMiB": 484.4,
+  "minMemAvailMiB": 6108,
+  "peakChildCount": 5,
+  "exitCode": 0,
+  "oomLines": [],
+  "finishedAt": "2026-09-10T17:12:04.962Z"
+}

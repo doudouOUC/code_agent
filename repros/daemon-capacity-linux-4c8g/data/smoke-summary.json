@@ -1,0 +1,43 @@
+[
+  {
+    "runLabel": "ladder-n1",
+    "count": 1,
+    "preheat": false,
+    "listenerMs": 476.3,
+    "readyMs": 1797.1,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 2.4,
+        "max": 2.4
+      },
+      "statusFull": {
+        "p50": 67.6,
+        "max": 70.1
+      },
+      "git": {
+        "calls": 1,
+        "totalMs": 29,
+        "p50": 28.8,
+        "p95": 28.8,
+        "max": 28.8
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 179904,
+      "daemonRssKiB": 179904,
+      "heapUsed": 95630376,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 2,
+      "acpChildren": 0
+    }
+  }
+]

@@ -1,0 +1,119 @@
+{
+  "control": {
+    "label": "control",
+    "slowGit": false,
+    "calls": [
+      {
+        "route": "/workspaces/<id>/git?wait=1",
+        "status": 200,
+        "body": {
+          "v": 2,
+          "workspaceCwd": "/root/cap/repos/ws000",
+          "branch": "main",
+          "detached": false,
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "conflicted": 0,
+          "hasUpstream": false,
+          "ahead": 0,
+          "behind": 0,
+          "stashCount": 0,
+          "computedAt": 1789057467255
+        },
+        "ms": 28
+      },
+      {
+        "route": "/workspaces/<id>/git?wait=1",
+        "status": 200,
+        "body": {
+          "v": 2,
+          "workspaceCwd": "/root/cap/repos/ws000",
+          "branch": "main",
+          "detached": false,
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "conflicted": 0,
+          "hasUpstream": false,
+          "ahead": 0,
+          "behind": 0,
+          "stashCount": 0,
+          "computedAt": 1789057467281
+        },
+        "ms": 26
+      },
+      {
+        "route": "/workspaces/<id>/git",
+        "status": 200,
+        "body": {
+          "v": 2,
+          "workspaceCwd": "/root/cap/repos/ws000",
+          "branch": "main",
+          "detached": false,
+          "staged": 0,
+          "unstaged": 0,
+          "untracked": 0,
+          "conflicted": 0,
+          "hasUpstream": false,
+          "ahead": 0,
+          "behind": 0,
+          "stashCount": 0,
+          "computedAt": 1789057467281
+        },
+        "ms": 2
+      }
+    ],
+    "modelRequests": 0,
+    "exitCode": 0,
+    "gitStderrLines": [
+      "2026-09-10T16:24:27.255Z [INFO] [DAEMON] route=GET /workspaces/4c7d9b84dee1ceed/git durationMs=26 status=200 request completed",
+      "2026-09-10T16:24:27.281Z [INFO] [DAEMON] route=GET /workspaces/4c7d9b84dee1ceed/git durationMs=24 status=200 request completed",
+      "2026-09-10T16:24:27.283Z [INFO] [DAEMON] route=GET /workspaces/4c7d9b84dee1ceed/git durationMs=0 status=200 request completed"
+    ]
+  },
+  "slow": {
+    "label": "slowgit",
+    "slowGit": true,
+    "calls": [
+      {
+        "route": "/workspaces/<id>/git?wait=1",
+        "status": 200,
+        "body": {
+          "v": 2,
+          "workspaceCwd": "/root/cap/repos/ws000",
+          "branch": "main"
+        },
+        "ms": 5008
+      },
+      {
+        "route": "/workspaces/<id>/git?wait=1",
+        "status": 200,
+        "body": {
+          "v": 2,
+          "workspaceCwd": "/root/cap/repos/ws000",
+          "branch": "main"
+        },
+        "ms": 5005
+      },
+      {
+        "route": "/workspaces/<id>/git",
+        "status": 200,
+        "body": {
+          "v": 2,
+          "workspaceCwd": "/root/cap/repos/ws000",
+          "branch": "main"
+        },
+        "ms": 5
+      }
+    ],
+    "modelRequests": 0,
+    "exitCode": 0,
+    "gitStderrLines": [
+      "qwen serve: daemon log → /root/cap/fixtures/probe-slowgit/runtime/debug/daemon/daemon.log",
+      "2026-09-10T16:24:34.180Z [INFO] [DAEMON] route=GET /workspaces/4c7d9b84dee1ceed/git durationMs=5006 status=200 request completed",
+      "2026-09-10T16:24:39.185Z [INFO] [DAEMON] route=GET /workspaces/4c7d9b84dee1ceed/git durationMs=5004 status=200 request completed",
+      "2026-09-10T16:24:39.190Z [INFO] [DAEMON] route=GET /workspaces/4c7d9b84dee1ceed/git durationMs=3 status=200 request completed"
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+[
+  {
+    "concurrency": 1,
+    "readyMs": 774,
+    "baseline": {
+      "totalRssMiB": 217.1,
+      "childCount": 0,
+      "memAvailMiB": 6360
+    },
+    "settled": {
+      "totalRssMiB": 469.8,
+      "daemonRssMiB": 196.9,
+      "childCount": 1,
+      "memAvailMiB": 6153
+    },
+    "peakTreeRssMiB": 484.4,
+    "minMemAvailMiB": 6108,
+    "peakChildCount": 5,
+    "turns": [
+      {
+        "turn": 1,
+        "wallMs": 54955,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 54955,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 480,
+        "minMemAvailMiB": 6108,
+        "treeAfter": {
+          "totalRssMiB": 468.5,
+          "daemonRssMiB": 198.1,
+          "childCount": 1,
+          "fds": 50,
+          "loadavg": [
+            "0.19",
+            "0.12",
+            "0.10"
+          ]
+        }
+      },
+      {
+        "turn": 2,
+        "wallMs": 16919,
+        "ok": 1,
+        "failed": [],
+        "perPrompt": [
+          {
+            "i": 0,
+            "ms": 16919,
+            "stopReason": "end_turn"
+          }
+        ],
+        "peakTreeRssMiB": 484.4,
+        "minMemAvailMiB": 6108,
+        "treeAfter": {
+          "totalRssMiB": 469.8,
+          "daemonRssMiB": 196.9,
+          "childCount": 1,
+          "fds": 51,
+          "loadavg": [
+            "0.20",
+            "0.12",
+            "0.10"
+          ]
+        }
+      }
+    ],
+    "exitCode": 0,
+    "oomLines": []
+  }
+]

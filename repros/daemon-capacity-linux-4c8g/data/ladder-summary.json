@@ -1,0 +1,207 @@
+[
+  {
+    "runLabel": "ladder-n1",
+    "count": 1,
+    "preheat": false,
+    "listenerMs": 474.9,
+    "readyMs": 1784.5,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 2.4,
+        "max": 2.5
+      },
+      "statusFull": {
+        "p50": 66,
+        "max": 67.3
+      },
+      "git": {
+        "calls": 1,
+        "totalMs": 27,
+        "p50": 27.4,
+        "p95": 27.4,
+        "max": 27.4
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 179528,
+      "daemonRssKiB": 179528,
+      "heapUsed": 95630512,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 2,
+      "acpChildren": 0
+    }
+  },
+  {
+    "runLabel": "ladder-n25",
+    "count": 25,
+    "preheat": false,
+    "listenerMs": 542.9,
+    "readyMs": 854.4,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 2.6,
+        "max": 3
+      },
+      "statusFull": {
+        "p50": 67.3,
+        "max": 68.2
+      },
+      "git": {
+        "calls": 25,
+        "totalMs": 25034,
+        "p50": 1043.7,
+        "p95": 1058.2,
+        "max": 1058.4
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 199060,
+      "daemonRssKiB": 199060,
+      "heapUsed": 106838704,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 26,
+      "acpChildren": 0
+    }
+  },
+  {
+    "runLabel": "ladder-n64",
+    "count": 64,
+    "preheat": false,
+    "listenerMs": 559,
+    "readyMs": 1034,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 2.7,
+        "max": 2.9
+      },
+      "statusFull": {
+        "p50": 68,
+        "max": 70.1
+      },
+      "git": {
+        "calls": 64,
+        "totalMs": 65607,
+        "p50": 1041.3,
+        "p95": 1055.2,
+        "max": 1062.7
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 204640,
+      "daemonRssKiB": 204640,
+      "heapUsed": 111602152,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 65,
+      "acpChildren": 0
+    }
+  },
+  {
+    "runLabel": "ladder-n128",
+    "count": 128,
+    "preheat": false,
+    "listenerMs": 581.2,
+    "readyMs": 1117.5,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 2.9,
+        "max": 3.8
+      },
+      "statusFull": {
+        "p50": 69.8,
+        "max": 70.2
+      },
+      "git": {
+        "calls": 128,
+        "totalMs": 131936,
+        "p50": 1038.3,
+        "p95": 1056.7,
+        "max": 1058.3
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 214376,
+      "daemonRssKiB": 214376,
+      "heapUsed": 120138016,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 129,
+      "acpChildren": 0
+    }
+  },
+  {
+    "runLabel": "ladder-n256",
+    "count": 256,
+    "preheat": false,
+    "listenerMs": 633.1,
+    "readyMs": 1307.1,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "capabilities": {
+        "p50": 3.7,
+        "max": 5
+      },
+      "statusFull": {
+        "p50": 70.6,
+        "max": 71.6
+      },
+      "git": {
+        "calls": 256,
+        "totalMs": 264935,
+        "p50": 1039.4,
+        "p95": 1053.7,
+        "max": 1066.3
+      }
+    },
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 231872,
+      "daemonRssKiB": 231872,
+      "heapUsed": 136023088,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 257,
+      "acpChildren": 0
+    }
+  }
+]

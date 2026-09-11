@@ -1,0 +1,36 @@
+[
+  {
+    "runLabel": "children-n1-a2",
+    "count": 1,
+    "preheat": false,
+    "listenerMs": 472.4,
+    "readyMs": 1784.7,
+    "error": "Error: /workspaces/undefined/runtime/ensure -> 400 {\"error\":\"`:workspace` must decode to a workspace id or absolute path\",\"code\":\"workspace_mismatch\"}",
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "git": {
+        "calls": 1,
+        "totalMs": 28,
+        "p50": 27.6,
+        "p95": 27.6,
+        "max": 27.6
+      }
+    },
+    "finalSample": {
+      "tag": "ensured-1",
+      "treeRssKiB": 434912,
+      "daemonRssKiB": 213072,
+      "heapUsed": 103400568,
+      "fd": 59,
+      "inotifyInstances": 2,
+      "inotifyWatches": 106,
+      "acpChildren": 1
+    }
+  }
+]

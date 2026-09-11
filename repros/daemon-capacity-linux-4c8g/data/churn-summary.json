@@ -1,0 +1,90 @@
+[
+  {
+    "runLabel": "churn-n256",
+    "count": 1,
+    "preheat": false,
+    "listenerMs": 474.6,
+    "readyMs": 1790.3,
+    "cleanup": {
+      "exitCode": 0,
+      "signalCode": null,
+      "portClosed": true,
+      "leftoverPids": [],
+      "daemonAlive": false
+    },
+    "latency": {
+      "git-cycle-1": {
+        "calls": 256,
+        "totalMs": 264703,
+        "p50": 1038.1,
+        "p95": 1054.1,
+        "max": 1064.1
+      },
+      "git-cycle-2": {
+        "calls": 256,
+        "totalMs": 264476,
+        "p50": 1036.8,
+        "p95": 1055.1,
+        "max": 1060.1
+      },
+      "git-cycle-3": {
+        "calls": 256,
+        "totalMs": 265103,
+        "p50": 1039.3,
+        "p95": 1055.3,
+        "max": 1063.7
+      }
+    },
+    "cycleStats": [
+      {
+        "cycle": 1,
+        "durationMs": 269627,
+        "loadedRssKiB": 227288,
+        "loadedInotify": 1,
+        "loadedWatches": 257,
+        "loadedFd": 33,
+        "drainedRegistered": 1,
+        "drainedRssKiB": 235024,
+        "drainedInotify": 1,
+        "drainedWatches": 2,
+        "drainedFd": 31
+      },
+      {
+        "cycle": 2,
+        "durationMs": 269251,
+        "loadedRssKiB": 256600,
+        "loadedInotify": 1,
+        "loadedWatches": 257,
+        "loadedFd": 33,
+        "drainedRegistered": 1,
+        "drainedRssKiB": 257920,
+        "drainedInotify": 1,
+        "drainedWatches": 2,
+        "drainedFd": 31
+      },
+      {
+        "cycle": 3,
+        "durationMs": 269862,
+        "loadedRssKiB": 226992,
+        "loadedInotify": 1,
+        "loadedWatches": 257,
+        "loadedFd": 33,
+        "drainedRegistered": 1,
+        "drainedRssKiB": 234804,
+        "drainedInotify": 1,
+        "drainedWatches": 2,
+        "drainedFd": 31
+      }
+    ],
+    "finalSample": {
+      "tag": "after-gc",
+      "treeRssKiB": 190624,
+      "daemonRssKiB": 190624,
+      "heapUsed": 96041328,
+      "fd": 32,
+      "inotifyInstances": 1,
+      "inotifyWatches": 2,
+      "acpChildren": 0
+    }
+  }
+]
