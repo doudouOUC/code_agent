@@ -118,6 +118,16 @@ R2.S1 已进入施工，其余两片仍是设计。R2.S1 拆为 R2.S1a 记录格
 
 证据：既有 Goal 端到端用例扩成一条完整链——先写一条 assistant 轮次作为证据记录（带 permit 的 `goalContext`）、再写带 `checkpointPending` 与 `evidenceCursor` 的 goal 快照，然后断言 restore 的窗口**等于**用同一批投影记录调用共享 builder 的结果，即「Managed 路径与 legacy 算的是同一个窗口」，而不只是「产出了某个窗口」。该用例同时诚实记录本夹具的判定是 `shouldCheckpoint: false`——一条证据记录低于 80 条/19.2 KB 两个阈值，凑够阈值只为翻转一个布尔值会让用例多写 80 条记录而信号不变。**反向对照**：把窗口固定成 undefined 后该用例立即失败。`src/managed-runtime`、`src/services`、`src/goals`、`src/config` 合计 93 个文件 3977 项通过、21 项跳过，仓库 build/typecheck、eslint 与 prettier 通过。
 
+**上游对齐已实测并给出解决图（本轮未提交合并）**：按「先对齐上游再接线」的决定，用显式 remote-tracking ref（`origin/main`，避免 `FETCH_HEAD` 被后续 fetch 污染这个已知坑）重新取到 `f649d65d1f`，基底仍为 `8ca93b4902`，此时上游多 **470** commit、本分支多 **74** commit。先做**不动工作树**的 `git merge-tree --write-tree` 干跑，再实际起 merge 度量，结果：**35 个冲突文件、约 105 个冲突块**，且分布极不均匀——
+
+- `packages/cli/src/acp-integration/acpAgent.ts` **24** 块、`packages/acp-bridge/src/bridge.ts` **20** 块、`packages/cli/src/acp-integration/session/Session.ts` **9** 块，三者合计过半，来自更早阶段的 ACP 改造（不是本轮 Session 层工作）。
+- 本轮 Session 层改动的文件反而几乎干净：`core/config.ts`、`session-transcript-reader.ts`、`utils/sessionStorageUtils.ts`、`utils/transcript-records.ts` 各 **1** 块，`sessionService.ts` **4** 块。
+- 两个 `UD`（上游删除、本分支修改）：`packages/cli/src/utils/envVarResolver.ts` 及其测试——上游已删除该模块，接受删除前必须先确认本分支对它的修改是否承载功能。
+
+**已确定的解决方案（下次可直接照做）**：①`transcript-records.ts` 与 `sessionStorageUtils.ts` 都是「两侧各加相邻行」，**两边都留**（前者 `session_execution_engine` + `session_sources_snapshot`；后者四个 import 全留）。②`session-transcript-reader.ts` 的 `buildIndex` **不能二选一**：本分支用 `executionEngine.parseLine(text, filePath)` 兼做引擎归属累计，上游改用 `jsonl.parseLineTolerantWithIntegrity` 并把 `parsed.complete` 累进 `sourceReadComplete`；而 `SessionExecutionEngineAccumulator.parseLine` **内部已经算了** `parsed.complete`（用于自己的 `reason`）却只返回 `records`，把完整性吞掉了。正确解法是让它返回 `{records, complete}` 并改其调用点，两个语义都保住——**任选一边都会静默丢掉一侧行为**。
+
+**本轮为何不提交这次合并**：剩余约 100 个冲突块集中在我并未编写的 ACP 阶段代码里，草率解冲突会静默丢掉某一侧行为，且半解状态不适合交接。因此已 `git merge --abort` 回到干净树；工作树与分支保持在 `203f7f3068`，另留本地保险 ref `backup/pre-upstream-merge-2026-09-11`（未推送）。建议下次以此图为序单独进行：先本轮 5 个核心文件 → `run-qwen-serve.ts`/`server.test.ts` 等 1～4 块的文件 → 最后 acpAgent/bridge/Session 三件套，每组解完即 build+typecheck+定向测试。**另需复核**：本文所有「读取路径已覆盖」的结论只针对旧基底成立，合并后 `session-transcript-reader.ts` 的索引与 turn 导航都变了，必须在新基底上重跑一遍证据。
+
 **一处与本改动无关的既有失败**：`src/config/storage.test.ts` 的 `ensureAuditFallbackDir` 5 项在本机失败（symlink 夹具 EEXIST／「Path is a directory」）。已在**未改动的主检出**（`main` @ `421393d51d`）复跑同一文件，失败完全一致，故为本机环境（Node v24.18）既有问题，不由本切片引入，也不在本切片修复范围。
 
 **一处测试稳定性需留意**：全量并跑 74 个套件时 `session-writer-lease` 的「elects exactly one certified replacement for a sealed session」曾在 10s 超时失败，**单独跑该套件 99 项全绿**。该用例 fork 子进程抢锁且超时较紧，而本轮新增套件都是真实 lease + 真实文件 I/O，因此**更可能是我加重并行争用把它顶过超时**，而非逻辑被破坏。上 CI 前建议给它放宽超时或串行化，不要当成无关抖动忽略。
