@@ -96,7 +96,7 @@ R2.S1 已进入施工，其余两片仍是设计。R2.S1 拆为 R2.S1a 记录格
 
 **一处测试稳定性需留意**：全量并跑 74 个套件时 `session-writer-lease` 的「elects exactly one certified replacement for a sealed session」曾在 10s 超时失败，**单独跑该套件 99 项全绿**。该用例 fork 子进程抢锁且超时较紧，而本轮新增套件都是真实 lease + 真实文件 I/O，因此**更可能是我加重并行争用把它顶过超时**，而非逻辑被破坏。上 CI 前建议给它放宽超时或串行化，不要当成无关抖动忽略。
 
-**下一步**：`loadSession` 与两条 restore 路径都能投影了，剩下的读取缺口是 `readTurnIndexPage`（turn 导航分页）。之后按 R2.3 让四处普通 factory（primary／启动时 secondary／dynamic replacement／直接嵌入 daemon）开启 `managedSessionLogEnabled`，daemon 默认路径才真正换成 Managed。随后补 `chat_compression`/`goal_state`/`file_history_snapshot` 映射与物理 writer 交接，然后进 R2.S3。
+**下一步（顺序已由一条依赖链定死）**：`chat_compression` 归 `context.compacted`，而该事件的合法 actor 只有 `harness`（见 `managed-session-records.ts` 的 actor 表），当前装配传的是 `activation: () => undefined`、记录一律归可信入口，因此**在有 activation 之前这条映射根本提交不上去**；而压缩未映射时 sink 会拒绝，`flush()` 随之抛错、recorder 进 `integrity_failed`——也就是说**任何会压缩上下文的 Managed 会话都会硬失败**。所以开启开关前必须先有 activation，而不是先接 factory。现成部件已在仓库里但**没有生产调用者**：`FileManagedActivationStore`、`EmbeddedHarnessScheduler`、`ManagedPromptAdmissionController` 只被彼此与 `index.ts` 引用，且它们是**独立的文件级 activation 存储**，与 authority 日志里的 `activation.changed`／fence 尚未打通。因此顺序是：①把 activation 接到 authority（R2.S2 核心，让 sink 能以 harness 身份提交）→ ②补 `chat_compression`/`goal_state`/`file_history_snapshot` 映射 → ③`readTurnIndexPage` 等 turn 导航读取器 → ④R2.3 逐处 factory 开启 `managedSessionLogEnabled` → ⑤物理 writer 交接与 R2.S3。
 
 **给恢复者的两点提醒**：一是本文件每片都同时写了证据与边界，包括两处我中途撤回的判断（rename 并未被引擎守卫覆盖；lock schema 3 不是屏障主体，sealing 才是），复核时以边界描述为准而不是只看通过数；二是本轮四个缺陷是靠测试或独立审查发现而非推理得出的（并发提交损坏日志、恢复删掉 header、引擎读取器把 Managed 误判为已验证 legacy、运行时 subtype 未注册），因此建议保持同样的小切片 + 每片独立审查节奏，不要为省时间合并成大片。
 
