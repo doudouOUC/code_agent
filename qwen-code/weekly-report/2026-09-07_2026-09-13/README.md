@@ -2,13 +2,13 @@
 
 > 本文件已整理 2026-09-07 至 2026-09-13（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: relaxed Conversations ownership runtime 切换、WebShell 历史浏览/轮询/浏览器通知与点击导航、CI/housekeeping 稳定性、Mem0 Auto Recall/写入/删除、ACP submitted prompt provenance、Channel worktree 路由恢复与删除回收、workspace 容量策略解耦与256注册扩容
+**主题**: relaxed Conversations ownership runtime 切换、WebShell 历史浏览/轮询/浏览器通知与点击导航、CI/housekeeping 稳定性、Mem0 Auto Recall/写入/删除、ACP submitted prompt provenance、Channel worktree 路由恢复与删除回收、workspace 容量策略解耦与256注册扩容、Linux bwrap 内核沙箱、ACP child heap 哨兵修复、Shell 输出预算单一决策
 
-**PR 统计**: 18 PRs - 17 merged / 1 open / 0 closed
-**当前已合并 PR 代码量**: +23,655 / -1,000，276 个文件变更
-**全量代码量**: +25,920 / -1,175，299 个文件变更
-**类型分布**: feat ×9, fix ×7, refactor ×1, perf ×1
-**范围 (scope)**: serve/daemon ×8, web-shell ×9, channels ×3, external-context ×5, core/writer-lease ×1, ci ×1, docs/design ×12
+**PR 统计**: 21 PRs - 19 merged / 2 open / 0 closed
+**当前已合并 PR 代码量**: +26,014 / -1,271，303 个文件变更
+**全量代码量**: +30,233 / -1,329，326 个文件变更
+**类型分布**: feat ×10, fix ×9, refactor ×1, perf ×1
+**范围 (scope)**: serve/daemon ×9, web-shell ×9, channels ×3, external-context ×5, cli/sandbox ×1, core/tool-budget ×1, core/writer-lease ×1, ci ×1, docs/design ×14
 
 ---
 
@@ -31,9 +31,12 @@
 | [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | ✅ merged | @doudouOUC | fix(external-context): Align deletion responses with Mem0 SDK | +92/-77 | 6 | 09-08 15:51 | 09-09 07:09 |
 | [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | ✅ merged | @doudouOUC | feat(web-shell): add opt-in browser task notifications | +1530/-54 | 12 | 09-08 15:53 | 09-09 05:46 |
 | [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | ✅ merged | @doudouOUC | refactor(serve): decouple workspace capacity policies | +2293/-12 | 12 | 09-09 03:13 | 09-09 06:25 |
-| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | 🟡 open | @doudouOUC | feat(web-shell): enrich browser notifications and open target sessions | +2265/-175 | 23 | 09-09 06:51 | — |
+| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | ✅ merged | @doudouOUC | feat(web-shell): enrich browser notifications and open target sessions | +2265/-175 | 23 | 09-09 06:51 | 09-11 02:27 |
 | [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | ✅ merged | @doudouOUC | fix(acp): Preserve submitted prompt provenance for auto recall | +744/-71 | 38 | 09-09 07:57 | 09-10 15:18 |
 | [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | ✅ merged | @doudouOUC | feat(serve): support 256 workspaces by default | +1857/-175 | 33 | 09-10 02:23 | 09-10 11:57 |
+| [#11614](https://github.com/QwenLM/qwen-code/pull/11614) | 🟡 open | @doudouOUC | feat(cli): add bwrap kernel sandbox backend for Linux | +3312/-27 | 15 | 09-11 03:20 | — |
+| [#11653](https://github.com/QwenLM/qwen-code/pull/11653) | ✅ merged | @doudouOUC | fix(acp-bridge): reject unlimited cgroup sentinel for ACP child heaps | +94/-96 | 4 | 09-11 10:16 | 09-12 04:42 |
+| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | 🟡 open | @doudouOUC | fix(core): let the producer's own budget decide shell output size | +907/-31 | 8 | 09-12 14:59 | — |
 
 ---
 
@@ -56,9 +59,12 @@
 | [#11397](https://github.com/QwenLM/qwen-code/pull/11397) | #11337 对DELETE英文message与额外字段做固定匹配，真实Holo已删除目标却因回执 `Memory <id> deleted successfully.` 被报为unknown。 | 最终接受任意成功HTTP状态并要求1MiB内严格UTF-8 JSON可解析，不再解释provider字段；仍只有精确post-delete GET确认absence才报deleted，空/204、坏JSON、非成功状态与目标仍存在均unknown且不重试。 | 已更新 External Context 的最终兼容口径。完整实现见 [implementations/pr-11397.md](implementations/pr-11397.md)。 |
 | [#11398](https://github.com/QwenLM/qwen-code/pull/11398) | 已离开WebShell窗口的用户只能靠侧栏未读状态发现任务完成，浏览器没有本地、显式opt-in的终态提醒。 | 最终在standalone WebShell设置中加入默认关闭、origin-local且跨tab同步的开关；只对后台已观察的完成/失败turn发通用通知，以pane/page和可用时Web Locks+storage去重，取消、历史和前台已消费终态静默。 | 已更新 WebUI transport 的浏览器通知最终实现。完整实现见 [implementations/pr-11398.md](implementations/pr-11398.md)。 |
 | [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | 单个 `MAX_DAEMON_WORKSPACES` 同时控制注册准入、ACP child建模和Channel控制超时，单纯扩容会意外改变三个独立契约。 | 最终保留三个现有值但拆分所有权：CLI注册仍限25，child模型仍最多25且只观测，Channel默认事务预算仍为2,130,000ms；旧公开常量保留为deprecated兼容导出，256注册与LRU只留在后续设计。 | 已更新 daemon资源预算与总览。完整实现见 [implementations/pr-11428.md](implementations/pr-11428.md)。 |
-| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | #11398通用通知不能辨认具体任务，点击也只聚焦原窗口，用户仍需手工找到原会话。 | 当前open diff加入会话标题、本轮提问/回复有界纯文本摘要和图标，并携带workspace/standalone/Live目标；点击通过实例内事件验证上下文后打开原会话。最新修正让storage不可读时保持关闭，保留泛型/比较符/围栏HTML并清理split状态；尚未进入`main`。 | 已在 WebUI transport 登记open增强方案。完整观察见 [implementations/pr-11447.md](implementations/pr-11447.md)。 |
+| [#11447](https://github.com/QwenLM/qwen-code/pull/11447) | #11398通用通知不能辨认具体任务，点击也只聚焦原窗口，用户仍需手工找到原会话。 | 最终加入会话标题、本轮提问/回复有界纯文本摘要和图标，并携带workspace/standalone/Live目标；点击通过实例内事件验证上下文后打开原会话。storage不可读时保持关闭，文本清理保留泛型/比较符/围栏HTML，健康当前会话只清理面板和split状态而不重复load。 | 已把 WebUI transport 从open方案更新为最终实现。完整实现见 [implementations/pr-11447.md](implementations/pr-11447.md)。 |
 | [#11455](https://github.com/QwenLM/qwen-code/pull/11455) | daemon/ACP fresh turn原来只有model-bound `prompt`，缺少Auto Recall要求的 `submitted_prompt`；直接从所有fresh请求推断又会误召回scheduled/sub-session/Live机器输入。 | 最终由WebShell及显式opt-in客户端逐请求声明扩展前原文；REST/ACP/bridge剥离可伪造public/private metadata，只沿trusted context转成private声明，Session仅对fresh、非channel、非空白声明发布字段，不从request/display回退。 | 已更新 Hooks 与 External Context 的最终producer/trust边界。完整实现见 [implementations/pr-11455.md](implementations/pr-11455.md)。 |
 | [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | 25个注册工作区上限阻塞多仓库用户，直接改常量又会联动放大session、Channel事务和持久化边界。 | 最终默认注册容量提升为256并支持operator环境覆盖；启动/恢复/dynamic/scratch/store共享同一上限，扩容模式默认总session限800，store支持255条secondary/8 MiB，Channel owner仍独立限25并公布capacity。 | 已更新 daemon资源预算、总览与feature索引。完整实现见 [implementations/pr-11515.md](implementations/pr-11515.md)。 |
+| [#11614](https://github.com/QwenLM/qwen-code/pull/11614) | Linux没有容器运行时时，现有sandbox选择无法提供内核级文件系统约束，worktree外置Git元数据又要求精确可写授权。 | 当前open diff新增显式`bwrap` backend：宿主根只读、规范化最小可写根并核验linked-worktree反向指针；`qwen sandbox`报告/验证边界，closed网络仅unshare net且保留宿主PID与`/tmp`。HOME祖先授权、不可运行backend和缺失容器镜像均fail closed。 | 新增 Linux kernel sandbox 方案；尚不能视为`main`能力。完整观察见 [implementations/pr-11614.md](implementations/pr-11614.md)。 |
+| [#11653](https://github.com/QwenLM/qwen-code/pull/11653) | 无cgroup限额的Linux可由libuv返回巨大“无限制”哨兵，旧spawn路径据此把每个ACP child老生代上限抬到16 GiB，与宿主和daemon状态模型严重偏离。 | 最终让`getAcpMemoryArgs()`复用`detectAvailableMemoryMb()`，只有真实且低于宿主的cgroup limit才作为可用内存；其余按host total取一半并封顶16 GiB，既有raise-only守卫、缓存与`--expose-gc`不变。 | 已更新 daemon资源预算与总览；#8182的raise-only缺口仍未解决。完整实现见 [implementations/pr-11653.md](implementations/pr-11653.md)。 |
+| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | Shell先按自身预算保留头尾，scheduler又用更低的通用门槛做head-only外置，默认配置下中间尺寸反而丢失退出码和尾部错误。 | 当前open diff让真正执行过producer预算检查的结果携带`outputBudgetApplied`，通用单结果gate只对该正文让行；Shell预留后续提示/告警字符，timeout详情按producer预算再次封顶，独立错误、hook追加内容、per-tool组合预算和batch finalizer仍受限。 | 已更新 Shell与最终工具响应预算方案；尚不能视为`main`能力。完整观察见 [implementations/pr-11727.md](implementations/pr-11727.md)。 |
 
 ## PR 对应 feature 覆盖
 
@@ -68,10 +74,12 @@
 | [daemon ACP bridge and permission](../../feature/daemon-serve-mode/07-acp-bridge-and-permission.md) | #11207(merged) | 将 global owner cutover 与 mandatory session writer fence 的关系更新为已落地。 |
 | [Scheduled Tasks](../../feature/scheduled-tasks.md) | #11207(merged) | 更新relaxed ownership cutover后mandatory lease、唯一controller binding与at-least-once边界。 |
 | [capabilities and protocol](../../feature/daemon-serve-mode/04-capabilities-and-protocol.md) | #11339(merged) | 登记optional live-state interval capability与旧daemon五秒fallback。 |
-| [WebUI and transport](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #11207/#11208/#11311/#11322/#11323/#11339/#11398/#11455(merged), #11447(open) | 登记writer-blocked恢复、连续历史/rail、generic MCP参数预览、导航timer/首帧请求修复、live-state协商、浏览器通知最终实现/open增强，以及WebShell显式submitted prompt producer。 |
+| [WebUI and transport](../../feature/daemon-serve-mode/11-webui-and-transport.md) | #11207/#11208/#11311/#11322/#11323/#11339/#11398/#11447/#11455(merged) | 登记writer-blocked恢复、连续历史/rail、generic MCP参数预览、导航timer/首帧请求修复、live-state协商、浏览器通知及点击导航最终实现，以及WebShell显式submitted prompt producer。 |
 | [Channel adapters](../../feature/channel-adapters.md) | #11308(merged), #11309(merged) | 更新worktree route managed restore与ownership-verified delete cleanup最终实现。 |
-| [daemon resource budgeting](../../feature/daemon-serve-mode/13-resource-budgeting.md) | #11428/#11515(merged) | 区分行为保持型容量owner解耦与P1默认256注册扩容，记录800 total-session、255条secondary/8 MiB store和25个Channel owner边界。 |
+| [daemon resource budgeting](../../feature/daemon-serve-mode/13-resource-budgeting.md) | #11428/#11515/#11653(merged) | 区分容量owner解耦、P1默认256注册扩容与child heap无限cgroup哨兵修复；raise-only和observe-only边界保持不变。 |
 | [Direct External Context](../../feature/external-context-provider.md) | #11246/#11311/#11337/#11397/#11455(merged) | 增补configurable Mem0 Auto Recall、writer、显式删除、DELETE兼容及显式ACP/daemon submitted prompt producer最终实现。 |
 | [Hooks / submitted prompt provenance](../../feature/hooks.md) | #11455(merged) | 登记逐请求public声明、bridge private转发、fresh非channel hook发布及缺失时不推断的最终边界。 |
+| [Linux kernel sandbox](../../feature/linux-kernel-sandbox.md) | #11614(open) | 登记bwrap只读宿主根、最小可写root/worktree Git授权、自检与网络/PID/Unix socket边界；当前仅为open方案。 |
+| [Shell tool semantics](../../feature/shell-tool.md) / [final tool response budget](../../feature/tool-response-budget.md) | #11727(open) | 登记producer预算标记与generic single-result gate让行，保留组合与batch预算；当前仅为open方案。 |
 
-_按个人 PR 口径更新于 2026-09-11_
+_按个人 PR 口径更新于 2026-09-13_

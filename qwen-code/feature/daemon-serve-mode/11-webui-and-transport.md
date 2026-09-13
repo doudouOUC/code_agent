@@ -479,9 +479,9 @@ Provider mount 前先按 `?context=standalone|live` 分类：standalone deep lin
 
 ## 2026-09-10 follow-up：通知内容、品牌与点击导航
 
-#11447当前仍为open。当前diff在#11398终态事实之上，按`promptId`从完成transcript投影中提取顶层user/assistant block；admission label或pending event文本作为prompt fallback。通知标题使用应用名与最多60个Unicode code point的session title，正文包含本地化状态、最多80个code point的本轮提问和最多120个code point的回复纯文本摘要；failed turn不展示部分回复或错误详情，并提供随包图标。
+#11447已合入。最终实现在#11398终态事实之上，按`promptId`从完成transcript投影中提取顶层user/assistant block；admission label或pending event文本作为prompt fallback。通知标题使用应用名与最多60个Unicode code point的session title，正文包含本地化状态、最多80个code point的本轮提问和最多120个code point的回复纯文本摘要；failed turn不展示部分回复或错误详情，并提供随包图标。
 
-binding捕获workspace、standalone或Live session target。点击通知后向所属WebShell实例的私有`EventTarget`派发导航事件，App复核context与locked workspace，退出settings/split view并复用既有session loader；健康current session只收起panel，不重新load，并显式清理受控split状态、恢复chat底部跟随。`WebShellWithProviders.browserNotifications`允许嵌入宿主配置默认值、app name和icon；默认关闭，而内置standalone当前diff传`defaultEnabled:true`，只在storage明确返回“无保存偏好”时启用，storage不可读保持关闭，且仍不自动请求权限。最新文本清理保留TypeScript泛型、比较运算符及代码围栏中的HTML。标题/提问/回复会进入系统通知中心或锁屏，这一open方案尚未进入`main`。
+binding捕获workspace、standalone或Live session target。点击通知后向所属WebShell实例的私有`EventTarget`派发导航事件，App复核context与locked workspace，退出settings/split view并复用既有session loader；健康current session只收起panel，不重新load，并显式清理受控split状态、恢复chat底部跟随。`WebShellWithProviders.browserNotifications`允许嵌入宿主配置默认值、app name和icon；默认关闭，而内置standalone传`defaultEnabled:true`，只在storage明确返回“无保存偏好”时启用，storage不可读保持关闭，且仍不自动请求权限。最终文本清理保留TypeScript泛型、比较运算符及代码围栏中的HTML。标题/提问/回复会进入系统通知中心或锁屏，页面仍须运行且权限仍需用户显式授予。
 
 ## 2026-09-11 follow-up：WebShell submitted prompt 显式声明（#11455 merged）
 
@@ -536,4 +536,4 @@ daemon action只在producer提供字符串时写public `_meta["qwen.submittedPro
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-11_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-13_

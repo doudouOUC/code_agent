@@ -1,6 +1,6 @@
 # daemon 资源预算、容量模型与公平调度
 
-> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget、#9380 已合入的 ACP child peak old-generation measurement、#11428 已合入的容量策略常量解耦，以及 #11515 已合入的默认256注册容量。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
+> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget、#9380 已合入的 ACP child peak old-generation measurement、#11428 已合入的容量策略常量解耦、#11515 已合入的默认256注册容量，以及#11653已合入的ACP child heap无限cgroup哨兵修复。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
 
 ## 背景
 
@@ -124,6 +124,12 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 
 持久化仍用schema version 1，结构上限调整为255条secondary记录和8 MiB，并在atomic write前检查序列化UTF-8字节。Channel控制独立限制25个owner，准入覆盖current、pending、candidate及recovery保留owner并集，超限返回`channel_control_workspace_limit_reached`；原2,130,000ms SDK事务预算、observe-only ACP child模型和spawn argv都不变。默认256仍是policy，不是256个active runtime或800个模型session的资源安全证明。
 
+## ACP child heap 无限 cgroup 哨兵（#11653 已合入）
+
+#11653修复spawn argv与daemon状态模型使用不同“可用内存”来源的问题。Node/libuv在无cgroup限额时可能返回接近2^63或2^64的无限哨兵；旧spawn路径只判断正数，按其一半计算后总会撞到16 GiB封顶。最终`getAcpMemoryArgs()`复用`detectAvailableMemoryMb()`：只有正数且严格低于host total的constraint才有效，无限、等于或高于host的值都回退宿主内存。
+
+50%比例、16,384 MiB上限、进程内一次性cache、只在目标高于当前V8 heap limit时下发的raise-only guard，以及`--expose-gc`均未改变。测试覆盖v1/v2哨兵、超宿主/等宿主、真实6/4/2 GiB限制、相等heap limit和64 GiB封顶，并锁定spawn/model常量一致性。该修复只收敛输入值；#8182的低内存raise-only缺口、按child切分、RSS enforcement和spawn admission仍未实现。
+
 ## 当前未接入项
 
 #8093 明确不做以下事情：
@@ -140,6 +146,7 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 - #8911 已对 daemon-owned ACP child 的 raw NDJSON 与 decoded inbound queue 接入固定 bounds，但不覆盖 ACP SDK handler/outbound/pending-response/outstanding request 队列。
 - #8947 已补 handler/outbound/request 队列 guard；#9007 已补 ACP HTTP pre-attach buffered reply byte budget 和 delivery-owned lease，但普通 live SSE/WS 新帧队列、单帧 stringify 瞬时放大、远端 exactly-once receipt 和完整 frame/session backpressure 不在本 PR 内。
 - #11428 只解耦三个容量owner；#11515已把注册默认/上限提升到256，但仍不实现runtime休眠/LRU，也不把child heap模型推进到enforcement。800 total-session与25 Channel owner是独立策略上限，不是内存安全证明。
+- #11653只拒绝无限/超宿主cgroup值并复用状态模型的可用内存探测；raise-only guard仍可能让child继承高于模型ceiling的V8默认值。
 
 这些内容应在后续 PR 按 route ownership、error taxonomy 与 client compatibility 分批接入。
 
@@ -159,6 +166,7 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 - #8947 已合入并声明覆盖 ACP bridge guard、daemon runtime、build/typecheck/lint、Prettier 与 SDK backpressure probes；#9007 已合入并声明覆盖 ACP bridge/CLI/SDK focused tests、build/typecheck/lint 与 diff check。
 - #11428 声明613项定向测试、build/typecheck/bundle、targeted lint/format/diff check与隔离daemon的25/26注册边界E2E通过；另有1项Windows-only测试在macOS跳过，本次文档复核未复跑source仓测试。
 - #11515 声明12个文件共2,082项定向测试、root build/typecheck/bundle、changed-file lint/format/diff check及4组重建产物E2E通过；另有1项既有平台skip。本次只核对merged head、33个changed files和最新`main`，未复跑256个活跃runtime或真实Channel负载。
+- #11653 声明ACP bridge聚焦测试、真实Node argv探针及build/typecheck/lint/format/bundle检查通过；本文核对merged head、4个changed files和最新`main`落点，未在真实cgroup v1/v2 Linux主机复跑。
 
 ## PR 归因
 
@@ -175,3 +183,6 @@ fatal protocol、serialization、EOF 或 admission failure 会立即把精确 wo
 | [#9007](https://github.com/QwenLM/qwen-code/pull/9007) | merged | 为 ACP HTTP pre-attach buffered replies 增加 stream/connection/global frame 与 byte budget、delivery lease、transactional ownership receipt 和 status/SDK counters。 |
 | [#11428](https://github.com/QwenLM/qwen-code/pull/11428) | merged | 将workspace注册、ACP child建模和Channel控制预算拆成独立owner，保留25/25/2,130,000ms既有行为与deprecated公开常量兼容。 |
 | [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | merged | 默认注册容量提升到256，增加1–256 operator配置、800 total-session默认、255条secondary/8 MiB store及独立25 Channel owner准入。 |
+| [#11653](https://github.com/QwenLM/qwen-code/pull/11653) | merged | 让ACP child spawn复用可用内存探测，拒绝v1/v2无限哨兵和超宿主constraint；50%、16 GiB、raise-only与cache策略不变。 |
+
+_按个人 PR 口径更新于 2026-09-13_

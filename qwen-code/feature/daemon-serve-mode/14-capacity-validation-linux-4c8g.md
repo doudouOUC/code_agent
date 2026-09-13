@@ -4,6 +4,7 @@
 > 起因：[#11386](https://github.com/QwenLM/qwen-code/issues/11386) 的设计文档 `docs/design/workspace-capacity-p1.md` §9 明确把 Linux、真实仓库、watcher/FD、真实负载列为未完成的部署证据；此前 P1 验证跑在 macOS 空目录上。
 > 复现脚本与逐次原始数据：[`repros/daemon-capacity-linux-4c8g/`](../../../repros/daemon-capacity-linux-4c8g/)。
 > 上游记录：#11386 评论区（容量验证 + 两次更正）、[#8182](https://github.com/QwenLM/qwen-code/issues/8182)（子进程堆授权）、[#11591](https://github.com/QwenLM/qwen-code/issues/11591)（git 状态开销，本次新开）。
+> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；下文数值保留为修复前历史证据。约6 GiB以下raise-only守卫丢弃目标参数、授权不参与准入的另一半仍未解决。
 
 ---
 
@@ -102,9 +103,9 @@ heavy 真正改变的是两件事：**延迟**（末轮综合达 307s，light �
 
 ---
 
-## 5. 子进程堆授权与模型严重不符（#8182 补充证据）
+## 5. 子进程堆授权与模型严重不符（#8182 修复前证据）
 
-采集时顺手读了子进程的 `/proc/<pid>/cmdline`，发现**8 个子进程全部带 `--max-old-space-size=16384`**——在一台 7265 MiB、无 swap 的机器上，每个子进程被授权 16 GiB 堆（整机的 2.25 倍）。
+采集时顺手读了子进程的 `/proc/<pid>/cmdline`，当时发现**8 个子进程全部带 `--max-old-space-size=16384`**——在一台 7265 MiB、无 swap 的机器上，每个子进程被授权 16 GiB 堆（整机的 2.25 倍）。#11653现已让spawn复用`detectAvailableMemoryMb()`，无限、等于或高于宿主的constraint会回退host total；该结果不再代表最新`main`。
 
 根因在机器上直接复现：`getAcpMemoryArgs`（`packages/acp-bridge/src/spawnChannel.ts`）把任何 `constrainedMemory() > 0` 当权威值，而本机 `process.constrainedMemory()` 返回 **18446744073709552000（2^64 哨兵值）**，于是 totalMB 被算成 17,592,186,044,416，`min(…, 16384)` 落到 16384；又因 `16384 > currentLimitMB(2096)` 而真的下发。
 
@@ -119,11 +120,11 @@ cgroup 受限档进一步把图补完整（`systemd-run --scope -p MemoryMax=<L>
 
 三点结论：
 
-1. **只要真的设了限额，`constrainedMemory()` 就是正确的**——哨兵值只出现在「无限制」情形，那一半可窄范围修复（`detectAvailableMemoryMb` 已经拒绝哨兵值）。
+1. **只要真的设了限额，`constrainedMemory()` 就是正确的**——哨兵值只出现在「无限制」情形；#11653已让spawn复用`detectAvailableMemoryMb()`完成这一半窄修复。
 2. **约 6 GB 以下参数会被整个丢弃**，因为 Node 默认堆本就约为 cgroup 限额的 51%，而 `targetMB > currentLimitMB` 这个守卫只会抬高。于是「50% 可用内存」策略**恰恰在运维真的设了限额的场景中从未生效**，子进程还拿到比策略意图更多的额度。只修哨兵值碰不到这一半。
-3. **每种情形的实际授权都超出 daemon 自身模型 1.4–30 倍**，且准入不看模型：`MemoryMax=2G` 时状态接口报 `maxConcurrentChildren: 1`，daemon 仍接纳了 2 个。
+3. **修复前每种情形的实际授权都超出 daemon 自身模型 1.4–30 倍**。#11653消除了无限哨兵导致的30倍档，但准入仍不看模型：`MemoryMax=2G` 时状态接口报 `maxConcurrentChildren: 1`，daemon仍接纳2个，raise-only分歧也仍存在。
 
-注意：`packages/acp-bridge/src/daemon-memory-budget.ts` 已在注释里记录了这处分歧并刻意推迟对齐，但把它限定为 **cgroup v1**。本机是 cgroup v2 统一层级、无 v1 controller、非容器、`memory.max = max`，仍然命中——所以这条路径不是 v1 独有的边缘情况。（也需诚实指出：#8182 正文里那台 3.4 GB Linux 机器算出的是 `target 1747`，**并未**命中哨兵值，故该行为与内核/libuv/cgroup 布局相关，并非普适。）
+注意：修复前`packages/acp-bridge/src/daemon-memory-budget.ts`注释把哨兵分歧限定为 **cgroup v1**，但本机是cgroup v2统一层级、无v1 controller、非容器、`memory.max = max`，仍然命中。#11653据此把v1/v2都纳入同一探测口径。（也需诚实指出：#8182正文里那台3.4 GB Linux机器算出的是`target 1747`，**并未**命中哨兵值，故该行为与内核/libuv/cgroup布局相关，并非普适。）
 
 ---
 
