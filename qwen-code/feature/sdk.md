@@ -1,6 +1,6 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 已合入 workspace session live-state SDK surface，#9380 已合入 daemon status child heap measurement types，#9396 已合入 live-state `updatedAt` optional field；#10294 已在 #10179 merged daemon API 上增加 standalone lifecycle/recovery surface），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
+> 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 已合入 workspace session live-state SDK surface，#9380 已合入 daemon status child heap measurement types，#9396 已合入 live-state `updatedAt` optional field；#10294 已在 #10179 merged daemon API 上增加 standalone lifecycle/recovery surface，#11812 已补普通 HTTP 非回环浏览器缺少 `crypto.randomUUID()` 时的安全 UUID v4 fallback），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >
 > 代码锚点均以 `file:symbol` 形式给出。Python SDK 在 `main` 分支；TS daemon SDK 的 daemon 相关部分已随 #4490 进入 `main`，早期段落保留的 `daemon_mode_b_main` 锚点仅用于解释演进来源。
 
@@ -224,7 +224,7 @@ CanUseTool = Callable[[str, dict, CanUseToolContext], Awaitable[PermissionResult
 
 #10179 已在 daemon 合入 `standalone_sessions_v1` 与 `/standalone/sessions` lifecycle route。#10294 已给 TypeScript SDK 增加 capability-gated create/list/page/get/load/resume/repair-directory/rename/export/archive/unarchive/delete，以及严格的 response runtime validators；SDK request 不接受 `cwd`/`workspaceCwd`，避免跨到普通 workspace restore。
 
-create 在 dispatch 前使用 caller UUID 或 `globalThis.crypto.randomUUID()`。outcome-unknown response、transport failure、timeout 或 malformed success 后只按该 UUID 做一次 exact lookup，返回 existing/creating/not-found/unavailable recovery context 并抛 `DaemonStandaloneCreationOutcomeUnknownError`，不自动重试 create。`DaemonSessionClient` 保存显式 `standalone` 或 `workspace` restore strategy，断线重附着不会 fallback primary。该 SDK surface 与 215 KiB browser bundle budget 已随 #10294 合入。
+create 在 dispatch 前使用 caller UUID；未提供时优先调用 `globalThis.crypto.randomUUID()`。#11812 已补普通 HTTP 非回环页面的兼容路径：当 native API 缺失但 `crypto.getRandomValues()` 可用时，用16个安全随机字节设置UUID v4 version/variant位并格式化为小写ID；不使用`Math.random()`。outcome-unknown response、transport failure、timeout 或 malformed success 后仍只按唯一一次 create 的该 UUID 做一次 exact lookup，返回 existing/creating/not-found/unavailable recovery context 并抛 `DaemonStandaloneCreationOutcomeUnknownError`，不自动重试 create。显式 caller ID 不访问 browser crypto；`DaemonSessionClient` 保存显式 `standalone` 或 `workspace` restore strategy，断线重附着不会 fallback primary。
 
 ### 4.4 Java daemon transport alpha（#7463 / #7603）
 
@@ -393,6 +393,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 | #9626 | MERGED | session storage conflict repair | 最终在 TS daemon SDK 的 archive/unarchive options 中追加 `resolveConflicts`，并在结果中追加 `resolvedConflicts`；调用前必须 gate `session_storage_conflict_repair`，默认 conflict 从 HTTP 200 batch `errors` 读取。 |
 | #10179 | MERGED | standalone daemon REST lifecycle | 条件广告 `standalone_sessions_v1` 并提供 exact-owner create/list/get/load/resume/repair/metadata/export/archive/unarchive/delete route；该 PR 本身不含 SDK。 |
 | #10294 | MERGED | standalone TypeScript SDK | 最终为完整 standalone lifecycle 增加 capability gate、strict validators、explicit restore strategy 与 outcome-unknown exact recovery，不自动重试 create。 |
+| #11812 | MERGED | standalone HTTP UUID fallback | `randomUUID()`缺失时用`getRandomValues()`生成规范UUID v4；caller ID与outcome-unknown exact recovery不变。 |
 
 ---
 
@@ -424,7 +425,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 
 12. **#9626 已合入**。`resolveConflicts` / `resolvedConflicts` 和 `session_storage_conflict_repair` 是 additive SDK surface；未广告 capability 的 daemon 必须保持默认 conflict 行为，客户端不能试探性发送 repair option。
 
-13. **#10294 已合入**。standalone TypeScript methods、runtime validators、recovery error 与 215 KiB browser bundle budget 已进入发布 SDK 契约；WebUI/WebShell 流程仍在范围外。
+13. **#10294/#11812 已合入**。standalone TypeScript methods、runtime validators与recovery error已进入发布SDK契约；#11812进一步让普通HTTP非回环WebShell可在native `randomUUID()`缺失时用安全随机字节创建UUID v4，且不改变单次create与exact recovery边界。
 
 14. **#10554 已合入**。`DaemonClient.setUserLanguage()` 与 `SetUserLanguageResult` 是 additive surface；consumer 必须先 gate `user_language_sync`，零 session 是成功，`refresh.failed` 表示持久化后仍有 runtime/session 未刷新。
 
@@ -546,10 +547,16 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 客户端必须把 server snapshot 原样带到后续分页和 `atRecordId` 读取，不能跨 snapshot 复用 ordinal/cursor；ordinal 只用于当前 snapshot 展示，durable identity 是 user-record UUID。
 - SDK validator 对 page size、label/detail 和 anchor fields 有界校验。浏览器 page table/virtualized rail 不属于该 SDK PR。
 
+### #11812 — standalone HTTP UUID fallback（merged）
+
+- `createStandaloneSessionId()`优先使用native `crypto.randomUUID()`；普通HTTP非回环来源缺少该API时，从`crypto.getRandomValues(new Uint8Array(16))`生成随机字节并设置UUID v4 version/variant位。
+- caller提供`sessionId`时不读取browser crypto，仍统一小写；未提供ID时两条生成路径都把同一ID交给唯一一次POST与timeout/outcome-unknown exact lookup，不自动重试create。
+- 单测覆盖全0/全255字节、前导零、version/variant位、caller ID无crypto与native/fallback两条recovery路径；该修复不新增route、capability或依赖。
+
 ### #11015 — worktree reset SDK（open）
 
 - 当前 open diff新增 capability-gated worktree reset request/response，必须同时验证 replacement session、canonical path与 per-response `persisted-v1`，不能只依赖 capability。
 - superseded restore的 typed replacement ID用于 Channel registry自愈；无 worktree response只清理 stale cached claim，带 worktree但证明/路径不符仍拒绝。
 - PR仍为 open，reset methods和 types不能视为当前发布 SDK契约。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-06_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-15_

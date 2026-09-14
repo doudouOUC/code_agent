@@ -489,6 +489,12 @@ binding捕获workspace、standalone或Live session target。点击通知后向�
 
 daemon action只在producer提供字符串时写public `_meta["qwen.submittedPrompt"]`。后端route/bridge再建立public-to-private trust边界，Session最终只对fresh、非channel、非空白显式声明发布Hook字段；缺失时不从prepared prompt、display projection或附件内容推断。该能力不改变默认notification、queue admission或extension注册，但启用Auto Recall的部署会把合格声明发送给管理员provider。
 
+## 2026-09-15 follow-up：HTTP非回环standalone create（#11812 merged）
+
+#11812已修复普通HTTP非回环来源下的No workspace首次提交。该页面不是secure context，因此浏览器不提供`crypto.randomUUID()`；WebShell继续复用`DaemonClient.createStandaloneSession()`，由SDK在native API缺失时用`crypto.getRandomValues()`生成规范小写UUID v4，再发送既有standalone create请求。页面无需安全策略override、crypto stub或HTTP mock。
+
+该修复不改变WebShell的context intent、deferred create、model/approval原子参数、typed outcome-unknown UI或session owner guard。显式caller ID仍优先；唯一一次POST和exact recovery复用同一生成ID。non-loopback listener的bearer/auth要求、trusted-loopback operator authority和其它browser UUID调用点也不在本PR范围。
+
 ---
 
 ## 已知限制 / v0.16-alpha scope
@@ -536,4 +542,4 @@ daemon action只在producer提供字符串时写public `_meta["qwen.submittedPro
 | serve-bridge MCP | `packages/sdk-typescript/src/daemon-mcp/serve-bridge/` |
 | serve server | `packages/cli/src/serve/server.ts` |
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-13_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-15_

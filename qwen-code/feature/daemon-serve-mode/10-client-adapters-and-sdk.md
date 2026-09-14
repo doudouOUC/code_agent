@@ -65,6 +65,7 @@ daemon 架构将 LLM 代理的全部状态收束到 `qwen serve` 进程内部，
 | #9261 | @doudouOUC | merged | workspace session live-state SDK surface：新增 `getWorkspaceSessionLiveState()` / `getSessionLiveState()` 与 catalog version/live-state 类型，配合 `workspace_session_live_state` capability。 |
 | #9380 | @doudouOUC | merged | daemon status child heap types：为 ACP child old-generation peak measurement 暴露 optional SDK status fields。 |
 | #9396 | @doudouOUC | merged | live-state activity watermark：在 `DaemonSessionLiveState` 上新增 optional `updatedAt`，不改变 response v1/capability。 |
+| #11812 | @doudouOUC | merged | standalone HTTP UUID fallback：native `randomUUID()`缺失时用安全随机字节生成UUID v4，保持caller ID与exact recovery不变。 |
 
 ---
 
@@ -411,4 +412,10 @@ sequenceDiagram
 
 #11015 当前 open diff新增 `DaemonClient.resetSessionWorktree()` / `DaemonSessionClient.resetWorktree()` 与 typed response/error。client必须先 gate `session_worktree_reset_v1`，验证 replacement ID、canonical path和 `persisted-v1`，再允许 Channel registry切换 owner；superseded restore携带 replacement ID供 self-heal。无 worktree resume可以清理 stale durable claim，但任何仍携带未证明或不同路径 metadata的 response继续 fail closed。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-06_
+## 2026-09-15 follow-up：普通 HTTP standalone UUID fallback
+
+#11812 已合入 `DaemonClient.createStandaloneSession()` 的浏览器兼容修复。未显式提供`sessionId`时，SDK优先使用native `crypto.randomUUID()`；普通HTTP非回环来源缺少该API时，改用`crypto.getRandomValues()`填充16字节、写入UUID v4 version/variant位并格式化为小写ID。随机字节API本身缺失时继续失败，不降级到非密码学随机数。
+
+caller显式ID仍优先且不访问browser crypto。native/fallback两条路径都在发POST前只生成一次ID，并让transport timeout或结果不确定后的exact lookup继续使用同一ID；不新增create重试、daemon route、capability或public option。全0/全255字节回归覆盖前导零和位约束，timeout recovery也按native API可用/不可用两条路径验证。
+
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-15_
