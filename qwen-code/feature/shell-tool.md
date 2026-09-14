@@ -1,7 +1,7 @@
 # Shell 工具执行语义技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat、#7053 shell safety tri-state classification、#7172 Plan-mode shell safety routing，以及#11727 open的producer预算单一决策方案。
+> 当前记录：#6864 shell timeout error semantics、#6876 silent foreground shell heartbeat、#7053 shell safety tri-state classification、#7172 Plan-mode shell safety routing，以及#11727已合入的producer预算单一决策。
 
 ---
 
@@ -160,11 +160,11 @@ unknown 审批不是新增一条持久权限规则，而是针对这一次 raw s
 
 ---
 
-## 8. Shell producer预算单一决策（#11727 open）
+## 8. Shell producer预算单一决策（#11727 merged）
 
-Shell现有producer预算用head-and-tail预览保留退出状态，但scheduler的generic single-result gate在默认配置下门槛更低，会把中间尺寸结果再次改成head-only。#11727当前diff让Shell在真正执行字符串预算检查后设置内部`outputBudgetApplied`，无论正文是否实际被截断；Shell先为long-run hint和attribution warning预留字符，scheduler再只对这份已决策正文跳过通用单结果gate。
+Shell producer预算用head-and-tail预览保留退出状态，但旧scheduler的generic single-result gate在默认配置下门槛更低，会把中间尺寸结果再次改成head-only。#11727最终让Shell在真正执行字符串预算检查后设置内部`outputBudgetApplied`，无论正文是否实际被截断；Shell用同一metadata列表计算并追加long-run hint/attribution warning，正文至少1字符且预留最多占显式阈值一半，scheduler再只对这份已决策正文跳过通用单结果gate。
 
-background launch、spawn/setup failure、独立错误和追加failure Hook上下文仍走generic gate；timeout detail即使带标记也按producer声明预算再次封顶。Shell自己的组合检查、batch finalizer和send cap保持。该open方案只改变模型侧结果在两道预算之间的决策owner，不改变TUI展示、外部响应schema或结构化exit metadata。完整观察见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11727|PR #11727 当前实现观察]]。
+background launch、spawn/setup failure、独立错误和追加failure Hook上下文仍走generic gate；timeout detail即使带标记也按producer声明预算再次封顶，成功/combined/timeout共享artifact三态映射。Shell自己的组合检查、batch finalizer和send cap保持。最终实现只改变模型侧结果在两道预算之间的决策owner，不改变TUI展示、外部响应schema或结构化exit metadata。完整实现见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11727|PR #11727 最终实现]]。
 
 ---
 
@@ -176,7 +176,7 @@ background launch、spawn/setup failure、独立错误和追加failure Hook上�
 | [#6876](https://github.com/QwenLM/qwen-code/pull/6876) | merged | silent shell heartbeat | 静默前台 shell 命令周期性发 `ShellProgressData`，ACP/stream-json 可见，TUI/模型上下文不受影响。 |
 | [#7053](https://github.com/QwenLM/qwen-code/pull/7053) | merged | shell safety tri-state classification | 新增 read-only/write/unknown 三态分类、bounded sed/awk/git 等规则和 wrapper 保守调度；默认非 Plan routing 仍保持兼容 allow/ask。 |
 | [#7172](https://github.com/QwenLM/qwen-code/pull/7172) | merged | Plan-mode shell routing | Plan mode 中模型发起的 shell/monitor 按三态分流：read-only 走既有权限，write 直接拒绝，unknown 走一次性精确审批并在执行前做 Plan revision/cwd/policy/raw invocation fencing。 |
-| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | open | producer budget owner | 当前diff标记已由Shell自身预算处理的正文，让generic single-result gate不再抢先丢尾；未合入。 |
+| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | merged | producer budget owner | 标记已由Shell自身预算处理的正文，让generic single-result gate不再抢先丢尾，并补追加metadata与timeout上界。 |
 
 ---
 
@@ -186,6 +186,6 @@ background launch、spawn/setup failure、独立错误和追加failure Hook上�
 - #6876 不向 ACP 流式转发命令输出，只提供 liveness heartbeat。
 - #7172 不处理用户手动 `!command`，也不把 unknown approval 持久化成规则；speculative interactive approval 仍保持 fail-closed。
 - MCP tool progress、subagent heartbeat 透传和 TUI 可视化增强仍是后续项。
-- #6864/#6876/#7053 均已合入；#11727仍为open，不能把producer预算标记写成`main`能力。MCP tool progress、subagent heartbeat透传和TUI可视化增强仍需单独设计。
+- #6864/#6876/#7053/#7172/#11727均已合入。MCP tool progress、subagent heartbeat透传和TUI可视化增强仍需单独设计。
 
-_按个人 PR 口径更新于 2026-09-13_
+_按个人 PR 口径更新于 2026-09-14_

@@ -1,7 +1,7 @@
 # 最终工具响应预算技术方案
 
 > 适用范围：`QwenLM/qwen-code` 的 Core scheduler、interactive TUI、headless、ACP session、Agent runtime 与 speculative follow-up。
-> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试；#8450 已合入，只在 ACP transport 边界裁剪 textual tool-result projection；#9012 已合入，在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界裁剪 `tool_result.content`，不改变 canonical transcript、producer artifact 或 model-facing response；#9039 已合入 opt-in、privacy-safe 的 tool-result boundary diagnostics，不记录正文或 raw id；#11727仍为open，producer预算单一决策只记录当前diff。
+> 当前记录：#7323 已合入；#7470 已合入并补 Shell 无 artifact truncation 回归测试；#8450 已合入，只在 ACP transport 边界裁剪 textual tool-result projection；#9012 已合入，在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界裁剪 `tool_result.content`，不改变 canonical transcript、producer artifact 或 model-facing response；#9039 已合入 opt-in、privacy-safe 的 tool-result boundary diagnostics，不记录正文或 raw id；#11727已合入producer预算单一决策。
 
 ---
 
@@ -151,28 +151,28 @@ producer 仍负责本地体验和首层防护，但不再承担最终 aggregate 
 | [#8450](https://github.com/QwenLM/qwen-code/pull/8450) | merged | ACP textual tool-result projection | 在 ACP live/history/subagent replay transport 上对 canonical text blocks 和 string `rawOutput` 做 65,536 byte JSON budget；不改变 model-facing finalizer、canonical transcript 或 offline export。 |
 | [#9012](https://github.com/QwenLM/qwen-code/pull/9012) | merged | Headless tool_result content projection | 在 Headless JSON/stream-json/SDK/subagent/Dual Output 边界把文本 `tool_result.content` 投影为 65,536 byte JSON 字符串预览，并把 Dual Output protocol 提升到 v2。 |
 | [#9039](https://github.com/QwenLM/qwen-code/pull/9039) | merged | privacy-safe boundary diagnostics | 增加 opt-in boundary observation，用 size、HMAC、mutation state 与 closed artifact summary 诊断 producer/finalizer/transport/writer 差异；不记录正文、raw id、tool name 或 artifact path。 |
-| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | open | Shell producer budget owner | 当前diff用内部标记让已按Shell预算处理的原正文跳过更低generic single-result gate；尚未进入`main`。 |
+| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | merged | Shell producer budget owner | 用内部标记让已按Shell预算处理的正文跳过更低generic single-result gate，并补metadata预留、timeout封顶与artifact三态一致性。 |
 
 ---
 
-## 7. Shell producer预算单一决策（#11727 open）
+## 7. Shell producer预算单一决策（#11727 merged）
 
-当前`main`中Shell先按自身预算生成head-and-tail正文，scheduler随后还会用更低的generic single-result threshold做head-only持久化。默认配置下落在两者之间的结果会由第二道策略重新决定，丢失尾部exit code、signal和错误摘要。
+旧实现中Shell先按自身预算生成head-and-tail正文，scheduler随后还会用更低的generic single-result threshold做head-only持久化。默认配置下落在两者之间的结果会由第二道策略重新决定，丢失尾部exit code、signal和错误摘要。
 
-#11727当前diff在内部`ToolResult`增加`outputBudgetApplied`。只有真正执行过producer预算检查的字符串正文才设置，未发生截断也要标记；background、spawn/setup failure不按工具身份推断。scheduler的成功与soft-failure路径只让该正文跳过generic single-result gate；普通错误路径还要求`errorMessage === llmContent`，因此独立错误或追加Hook上下文后仍受门槛保护。timeout分支对带标记detail按工具声明预算再次封顶并保留新artifact，没有标记时仍走generic gate。
+#11727最终在内部`ToolResult`增加`outputBudgetApplied`。只有真正执行过producer预算检查的字符串正文才设置，未发生截断也要标记；background、spawn/setup failure不按工具身份推断。scheduler的成功与soft-failure路径只让该正文跳过generic single-result gate；普通错误路径还要求`errorMessage === llmContent`，因此独立错误或追加Hook上下文后仍受门槛保护。timeout分支对带标记detail按工具声明预算再次封顶并保留新artifact，没有标记时仍走generic gate。
 
-Shell在截断正文时为后续long-run advisory和AI attribution warning预留字符，避免“先标记、后追加”越过声明预算。该标记不替代`persistedOutputFiles`，也不绕过Shell per-tool/combined pass、aggregate batch finalizer或send边界no-I/O cap。attribution warning异常摘要另限制为120字符。外部function response、Hook、ACP、JSON、telemetry和持久化UI schema均不增加字段。
+Shell用同一metadata列表计算并追加long-run advisory和AI attribution warning，正文预算至少1字符，metadata预留最多占显式阈值的一半，避免极小阈值把尾部状态挤没。成功、combined和timeout截断共享artifact三态映射。该标记不替代`persistedOutputFiles`，也不绕过Shell per-tool/combined pass、aggregate batch finalizer或send边界no-I/O cap；attribution warning异常摘要另限制为120字符。外部function response、Hook、ACP、JSON、telemetry和持久化UI schema均不增加字段。
 
-完整观察见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11727|PR #11727 当前实现观察]]。在PR合入前，以上只能用于review当前方案，不能描述为主干现状。
+完整实现见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11727|PR #11727 最终实现]]。
 
 ---
 
 ## 8. 已知限制 / 后续
 
 - #7323/#7470 已合入；文档记录当前 main 的最终实现方案。
-- #8450/#9012/#9039 已合入；#8450/#9012 是 transport-display projection，#9039 是诊断面，均不改变模型上下文 finalizer。后续如字段集合、预算、marker 或 diagnostics schema 调整，需要按新 diff 再更新。
+- #8450/#9012/#9039/#11727 已合入；#8450/#9012 是 transport-display projection，#9039 是诊断面，#11727修复Shell producer与generic gate的决策次序。后续如字段集合、预算、marker 或 diagnostics schema 调整，需要按新 diff 再更新。
 - 不提供精确 token 预算，不改变 provider context window 估算与自动压缩策略。
 - 不保证 artifact path 在远端 UI 中可直接读取；这里只保证模型响应里有可诊断的 path reference。
 - 后续如要在 Ctrl+O transcript 中读取完整 artifact，需要独立设计权限、路径暴露、大小限制和 UI streaming。
 
-_按个人 PR 口径更新于 2026-09-13_
+_按个人 PR 口径更新于 2026-09-14_

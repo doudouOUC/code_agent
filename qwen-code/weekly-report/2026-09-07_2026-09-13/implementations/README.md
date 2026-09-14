@@ -22,6 +22,6 @@
 | [#11515](https://github.com/QwenLM/qwen-code/pull/11515) | ✅ merged | feat(serve): support 256 workspaces by default | [pr-11515.md](pr-11515.md) |
 | [#11614](https://github.com/QwenLM/qwen-code/pull/11614) | 🟡 open | feat(cli): add bwrap kernel sandbox backend for Linux | [pr-11614.md](pr-11614.md) |
 | [#11653](https://github.com/QwenLM/qwen-code/pull/11653) | ✅ merged | fix(acp-bridge): reject unlimited cgroup sentinel for ACP child heaps | [pr-11653.md](pr-11653.md) |
-| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | 🟡 open | fix(core): let the producer's own budget decide shell output size | [pr-11727.md](pr-11727.md) |
+| [#11727](https://github.com/QwenLM/qwen-code/pull/11727) | ✅ merged | fix(core): let the producer's own budget decide shell output size | [pr-11727.md](pr-11727.md) |
 
-_按个人 PR 口径更新于 2026-09-13_
+_按个人 PR 口径更新于 2026-09-14_

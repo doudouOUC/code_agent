@@ -29,14 +29,14 @@
 | monitor 事件工具 | [monitor-tool.md](monitor-tool.md) | #3684 #3726 #3792 #3933 #5165 | 长任务节流流式监控、MonitorRegistry owner-scoped 通知、batch drain 降 token waste、前台 shell 临近超时提示。 |
 | 后台 agent/会话恢复 | [background-agent-resume.md](background-agent-resume.md) | #3739 #4222 #5972 #6502 | 背景 agent paused/resume、daemon session load/resume、subagent output-token display；broken parentUuid chain 恢复时显式展示不可恢复的 history gap。 |
 | 上下文压缩 | [context-compression.md](context-compression.md) | #3879 #3985 #3872 #5042 #5111 #7323 #8464 | 反应式溢出压缩、会话记录瘦身、大工具结果外置、active tool result history 预算，并补最终 tool response batch finalization 与历史预算的边界关系；#8464 已合入，将历史工具结果清理目标改为 threshold/2 low watermark，并修正 pending batch 的 keep-recent accounting。 |
-| 最终工具响应预算 | [tool-response-budget.md](tool-response-budget.md) | #7323 #7470 #8450 #9012 #9039 #11727(open) | 统一 Shell/MCP/generic producer artifact metadata 与 shared finalizer，在 interactive/headless/ACP/Agent/speculation 聚合边界约束发给模型且录制的 tool response batch；#11727 open方案拟让已执行自身预算检查的Shell正文跳过更低的generic single-result gate，组合与batch预算保持不变。 |
+| 最终工具响应预算 | [tool-response-budget.md](tool-response-budget.md) | #7323 #7470 #8450 #9012 #9039 #11727 | 统一 Shell/MCP/generic producer artifact metadata 与 shared finalizer，在 interactive/headless/ACP/Agent/speculation 聚合边界约束发给模型且录制的 tool response batch；#11727已让执行自身预算检查的Shell正文跳过更低generic gate，并补metadata/timeout上界。 |
 | Enterprise Memory Gateway | [enterprise-memory-gateway.md](enterprise-memory-gateway.md) | #7502(closed) / #7509(open) / #7505(open) / #7507(open) / #7508(open) / #7506(open) | 可选企业长期记忆集成：外部 Gateway + canonical PostgreSQL/RLS + semantic index + management/runtime planes + signed extension/Hook/MCP，Qwen Core 不承载企业身份、凭据或管理权限。 |
 | Direct External Context | [external-context-provider.md](external-context-provider.md) | #7586 / #7877 / #8206 / #8352 / #8507 / #9068 / #10113 / #10149 / #10634 / #10653 / #11246 / #11311 / #11337 / #11397 / #11455 | 私有仓库绑定的外部上下文extension：管理员固定provider/corpus/credential，默认只读MCP下模型可显式调用 `context_search({query})`；#7877与#11246分别为direct profile和configurable Mem0 package提供opt-in `UserPromptSubmit.submitted_prompt` Auto Recall，结果均以bounded untrusted context注入；#10634/#10653已合入administrator-owned dialect runtime与分发，#11246已合入独立v3 Hook，#11311已合入独立v4 daemon writer与generic MCP审批参数预览，#11337/#11397已合入v5显式删除及DELETE响应兼容；#11455已合入逐请求声明、public/private trust转发与fresh非channel ACP producer。 |
 | Mobile MCP | [mobile-mcp.md](mobile-mcp.md) | #8311(closed) | 独立发布的 `@qwen-code/mobile-mcp` 关闭前 diff 曾将运行时基线提升到 Node.js 22，升级 MCP SDK 1.30.0，并用 `@hono/node-server` `^2.0.12` 移除 Hono 1.x advisory path；同时记录 split-Zod type bridge、release bump 与 CI follow-up。 |
 | 工具调用 ID 完整性 | [tool-call-id-integrity.md](tool-call-id-integrity.md) | #5107 #5624 #9435 #9436 | OpenAI-compatible provider 的 `tool_call.id` 规范化、去重执行、dangling replay 终止化、duplicate provider id 可见 loop-detected stop 与参数敏感 replay 判定。 |
 | Diff 渲染与变更统计 | [diff-rendering.md](diff-rendering.md) | #6141 | edit/write/shell 等工具的 whitespace-only diff 不再显示为 “No changes detected”，diff stat 也按 smart fallback 统计。 |
 | 文件读取 / 大文本范围 / PDF 预算 | [file-reading.md](file-reading.md) | #6404 / #6409 / #6585 / #6846 / #7947 / #7967 / #8002 / #8383 | 大文本范围读取与 PDF 读取预算：Core 超过旧 10MB 文本 guard 时返回有界行范围，大型 PDF 不带 `pages` 时返回 guidance/reference；文本提取失败或单页超预算时可用 bounded PDF vision bridge fallback；#7947 让 Serve workspace `/file` 也能对超过 256 KiB 的 UTF-8 文本返回 bounded line window；#7967 已合入 handle-bound range reader 分层清理；#8002 增加 byte-cursor paging；#8383 已合入 CRLF cursor paging 的 lineEnding 文件级 metadata 修复。 |
-| Shell 工具执行语义 | [shell-tool.md](shell-tool.md) | #6864 / #6876 / #7053 / #7172 / #11727(open) | 前台shell timeout、静默心跳与安全三态保持一致；#11727 open方案新增producer预算标记，避免默认配置下generic gate抢先丢掉Shell尾部终态。 |
+| Shell 工具执行语义 | [shell-tool.md](shell-tool.md) | #6864 / #6876 / #7053 / #7172 / #11727 | 前台shell timeout、静默心跳与安全三态保持一致；#11727已新增producer预算标记，避免默认配置下generic gate抢先丢掉Shell尾部终态。 |
 | Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614(open) | open方案为Linux新增显式bwrap backend：宿主根只读、最小可写root与linked-worktree Git来源核验，并提供`qwen sandbox`报告/验证；尚未进入`main`。 |
 | Scheduled Tasks | [scheduled-tasks.md](scheduled-tasks.md) | #9838 / #10144 / #10828 / #10924 / #11207 | 已合入current-session reuse、empty-session persistence与relaxed ownership task设计；#10924提供mandatory lease/controller-binding fence，#11207已完成新版daemon global-owner runtime cutover，不改变at-least-once dispatch窗口。 |
 | 诊断 / creator skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 #6117 #6233(closed) | `/doctor` 代码命令、`/stuck` 诊断技能、`/batch` prompt 技能、ACP/non-interactive `/skills` 列表输出；disabled skill wire/filtering 仅为 #6233 closed 方案记录。 |
@@ -50,7 +50,7 @@
 >
 > W36 最终 follow-up：#10643/#10751/#10924 已合入 worktree isolation、turn-navigation Phase 1 与 mandatory Conversations writer fence；#11020 已合入 Phase 2 docs-only设计，#11054 已合入 separate-store Phase 2A，#11120 已合入 failed close-probe抑制；#11015仍为 open worktree reset，#10786/#11053/#11143 closed未合入。
 >
-> W37 日更 follow-up：#11207已合入relaxed Conversations runtime cutover，#11208/#11322/#11323已交付连续历史/compact rail与交互收口，#11246/#11311/#11337/#11397已合入Mem0 Auto Recall/写入/删除与DELETE兼容，#11308/#11309已合入Channel worktree恢复/回收，#11339已合入五秒live-state轮询，#11398/#11447已交付浏览器通知基础、内容与点击导航，#11428/#11515已完成容量owner解耦与默认256注册，#11653已修复ACP child heap无限cgroup哨兵；#11614 Linux bwrap sandbox与#11727 Shell producer预算单一决策仍为open方案，不能视为`main`能力。
+> W37 日更 follow-up：#11207已合入relaxed Conversations runtime cutover，#11208/#11322/#11323已交付连续历史/compact rail与交互收口，#11246/#11311/#11337/#11397已合入Mem0 Auto Recall/写入/删除与DELETE兼容，#11308/#11309已合入Channel worktree恢复/回收，#11339已合入五秒live-state轮询，#11398/#11447已交付浏览器通知基础、内容与点击导航，#11428/#11515已完成容量owner解耦与默认256注册，#11653已修复ACP child heap无限cgroup哨兵，#11727已交付Shell producer预算单一决策；#11614 Linux bwrap sandbox仍为open方案，不能视为`main`能力。
 
 ## 使用口径
 
@@ -64,4 +64,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/README.md)（见其 07 子文档）。
 - 每篇「已知限制」综合 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-13_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-14_

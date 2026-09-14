@@ -1,7 +1,7 @@
 # Linux bwrap 内核沙箱技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#11614 open；以下按2026-09-13 head `a2839740933f`描述方案，尚未进入upstream `main`。
+> 当前记录：#11614 open；以下按2026-09-14 head `8f1b2b107a64`描述方案，尚未进入upstream `main`。
 
 ## 1. 背景与目标
 
@@ -28,6 +28,8 @@ flowchart LR
 
 Git来源验证不信任ambient `GIT_DIR`等selector，而使用清理后的`gitEnv()`探测真实top-level、absolute git dir与common dir。普通checkout要求`.git`就是对应真实目录；linked worktree要求common仓库中存在同名registration，且worktree git dir里的普通文件`gitdir`反向指向当前`.git`文件。独立Git目录和未登记submodule不会自动得到外部写权限，只能由用户显式include。
 
+workspace `.env`与`settings.env`不能设置sandbox backend/image/网络/代理控制或`XDG_CACHE_HOME`、`TMPDIR/TMP/TEMP`。operator继承环境与用户级`.env`仍是可信输入，但在可写Qwen目录之上把该文件重新只读bind。这防止不可信仓库或受限子进程让host选择backend、执行proxy命令，或把HOME敏感目录伪装成cache/temp后扩大可写bind；reload也不会中途改写project-env拒绝集合。仓库可控include目录展开`~`后若落在HOME内部会被拒绝，非法`QWEN_SANDBOX_NET`直接报错而不会退回open。
+
 ## 4. 运行边界
 
 `buildBwrapArgs()`使用`--ro-bind / /`、`--dev /dev`、`--die-with-parent`，再逐个bind可写root并切换到target cwd。closed网络增加`--unshare-net`；open与proxied保留host network，proxied只注入代理环境并不阻止direct connection。
@@ -36,13 +38,13 @@ Git来源验证不信任ambient `GIT_DIR`等selector，而使用清理后的`git
 
 ## 5. 可诊断性
 
-`qwen sandbox`报告backend、enforcement、network mode、target与可写root。`--verify`运行四项负载：workspace内写成功、root外写返回EROFS、host进程可见、network namespace符合配置；`-- <command>`在同一argv构造下继承stdio并透传退出码。verify不能证明Git写入或host socket隔离，worktree commit仍需单独测试。
+`qwen sandbox`报告backend、enforcement、network mode、target与可写root。`--verify`运行四项负载：workspace内`mktemp`成功、root外写返回EROFS、host进程可见、network namespace符合配置；probe固定C locale，网络检查要求命令成功、stdout含loopback后才判定，避免最小镜像缺命令或stderr文本造成假阳性。safe mode仍按完整settings选择backend，但不采用settings-derived额外root；`-- <command>`关闭数字参数自动转换，在同一argv构造下继承stdio并透传退出码。Core prompt同时区分宿主只读根和最小`/dev`设备树，并让模型把拒绝路径交还用户在host侧检查。verify不能证明Git写入或host socket隔离，worktree commit仍需单独测试。
 
 Core prompt只在`SANDBOX=bwrap`时说明EROFS边界，要求模型报告拒绝路径，不得改写其它位置、提权或重复尝试。普通EACCES仍可能来自文件权限，不能被误判为sandbox拒绝。
 
 ## 6. 验证与状态
 
-open PR包含CLI、root推导、argv、环境、prompt和verify battery测试。PR记录较早head在Ubuntu Lima验证两种网络模式、worktree commit和越界写拒绝，当前head在macOS完成定向构建与测试；2026-09-13当前GitHub Ubuntu Node 22检查失败，Linux最新head、Windows、真实Electron、Landlock和seccomp未完成最终验证。
+open PR包含CLI、root推导、环境来源拒绝、argv、环境、prompt和verify battery测试。PR记录较早head在Ubuntu Lima验证两种网络模式、worktree commit和越界写拒绝，较早macOS head完成定向构建与测试；最新review follow-up未重跑Linux。2026-09-14当前GitHub的Lint、Ubuntu测试、Serve A/B和Java real-daemon E2E均失败，review仍在进行且最近正式结论为changes requested；Linux最新head、Windows、真实Electron、Landlock和seccomp未完成最终验证。
 
 完整PR级观察见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11614|PR #11614 当前实现观察]]。
 
