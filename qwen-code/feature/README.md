@@ -50,7 +50,7 @@
 >
 > W36 最终 follow-up：#10643/#10751/#10924 已合入 worktree isolation、turn-navigation Phase 1 与 mandatory Conversations writer fence；#11020 已合入 Phase 2 docs-only设计，#11054 已合入 separate-store Phase 2A，#11120 已合入 failed close-probe抑制；#11015仍为 open worktree reset，#10786/#11053/#11143 closed未合入。
 >
-> W37 日更 follow-up：#11207已合入relaxed Conversations runtime cutover，#11208/#11322/#11323已交付连续历史/compact rail与交互收口，#11246/#11311/#11337/#11397已合入Mem0 Auto Recall/写入/删除与DELETE兼容，#11308/#11309已合入Channel worktree恢复/回收，#11339已合入五秒live-state轮询，#11398/#11447已交付浏览器通知基础、内容与点击导航，#11428/#11515已完成容量owner解耦与默认256注册，#11653已修复ACP child heap无限cgroup哨兵，#11727已交付Shell producer预算单一决策；#11614 Linux bwrap sandbox仍为open方案，不能视为`main`能力。
+> W37 最终 follow-up：#11207已合入relaxed Conversations runtime cutover，#11208/#11322/#11323已交付连续历史/compact rail与交互收口，#11246/#11311/#11337/#11397已合入Mem0 Auto Recall/写入/删除与DELETE兼容，#11308/#11309已合入Channel worktree恢复/回收，#11339已合入五秒live-state轮询，#11398/#11447已交付浏览器通知基础、内容与点击导航，#11428/#11515已完成容量owner解耦与默认256注册，#11653已修复ACP child heap无限cgroup哨兵，#11727已交付Shell producer预算单一决策；#11614 Linux bwrap sandbox仍为open方案，不能视为`main`能力。
 
 ## 使用口径
 

@@ -1,4 +1,4 @@
-# qwen-code PRs · 2026-09-07 ~ 2026-09-13 (W37 周内累计)
+# qwen-code PRs · 2026-09-07 ~ 2026-09-13 (W37 最终版)
 
 > 本文件已整理 2026-09-07 至 2026-09-13（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
