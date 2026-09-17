@@ -689,3 +689,14 @@ sequenceDiagram
 - `QWEN_SESSION_LIVE_STATE_POLL_INTERVAL_MS`只接受1000到2147483647范围内的十进制整数；缺失、零值、负数、小数、带单位、越界或其它非法输入全部回退5000ms。该值从daemon启动进程环境读取，不做per-workspace覆盖。
 - WebShell要独立验证字段并回退，不能把malformed capability传给timer。interval变化只影响下一轮调度，不得重置已提交live-state、并发第二个in-flight read或改变30秒错误backoff。
 - 该字段只调整已有live-state polling cadence，不表示SSE、batch read、自适应polling或完整catalog polling已落地；较大值会相应增加跨client状态变化的可见延迟。
+
+### #11911/#11940 — ACP child count admission 与自动回收（merged）
+
+- #11911 不新增 capability tag；`/daemon/status` additive 增加 `childHeap.mode:'admit'`、`admissionEnforced` 与 `runtime.memory.committedAcpChildren`，并以 REST 503 / ACP error data 的 `acp_child_capacity_exhausted` 表达满额。旧 daemon 可省略字段，客户端不能从 `limits.memory.enforced:false` 推断 count gate 未启用。
+- #11940 同样不新增公开 tag/route；它只在首次count拒绝后尝试回收一个零session/零activity warm child，再做一次fresh admission。失败继续使用 #11911 的容量错误。
+
+### #12008 — `workspace_runtime_stop`（open）
+
+- 当前 diff 只有在daemon拥有完整process accounting、activity/scheduled-task observation、confirmed stop与receipt snapshot时才广告`workspace_runtime_stop`；既有`workspace_runtime`不能隐含stop支持。
+- read-only options返回候选identity/session/block reason/token；mutation要求`confirmInterruptions:true`和exact channel/epoch/token/session集合。stale/blocked/incomplete/in-progress/failed/not-supported使用稳定409/503/501 taxonomy。
+- 成功后事件沿用`session_closed`，additive `cause:'workspace_runtime_stop'`；不发`workspace_removed`。该tag、route和event cause当前仍是open方案，旧daemon/client按既有容量错误降级。

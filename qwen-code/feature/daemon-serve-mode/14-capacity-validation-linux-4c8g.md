@@ -4,7 +4,7 @@
 > 起因：[#11386](https://github.com/QwenLM/qwen-code/issues/11386) 的设计文档 `docs/design/workspace-capacity-p1.md` §9 明确把 Linux、真实仓库、watcher/FD、真实负载列为未完成的部署证据；此前 P1 验证跑在 macOS 空目录上。
 > 复现脚本与逐次原始数据：[`repros/daemon-capacity-linux-4c8g/`](../../../repros/daemon-capacity-linux-4c8g/)。
 > 上游记录：#11386 评论区（容量验证 + 两次更正）、[#8182](https://github.com/QwenLM/qwen-code/issues/8182)（子进程堆授权）、[#11591](https://github.com/QwenLM/qwen-code/issues/11591)（git 状态开销，本次新开）。
-> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；下文数值保留为修复前历史证据。约6 GiB以下raise-only守卫丢弃目标参数、授权不参与准入的另一半仍未解决。
+> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；#11911已增加显式`admit`下的modeled child数量准入，#11940已增加零session/零activity warm child单候选回收。下文数值保留为默认`observe`与修复前历史证据；约6 GiB以下raise-only守卫、per-child heap/RSS enforcement仍未解决。
 
 ---
 
@@ -65,7 +65,7 @@
 两点值得记入 [`13-resource-budgeting.md`](13-resource-budgeting.md) 的观测面：
 
 - **256 个 workspace 下启动预热只拉起 1 个子进程**（primary bridge），不是每 workspace 一个。已在生产默认下确认（不设 `VITEST_WORKER_ID`）。
-- **拉起 8 个子进程成功且 `refusals: 0`**，超过模型报告的 `maxConcurrentChildren: 6`。`enforced: false` 下预期如此，但这说明 `maxTotalSessions: 800` 与 child heap 模型都不构成约束。
+- **拉起 8 个子进程成功且 `refusals: 0`**，超过模型报告的 `maxConcurrentChildren: 6`。这是当时默认`observe`且`admissionEnforced:false`的历史结果；#11911后显式`admit`会在spawn前执行数量上限，但`limits.memory.enforced:false`仍表示heap ceiling没有应用。`maxTotalSessions:800`也仍不是内存安全证明。
 
 ---
 
@@ -145,7 +145,7 @@ cgroup 受限档进一步把图补完整（`systemd-run --scope -p MemoryMax=<L>
 
 真实 clone 也复现（0.62s/次），所以不是硬链接夹具的假象：**任何只被 daemon 读取的仓库都会长期为每次状态查询付这份开销。**
 
-溯源：该函数与该标志由 [#7054](https://github.com/QwenLM/qwen-code/pull/7054)（2026-07-18）引入，比容量改动早近两个月，**不是回归**；#11515 提高默认上限只是让它在规模下显现。
+溯源：该函数与该标志在本次容量改动前已存在近两个月，**不是回归**；#11515 提高默认上限只是让它在规模下显现。
 
 ### 6.1 超时会静默返回与工作树矛盾的 200
 
@@ -176,6 +176,7 @@ CI triage 同时指出：方向上若想给 `wait=1` 加 TTL，等于重开上�
   - 按响应性规划时用 heavy 的数字：末轮综合可达 307s。
 - **此结论取代了我最初「先 2 个并发、验证后到 4 个」的建议**——那是在没有任何真实负载数据时给的，对这类负载保守了 4–8 倍。两版都已在 #11386 评论区更正留痕。
 - 内核上限不构成约束：daemon 占 1 个 inotify 实例、每个子进程恰好 1 个，实例要到约 127 个并发子进程才耗尽，内存远早于此触顶。
+- 部署需要硬限制物理ACP child数量时应显式启用`admit`并按本机负载重算budget；满额后#11940只会回收零session warm child，不会自动终止loaded session。#12008的用户确认stop仍为open方案。
 
 ---
 
@@ -188,3 +189,5 @@ CI triage 同时指出：方向上若想给 `wait=1` 加 TTL，等于重开上�
 - **深历史仓库**：素材仓库只有 2 个提交。
 - **多小时稳定性**：最长连续运行 19.9 分钟。
 - 工具授权由程序自动批准，而非人工应答；两种负载形态都用 `qwen3.8-flash`。
+
+_按个人 PR 口径更新于 2026-09-18_

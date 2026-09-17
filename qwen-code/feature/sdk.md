@@ -559,4 +559,14 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - superseded restore的 typed replacement ID用于 Channel registry自愈；无 worktree response只清理 stale cached claim，带 worktree但证明/路径不符仍拒绝。
 - PR仍为 open，reset methods和 types不能视为当前发布 SDK契约。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-15_
+### #11911 — ACP child count admission status（merged）
+
+- daemon status types additive支持`childHeap.mode:'admit'`、`admissionEnforced`与`committedAcpChildren`；旧daemon省略字段时兼容。
+- `limits.memory.enforced:false`仍只表示modeled heap ceiling未应用，不否定显式count gate。
+
+### #12008 — workspace runtime stop SDK（open）
+
+- 当前diff增加只读stop options、exact confirmation和typed receipt/error；management方法固定走REST且不得自动重复POST。
+- lost response/partial outcome必须刷新matching receipt，只有`stopped && released`才允许caller自行决定是否继续；该surface尚未进入发布SDK。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-18_

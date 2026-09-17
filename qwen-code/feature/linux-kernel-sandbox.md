@@ -1,56 +1,59 @@
 # Linux bwrap 内核沙箱技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前记录：#11614 open；以下按2026-09-14 head `8f1b2b107a64`描述方案，尚未进入upstream `main`。
+> 当前口径：#11614 已合入 whole-CLI bwrap backend；#11981、#12064、#12067 仍为 open，分别是当前真实 Linux CI follow-up、工具级迁移总体 draft 与第一拆分 foundation，不能写成 `main` 已具备工具级沙箱。
 
-## 1. 背景与目标
+## 1. 已合入基线：whole-CLI bwrap（#11614）
 
-Linux现有sandbox路径依赖Docker/Podman；在rootless CI、共享构建机或最小系统上，容器runtime本身可能不可用。#11614拟增加显式`bwrap` backend，以内核mount namespace把宿主文件系统变为只读，同时保留agent完成任务所需的最小写路径，并让用户能检查和验证真实边界。
+Linux 在 Docker/Podman 不可用时可显式选择 `bwrap`。启动前以最小 `--ro-bind / / --dev /dev --die-with-parent -- true` 探针确认二进制、user namespace 与 LSM policy 真正允许约束；显式请求失败会非零退出，不静默回到 unconfined。Docker/Podman 仍走 image/container 路径，bwrap/Seatbelt 属于 in-place backend。
 
-方案必须同时满足三点：显式请求不可静默fail open；Git worktree位于workspace外的元数据仍可写；对外准确说明网络、PID和Unix socket并未被文件系统边界自动隔离。
+`resolveBwrapWritableRoots()` 规范化 cwd、系统 temp/cache、Qwen 状态目录、显式 include 与 Git 元数据。HOME 及其祖先不能成为可写根；ambient `GIT_DIR` 等 selector 不被信任。普通 checkout 必须匹配真实 `.git`，linked worktree 必须在 common dir 有 registration 且 `gitdir` 反向指针匹配，避免仓库伪造外部写授权。
 
-## 2. 选择与探测
+workspace `.env`/`settings.env` 不能设置 backend/image/network/proxy 或把 HOME 伪装成 temp/cache。operator environment 与用户级 `.env` 是可信输入，但后者在 sandbox 内重新只读 bind。非法 network mode、HOME 内仓库 include 或探针失败均 fail closed。
 
-`packages/cli/src/config/sandboxConfig.ts`把backend分成container和in-place两类。Docker/Podman仍要求image；`bwrap`不依赖image。选择后不是只检查PATH，而是有5秒上限地执行最小只读root约束，验证当前内核、user namespace与LSM策略确实允许运行。显式backend探测失败会抛出fatal error，不回落为unconfined。
+实际 hop 使用宿主根只读 bind、最小 `/dev` 与逐 root 可写 bind。closed network 通过 `--unshare-net`；open/proxied 仍保留 host network，proxied 不是 direct-connect 防火墙。该实现刻意不创建 PID namespace，并保留宿主 `/tmp`，因此 filesystem `full` 不代表 Unix socket、凭据、进程或宿主服务完全隔离。
 
-```mermaid
-flowchart LR
-  SEL[显式选择 bwrap] --> PROBE[最小 confinement probe]
-  PROBE -->|失败| STOP[非零退出]
-  PROBE -->|成功| ROOTS[解析并核验可写 roots]
-  ROOTS --> HOP[ro-bind host root + bind writable roots]
-  HOP --> CLI[重新执行 CLI]
-```
+`qwen sandbox` 可 inspect backend/root/network，`--verify` 检查 workspace 写、越界 EROFS、host PID 可见性和 network namespace，`-- <command>` 在相同边界透传 stdio/exit code。完整实现见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11614|PR #11614 最终实现]]。
 
-## 3. 文件系统授权
+## 2. 真实 Linux CI follow-up（#11981 当前 open draft）
 
-`resolveBwrapWritableRoots()`创建并规范化Qwen配置/运行目录，组合真实cwd、系统temp、cache、显式include目录、npm/git配置和Git元数据。`normalizeWritableRoots()`拒绝HOME及其祖先，丢弃不存在路径并合并已被父root覆盖的子路径，防止一个宽授权吞掉只读边界。
+#11981 为 merged backend 增加独立 Ubuntu 22.04 workflow 和显式 `test:integration:sandbox:bwrap`。普通 integration suite 排除 Linux-only 测试；显式命令缺少 bwrap/namespace 前置条件时必须失败，不能 skip 后假绿。
 
-Git来源验证不信任ambient `GIT_DIR`等selector，而使用清理后的`gitEnv()`探测真实top-level、absolute git dir与common dir。普通checkout要求`.git`就是对应真实目录；linked worktree要求common仓库中存在同名registration，且worktree git dir里的普通文件`gitdir`反向指向当前`.git`文件。独立Git目录和未登记submodule不会自动得到外部写权限，只能由用户显式include。
+当前 14 项用例覆盖真实 workspace/越界写、open/closed 网络、linked-worktree commit、missing backend、direct/proxied fake-model Shell、跨边界 writer lease，以及 SIGINT/SIGTERM 对 payload、descendant/proxy 的清理。它是测试覆盖，不改变生产路径。当前 GitHub classify、lint/static 与 Ubuntu test 仍失败，hosted x64 尚不能作为通过证据。
 
-workspace `.env`与`settings.env`不能设置sandbox backend/image/网络/代理控制或`XDG_CACHE_HOME`、`TMPDIR/TMP/TEMP`。operator继承环境与用户级`.env`仍是可信输入，但在可写Qwen目录之上把该文件重新只读bind。这防止不可信仓库或受限子进程让host选择backend、执行proxy命令，或把HOME敏感目录伪装成cache/temp后扩大可写bind；reload也不会中途改写project-env拒绝集合。仓库可控include目录展开`~`后若落在HOME内部会被拒绝，非法`QWEN_SANDBOX_NET`直接报错而不会退回open。
+## 3. 工具级迁移总体方案（#12064 当前 open draft）
 
-## 4. 运行边界
+whole-CLI 方案把模型通信、认证、审批和 session state 与工具命令放进同一边界；仅包装 Shell 又会漏掉 Write/Edit 等直接副作用。#12064 的总体 draft 将约束移动到命令执行和文件 worker，可信控制面留在 host。
 
-`buildBwrapArgs()`使用`--ro-bind / /`、`--dev /dev`、`--die-with-parent`，再逐个bind可写root并切换到target cwd。closed网络增加`--unshare-net`；open与proxied保留host network，proxied只注入代理环境并不阻止direct connection。
+operator-only `tools.executionSandbox` 要求显式 filesystem `read-only|workspace-write` 与 command network `open|closed`，backend 为 `auto|bwrap`。User/System 可配置，Workspace/project env/bare/safe/嵌套 agent 不能放宽。旧 bwrap selector 给迁移错误；backend 不可用、设置损坏或 unsupported integrations 在副作用前 fail closed。
 
-方案刻意不创建PID namespace，因为Qwen跨进程owner记录保存host PID，namespace局部PID会让外部liveness判断命中无关host进程。`/tmp`也不替换为tmpfs，以保留X11/Wayland和ssh-agent socket。因此`SANDBOX_ENFORCEMENT=full`只表示filesystem mount enforcement；host Unix socket、可写Git hooks/config及Qwen settings仍可能影响边界外行为。
+draft 覆盖 ordinary headless、Ink/OpenTUI `!`、prompt interpolation、Monitor、Read/Write/Edit 和部分同 workspace Agent/Code Mode；ACP/serve/web terminal、hooks/MCP/LSP、技能准备、Omni 等未适配路径被拒绝或禁用。它同时包含 x64/ARM64 public/runtime/adapter acceptance，但 148 文件总体改动正在拆分，不能作为当前产品契约。
 
-## 5. 可诊断性
+## 4. 第一拆分：execution foundation（#12067 当前 open）
 
-`qwen sandbox`报告backend、enforcement、network mode、target与可写root。`--verify`运行四项负载：workspace内`mktemp`成功、root外写返回EROFS、host进程可见、network namespace符合配置；probe固定C locale，网络检查要求命令成功、stdout含loopback后才判定，避免最小镜像缺命令或stderr文本造成假阳性。safe mode仍按完整settings选择backend，但不采用settings-derived额外root；`-- <command>`关闭数字参数自动转换，在同一argv构造下继承stdio并透传退出码。Core prompt同时区分宿主只读根和最小`/dev`设备树，并让模型把拒绝路径交还用户在host侧检查。verify不能证明Git写入或host socket隔离，worktree commit仍需单独测试。
+#12067 只抽取内部执行底座，不开放 runtime policy、公开设置或 tool routing：
 
-Core prompt只在`SANDBOX=bwrap`时说明EROFS边界，要求模型报告拒绝路径，不得改写其它位置、提权或重复尝试。普通EACCES仍可能来自文件权限，不能被误判为sandbox拒绝。
+- `ShellExecutionService.executeLaunch` 接收绝对 executable/cwd、字面量 argv、精确 snapshot env 与可选 binary stdin；pipe 等待 stdio close，PTY spawn 后失败不得通过另一 transport 重放。
+- bwrap relay 用 payload 不继承的 status FD 和受保护 control file 记录最终 receipt；`confirmed/unconfirmed/interrupted/running` 与 stdout 分离，未知结果不授权 retry。
+- binary file worker 在 namespace 内做 atomic write、file-version 复核和 outside/symlink/special-file 拒绝；host 同时校验 trusted receipt 与 worker reply。
+- relay/worker 作为独立 bundle/package assets 发布，缺失时在执行前失败；独立 verifier 覆盖 34 项真实 Linux adapter 行为。
 
-## 6. 验证与状态
+旧 whole-CLI backend 在该拆分中仍存在。只有后续 policy/tool wiring 和完整 public cutover 合入后，工具级边界才会成为可用产品能力。
 
-open PR包含CLI、root推导、环境来源拒绝、argv、环境、prompt和verify battery测试。PR记录较早head在Ubuntu Lima验证两种网络模式、worktree commit和越界写拒绝，较早macOS head完成定向构建与测试；最新review follow-up未重跑Linux。2026-09-14当前GitHub的Lint、Ubuntu测试、Serve A/B和Java real-daemon E2E均失败，review仍在进行且最近正式结论为changes requested；Linux最新head、Windows、真实Electron、Landlock和seccomp未完成最终验证。
+## 5. 设计边界
 
-完整PR级观察见 [[qwen-code/weekly-report/2026-09-07_2026-09-13/implementations/pr-11614|PR #11614 当前实现观察]]。
+- bwrap 路径提供 write 与 command-network confinement，不承诺 secret confidentiality 或完整 host isolation；广泛 host read 与 pathname Unix socket 仍可用。
+- #11614 默认不自动启用；Landlock、seccomp、一次性提权、Windows/macOS 新 backend 均不在当前 `main` 能力内。
+- #11981 是 CI 方案且当前失败；#12064 是总体 draft；#12067 是未接线的内部 foundation，三者都不能替代 merged #11614 的现状描述。
+- tool-level 迁移涉及安全边界、PTY/pipe 生命周期、文件并发和配置来源，必须逐拆分核对，不应从大 draft 的通过声明推断每个 extraction 已验证。
 
-## 7. 未完成边界
+## PR 归因
 
-- #11614未合入，不能把`bwrap`、`qwen sandbox`或默认行为变化写成当前产品能力。
-- Landlock fallback、seccomp、按命令约束与一次性提权、默认启用均是后续阶段。
-- Seatbelt既有Git目录与proxy传递缺口不由本方案修复。
-- filesystem-only约束不是完整的进程、凭据、网络或宿主服务隔离。
+| PR | 状态 | 作用 |
+|---|---|---|
+| [#11614](https://github.com/QwenLM/qwen-code/pull/11614) | merged | 显式 whole-CLI bwrap backend、最小可写 roots、project-env 来源隔离与 `qwen sandbox` 检查/验证。 |
+| [#11981](https://github.com/QwenLM/qwen-code/pull/11981) | open draft | 为 whole-CLI backend 增加真实 Linux workflow 与 14 项 integration coverage；当前 GitHub checks 失败。 |
+| [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | open draft | 工具级 bwrap 完整迁移参考、公开 policy/cutover 与跨架构 acceptance。 |
+| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | open | 从总体 draft 抽取 structured execution、trusted receipt、file worker 与 packaging foundation。 |
+
+_按个人 PR 口径更新于 2026-09-18_
