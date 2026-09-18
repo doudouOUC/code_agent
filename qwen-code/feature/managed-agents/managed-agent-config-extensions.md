@@ -2,6 +2,8 @@
 
 > **HTML 对齐（2026-09-18）：** 版本化 AgentBundle 为 Harness 提供模型、instructions、Tool Schema、Skill 静态描述、MCP 能力快照和权限摘要，Runtime ready 后核验 revision/digest。Workspace 工具、MCP 和本地副作用在 Runtime 执行；未迁移的 Hooks/动态 MCP/Extension 使新 Session 保留 Legacy，完整扩展按 H 启用。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **首版运行范围（2026-09-19）：** [静态 Bundle 契约](managed-agent-first-runtime.md#4-静态-agentbundle-与工具范围)要求可信发布步骤预先生成完整不可变配置，Harness 无需启动 Runtime 即可读取；缺快照拒绝准入。首版 definition 固定，升级使用新 Session；下文完整 SourceReader、发现和热更新属于 H 的扩展，不参与首轮隐式初始化。
+
 更新日期：2026-09-11；生产源码基线 `a836081466`，既有设计基线 `4cacfbd0ed`。本文定义[全量覆盖表](managed-agent-full-design.md)的 C03/C07/C08/C09，采用[Session 存储](managed-agent-session-storage.md)、[私有协议](managed-agent-control-protocol.md)、[完整 Harness](managed-agent-harness.md)与[coordinator](managed-agent-coordinator.md)的身份、提交和生命周期契约。第 1 节描述现有源码；其后新增类型、版本化适配与恢复保证均待实现和验收。
 
 首阶段仍延期完整 Skills/MCP/Hooks 迁移，详细设计在本文完成。未具备相应能力的新 Session 按正向兼容证明固定 legacy；已存在 Managed 遇到不支持的变更明确拒绝或阻塞恢复，不切换引擎重跑。独立 CLI/TUI 与旧公开返回、错误时机和输入额度保持原兼容边界。
@@ -235,6 +237,8 @@ RootSnapshot 必须实际注入：Storage/global getters、CLI lite getters、en
 Secrets 采用受信任进程内或认证 broker 的 purpose-scoped `SecretHandle`：它是可记录的定位引用，**不是持有即授权的 bearer token**。broker 每次根据真实连接核对 tenant/workspace、可选 session/client 限定、purpose、credentialGeneration、expiresAt 和 audienceRef；缺省 session 仅表示经过显式授权的 workspace 共享，client 范围不得跨连接 epoch。只保存引用/非敏感账号标识，运行时取值，不把 token/header/env 全量写 JSONL/模型上下文。配置文件内混合 secret 的原内容也由 secret store 保管，普通 DurableRef 只存去秘密后的对象。私有 ACP capability/daemon token/activation gate 不进入子命令 env。broker 缺失/过期返回 auth_required，不回退其他账号/root。正常 token refresh 可在核对同一账号、purpose 和 audience 后发布新 handle；记录 credential generation 变更，已开始请求保留原身份与回执，不因更新重发请求。恢复不能取得合法新 handle 时保持 credential_required。
 
 ## 3. 版本、更新、恢复的共同状态机
+
+本节完整热更新机制在对应 H 能力验收后启用。首版静态 Bundle profile 不执行 definition 升级、动态发现或 watcher 驱动配置替换；保留原权限策略的审批决定，Agent 定义升级创建新 Session。
 
 `read → prepared → installing → committed → active → retiring → released`；解析/信任/能力失败为 rejected，安装失败保留上版 active。安装状态属于配置操作，不是第二个模型 activation。安装过程中没有成功 ACK 前不得向新调用发布新版；commit 成功但 ACK 丢失按原 operationId 查询，不能重新提交等价变更。旧 revision 有 invocation/async Hook/MCP lease/continuation 引用时保持 retiring，真实 drain 后释放。
 

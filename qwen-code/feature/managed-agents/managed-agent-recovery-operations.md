@@ -2,6 +2,8 @@
 
 > **HTML 对齐（2026-09-18）：** Java 恢复 SessionBackendBinding、RuntimeBinding、Execution Ledger；Harness 依据正式 Transcript/checkpoint 和原 Ledger 恢复；Runtime 提供物理回执。started 无终态保持 recovery_blocked，禁止换 Runtime 重放。F 验收现有部署故障，G 验收共享 Authority 与跨实例接管；内部 UNKNOWN 须显式映射，不直接替换目标状态。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **首版运行范围（2026-09-19）：** 首版先通过[运行验收 M01～M10](managed-agent-first-runtime.md#8-首版验收与阶段关系)：原 ID 受理/执行查询、取消与真实释放、单实例重启恢复或准确阻塞。完整跨实例接管留 G，多副本路由/创建竞争只在该部署启用前强制；不将本文全量平台方案均列为首版条件。
+
 历史设计日期：2026-09-10；源码基线 `a836081466`。本文补齐当时 daemon 路线中的 worker/daemon 重启、远端执行、平台和容量设计，配合[存储契约](managed-agent-session-storage.md)、[私有门禁](managed-agent-control-protocol.md)及[coordinator](managed-agent-coordinator.md)。先前产品文档记录过部分 durable Broker 与 UNKNOWN 能力进展，现保留为历史证据；本地文件账本、任意恢复和平台门槛仍须按具体条目核验，不能整体标记完成或未完成。
 
 ## 1. 当前事实与选定后端

@@ -1,19 +1,28 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **当前基准：用户指定的 [HTML v1.2](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-18。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.3](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-19；在用户提供的 v1.2 上补充首版运行条件。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
 ## 当前方案入口
 
-先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。HTML 原样收录，SHA-256 为 `81805b396e8e9b7e46eab3478ed0b57e0327b683a5c631a9494f328d40b16191`。
+先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。v1.3 按本轮决定补充最小运行范围，详细方法、生命周期和验收见[首版运行契约](managed-agent-first-runtime.md)；原 v1.2 可从 Git 提交 `479432d` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.2 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.3 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
+
+## 首版运行范围
+
+首版验证采用单 Java + qwen Sidecar、预发布静态 Bundle、Session 独占 Runtime，复用现有产品 SSE/历史。tenantId 设计暂缓，不作为本轮前置项，既有访问检查继续执行。
+
+- 五项必需：qwen 持久受理后 ACK 与原请求幂等、Broker 完整调用/查询、固定 Bundle、Session 归属与持久存储、Runtime 有界创建/取消/释放。
+- 条件必需：已开放工具需要的审批必须可用；跨 Session 共享 Runtime 开启前完成独立配置/权限/gate/释放验收。
+- 多 Java 副本启用前完成原 owner 路由与跨副本 provision 去重；单实例验证不证明分布式能力。
+- D 的独立公共 Item/eventSequence 投影、G 的共享 Authority/自动接管和 H 的完整扩展可后置；首版按[运行验收 M01～M10](managed-agent-first-runtime.md#8-首版验收与阶段关系)交付。
 
 ## 1. 架构与职责
 
@@ -48,7 +57,7 @@ Legacy 续接须创建新 Managed Session ID 并记录 migratedFrom。完整历�
 | --- | --- |
 | 浏览器 → Java | 产品 `/sessions`、Prompt、Cancel、Events；不直连 Harness/Runtime |
 | Java → qwen serve | 复用 `/session`、Prompt、Cancel、Resume、`/events` 等 daemon 契约 |
-| Harness → Java Broker | `JavaBrokerManagedRuntimeProvider` 调用 `/internal/agent-runtime/v1/{prepare,manifest,execute,cancel,release}` |
+| Harness → Java Broker | `JavaBrokerManagedRuntimeProvider` 调用 prepare/manifest/execute/cancel/release，并使用原 execution 查询、control 与持久结果 ack；见[目标方法表](managed-agent-first-runtime.md#3-broker-到-runtime-的最小协议) |
 | Java → Runtime | `/healthz`、`/v1/prepare`、manifest、executions/query/events/cancel、release；HTTP 与 SSE 均由 Java 发起 |
 | 公共 Agent API | 阶段 D 在 Java 提供 Agent/Session/Event/Turn/Item，公共 ID 与内部进程/Runtime ID 解耦 |
 
@@ -56,9 +65,11 @@ Legacy 续接须创建新 Managed Session ID 并记录 migratedFrom。完整历�
 
 稳定 executionCallId 用于查询原调用与幂等；started 后失联且无法证明终态时进入 recovery_blocked，禁止换 Runtime 重放。取消 ACK 不证明工具或进程树已停止；有未决副作用或未转存 Artifact 唯一副本时不能释放资源。
 
-公共事件使用 eventSequence / Last-Event-ID；Items/Turns 从权威记录投影。旧实验 `/managed/sessions*` 不升级为公共 API，待 Java 覆盖 admission、事件、查询和幂等后退役；普通 `/session + executionEngines` 保留。
+首版复用现有 SSE 与正式历史查询；D 开放的公共事件使用 eventSequence / Last-Event-ID，Items/Turns 从权威记录投影，届时补齐原子提交/重建契约。旧实验 `/managed/sessions*` 不升级为公共 API，待 Java 覆盖 admission、事件、查询和幂等后退役；普通 `/session + executionEngines` 保留。
 
 ## 4. A～H 实施顺序
+
+A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环；A/B/C/E 联合 F 的必要验收先交付，D/G/H 按各自门槛扩展。
 
 | 阶段 | 做什么 | 怎么做 |
 | --- | --- | --- |
@@ -108,4 +119,4 @@ Legacy 续接须创建新 Managed Session ID 并记录 migratedFrom。完整历�
 | [原 README](managed-agent-readme-history.md) | P0～P9a 摘要、实验命令、数据与测试限制 |
 | [原 Java 产品方案](managed-agent-java-hosted-runtime-history.md) | 已替换的 M0～M8/Provider 路线及当时的实现记录 |
 
-HTML 原文只作为方案基准；已有代码、定向测试、本地进程 E2E、真实产品 E2E 和生产灰度分别记录。本次未重跑历史测试，后续按目标契约逐项补齐证据。
+HTML 当前修订作为方案基准；已有代码、定向测试、本地进程 E2E、真实产品 E2E 和生产灰度分别记录。本次未重跑历史测试，后续按目标契约逐项补齐证据。

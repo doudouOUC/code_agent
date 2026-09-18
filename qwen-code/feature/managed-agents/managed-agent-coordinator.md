@@ -2,6 +2,8 @@
 
 > **HTML 对齐（2026-09-18）：** B 保留同 daemon 的双引擎、coordinator 与固定 owner；C 在 Java 内嵌 Broker，持久化 RuntimeBinding/Execution Ledger 并管理 Runtime 生命周期；D 由 Java 提供公共资源投影；G 再外置 Session Authority。执行协调、产品路由与资源调度不合并为第二套模型循环。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md)采用 qwen 持久输入/WakeIntent 后 ACK、单 Java + Sidecar、Session 独占 Runtime；coordinator 继续是原 Session activation 的协调者，Broker 只负责环境/账本。多实例启用前须补原 owner 路由和跨副本创建去重，不能从本地 coordinator 推导接管能力。
+
 历史更新日期：2026-09-11；核对源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`，前一版文档 `4dc4a90dcc`。本文最初细化 daemon 内[全局架构](managed-agent-session-harness-runtime.md)的调度与普通接入部分；配合[Harness](managed-agent-harness.md)、[私有协议](managed-agent-control-protocol.md)及[Session 兼容映射](managed-agent-session-method-map.md)。其生命周期和门禁规则继续复用，具体产品实现状态以最新架构为准。
 
 ## 0. HTML 中两类协调的分工

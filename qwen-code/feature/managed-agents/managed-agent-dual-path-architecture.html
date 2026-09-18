@@ -811,6 +811,7 @@
         </div>
         <div class="nav-title">方案目录</div>
         <nav class="nav">
+          <a href="#minimum-runtime">首版运行条件</a>
           <a href="#overview">架构总览</a>
           <a href="#goals">目标与边界</a>
           <a href="#roles">组件职责</a>
@@ -829,7 +830,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.2<br />
+          方案版本 v1.3 · 2026-09-19<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环。
         </div>
@@ -873,6 +874,60 @@
             </div>
           </div>
         </header>
+
+        <section id="minimum-runtime">
+          <div class="section-head">
+            <div>
+              <div class="section-index">00 / FIRST RUNTIME</div>
+              <h2>首版运行条件</h2>
+            </div>
+          </div>
+          <p class="lead">
+            v1.3 保留 v1.2 的总体架构，补充首版取舍：单 Java + qwen Sidecar、
+            预发布静态 AgentBundle、Session 独占 Runtime，复用现有产品 REST/SSE
+            与正式历史。同 Session 多轮复用环境，Harness 仍可承载多个 Session。
+          </p>
+          <div class="callout warning">
+            <strong>本轮范围：</strong>tenantId 语义与多租户设计暂缓，不作为本轮前置条件；
+            既有鉴权和 Session/Workspace 校验继续适用。该验证配置不改变现有部署；
+            若目标 Java 已有多个副本，原 owner 路由和跨副本创建去重必须先完成。
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>项目</th><th>首版要求</th><th>最小完成边界</th></tr></thead>
+              <tbody>
+                <tr><td>Prompt 受理与幂等</td><td>必需</td><td>固定请求 ID；qwen 持久输入与 WakeIntent 后 Java 才 ACK，响应丢失查原请求；不新增 Java 提前 ACK 的输入队列。</td></tr>
+                <tr><td>Broker 调用与查询</td><td>必需</td><td>同轮等待、原 execution 查询、门禁映射、取消和实际释放；execute accepted 不等于完成。</td></tr>
+                <tr><td>AgentBundle</td><td>必需</td><td>预发布不可变版本与资源闭包，Harness 离线可读；缺失拒绝准入，Runtime 核验 manifest。</td></tr>
+                <tr><td>Session 归属与存储</td><td>必需</td><td>固定后端、明确持久位置；重启无证明则阻塞，不能新建空 Session 替代。</td></tr>
+                <tr><td>Runtime 生命周期</td><td>必需</td><td>持久创建意图、创建去重、有限启动/idle 期限和容量；取消后迟到 ready 重新校验，释放核验真实退出。</td></tr>
+                <tr><td>审批与用户问答</td><td>条件必需</td><td>已开放工具需要交互时，响应必须经 Java 回到原持久仲裁；不静默自动批准。</td></tr>
+                <tr><td>跨 Session 共享 Runtime</td><td>默认关闭</td><td>独立 ToolSessionBinding、配置/权限/gate/历史及引用计数通过验收后启用。</td></tr>
+                <tr><td>独立公共 SSE/Item 投影</td><td>按 D 后置</td><td>首版使用现有 SSE、状态与历史查询；公共序号与投影事务另行验收。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3 style="margin-top: 28px">最小受理与故障边界</h3>
+          <pre>
+Client stable request ID → Java 持久 ID / BackendBinding 映射
+                        → qwen 提交 input + WakeIntent → CommitReceipt
+                        → Java 返回 accepted
+模型推进与 Runtime 预热并行，不等待 Runtime ready。
+ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocked。
+取消：先持久请求，再追踪实际停止与资源释放。</pre>
+          <p>
+            qwen Transcript/checkpoint、资源与 Broker Ledger 必须有明确持久保存位置。
+            Java 单独重启查询原 Sidecar/Runtime；Sidecar 重启核验 writer 与原调用；
+            Pod 替换、卷不可用或旧 owner 不明时，首版不保证自动恢复。
+            多实例必须先完成原 owner 路由与 provision 竞争控制，自动跨实例接管仍属于 G。
+          </p>
+          <p>
+            首版使用 A/B/C/E 与 F 的必要验收，完整 D 不阻塞现有产品 API 上的 E 闭环。
+            方法与字段、Bundle 发布、部署矩阵、生命周期、审批及 M01～M10 验收见
+            <a href="managed-agent-first-runtime.md">首版运行契约</a>；
+            这些是目标条件，不表示实现或测试已经完成。
+          </p>
+        </section>
 
         <section id="overview">
           <div class="section-head">
@@ -1341,15 +1396,15 @@ Tool Runtime Pod（按需）</pre
             </div>
           </div>
           <p class="lead">
-            Java 收到请求后，同时启动模型链路和 Runtime 链路。Harness
-            已经持有版本化 AgentBundle，因此模型调用不依赖 Runtime
-            在线发现工具。
+            Java 收到请求后，同时转发原请求与预热 Runtime；只有 qwen 持久受理后才对客户端 ACK。Harness
+            已经持有预发布的版本化 AgentBundle，因此模型调用不依赖 Runtime
+            在线发现工具。缺少必要配置快照时拒绝 Managed 准入。
           </p>
           <div class="sequence">
             <article class="sequence-step">
               <div class="step-no">01</div>
               <h4>接收 Prompt</h4>
-              <p>Java完成鉴权、Session 路由和稳定 turnId 分配。</p>
+              <p>Java 完成鉴权、原 Session 路由与稳定请求 ID 映射；qwen 持久受理后才返回 accepted。</p>
             </article>
             <article class="sequence-step">
               <div class="step-no">02</div>
@@ -1391,7 +1446,7 @@ Prompt → Model → Tool Call
           <div class="callout">
             AgentBundle 至少包含 System Prompt、Tool Schema、Skill 静态描述、MCP
             能力快照、权限摘要和 <code>agentDefinitionRevision</code>。Runtime
-            启动后必须核验相同 revision/manifest digest。
+            启动后必须核验相同 revision/manifest digest。首版 definition 固定，更新定义使用新 Session；动态发现与完整热更新按 H 扩展。
           </div>
         </section>
 
@@ -1406,13 +1461,14 @@ Prompt → Model → Tool Call
             <article class="card">
               <h3>前端 → Java</h3>
               <p>
-                继续使用产品 REST/SSE。浏览器不直接访问 Harness 和 Runtime。
+                继续使用产品 REST/SSE。审批复用现有入口；没有对应入口时补充下列 responses 路由。浏览器不直接访问 Harness 和 Runtime。
               </p>
               <pre>
 POST /sessions
 POST /sessions/{id}/prompt
 POST /sessions/{id}/cancel
-GET  /sessions/{id}/events</pre
+GET  /sessions/{id}/events
+POST /sessions/{id}/actions/{requestId}/responses</pre
               >
             </article>
             <article class="card">
@@ -1437,11 +1493,23 @@ POST /internal/agent-runtime/v1/prepare
 POST /internal/agent-runtime/v1/manifest
 POST /internal/agent-runtime/v1/execute
 POST /internal/agent-runtime/v1/cancel
-POST /internal/agent-runtime/v1/release</pre
+POST /internal/agent-runtime/v1/release
+GET  /internal/agent-runtime/v1/executions/{executionCallId}
+POST /internal/agent-runtime/v1/control
+POST /internal/agent-runtime/v1/executions/{executionCallId}/ack</pre
               >
             </article>
           </div>
 
+          <div class="callout">
+            v1.3 补充原 execution 查询、control 与结果 ack。execute 返回 accepted 后，
+            Harness 可有界轮询原 ID，连接中断不能重新派发。
+            control 仅包含 stageGate / enableGate / renewGate / revokeGate / queryGate / queryReceipt；
+            门禁安装遵循原 authority 提交和 enable ACK 顺序。
+            qwen 结果接收 CommitReceipt 经可信入口核验后才记 delivered，
+            release 还需核对 checkpoint、资源引用和物理退出。
+            完整方法映射见 <a href="managed-agent-first-runtime.md#3-broker-到-runtime-的最小协议">运行契约</a>。
+          </div>
           <h3 style="margin-top: 28px">Java → Runtime</h3>
           <div class="table-wrap">
             <table>
@@ -1457,6 +1525,11 @@ POST /internal/agent-runtime/v1/release</pre
                   <td><code>GET /healthz</code></td>
                   <td>存活与版本探测</td>
                   <td>状态和协议版本</td>
+                </tr>
+                <tr>
+                  <td><code>POST /v1/control</code></td>
+                  <td>原门禁安装、启用、续租、撤销和查询</td>
+                  <td>gate receipt</td>
                 </tr>
                 <tr>
                   <td><code>POST /v1/prepare</code></td>
@@ -1585,11 +1658,14 @@ POST /internal/agent-runtime/v1/release</pre
             </div>
           </div>
           <p class="lead">
-            第一阶段建议按
-            <code
-              >tenantId + workspaceId + workspaceGeneration + canonicalCwd</code
-            >
-            复用 Runtime，不跨租户共享。
+            首版默认 Session 独占 Runtime：归属绑定原 Workspace scope、
+            workspaceGeneration、canonicalCwd 和 sessionId，同 Session 多轮复用。
+            原 workspace 级跨 Session 复用作为可选优化，须先通过逻辑绑定与隔离验收。
+            tenantId 语义本轮不扩展设计。
+          </p>
+          <p>
+            环境 ready 与 activation gate 分开：没有活跃 Turn 时可以预热并保持 gate closed；
+            实际 Tool Call 仍须安装原 Session/activation 门禁并取得 enable ACK，迟到 ready 不授予执行资格。
           </p>
           <div class="state-flow">
             <span class="state">absent</span><span class="state-arrow">→</span>
@@ -1608,11 +1684,13 @@ POST /internal/agent-runtime/v1/release</pre
             <article class="card">
               <h3>复用规则</h3>
               <ul>
-                <li>Java只允许同一 binding key 一个 active provision。</li>
+                <li>同 key 只允许一个 active provision；外部创建前持久保存 provisionRequestId。</li>
+                <li>创建结果不明查原请求，无法确认保持待处理，不换 ID 重建。</li>
+                <li>取消后迟到 ready 重新核验 Session、generation 和需求，无人持有则 draining。</li>
                 <li>Runtime endpoint 不由 Harness 或模型指定。</li>
                 <li>Workspace generation 变化时创建新 Binding。</li>
-                <li>Idle Runtime 保留一段时间服务第二、三轮。</li>
-                <li>强隔离任务可以升级为 Session 独占 Runtime。</li>
+                <li>启动 deadline、idle 保留时间和容量有界；同 Session 第二、三轮可复用。</li>
+                <li>跨 Session 共享必须先有独立配置、权限、文件历史、gate 和释放引用计数。</li>
               </ul>
             </article>
             <article class="card">
@@ -1816,13 +1894,14 @@ POST /internal/agent-runtime/v1/release</pre
           <div class="section-head">
             <div>
               <div class="section-index">12 / SECURITY</div>
-              <h2>安全与租户隔离</h2>
+              <h2>安全与隔离边界</h2>
             </div>
           </div>
           <ul class="checklist">
+            <li>本轮暂缓 tenantId 语义设计；下列租户条目保留为全量目标，不作为本轮运行验收或能力声明。</li>
             <li>浏览器只能访问 Java，不能直接访问 Harness 或 Runtime。</li>
             <li>Hosted qwen serve 只监听 loopback，并由 Java Sidecar 调用。</li>
-            <li>Java只代理必要的 Session、Prompt、Cancel 和 Event API。</li>
+            <li>Java 只代理必要的 Session、Prompt、Cancel、Event 和已开放能力需要的审批/问答 API。</li>
             <li>Runtime endpoint 不返回给浏览器和模型。</li>
             <li>Java与 Runtime 使用短期 Token 或 mTLS。</li>
             <li>Token 绑定 tenant、workspace、generation 和 epoch。</li>
@@ -1873,7 +1952,7 @@ POST /internal/agent-runtime/v1/release</pre
                 <li>Provisioning、Ready、Idle、Draining 分开计量。</li>
                 <li>监控 Tool 并发、Workspace、子进程和未决副作用。</li>
                 <li>Harness 容量与 Runtime 容量独立扩缩容。</li>
-                <li>不跨租户复用；同租户复用需匹配 generation。</li>
+                <li>首版 Session 独占且匹配 generation；跨 Session 共享经隔离验收后开启。</li>
                 <li>高风险任务支持 Session 独占。</li>
               </ul>
             </article>
@@ -2010,7 +2089,12 @@ interface AgentBundle {
             digest，防止模型看到的工具定义与实际执行能力不一致。
           </p>
 
-          <h3 style="margin-top: 28px">第一版公共接口</h3>
+          <div class="callout">
+            首版先复用现有产品 SSE、状态、历史和审批入口。下列公共 Agent API 及独立
+            Item / eventSequence 投影按 D 开放，不是 E 最小闭环的前置条件。
+            D 启用前必须冻结源事件键、公共版本、源进度与事件的原子提交以及重放/重建规则。
+          </div>
+          <h3 style="margin-top: 28px">阶段 D 公共接口</h3>
           <pre>
 POST   /v1/agents
 GET    /v1/agents/{agentId}
@@ -2034,13 +2118,13 @@ GET    /v1/agent-sessions/{sessionId}/artifacts/{artifactId}/content</pre
             <article class="card accent-blue">
               <h3>写入与执行</h3>
               <ul>
-                <li>所有写请求支持服务端生成或客户端提供的幂等键。</li>
+                <li>可重试写请求携带调用前已确定的稳定幂等键；同键不同内容拒绝，仅在响应中生成 ID 不足以处理响应丢失。</li>
                 <li>
                   创建 Session 时固定 agentRevision、executionEngine 和
                   workspaceGeneration。
                 </li>
                 <li>
-                  输入 Event 持久化成功后即可返回 accepted，不等待 Turn 完成。
+                  首版等待 qwen 输入与 WakeIntent 持久提交后返回 accepted，不等待 Turn 完成。Java 提前 ACK 的异步交付方案后置。
                 </li>
                 <li>Java 同时转发 Harness 并异步创建或复用 RuntimeBinding。</li>
                 <li>Cancel 是一个持久化输入事件，不以 HTTP 连接关闭代替。</li>
@@ -2092,6 +2176,10 @@ turn.settled          -> Turn terminal state</pre
               <div class="section-index">15 / DELIVERY PLAN</div>
               <h2>分阶段实施</h2>
             </div>
+          </div>
+          <div class="callout">
+            A～H 为能力阶段。首个运行闭环先完成 A/B/C/E 及 F 的 M01～M10；
+            完整 D 公共投影、G 共享 Authority 与 H 全量扩展按各自门槛后续开放。
           </div>
           <div class="timeline">
             <article class="phase">
@@ -2164,6 +2252,12 @@ turn.settled          -> Turn terminal state</pre
               <h2>核心验收标准</h2>
             </div>
           </div>
+          <p class="lead">
+            首版运行验收以 <a href="managed-agent-first-runtime.md#8-首版验收与阶段关系">M01～M10</a>
+            为准：慢启动首 token、同轮工具、受理/执行 ACK 丢失、取消/迟到 ready、独占隔离、
+            重启恢复或准确阻塞、SSE 重连、容量与审批。多副本/共享 Runtime 只在启用时追加门槛。
+            以下保留 A～H 全量清单；租户项本轮暂缓，公共序号归 D，跨实例接管归 G。
+          </p>
           <ol class="checklist">
             <li>Runtime 人为延迟 15 秒，模型首 token 仍提前返回。</li>
             <li>无 Tool Turn 在 Runtime 未就绪时可以正常完成。</li>
@@ -2202,7 +2296,7 @@ turn.settled          -> Turn terminal state</pre
           <div class="section-head">
             <div>
               <div class="section-index">17 / CURRENT GAP</div>
-              <h2>现有基础与主要缺口</h2>
+              <h2>现有基础与主要缺口（原 v1.2 快照）</h2>
             </div>
           </div>
           <div class="grid-2">
@@ -2242,7 +2336,7 @@ turn.settled          -> Turn terminal state</pre
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.2 · 单文件自包含 HTML<br />
+          Managed Agent 双链路技术方案 · v1.3 · 2026-09-19 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>

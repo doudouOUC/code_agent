@@ -1,6 +1,6 @@
 # Managed Agent Tool-only Runtime P6
 
-> **HTML 对齐（2026-09-18）：** P6 保留 Gateway/Tool-only Runtime 的历史实验；现行模型从首轮起由 qwen serve 内完整 Harness 推进，Local Managed 使用本地 Provider，Hosted Managed 经 Java 内嵌 Broker 执行工具。Java 并行转发 Prompt 与 provision Runtime，只有真实 Tool Call 等待。当前架构、协议和 A～H 顺序以 [HTML v1.2](managed-agent-dual-path-architecture.html)及[双链路方案](managed-agent-java-hosted-runtime.md)为准。
+> **HTML 对齐（2026-09-18）：** P6 保留 Gateway/Tool-only Runtime 的历史实验；现行模型从首轮起由 qwen serve 内完整 Harness 推进，Local Managed 使用本地 Provider，Hosted Managed 经 Java 内嵌 Broker 执行工具。Java 并行转发 Prompt 与 provision Runtime，只有真实 Tool Call 等待。当前架构、协议和 A～H 顺序以 [HTML v1.3](managed-agent-dual-path-architecture.html)及[双链路方案](managed-agent-java-hosted-runtime.md)为准。
 >
 > 本文正文保留 P6 当时的协议、实现与实验记录，不覆盖 2026-09-18 产品部署决策。
 

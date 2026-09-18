@@ -2,6 +2,8 @@
 
 > **HTML 对齐（2026-09-18）：** Java→qwen serve 复用 daemon 会话契约，Harness→Java 内嵌 Broker→Runtime 为独立私有工具链路。qwen 侧执行 Transcript/checkpoint 与 Java 公共投影分开，完整 Authority 外置和可替换 Harness 在 G。下文 managed-session/1、managed-runtime-control/1 是专项设计命名，不代替 HTML 的 HTTP 目标接口，也不声明已经部署。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **首版运行范围（2026-09-19）：** 按[运行契约](managed-agent-first-runtime.md)补齐 HTTP 映射，qwen 持久提交后 Java 才 ACK；Broker 增加原 execution 查询、control 和持久结果 ack。首版单实例、Session 独占，不前置完整公共投影或跨实例接管。tenantId 语义本轮暂缓，下面本地 v1 的历史定义不作为 Hosted 租户设计。
+
 历史更新日期：2026-09-11；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。本文最初定义 daemon 内三层拆分的首版契约，普通 HTTP/ACP/SDK 的旧接口与错误时机按[兼容方案](managed-agent-session-compatibility.md)适配。其消息、提交和原调用接管语义继续作为产品协议设计输入，但不能据此认定完整 activation 隔离或跨 worker 重启恢复已经验收。
 
 ## 0. HTML 的传输边界与目标接口
@@ -9,8 +11,8 @@
 | 方向 | 目标接口 | 归属 |
 | --- | --- | --- |
 | Java→qwen serve | Session/Prompt/Cancel/Load/Resume/SSE，保留 `/session + executionEngines` | 统一 daemon 契约，固定会话 owner |
-| qwen serve→Java Broker | `/internal/agent-runtime/v1/prepare`、`manifest`、`execute`、`cancel`、`release` | JavaBrokerManagedRuntimeProvider 调用内嵌 Broker |
-| Java→Runtime | `GET /healthz`、`POST /v1/prepare`、`GET /v1/manifest`、`POST /v1/executions`、执行查询/events/cancel、release | Java 发起 HTTP/SSE，Runtime 不反向连接 Java |
+| qwen serve→Java Broker | `/internal/agent-runtime/v1/prepare`、`manifest`、`execute`、`cancel`、`release`；`GET executions/{executionCallId}`、`POST control`、`POST executions/{executionCallId}/ack` | JavaBrokerManagedRuntimeProvider 调用内嵌 Broker |
+| Java→Runtime | `GET /healthz`、`POST /v1/prepare`、`GET /v1/manifest`、`POST /v1/control`、`POST /v1/executions`、执行查询/events/cancel、release | Java 发起 HTTP/SSE，Runtime 不反向连接 Java |
 
 完整路由与字段见[双链路方案第 7～8 节](managed-agent-java-hosted-runtime.md#7-通信协议与连接方向)。现有 `/internal/runtime-broker/v1/*`、owned v1/v2 和下面的 typed control 是已有实现或详细接缝，不能冒称已实现相同 HTML 路径；需显式适配并验证原调用 ID、权限、状态、取消和释放。
 
@@ -44,7 +46,7 @@
 | `ToolOutcomeRef`    | 按来源分型：runtime 含已接收 InvocationBinding/receipt；domain 含 action/Goal/Todo 等领域提交回执；orchestration 含注册的编排结果或 child 结算引用。三者共享稳定 executionCallId、输入摘要和批次位置，不能伪造另一来源的回执                                                                       |
 | `WakeIntent`        | `wakeId, reason, subject, sourceEventId, requiredSequence`；reason 为 input/action_resolved/tool_settled/recovery，定时及子任务扩展按相应用途验收后启用；不等同允许重放副作用                                                                                                                      |
 
-**v1 的 `tenantId` 语义要写死，避免被当成多租户能力。** 它是由已解析 workspace 派生的**本地键**，用于身份规范化与路径/索引分区，不代表已认证的租户主体，不承担隔离、配额、计费或跨租户授权语义；真实多租户平台在[全量覆盖表](managed-agent-full-design.md)§1 的目标边界外。因此本轮所有“per-tenant 公平轮转/上限”在实现上退化为 workspace 级别的公平与上限，字段保留是为了将来不改记录格式，不是已具备租户隔离的声明。禁止基于该字段设计跨租户的信任、配额或数据可见性；需要真实租户身份时必须先有认证控制面，并在对应专项重新定义该字段的来源与校验。
+**v1 的 `tenantId` 语义要写死，避免被当成多租户能力。** 它是由已解析 workspace 派生的**本地键**，用于身份规范化与路径/索引分区，不代表已认证的租户主体，不承担隔离、配额、计费或跨租户授权语义；此处只记录原 Local v1 边界；Hosted tenantId 语义按 2026-09-19 决定暂缓设计，不列为本轮运行门槛。原本地专项中的“per-tenant 公平轮转/上限”实际为 workspace 级别的公平与上限，字段保留是为了将来不改记录格式，不是已具备租户隔离的声明。禁止基于该字段设计跨租户的信任、配额或数据可见性；真实租户字段来源与校验留待对应专项明确，本轮不展开。
 
 `ActivationSubject` 是封闭 union：`{kind:'turn',turnId}` 或 `{kind:'hook_operation',operationId,occurrenceId,event,phase,originTurnId?}`；普通旧 turn DTO 仍从前者投影原 turnId，不添加假用户轮次。WakeIntent 与执行事件携带相同 subject。无活 turn 的 prompt Hook 使用后者，仍共享同 Session 单调 epoch、唯一模型推进者、Harness 槽位和模型预算；OperationGrant 本身不授予模型调用权。
 

@@ -2,13 +2,15 @@
 
 > **HTML 对齐（2026-09-18）：** C01～C18 继续作为能力、风险和验收清单，并映射到 A～H。B 的 daemon factory/双引擎、G 的权威事件与 checkpoint 外置、H 的全量能力迁移分别交付；原 R/F 编号仅保留为专项索引，不能另定产品实施顺序。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **首版运行范围（2026-09-19）：** 按[运行契约](managed-agent-first-runtime.md)收敛到五项基础必需；审批随已开放工具启用，共享 Runtime/多实例随对应 profile 验收。tenantId 设计暂缓；完整 D 投影、G 接管与 H 扩展不作为最小闭环前置。C01～C18 是全量目标，不表示首版全部开启。
+
 历史更新日期：2026-09-11；生产源码基线 `a836081466`，上一轮核心设计 `4cacfbd0ed`。本稿将 daemon 默认替换的 C01～C18 纳入详细设计，包括原先延期能力。设计覆盖、源码实现、产品验收分别记录。
 
 ## 1. 完整能力与当前交付边界
 
 HTML 的 B 先让兼容的新普通 Session 通过统一接口使用完整 Managed Agent，Legacy 与未覆盖用途继续共存；H 再逐项扩大能力。职责保持分层：Session 保存权威执行状态，Harness 复用原 Agent，Runtime 执行所属环境的本地操作，coordinator 负责准入、激活和关闭；Hosted 的 Runtime 生命周期与执行账本由 Java Broker 管理。Web Shell、REST、ACP、SDK、Channels、定时、Goal/Live、子任务/记忆和旧会话操作都在覆盖表中；不把延期实现解释为延期设计。
 
-全量指本仓库 daemon 能力的完整迁移及明确的平台/故障契约，不承诺任意外部副作用 exactly-once、任意进程快照或任意旧二进制可写新格式。原 daemon 专项不单独交付恶意进程安全沙箱、通用 SaaS 平台、Kubernetes/VM 模板或独立 CLI/TUI 默认替换；当前整体方案包含 Java 托管控制面与租户隔离，但不要求以 Kubernetes 作为协议前提。
+全量指本仓库 daemon 能力的完整迁移及明确的平台/故障契约，不承诺任意外部副作用 exactly-once、任意进程快照或任意旧二进制可写新格式。原 daemon 专项不单独交付恶意进程安全沙箱、通用 SaaS 平台、Kubernetes/VM 模板或独立 CLI/TUI 默认替换；当前整体方案包含 Java 托管控制面，租户语义与多租户设计本轮暂缓；不要求以 Kubernetes 作为协议前提。
 
 两条全局口径与上面的目标边界同级，各专项不得各自放宽：
 
@@ -55,7 +57,7 @@ HTML 的 B 先让兼容的新普通 Session 通过统一接口使用完整 Manag
 | C17 故障/平台/观测        | [恢复与运行](managed-agent-recovery-operations.md)：持久phase、Windows Job/Linux cgroup/进程组、远端挑战、具体性能门槛                                           | A/F/G/H；O01～O07 |
 | C18 默认切换/回退         | [实施计划](managed-agent-daemon-default-plan.md)、[客户端](managed-agent-client-surfaces.md)：按purpose/config/profile证据扩大，新建开关不改变已有owner | B/E/F/H；U01/U06/O07 |
 
-每个C项的详细接口见对应专项；表中验收编号只在所属文档命名空间内唯一，不与总表C编号或其他专项编号混算。18项没有以“以后再决定归属/协议”作为设计结论；实现出现新消费者时必须回到对应专项更新契约与覆盖。
+每个C项的详细接口见对应专项；表中验收编号只在所属文档命名空间内唯一，不与总表C编号或其他专项编号混算。18 项记录全量专项的归属与协议；本轮首版按运行契约启用，延期项不视为已冻结 Hosted 适配。实现出现新消费者时必须回到对应专项更新契约与覆盖。
 
 ## 4. 此前待定问题的决定
 

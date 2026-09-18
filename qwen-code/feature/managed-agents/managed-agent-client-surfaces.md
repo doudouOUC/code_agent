@@ -2,6 +2,8 @@
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md#7-审批与用户问答)要求已开放能力的审批/问答经过 Java 回到原持久仲裁；复用既有产品入口、SSE 和历史查询。独立公共 Item/eventSequence 投影属于 D，不阻塞首版 Hosted 运行；首版 accepted 必须等待 qwen 持久受理。
+
 更新日期：2026-09-11；基于源码 `a836081466` 和三层设计 `4cacfbd0ed`。本稿细化 C05/C14/C15/C18 的 Web Shell、REST、ACP、SDK 和管理路径；是待实现设计，现有公开接口仍按[兼容映射](managed-agent-session-method-map.md)逐项保留，独立 Managed 实验页不替代普通入口。
 
 ## 0. HTML 当前客户端链路
@@ -20,7 +22,7 @@
 | Java→qwen serve | `/session`、`/session/{id}/prompt`、`/cancel`、`/resume` | `/events` 与 daemon Load/Resume/SSE 契约 |
 | 阶段 D 公共 Agent API | `/v1/agents`、`/v1/agent-sessions`、Session events/turns/items/artifacts | 单调 eventSequence、Last-Event-ID；公共 Item/Turn 从权威记录投影 |
 
-所有写请求使用稳定幂等键；输入 Event 持久化后返回 accepted，断线不取消后台 Turn。Cancel 是持久输入事件，不能把 HTTP 关闭或接受回执当作物理完成。私有 eventEpoch/sequence、旧实验 cursor 与公共 eventSequence 必须显式映射，不互相替代。
+所有可重试写请求使用调用前确定的稳定幂等键；首版等待 qwen 输入及 WakeIntent 持久提交后返回 accepted，Java 不提前 ACK 并另建异步交付队列。断线不取消后台 Turn。Cancel 是持久输入事件，不能把 HTTP 关闭或接受回执当作物理完成。私有 eventEpoch/sequence、旧实验 cursor 与公共 eventSequence 必须显式映射，不互相替代。
 
 旧 `/managed/sessions*` 实验页面和事件存储不升级为公共 API。只有 Java 覆盖 admission、事件、查询与幂等后才退役过渡控制面；不提前删除尚有消费者的实验入口。
 
