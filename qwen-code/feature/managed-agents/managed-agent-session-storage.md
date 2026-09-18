@@ -1,6 +1,22 @@
 # Managed Session：记录格式、提交与协议限额
 
+> **HTML 对齐（2026-09-18）：** JSONL、SessionWriterLease、ChatRecord 和本地 lock schema 继续作为 qwen 侧执行权威/兼容存储的专项设计。Java 保存公共 ID/投影、SessionBackendBinding、RuntimeBinding 和 Execution Ledger，不再把特定 Java 数据表列为首阶段全部 Session 状态的唯一存储；G 才外置权威事件/checkpoint。两份投影不能相互覆盖原始执行事实。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3/§3.1 的封闭 kind 与 domain、§5 的记录与事务限额已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地；§4 的事务提交（先事件后 marker、`previousCommitDigest` 链、幂等键、写失败停止推进、完整前缀恢复扫描）由 `managed-session-authority.ts` 的 `LocalManagedSessionAuthority` 通过既有 `SessionWriterLease` 实现并有定向单测。仍未实现或验收：lock schema 3 的认证换锁、§2.1 资源仓库、RestoreBundle、坏尾截断的 lease 能力、目录/标题等各适配器与投影，以及四处普通 factory 接线。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
+
+## 0. HTML 的权威记录与公共投影
+
+| 记录 | 第一阶段归属 | 后续演进 |
+| --- | --- | --- |
+| Session engine / 后端绑定 | qwen 固定执行 owner，Java 保存 SessionBackendBinding 路由 | 始终不能因重连或失败重选引擎 |
+| 正式 Transcript / checkpoint / 执行恢复依据 | qwen Session Authority，复用本地 writer 与兼容约束 | G 外置到共享存储；明确唯一写入 authority 和 activation fencing |
+| Agent/Session/Turn/Item/Artifact 公共 ID 与读模型 | Java 产品控制面 | D 建立稳定公共 API 和事件投影，不产生第二份权威模型历史 |
+| RuntimeBinding / ToolExecution | Java 内嵌 Broker 的 Repository / Ledger | Java 重启按原 executionCallId 查询，不换 Runtime 重放 |
+| 物理工具回执 / 文件产物 | 原 Tool Runtime 与持久 Artifact 存储 | 未决调用或唯一副本未转存前不释放 |
+
+公共流使用 eventSequence / Last-Event-ID。daemon eventEpoch、私有 sequence、JSONL UUID 和旧实验 cursor 各有命名空间，投影显式转换。HTML 没有冻结 `chat_session` 等 Java 表结构；此前表映射保存在[历史产品方案](managed-agent-java-hosted-runtime-history.md)，不能替代目标权威边界。
+
+下面的 JSONL/ChatRecord/lock schema 为局部存储及兼容的详细方案，其具体实现/测试状态沿原日期记录。不能因本文定义了 durable checkpoint，就宣称 G 的共享存储和跨实例恢复已验收。
 
 ## 1. 唯一载体与版本决策
 

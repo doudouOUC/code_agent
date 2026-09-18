@@ -1,5 +1,7 @@
 # Managed Agent Remote Runtime P8
 
+> **HTML 对齐（2026-09-18）：** P8 保留进程边界、lease/scope 和私有 HTTP 实验依据。Local Managed 可使用本地/远程 Provider，Hosted Managed 通过 Java 内嵌 Broker 访问 Tool Runtime；HTML 的目标路由与现有 v1/v2 实现差异须显式适配，不将实验公共 API 当成 D。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 > 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [dfb1309f15](https://github.com/doudouOUC/qwen-code/commit/dfb1309f15297df37d60131bfa41038b27a39dad) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status

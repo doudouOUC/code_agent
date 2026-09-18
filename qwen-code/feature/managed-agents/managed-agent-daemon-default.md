@@ -1,10 +1,12 @@
 # Managed Agent 作为 daemon 默认执行实现
 
-## 目标、基线与文档分工
+> **HTML 对齐（2026-09-18）：** C01～C18 的能力清单、兼容风险和验收继续复用。当前 B 明确保留普通 qwen serve 的双引擎接线与固定 owner；托管部署经 C/D/E 进入 Java + qwen serve Sidecar，G 外置 Authority，H 扩大能力。旧默认替换的 R/F 编号不替代 A～H，也不意味着首阶段强制迁移全部会话。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
-更新日期：2026-09-10；本轮源码核对基线：`a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。目标是将 Managed Agent 替换为 daemon 的默认执行实现，复用现有 Agent 能力，兼容普通 Web Shell、SDK、Channels、定时任务及旧会话。独立 Managed 页面保留为实验和诊断入口。独立 CLI/TUI 的默认引擎、Kubernetes/VM 部署和生产多租户调度不属于本次 daemon 默认替换的前置要求。
+## 历史目标、基线与文档分工
 
-本文件是完整产品范围、能力状态和验收要求的总入口；[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)定义用户最新要求的三层拆分；[首阶段实施计划](managed-agent-daemon-default-plan.md)决定当前执行顺序；[执行引擎详细设计](managed-session-execution-engine.md)定义固定 owner、双通道和兼容选择。工具、媒体与子任务细节由下文链接的专项设计负责。原总方案的逐次调查、失败与验收记录完整保留在[历史记录](managed-agent-daemon-default-history.md)，其中的旧顺序和“下一步”不再作为当前计划。D1～D5 是历史切片命名，当前顺序以首阶段计划为准。
+历史更新日期：2026-09-10；源码核对基线：`a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。当时目标是将 Managed Agent 替换为 daemon 的默认执行实现，复用现有 Agent 能力，兼容普通 Web Shell、SDK、Channels、定时任务及旧会话。该目标现作为本地 daemon 能力迁移参考，不再作为产品部署入口。
+
+本文件是历史 daemon 路线的完整范围、能力状态和验收入口。[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)、[首阶段实施计划](managed-agent-daemon-default-plan.md)和[执行引擎详细设计](managed-session-execution-engine.md)保留当时的拆分与接线设计；当前实施顺序以 HTML 的 A～H 为准。原方案的逐次调查、失败与验收记录完整保留在[历史记录](managed-agent-daemon-default-history.md)。
 
 普通默认入口尚未切换。当前已有完整 Agent host、独立 Tool-only Runtime、若干工具与子作用域、持久 owner、配对 Bridge、严格 settings/项目 MCP 读取；相应限定验收不能代替普通入口的完整验收。本轮只调研和整理文档，没有新增生产实现或重跑历史产品测试。
 

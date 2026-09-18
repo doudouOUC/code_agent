@@ -1,14 +1,18 @@
 # Managed Agent 全局架构：Session、Harness 与 Runtime
 
+> **HTML 对齐（2026-09-18）：** Session、Harness、Runtime 保持独立职责；第一阶段 qwen serve 承载统一会话协议、双引擎和执行恢复依据，Java 负责产品路由、公共投影和内嵌 Runtime Broker。Hosted 为 Java Pod + qwen serve Sidecar；共享权威事件/checkpoint、可替换 Harness 与取消粘性按 G 实施，不前置为已完成状态。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+>
+> 下文保留详细逻辑接口和历史源码锚点；其局部 R 阶段不代替 HTML A～H。共享存储和跨实例恢复只在 G 的完成证据具备后启用。
+
 ## 决策、范围与当前状态
 
 2026-09-10 用户明确要求按 Claude Managed Agents 拆分，并先完成全局方案设计。本文件定义目标架构；其中新增接口、统一事件存储、Harness 恢复与实施阶段均为待实现设计。当前生产源码基线为 `a836081466`，前一版文档基线为 `4dc4a90dcc`；本次不改生产代码、不构建启动、不触碰 4170 预览或用户数据。
 
-目标是在保持普通 daemon 契约和现有 Agent 能力的前提下，将会话状态、模型执行和工具环境分成三个独立职责。Session 可以在没有活 Harness 或 Runtime 时被查询；Harness 可以从持久状态重建；Runtime 的退出不会删除会话。默认执行替换继续是产品目标，独立 Managed 页面作为实验和诊断入口保留。
+本文历史目标是在保持普通 daemon 契约和现有 Agent 能力的前提下，将会话状态、模型执行和工具环境分成三个独立职责。Session 可以在没有活 Harness 或 Runtime 时被查询；Harness 可以从持久状态重建；Runtime 的退出不会删除会话。这些生命周期原则继续适用。HTML 的 B 正式接入同 daemon 双引擎，C/D/E 接 Java Broker、公共 API 与 Sidecar，G 再外置权威存储；浏览器访问 Java 产品接口，内部继续复用 daemon 契约。
 
 Anthropic 公开架构将 Session 定义为持久追加事件日志，由 Harness 读取历史、组织模型上下文并派发工具，Sandbox 执行本地工作；三者通过接口独立替换。本文沿用这些职责边界。下文的文件布局、租约、兼容策略和阶段是 Qwen Code 的设计，不代表已知的 Claude 内部实现。[官方架构说明](https://www.anthropic.com/engineering/managed-agents)
 
-本文件决定全局分层；[默认替换总方案](managed-agent-daemon-default.md)维护 C01～C18 的产品范围和证据；[首阶段计划](managed-agent-daemon-default-plan.md)维护执行顺序；[执行引擎设计](managed-session-execution-engine.md)维护固定 owner 与兼容准入。先完成本轮设计，后续施工先建立 Session 权威存储与完整 Harness 接缝，再接四处普通 factory；不再将只接 factory 视作架构拆分完成。
+HTML 决定总体架构与 A～H；本文件细化三层逻辑职责，[默认替换总方案](managed-agent-daemon-default.md)维护 C01～C18 的产品范围和证据；[首阶段计划](managed-agent-daemon-default-plan.md)维护执行顺序；[执行引擎设计](managed-session-execution-engine.md)维护固定 owner 与兼容准入。先完成本轮设计，局部存储、owner 与完整 Harness 接缝必须满足 B 的安全接线条件；共享 Authority 与可替换 Harness 属于 G，不能把只接 factory 视作完整三层拆分或 G 已完成。
 
 专项契约现已补齐：[Session 兼容与方法映射](managed-agent-session-compatibility.md)、[完整 Harness 接口和检查点](managed-agent-harness.md)、[私有消息与 Runtime 接管协议](managed-agent-control-protocol.md)、[coordinator 调度和四处装配](managed-agent-coordinator.md)。这些文档给出可实施的责任与字段约束，尚不代表接口已经编码或故障验收通过。
 
@@ -16,20 +20,29 @@ Anthropic 公开架构将 Session 定义为持久追加事件日志，由 Harnes
 
 ```mermaid
 flowchart TB
-    C[Web Shell / SDK / REST / ACP / 内部触发] --> G[daemon Gateway 与所属工作区 Bridge]
+    C[托管产品前端] --> J[Java Product API / SessionRouter / ClientEventAdapter]
+    J -->|Session / Prompt / Load / Resume / SSE| G[qwen serve 与所属工作区 Bridge]
+    L[本地 Web Shell / SDK / REST / ACP] --> G
+    G --> X[Legacy executor / qwen --acp]
     G --> S[Session Service：状态、事件、历史与恢复依据]
     G --> P[Prompt 准入与 Activation 调度]
     P --> S
-    P --> H[Harness Worker：完整 Agent 模型循环]
+    P --> H[进程内 TS Harness：完整 Agent 模型循环]
     H -->|读取事件 / 条件追加 / 恢复检查点| S
-    H -->|工具调用 / 查询原调用 / 取消| R[Runtime Provider 与 Tool-only Runtime]
+    H -->|Hosted 工具调用 / 查询 / 取消| B[Java 内嵌 Runtime Broker]
+    B -->|Java 发起 HTTP / SSE| R[Tool-only Runtime]
+    H -.->|Local Runtime Provider| R
     R --> W[工作区文件、工具及自有进程]
-    R -->|原调用回执| P
+    R -->|原调用回执| B
+    B -->|执行回执| H
+    R -.->|Local 原调用回执| H
     S --> V[目录 / transcript / 进度 / 终态投影]
     V --> G
 ```
 
 Gateway/Bridge 和调度器是接入与控制组件，不成为另一套 Agent 循环。网络协议不决定业务归属：普通客户端仍使用现有 Session/Prompt/ACP/REST；模型只由 Harness 推进。
+
+图中的 Session Service 是执行侧逻辑边界，第一阶段由 qwen 侧承载；Java 管理公共资源/事件投影和 Broker。阶段 G 再外置权威事件与 checkpoint。Legacy 分支保留原 Workspace 与工具执行，不经过 Managed Tool Runtime。内部触发按用途和兼容性选择已有 owner，Channel/Scheduled Task 等首阶段仍走 Legacy。
 
 | 层              | 权威责任                                                                                              | 不承担的责任                                                                       |
 | --------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -37,7 +50,7 @@ Gateway/Bridge 和调度器是接入与控制组件，不成为另一套 Agent �
 | Harness         | 复用完整 Agent 的提示词、模型循环、压缩、权限决策、工具编排与停止逻辑；持有一次 activation 的执行资格 | 不成为唯一历史持有者，不直接写 Session 存储文件，不以 Runtime 生命周期定义会话生命 |
 | Runtime         | 绑定工作区与执行作用域，执行获准工具，维护实际调用回执、文件备份和自有进程，支持取消与可验证释放      | 不持有模型凭据，不推进模型，不决定用户会话终态，不直接改 Session 权威日志          |
 
-Session Service 中的“服务”首先是接口与生命周期边界。首个本地实现由 daemon 承载持久存储，完整 ACP host 作为 Harness 通过受控 Session client 访问；当前 Managed factory 使用 in-memory ACP host，Tool-only worker 使用已有独立进程。逻辑 handle 与可共享的物理 host 分别计量。即使开发时使用同进程适配器，也必须能独立销毁并重建 Harness，且存储不被它释放。后续可独立部署 Session 服务和 Harness 池；本轮不引入 Kubernetes、消息中间件或分布式数据库作为前置依赖。
+Session Service 中的“服务”首先是接口与生命周期边界。历史首个本地设计由 daemon 承载持久存储，完整 ACP host 作为 Harness 通过受控 Session client 访问；当时 Managed factory 使用 in-memory ACP host，Tool-only worker 使用独立进程。逻辑 handle 与可共享的物理 host 分别计量。当前 HTML 保留这一初期同 daemon 双引擎模型；Hosted 使用 Java Pod + qwen serve Sidecar，Java 管理公共投影与 Broker。“存储不随 Harness 释放、物理 host 可承载多个逻辑 handle、Kubernetes 不是协议前提”保持不变，完整 Authority 外置按 G 推进。
 
 ## 2. 当前组件如何归位
 

@@ -1,5 +1,7 @@
 # Managed 子任务执行与持久文件历史
 
+> **HTML 对齐（2026-09-18）：** 父子作用域、稳定 Runtime ID、文件历史 owner、取消和结果接管作为专项能力保留；同 daemon 双引擎与固定 owner 属于 B，完整后台/子任务能力按 H 的兼容与验收范围启用。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 状态：2026-09-09，本阶段实现及下列 macOS 验收已完成；daemon 默认入口尚未切换。代码基线为 `174e072ac4`，本文件随其后续实现提交。完整迁移目标见 [daemon 默认替换方案](managed-agent-daemon-default.md)，工具调用契约见 [Runtime invocation v2](managed-agent-runtime-invocations.md)。
 
 2026-09-10 三层设计调整：逻辑父/子 Session、历史与结果归 Session authority；完整父/子模型编排归 Harness；实际工具、独立读取缓存与原父文件历史 owner 归 Runtime。coordinator 保留稳定 binding 和清理责任，接管不重新生成原 Runtime ID。详见[Harness](managed-agent-harness.md)、[私有协议](managed-agent-control-protocol.md)和[coordinator](managed-agent-coordinator.md)。下文 Gateway 表述及冷恢复生成新 UUID 是既有终结后重建行为，不能套用到未决原调用的 Harness 接管；新可恢复 child/后台能力仍按后续范围验收。

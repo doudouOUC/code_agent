@@ -1,6 +1,32 @@
 # Managed 普通客户端、交互与事件投影
 
+> **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 更新日期：2026-09-11；基于源码 `a836081466` 和三层设计 `4cacfbd0ed`。本稿细化 C05/C14/C15/C18 的 Web Shell、REST、ACP、SDK 和管理路径；是待实现设计，现有公开接口仍按[兼容映射](managed-agent-session-method-map.md)逐项保留，独立 Managed 实验页不替代普通入口。
+
+## 0. HTML 当前客户端链路
+
+```text
+托管前端 -> Java 产品 REST/SSE -> qwen serve Session/Prompt/Load/Resume/SSE
+                                      -> 固定 Legacy / Managed owner
+本地前端 -> qwen serve 原有会话接口
+```
+
+浏览器只访问 Java 的必要产品路由，不直连 Harness/Broker/Runtime；内部保留普通 `/session + executionEngines`。HTML 未指定 JavaAgentProvider，也未要求 Java 模拟全部 daemon 管理接口。阶段 D 提供 Agent、Session、Event、Turn、Item 的稳定公共资源，内部 ACP/Harness/Runtime ID 不作为公共 ID。
+
+| 层次 | 提交 / 查询 | 事件与恢复 |
+| --- | --- | --- |
+| 当前产品入口 | `/sessions`、`/sessions/{id}/prompt`、`/cancel` | `/sessions/{id}/events`，Java 产品 SSE |
+| Java→qwen serve | `/session`、`/session/{id}/prompt`、`/cancel`、`/resume` | `/events` 与 daemon Load/Resume/SSE 契约 |
+| 阶段 D 公共 Agent API | `/v1/agents`、`/v1/agent-sessions`、Session events/turns/items/artifacts | 单调 eventSequence、Last-Event-ID；公共 Item/Turn 从权威记录投影 |
+
+所有写请求使用稳定幂等键；输入 Event 持久化后返回 accepted，断线不取消后台 Turn。Cancel 是持久输入事件，不能把 HTTP 关闭或接受回执当作物理完成。私有 eventEpoch/sequence、旧实验 cursor 与公共 eventSequence 必须显式映射，不互相替代。
+
+旧 `/managed/sessions*` 实验页面和事件存储不升级为公共 API。只有 Java 覆盖 admission、事件、查询与幂等后才退役过渡控制面；不提前删除尚有消费者的实验入口。
+
+验收覆盖同 daemon 双引擎、冷恢复 sticky owner、Managed 失败不转 Legacy、公共 SSE 重连无重复、取消可追踪及内部地址/凭据不泄漏。原 JavaAgentProvider/managedLastSequence 路线保存在[历史产品方案](managed-agent-java-hosted-runtime-history.md)，不是 HTML 冻结契约。
+
+以下各节为普通 daemon 兼容与完整客户端行为的专项约束；其阶段范围按 A～H 映射，不把完整能力清单都视作第一阶段已开放。
 
 ## 1. 入口与路由归属
 

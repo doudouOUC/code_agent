@@ -1,5 +1,7 @@
 # Managed 自动任务、Channels 与子任务交付
 
+> **HTML 对齐（2026-09-18）：** 领域准入、幂等、父接受、取消和交付语义继续复用。HTML 第一阶段将 Channel、Scheduled Task 等用途留在 Legacy，完整扩展按阶段 H 逐项迁移；执行记录与 Java 公共投影分开，不能提前把全部领域状态搬成 Java 首阶段 Session authority。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 更新日期：2026-09-11；生产源码基线 `a836081466`，前版设计 `4cacfbd0ed`。本文定义[全量设计](managed-agent-full-design.md)的 C10/C11/C12：Channels 入站和交付，定时与内部继续，child/background/memory。以下新增协议、持久记录和恢复流程均待实现，已有实验或限定场景验证不证明本稿完成。首阶段仍延期这些能力的完整迁移；全量设计在本文给出，不延期决定其职责和失败语义。
 
 记录采用[Session 存储](managed-agent-session-storage.md)，执行与关闭采用[coordinator](managed-agent-coordinator.md)和[私有控制协议](managed-agent-control-protocol.md)。worker/daemon 重启与平台保证采用[恢复规范](managed-agent-recovery-operations.md)，不由领域账本推断物理成功。

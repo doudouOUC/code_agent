@@ -1,8 +1,25 @@
 # Managed daemon 默认实现：首阶段实施计划
 
-更新日期：2026-09-11；代码核对基线 `a836081466`。完整范围与 C01～C18 能力/入口/状态/验收总表见[默认替换总方案](managed-agent-daemon-default.md)，三层责任与接口见[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)。历史 D1～D5 不再单独决定当前执行顺序。用户最新要求补齐[全量详细设计](managed-agent-full-design.md)，本轮不开始实现。后续在保留当前 4170 预览、用户数据和已验证能力的前提下，先抽出权威 Session 服务并接入完整 Harness，再完成创建时的兼容选择与普通 factory，让兼容范围明确的新 daemon 会话使用 Managed 默认实现。保持现有 Agent 行为，不把局部验收扩大为全部默认替换完成。
+> **HTML 对齐（2026-09-18）：** R1～R5 保留为历史切片、依赖与验收记录。现行顺序为 A～H：B 同 daemon 双引擎，C 内嵌 Broker，D 公共 API，E Sidecar，F 故障验收，G Authority 外置，H 扩展。旧 R2.S1～S3 可提供局部存储/安全接缝，不作为先完成整个 G 才允许 B 的要求。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
-## 当前优先顺序
+历史更新日期：2026-09-11；代码核对基线 `a836081466`。完整范围与 C01～C18 能力/入口/状态/验收总表见[默认替换总方案](managed-agent-daemon-default.md)，三层责任与接口见[Session / Harness / Runtime 全局架构](managed-agent-session-harness-runtime.md)。当时计划先抽出 daemon 内权威 Session 服务并接入完整 Harness，再完成四处普通 factory 的兼容选择；当前将必要的双引擎/owner 接线映射到 B，将完整共享 Authority/可替换 Harness 映射到 G，不沿用原 R 编号决定当前阶段。
+
+## HTML 当前交付阶段
+
+| 阶段 | 当前任务 | 复用本计划的范围 |
+| --- | --- | --- |
+| A | 冻结资源、协议、状态与基线 | 契约清单和历史测量方法 |
+| B | 同 Bridge 双引擎、owner、selector、指定流量 | R1/普通 factory/兼容配置的必要接缝；完整外置恢复不前置 |
+| C | Java 内嵌 Broker、Binding、Ledger、HTTP/SSE | 工具身份、取消、释放和资源门禁 |
+| D | 公共 Agent API MVP 与事件投影 | 客户端/领域语义，不直接升级旧 Gateway API |
+| E | Java Pod + qwen serve Sidecar | TS Harness、并行 provisioning、安全 Profile |
+| F | ACK/SSE/崩溃/取消/Artifact 故障验收 | 已有真实进程和故障矩阵 |
+| G | 共享 Session Authority 与可替换 Harness | checkpoint、activation fencing、原调用接管设计 |
+| H | 按 HTML 顺序扩大能力 | C01～C18 与各工具/扩展专项 |
+
+以下原 R1～R5 任务、状态和顺序保留为历史执行记录；当前工作按本表与[HTML](managed-agent-dual-path-architecture.html#delivery)选择切片。已经实现的能力不回滚，原验收证据不扩大，未接入能力不因文档映射而开放。
+
+## 历史优先顺序
 
 | 顺序 | 工作                                                             | 完成证据                                                                                                                                                              |
 | ---- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

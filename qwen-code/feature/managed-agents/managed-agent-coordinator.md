@@ -1,6 +1,19 @@
 # Managed coordinator：调度、装配与关闭
 
-更新日期：2026-09-11；核对源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`，前一版文档 `4dc4a90dcc`。本文是待实现设计，细化[全局架构](managed-agent-session-harness-runtime.md)的调度与普通接入部分；配合[Harness](managed-agent-harness.md)、[私有协议](managed-agent-control-protocol.md)及[Session 兼容映射](managed-agent-session-method-map.md)。本轮不启动产品、不切换默认入口。
+> **HTML 对齐（2026-09-18）：** B 保留同 daemon 的双引擎、coordinator 与固定 owner；C 在 Java 内嵌 Broker，持久化 RuntimeBinding/Execution Ledger 并管理 Runtime 生命周期；D 由 Java 提供公共资源投影；G 再外置 Session Authority。执行协调、产品路由与资源调度不合并为第二套模型循环。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
+历史更新日期：2026-09-11；核对源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`，前一版文档 `4dc4a90dcc`。本文最初细化 daemon 内[全局架构](managed-agent-session-harness-runtime.md)的调度与普通接入部分；配合[Harness](managed-agent-harness.md)、[私有协议](managed-agent-control-protocol.md)及[Session 兼容映射](managed-agent-session-method-map.md)。其生命周期和门禁规则继续复用，具体产品实现状态以最新架构为准。
+
+## 0. HTML 中两类协调的分工
+
+| 组件 | 做什么 | 不能替代 |
+| --- | --- | --- |
+| daemon coordinator / Bridge | B 的会话准入、固定 engine、完整 Harness 装配和所属资源关闭 | Java 公共资源 API 与托管 Runtime 生命周期 |
+| Java SessionRouter / HarnessClient / ClientEventAdapter | 产品路由、向 qwen 转发 Prompt/Cancel、公共事件投影 | Harness 模型循环与 qwen 执行 Transcript |
+| Java Runtime Broker | C 的 provision、RuntimeBinding、Execution Ledger、租约与原调用查询 | Session 最终模型历史、第二套 activation authority |
+| 外置 Session Authority | G 的共享事件/checkpoint、activation epoch/fencing | 不能由内存 Map 或局部进程存活推导其已完成 |
+
+首轮 Prompt 的 Harness 转发与 Runtime provisioning 并行；只有 Tool Call 等待 Runtime。单 Session Turn 串行、进程级容量和未决调用清理分别管理。下文描述 daemon 局部 coordinator 的实现接缝，Hosted 时 Runtime 生命周期经 Broker；旧 R 阶段只作为实现参考。
 
 ## 1. 控制权与当前差距
 

@@ -1,5 +1,7 @@
 # Managed 多媒体与调用配置
 
+> **HTML 对齐（2026-09-18）：** Runtime 原生读取、渲染、裁剪、物理取消和字节校验继续复用；模型媒体处理归 Harness，Java 管理公共 Artifact ID/鉴权/引用。未转存唯一副本不得释放 Runtime，SSE 只传有界预览与引用；完整媒体范围按 H 逐项验收。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 状态：2026-09-09，基于 `3c6556e70b` 实施 M1，限定真实验收、两轮自审及独立最终源码审查通过。基于 `429d780beb` 继续补齐 M2 的 PDF 物理取消，构建与真实复验通过；Gateway 转写接口及 M3 仍待实现。完整目标仍为 [daemon 默认替换](managed-agent-daemon-default.md)，此文不代表完整多媒体或默认替换已验收。三处 workspace factory 加自有嵌入入口共四处，尚未切换；4170 预览与用户数据保持原状。
 
 2026-09-10 文档核对：M2 的 PDF 物理取消已有限定验收，Gateway 模型转写仍仅设计，M3 客户端展示与产物访问待实现；不得将整个 M2 标为完成。当前按[全局架构](managed-agent-session-harness-runtime.md)先设计 Session/Harness/Runtime 拆分，随后按[首阶段计划](managed-agent-daemon-default-plan.md)接默认引擎和普通 Web Shell/SDK；保留已验证媒体路径，完整媒体扩展后置。

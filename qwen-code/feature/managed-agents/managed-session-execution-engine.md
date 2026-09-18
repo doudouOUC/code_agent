@@ -1,8 +1,23 @@
 # daemon 会话执行引擎选择与持久化
 
-## 目标与当前缺口
+> **HTML 对齐（2026-09-18）：** 本文是 B 的直接接缝：普通 qwen serve 使用 executionEngines，Legacy/Managed 同 Bridge 共存，创建持久 owner，恢复不重选，失败不跨引擎重跑。首阶段兼容条件按 HTML 第 5 节；Java 保留产品路由，不能用更换前端 Provider 代替 daemon 内引擎接线。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
-本项完整范围见[默认替换总方案](managed-agent-daemon-default.md)，优先级遵循[首阶段计划](managed-agent-daemon-default-plan.md)。用户要求先完成[Session / Harness / Runtime 全局设计](managed-agent-session-harness-runtime.md)；后续先实现 Session 独立权威、完整 Harness 接入与持久恢复，再完成本文件尚未接通的四处普通 factory。固定引擎和共享 Bridge 成果保留，完整媒体展示、Skills、后台任务和历史迁移延期实施，详细设计已在文末全量专项中补齐。
+## HTML 阶段 B 的当前目标
+
+普通 qwen serve 使用 executionEngines，Legacy/Managed 在同一 Bridge 共存。引擎选择在 Session 创建时完成并持久化，冷恢复使用原 owner，指定流量逐步启用；Hosted 模式由 Java 路由到 qwen serve，不能绕开其固定 owner 语义。
+
+| 首阶段选择 Managed | 首阶段保留 Legacy |
+| --- | --- |
+| 普通用户 Session，Workspace 已信任且 cwd 精确匹配 | 已有 Legacy、用途或配置兼容性未知 |
+| 无未迁移 Hooks、动态 MCP、Extension | Channel、Scheduled Task、Standalone、Worktree、Branch |
+| Harness、AgentBundle、Runtime 协议版本兼容，持久 owner/配置证明齐全 | 依赖未迁移能力、owner/配置证明不全、服务端策略保留 |
+
+Managed 初始化、模型或工具失败不调用 Legacy factory 重跑。跨引擎续接创建新 Session ID 与 migratedFrom；原 Session 不原地热切换。下文双通道、strict config 和 writer 的已有证据保留，但不据此宣称 B 的全部普通入口已经接通。
+
+
+## 历史目标与可复用约束
+
+本项原完整范围见[默认替换总方案](managed-agent-daemon-default.md)，历史优先级见[首阶段计划](managed-agent-daemon-default-plan.md)。产品路线保留创建时固定引擎、恢复时读取 durable binding、未知状态不猜测以及失败不跨引擎重跑；Session 权威改由 Java 提供，WebShell 不再通过四处普通 daemon factory 选择 Managed。
 
 本文件已验收的物理 writer 当前位于 ACP host，未来移交 Session 服务是单独的 R2.S2 切片，须排空、封存、校验再接管，不能把现有 writer 保护描述为已经完成三层拆分。下文第 3 片仍定义配置和路由的局部顺序，不覆盖新增 R2.S1～R2.S3 的全局前置。
 

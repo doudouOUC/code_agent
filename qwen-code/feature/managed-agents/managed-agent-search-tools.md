@@ -1,5 +1,7 @@
 # Managed 搜索工具：Glob 与可选 LS
 
+> **HTML 对齐（2026-09-18）：** 目录、ignore、父子 scope、LS opt-in、权限与取消语义作为 Local/Hosted 工具能力复用。B 的 daemon 接线和 H 的能力扩展仍需分别验收，历史 Gateway 的局部通过不代表公共 API 或全量默认切换完成。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 状态：2026-09-09，基于 `aad95e62aa` 完成本阶段实现与 macOS 限定验收。属于 [daemon 默认替换](managed-agent-daemon-default.md) 的工具迁移步骤；本阶段不切换普通会话 factory。完整工具契约沿用 [Runtime invocation v2](managed-agent-runtime-invocations.md)，子执行与父文件历史沿用 [已有作用域](managed-agent-child-scopes.md)。
 
 ## 问题与目标

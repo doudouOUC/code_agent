@@ -1,6 +1,8 @@
 # Managed Harness：完整 Agent 的装配与可恢复执行
 
-更新日期：2026-09-11；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`，前一版文档 `4dc4a90dcc`。本文是待实现的 Harness 专项设计，配合[全局架构](managed-agent-session-harness-runtime.md)、[私有协议](managed-agent-control-protocol.md)、[coordinator](managed-agent-coordinator.md)及[Session 兼容方案](managed-agent-session-compatibility.md)。新增接口和恢复能力尚未实现，本轮不改变生产行为。
+> **HTML 对齐（2026-09-18）：** Harness 第一阶段为 qwen serve 内完整 TS Agent，Hosted 使用 Java Sidecar，不建设独立 Worker Pool。原文及历史产品记录中的在线主链路/E2E 不等于 H01～H08 完整恢复；共享权威存储、可替换 Harness 和取消粘性在 G 验收，不能只因有 Profile 就标记 E/F/G 全部完成。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
+历史设计日期：2026-09-11；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`，前一版文档 `4dc4a90dcc`。本文最初定义完整 Harness 专项设计，配合[全局架构](managed-agent-session-harness-runtime.md)、[私有协议](managed-agent-control-protocol.md)、[coordinator](managed-agent-coordinator.md)及[Session 兼容方案](managed-agent-session-compatibility.md)。应逐节区分历史记录的 Hosted 在线主链路、当前代码事实和 G 的完整可恢复执行验收；本次文档更新未复跑历史测试。
 
 ## 1. 首版实现与依赖边界
 

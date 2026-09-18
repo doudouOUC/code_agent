@@ -1,5 +1,7 @@
 # Managed NotebookEdit 与后续多媒体边界
 
+> **HTML 对齐（2026-09-18）：** Notebook 读取缓存、审批修改、父备份、写后回执和物理取消继续复用。Local Managed 使用本地 Provider，Hosted 通过 Java Broker 调度 Runtime；同 daemon 双引擎仍是 B 的接入基础，专项通过不代表完整 H 已交付。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 状态：2026-09-09，基于 `942af888cd` 实现 NotebookEdit 的 Runtime 迁移和完整内容修改。下述限定验收已通过；不改变普通 daemon 默认入口。完整目标仍见 [默认替换方案](managed-agent-daemon-default.md)。
 
 ## 迁移前的缺口

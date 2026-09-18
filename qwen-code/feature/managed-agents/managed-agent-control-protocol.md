@@ -1,6 +1,22 @@
 # Session / Harness / Runtime 私有协议
 
-更新日期：2026-09-11；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。这是待实现的首版契约，普通 HTTP/ACP/SDK 的旧接口与错误时机继续按[兼容方案](managed-agent-session-compatibility.md)适配。本文补齐[Harness](managed-agent-harness.md)与[coordinator](managed-agent-coordinator.md)之间的消息、提交和原调用接管；不表示当前 Tool v2 已具有 activation 隔离或跨 worker 重启恢复。
+> **HTML 对齐（2026-09-18）：** Java→qwen serve 复用 daemon 会话契约，Harness→Java 内嵌 Broker→Runtime 为独立私有工具链路。qwen 侧执行 Transcript/checkpoint 与 Java 公共投影分开，完整 Authority 外置和可替换 Harness 在 G。下文 managed-session/1、managed-runtime-control/1 是专项设计命名，不代替 HTML 的 HTTP 目标接口，也不声明已经部署。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
+历史更新日期：2026-09-11；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。本文最初定义 daemon 内三层拆分的首版契约，普通 HTTP/ACP/SDK 的旧接口与错误时机按[兼容方案](managed-agent-session-compatibility.md)适配。其消息、提交和原调用接管语义继续作为产品协议设计输入，但不能据此认定完整 activation 隔离或跨 worker 重启恢复已经验收。
+
+## 0. HTML 的传输边界与目标接口
+
+| 方向 | 目标接口 | 归属 |
+| --- | --- | --- |
+| Java→qwen serve | Session/Prompt/Cancel/Load/Resume/SSE，保留 `/session + executionEngines` | 统一 daemon 契约，固定会话 owner |
+| qwen serve→Java Broker | `/internal/agent-runtime/v1/prepare`、`manifest`、`execute`、`cancel`、`release` | JavaBrokerManagedRuntimeProvider 调用内嵌 Broker |
+| Java→Runtime | `GET /healthz`、`POST /v1/prepare`、`GET /v1/manifest`、`POST /v1/executions`、执行查询/events/cancel、release | Java 发起 HTTP/SSE，Runtime 不反向连接 Java |
+
+完整路由与字段见[双链路方案第 7～8 节](managed-agent-java-hosted-runtime.md#7-通信协议与连接方向)。现有 `/internal/runtime-broker/v1/*`、owned v1/v2 和下面的 typed control 是已有实现或详细接缝，不能冒称已实现相同 HTML 路径；需显式适配并验证原调用 ID、权限、状态、取消和释放。
+
+同一 SessionBackendBinding 固定 engine/backendInstanceId/workspaceGeneration；RuntimeBinding 与 ToolExecution 独立。ToolExecution 使用稳定 executionCallId，结果不确定为 recovery_blocked，查询原 ID 而非创建新执行。内部 UNKNOWN 只可通过明确映射承载该语义。
+
+以下章节细化局部 Session/Runtime 门禁。跨实例共享 Authority、activation epoch 和可替换 Harness 的完整接管按 G 验收；局部 gate 不等于 G 已完成。
 
 ## 1. 传输、版本与可信调用方
 

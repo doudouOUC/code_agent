@@ -1,6 +1,8 @@
 # Session 服务：兼容接口与实现串联
 
-更新日期：2026-09-10。源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`；本轮补充设计，不表示接口已抽取或 Managed 已具备全部恢复能力。本文细化[三层全局架构](managed-agent-session-harness-runtime.md)第 4、10、12 节，逐方法证据见[兼容映射附录](managed-agent-session-method-map.md)，实施顺序以[首阶段计划](managed-agent-daemon-default-plan.md)为准。
+> **HTML 对齐（2026-09-18）：** 此清单继续服务 B 的同 daemon 双引擎与 Java→qwen serve 契约复用，保护 Legacy/Core/ACP 原调用者。D 的 Java 公共 API 是独立投影，不要求 Java 实现全部 daemon 方法；HTML 未指定前端 Provider 类名。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
+历史更新日期：2026-09-10。源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`；本文细化 daemon 内[三层全局架构](managed-agent-session-harness-runtime.md)第 4、10、12 节，逐方法证据见[兼容映射附录](managed-agent-session-method-map.md)。历史 daemon 实施顺序见[首阶段计划](managed-agent-daemon-default-plan.md)，当前实施顺序以 HTML 的 A～H 为准。
 
 ## 1. 结论与覆盖边界
 

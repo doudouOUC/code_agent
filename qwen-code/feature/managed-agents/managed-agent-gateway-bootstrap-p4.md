@@ -1,6 +1,7 @@
 # Managed Agent Gateway Bootstrap P4
 
 > 归档说明（2026-09-07）：本文记录本地 Qwen Code 实验工作树的阶段设计与验证，不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 当前产品部署与实施顺序见 [HTML 双链路方案](managed-agent-java-hosted-runtime.md)；P4 bootstrap 双模型响应已被后续权威模型立即开始方案淘汰。
 
 > Historical milestone: P7 removed this non-authoritative bootstrap response.
 > The active path starts the authoritative Gateway model immediately and waits

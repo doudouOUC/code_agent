@@ -1,12 +1,14 @@
 # Managed Agent 本地 Runtime 自动激活 P9a
 
+> **HTML 对齐（2026-09-18）：** P9a 作为 Local Managed 的 Auto Local Runtime 激活、复用、容量和清理依据继续保留。Hosted Managed 由 Java 内嵌 Broker 管理 Runtime，按 tenant/workspace/workspaceGeneration/canonicalCwd 复用；未知副作用按 recovery_blocked 阻塞，不把本地测试当托管验收。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 > 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [dfb1309f15](https://github.com/doudouOUC/qwen-code/commit/dfb1309f15297df37d60131bfa41038b27a39dad) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 > 状态：P9a 实验实现，2026-09-08。本次在 P8 + Session Surfaces 基线 `5406d3fa1d` 上实现 auto-local；macOS 本地真实进程验证已通过，具体覆盖与未验证范围见第 15 节。尚未合入上游 main。
 
 ## 1. 目标与边界
 
-产品目标已明确为 [Managed Agent 替换 daemon 默认执行实现](managed-agent-daemon-default.md)。P9a 提供其中可复用的本地 Runtime 生命周期；默认替换仍需对齐普通 Agent 能力和会话协议，不以 P9b Kubernetes 接入为前提。
+历史阶段的产品目标曾是 [Managed Agent 替换 daemon 默认执行实现](managed-agent-daemon-default.md)。P9a 提供了可复用的本地 Runtime 生命周期；当前产品不再先推进 daemon 默认替换，也不以 Kubernetes 接入为前提，而是先完成 Java/Hosted Harness/Tool Runtime 的真实网络和恢复门禁。
 
 用户只启动 Gateway，在 Web Shell 创建 Managed 任务；Gateway 开始权威模型推理，同时按需启动本机 Tool-only Runtime。模型请求工具时等待该 Runtime，工具结果回到原模型上下文；续轮复用仍有效的 Runtime。会话目录、展示日志、模型历史和 Prompt outcome 始终属于 Gateway。
 

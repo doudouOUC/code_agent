@@ -1,9 +1,6 @@
 # Managed Agent session surfaces
 
-The product target is now to make Managed Agent the daemon's default execution
-implementation; see [the default migration design](managed-agent-daemon-default.md).
-The separate surface described here remains the implemented experimental entry
-point. It does not establish ordinary-session protocol or coding-capability parity.
+> Historical experimental surface. The current baseline is [HTML v1.2](managed-agent-dual-path-architecture.html) and its [dual-path specification](managed-agent-java-hosted-runtime.md). Keep ordinary `/session + executionEngines`; phase D introduces Java public resources and retires `/managed/sessions*` only after admission, events, queries, and idempotency are covered. This document preserves P8 UI and presentation evidence; it does not mandate a new frontend Provider class.
 
 > 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [8b1fd03c9a](https://github.com/doudouOUC/qwen-code/commit/8b1fd03c9a3a681ac535cb17eebe01a2fb728fd0) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
@@ -110,7 +107,7 @@ continue from the last successfully committed conversation.
 
 After building and bundling the experimental branch, start the Gateway with
 `node dist/cli.js serve --experimental-managed-agents --port 4170` and the
-existing model configuration. See the [operator guide](README.md#10-当前体验方式)
+existing model configuration. See the [operator guide](managed-agent-readme-history.md#10-当前体验方式)
 for fixed-URL and auto-local commands; the globally installed CLI may lack these
 flags. Omit `--no-web` to use its Web Shell.
 For a separate Runtime worker, keep the P8 remote Runtime flags and credentials.

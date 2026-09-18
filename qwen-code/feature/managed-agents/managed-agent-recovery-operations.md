@@ -1,6 +1,8 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-更新日期：2026-09-10；源码基线 `a836081466`。本文补齐全量目标中的 worker/daemon 重启、远端执行、平台和容量设计，配合[存储契约](managed-agent-session-storage.md)、[私有门禁](managed-agent-control-protocol.md)及[coordinator](managed-agent-coordinator.md)。这些增强尚未实现；首个交付仍先保证原 coordinator/worker 存活时替换 Harness，后续按本稿扩大能力。
+> **HTML 对齐（2026-09-18）：** Java 恢复 SessionBackendBinding、RuntimeBinding、Execution Ledger；Harness 依据正式 Transcript/checkpoint 和原 Ledger 恢复；Runtime 提供物理回执。started 无终态保持 recovery_blocked，禁止换 Runtime 重放。F 验收现有部署故障，G 验收共享 Authority 与跨实例接管；内部 UNKNOWN 须显式映射，不直接替换目标状态。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
+历史设计日期：2026-09-10；源码基线 `a836081466`。本文补齐当时 daemon 路线中的 worker/daemon 重启、远端执行、平台和容量设计，配合[存储契约](managed-agent-session-storage.md)、[私有门禁](managed-agent-control-protocol.md)及[coordinator](managed-agent-coordinator.md)。先前产品文档记录过部分 durable Broker 与 UNKNOWN 能力进展，现保留为历史证据；本地文件账本、任意恢复和平台门槛仍须按具体条目核验，不能整体标记完成或未完成。
 
 ## 1. 当前事实与选定后端
 

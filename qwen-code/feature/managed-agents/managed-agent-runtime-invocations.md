@@ -1,6 +1,8 @@
 # Managed Agent：Runtime invocation v2
 
-状态更新：2026-09-10，源码复核基线 `a836081466`。阶段 1 的本地 macOS 验收与阶段 2 已记录的 Core/ACP 调度、独立子作用域、父文件历史结果保留；当前注册九种工具代理（Read/Write/Edit/Shell、Glob/可选 LS、Grep、NotebookEdit、Zoom），各自证据见[总方案能力表](managed-agent-daemon-default.md)及专项文档，不能将注册等同全部语义验收。四处普通默认入口与共同兼容 selector 尚未接线；当前先实施[首阶段计划](managed-agent-daemon-default-plan.md)，MCP/Hooks/Channels 迁移及完整初始化/媒体/后台/历史能力后置。下文按切片保留当时结果，“四类工具”等指历史注册切片，不是当前总能力清单。
+> **HTML 对齐（2026-09-18）：** owned v2 的身份、scope、lease、权限、取消和原调用回执继续复用。B 仍需普通 daemon 双引擎与 selector；Hosted 工具链路为 Harness→Java Broker→Runtime。目标接口和现有 v2 wire 分开记录，R/D 只作历史切片索引。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
+历史状态更新：2026-09-10，源码复核基线 `a836081466`。阶段 1 的本地 macOS 验收与阶段 2 已记录的 Core/ACP 调度、独立子作用域、父文件历史结果保留；当时注册九种工具代理（Read/Write/Edit/Shell、Glob/可选 LS、Grep、NotebookEdit、Zoom），各自证据见[总方案能力表](managed-agent-daemon-default.md)及专项文档，不能将注册等同全部语义验收。四处普通默认入口与共同兼容 selector 当时尚未接线；原计划按[首阶段计划](managed-agent-daemon-default-plan.md)推进，现按 HTML 的 A～H 重新映射。下文按切片保留当时结果，“四类工具”等指历史注册切片，不是当前总能力清单。
 
 目标是让普通 daemon 复用完整 Agent，由 Harness 推进模型、Session 服务持有会话权威状态，独立 Tool-only Runtime 执行工作区工具。保留现有权限、调度、客户端事件和结果语义；不能用只读工具集作为最终替换验收。
 
@@ -198,4 +200,4 @@ macOS 五组真实完整 host 验收通过：A 父未用文件工具而子 Read/
 
 ## Glob 与可选 LS 后续接线
 
-[搜索工具方案](managed-agent-search-tools.md)在同一 v2 invocation 链加入 Glob/LS，共享原生声明且不在 Gateway 构造或执行这两个本地工具。已有 bind-history DTO 增加可选执行上下文，实际新 producer 总是携带父子各自的目录、过滤、记忆根和 LS opt-in；Runtime 派生视图执行并保持原权限与共享父历史。macOS 四组真实搜索验收和既有子任务 prior-read 回归通过。没有新增公共路由或宽松 fallback；未识别上下文的旧 worker 明确报错。后续 Grep、NotebookEdit、媒体 M1/PDF 物理取消已有各自限定验收；配置热更新、其余工具、本地初始化和物理历史仍须补齐。三处 workspace factory 加自有嵌入入口共四处，当前按首阶段计划接入，不将后置能力作为有限启用的无条件前置。
+[搜索工具方案](managed-agent-search-tools.md)在同一 v2 invocation 链加入 Glob/LS，共享原生声明且不在 Gateway 构造或执行这两个本地工具。已有 bind-history DTO 增加可选执行上下文，实际新 producer 总是携带父子各自的目录、过滤、记忆根和 LS opt-in；Runtime 派生视图执行并保持原权限与共享父历史。macOS 四组真实搜索验收和既有子任务 prior-read 回归通过。没有新增公共路由或宽松 fallback；未识别上下文的旧 worker 明确报错。后续 Grep、NotebookEdit、媒体 M1/PDF 物理取消已有各自限定验收；配置热更新、其余工具、本地初始化和物理历史仍须补齐。当时计划接入三处 workspace factory 加自有嵌入入口；当前产品不再以该四处 factory 接线作为启用前提。

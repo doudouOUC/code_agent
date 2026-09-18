@@ -1,6 +1,7 @@
 # Managed Agent Activation P1
 
 > 归档说明（2026-09-07）：本文记录本地 Qwen Code 实验工作树的阶段设计与验证，不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
+> 当前产品部署与实施顺序见 [HTML 双链路方案](managed-agent-java-hosted-runtime.md)；本文仅保留 P1 activation、lease 和调度实验依据。
 
 ## Status
 

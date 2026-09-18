@@ -1,5 +1,7 @@
 # Session 服务逐方法兼容映射
 
+> **HTML 对齐（2026-09-18）：** 268 项映射继续用于 B 的 daemon/Core/ACP 调用者兼容与 Java→qwen serve 契约复用，不等于 Java 要重写全部方法。D 的公共 API 投影与内部 ID/游标分离；前端 Provider 类名不是 HTML 冻结项。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 更新日期：2026-09-10；源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`。本附录是[兼容接口与实现串联](managed-agent-session-compatibility.md)的逐项替换依据，配合[三层全局架构](managed-agent-session-harness-runtime.md)使用。所有“适配/增强/迁移”均为设计状态；本轮只核对源码和文档，没有新增生产实现或产品验收。
 
 完整 Harness 内部的模型、工具、恢复、队列和 dispose 接缝另见[Harness 专项方法映射](managed-agent-harness.md)；不混入本附录的公开声明计数。

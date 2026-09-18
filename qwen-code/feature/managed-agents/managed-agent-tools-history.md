@@ -1,5 +1,7 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
+> **HTML 对齐（2026-09-18）：** 工具 schema、权限、媒体、Artifact、父子作用域和文件历史继续复用。Java 管理公共资源与授权，qwen 侧保留执行 Transcript/checkpoint，Runtime 执行副作用并保留物理回执；B 的有限双引擎与 H 的全量能力迁移分开验收。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 更新日期：2026-09-11。生产源码基线为 `a836081466`，本次修订基于方案 `2ec07afb727464ac2306282c9be2c086697f7768`，两者之间仅有文档变化。本稿覆盖[全量设计](managed-agent-full-design.md)的 C04/C06/C13/C14；第 2 节记录已核实源码，第 3～8 节是选定但尚未实现、尚未产品验收的完整契约。
 
 本稿复用[存储规范](managed-agent-session-storage.md)的唯一 Session 事实、[私有协议](managed-agent-control-protocol.md)的资格和回执，以及[完整 Harness](managed-agent-harness.md)的模型循环与 checkpoint。首阶段只启用已实际验收的范围，完整工具/内容与历史转换分别在 R5.F2、R5.F7 实施；延期的是实施，不是这些能力的设计。

@@ -1,5 +1,7 @@
 # Managed Agent Eager Authoritative Turn P7
 
+> **HTML 对齐（2026-09-18）：** P7 的权威模型立即开始、只在 Tool Call 等待 Runtime 与 HTML 一致。Local Managed 可保留本地 Provider，Hosted Managed 经 Java 内嵌 Broker；P7 实验 Gateway API 与文件布局只作历史依据，不等于阶段 D 公共 API。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 > 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [5406d3fa1d](https://github.com/doudouOUC/qwen-code/commit/5406d3fa1d34072026d1a812197cc368ee820e35) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 
 ## Status

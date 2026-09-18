@@ -1,5 +1,7 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+> **HTML 对齐（2026-09-18）：** 版本化 AgentBundle 为 Harness 提供模型、instructions、Tool Schema、Skill 静态描述、MCP 能力快照和权限摘要，Runtime ready 后核验 revision/digest。Workspace 工具、MCP 和本地副作用在 Runtime 执行；未迁移的 Hooks/动态 MCP/Extension 使新 Session 保留 Legacy，完整扩展按 H 启用。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+
 更新日期：2026-09-11；生产源码基线 `a836081466`，既有设计基线 `4cacfbd0ed`。本文定义[全量覆盖表](managed-agent-full-design.md)的 C03/C07/C08/C09，采用[Session 存储](managed-agent-session-storage.md)、[私有协议](managed-agent-control-protocol.md)、[完整 Harness](managed-agent-harness.md)与[coordinator](managed-agent-coordinator.md)的身份、提交和生命周期契约。第 1 节描述现有源码；其后新增类型、版本化适配与恢复保证均待实现和验收。
 
 首阶段仍延期完整 Skills/MCP/Hooks 迁移，详细设计在本文完成。未具备相应能力的新 Session 按正向兼容证明固定 legacy；已存在 Managed 遇到不支持的变更明确拒绝或阻塞恢复，不切换引擎重跑。独立 CLI/TUI 与旧公开返回、错误时机和输入额度保持原兼容边界。
