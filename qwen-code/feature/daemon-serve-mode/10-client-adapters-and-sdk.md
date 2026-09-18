@@ -422,6 +422,6 @@ caller显式ID仍优先且不访问browser crypto。native/fallback两条路径�
 
 #11911已把daemon status类型扩展为`childHeap.mode:'admit'`、optional `admissionEnforced`和optional/null `committedAcpChildren`。字段是additive，旧daemon省略时SDK consumer必须降级；`limits.memory.enforced:false`只表示heap ceiling未应用，不能覆盖count admission。
 
-#12008当前open diff增加process-global `runtimeStopOptions()` 和 `workspaceById(id).stopRuntime(confirmation)`。即使client配置ACP transport，这两个management操作仍走REST；POST不能自动重复。response-loss时应刷新read-only receipt并匹配workspace+stop token，partial/unknown不能当作“未发生”。只有`stopped && released`且原daemon/workspace/draft仍current时，调用方才可继续原操作一次。该surface尚未进入发布SDK契约。
+#12008当前open diff增加process-global `runtimeStopOptions()` 和 `workspaceById(id).stopRuntime(confirmation)`。即使client配置ACP transport，这两个management操作仍走REST；POST不能自动重复。response-loss时应刷新read-only receipt并匹配workspace+stop token，partial/unknown不能当作“未发生”；刷新后的`stopped+released` receipt也可能保留早先teardown warning。UI normalizer把已知close reason转换为可读文案，未知token使用通用提示。只有`stopped && released`且原daemon/workspace/draft仍current时，调用方才可继续原操作一次。该surface尚未进入发布SDK契约。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-18_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-19_

@@ -33,10 +33,10 @@ draft 覆盖 ordinary headless、Ink/OpenTUI `!`、prompt interpolation、Monito
 
 #12067 只抽取内部执行底座，不开放 runtime policy、公开设置或 tool routing：
 
-- `ShellExecutionService.executeLaunch` 接收绝对 executable/cwd、字面量 argv、精确 snapshot env 与可选 binary stdin；pipe 等待 stdio close，PTY spawn 后失败不得通过另一 transport 重放。
-- bwrap relay 用 payload 不继承的 status FD 和受保护 control file 记录最终 receipt；`confirmed/unconfirmed/interrupted/running` 与 stdout 分离，未知结果不授权 retry。
-- binary file worker 在 namespace 内做 atomic write、file-version 复核和 outside/symlink/special-file 拒绝；host 同时校验 trusted receipt 与 worker reply。
-- relay/worker 作为独立 bundle/package assets 发布，缺失时在执行前失败；独立 verifier 覆盖 34 项真实 Linux adapter 行为。
+- `ShellExecutionService.executeLaunch` 接收绝对 executable/cwd、字面量 argv、精确 snapshot env 与可选 binary stdin；pipe 在 stdio close 或 child exit 后最多 1 秒 drain 中先到者结算，PTY spawn 后失败不得通过另一 transport 重放。
+- bwrap relay 用 payload 不继承的 status FD 和受保护 control file 记录最终 receipt；`confirmed/unconfirmed/interrupted/running` 与 stdout 分离，`payloadExitObserved` 保持 true/false/unknown 三态，只有明确 pre-exec 失败可按未执行清理，未知结果不授权 retry。
+- binary file worker 使用最多 16 KiB 的 newline JSON header 与精确 binary length，在 namespace 内做 atomic write、file-version 复核和 outside/symlink/special-file 拒绝；host 同时校验 trusted receipt、worker reply 与独立 diagnostics。
+- relay/worker 作为独立 bundle/package assets 发布，缺失时在执行前失败；当前 head 另补 scratch-root admission、CI 单测和更强的 Linux evidence，独立 verifier 覆盖 36 项真实 Linux adapter 行为。
 
 旧 whole-CLI backend 在该拆分中仍存在。只有后续 policy/tool wiring 和完整 public cutover 合入后，工具级边界才会成为可用产品能力。
 
@@ -56,4 +56,4 @@ draft 覆盖 ordinary headless、Ink/OpenTUI `!`、prompt interpolation、Monito
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | open draft | 工具级 bwrap 完整迁移参考、公开 policy/cutover 与跨架构 acceptance。 |
 | [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | open | 从总体 draft 抽取 structured execution、trusted receipt、file worker 与 packaging foundation。 |
 
-_按个人 PR 口径更新于 2026-09-18_
+_按个人 PR 口径更新于 2026-09-19_

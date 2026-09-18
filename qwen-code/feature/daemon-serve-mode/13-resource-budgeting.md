@@ -191,7 +191,7 @@ WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿
 - #11653 声明ACP bridge聚焦测试、真实Node argv探针及build/typecheck/lint/format/bundle检查通过；本文核对merged head、4个changed files和最新`main`落点，未在真实cgroup v1/v2 Linux主机复跑。
 - #11911 声明33项admission检查、完整build/typecheck/bundle、真实daemon create/ensure/load/ACP SSE及真实Chromium 10项验证通过；GitHub Linux lint/static、Ubuntu tests、Serve A/B、WebShell E2E与real-daemon/Java等主要lane通过。本文核对merged head、43个changed files及最新`main`的shared registry/policy、503/status/WebShell落点，未复跑低内存E2E。
 - #11940 声明780项定向单测和5组真实daemon的52项断言通过；本文核对merged head、22个changed files及最新`main`接线，未复跑真实daemon。
-- #12008 声明2,863项定向单测和176项HTTP/ACP/browser断言通过；本文核对open head、58个changed files和#11911/#11940 baseline，GitHub当前classify、lint/static、Ubuntu tests、Serve A/B、WebShell E2E与real-daemon/Java等可见lane通过，未复跑浏览器E2E。
+- #12008 PR body记录2,863项定向单测和176项HTTP/ACP/browser断言通过；本文核对open head、59个changed files和#11911/#11940 baseline，后续review commits补submit/queue/plan fences、timeout taxonomy与process-release平台边界，GitHub当前classify、lint/static、Ubuntu tests、Serve A/B、WebShell E2E与real-daemon/Java等产品lane通过，未复跑浏览器E2E。
 
 ## PR 归因
 
@@ -211,6 +211,6 @@ WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿
 | [#11653](https://github.com/QwenLM/qwen-code/pull/11653) | merged | 让ACP child spawn复用可用内存探测，拒绝v1/v2无限哨兵和超宿主constraint；50%、16 GiB、raise-only与cache策略不变。 |
 | [#11911](https://github.com/QwenLM/qwen-code/pull/11911) | merged | 新增opt-in `admit`，用共享registry的committed child count在spawn前拒绝超额，并贯通REST/ACP/WebShell/status；不应用heap ceiling。 |
 | [#11940](https://github.com/QwenLM/qwen-code/pull/11940) | merged | 首次拒绝后回收一个零session、零activity的LRU warm child，再做一次fresh admission；保留workspace与历史。 |
-| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | open | 当前diff让用户查看并确认停止loaded workspace runtime，等待名额释放后只继续原操作一次；尚未进入`main`。 |
+| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | open | 当前diff让用户查看并确认停止loaded workspace runtime，区分in-flight失败与close间预算耗尽，并在名额释放后只继续原操作一次；尚未进入`main`。 |
 
-_按个人 PR 口径更新于 2026-09-18_
+_按个人 PR 口径更新于 2026-09-19_

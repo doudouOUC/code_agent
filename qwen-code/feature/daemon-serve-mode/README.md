@@ -638,7 +638,7 @@ sequenceDiagram
 | #11812 | standalone HTTP UUID fallback | 已合入非安全HTTP上下文的`getRandomValues()` UUID v4 fallback，保持caller ID优先、单次create与exact recovery语义。 |
 | #11911 | budget-based ACP child admission | 已合入显式`admit`模式，用共享registry的committed child count在OS spawn前拒绝超额，并贯通REST/ACP/WebShell/status；不应用heap ceiling。 |
 | #11940 | idle ACP child reclamation | 已合入首次count拒绝后的单候选回收，只终止零session、零activity的exact warm child并保留workspace与历史。 |
-| #12008 | user-directed runtime stop | 当前open；让用户查看并确认停止loaded workspace runtime，只有`stopped+released`后才允许一次guarded continuation，尚未进入`main`。 |
+| #12008 | user-directed runtime stop | 当前open；让用户查看并确认停止loaded workspace runtime，区分in-flight失败与close间预算耗尽，并在`stopped+released`后只允许一次guarded continuation，尚未进入`main`。 |
 
 ---
 
@@ -1003,4 +1003,4 @@ prompt 路由还支持 `--prompt-deadline-ms` 与 non-blocking prompt（`NonBloc
 
 唯一一次create与transport timeout/outcome-unknown后的exact lookup继续复用同一ID，不新增route、capability、依赖或create重试。该修复让既有No workspace首次提交可从HTTP IP来源真正发出请求，但不改变non-loopback鉴权、trusted-loopback operator authority、session owner或directory边界。
 
-_生成于 2026-06-03；按个人 PR 口径更新于 2026-09-18_
+_生成于 2026-06-03；按个人 PR 口径更新于 2026-09-19_

@@ -37,7 +37,7 @@
 | Diff 渲染与变更统计 | [diff-rendering.md](diff-rendering.md) | #6141 | edit/write/shell 等工具的 whitespace-only diff 不再显示为 “No changes detected”，diff stat 也按 smart fallback 统计。 |
 | 文件读取 / 大文本范围 / PDF 预算 | [file-reading.md](file-reading.md) | #6404 / #6409 / #6585 / #6846 / #7947 / #7967 / #8002 / #8383 | 大文本范围读取与 PDF 读取预算：Core 超过旧 10MB 文本 guard 时返回有界行范围，大型 PDF 不带 `pages` 时返回 guidance/reference；文本提取失败或单页超预算时可用 bounded PDF vision bridge fallback；#7947 让 Serve workspace `/file` 也能对超过 256 KiB 的 UTF-8 文本返回 bounded line window；#7967 已合入 handle-bound range reader 分层清理；#8002 增加 byte-cursor paging；#8383 已合入 CRLF cursor paging 的 lineEnding 文件级 metadata 修复。 |
 | Shell 工具执行语义 | [shell-tool.md](shell-tool.md) | #6864 / #6876 / #7053 / #7172 / #11727 | 前台shell timeout、静默心跳与安全三态保持一致；#11727已新增producer预算标记，避免默认配置下generic gate抢先丢掉Shell尾部终态。 |
-| Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614(merged) / #11981(open) / #12064(open) / #12067(open) | #11614 已合入 whole-CLI bwrap backend；#11981 是真实 Linux CI follow-up，#12064 是工具级迁移总体 draft，#12067 仅交付第一段内部 execution foundation，后三者均未进入 `main`。 |
+| Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614(merged) / #11981(open) / #12064(open) / #12067(open) | #11614 已合入 whole-CLI bwrap backend；#11981 是真实 Linux CI follow-up，#12064 是工具级迁移总体 draft，#12067 交付内部 execution foundation、确定性 file-worker framing 与 36 项 verifier，后三者均未进入 `main`。 |
 | Scheduled Tasks | [scheduled-tasks.md](scheduled-tasks.md) | #9838 / #10144 / #10828 / #10924 / #11207 | 已合入current-session reuse、empty-session persistence与relaxed ownership task设计；#10924提供mandatory lease/controller-binding fence，#11207已完成新版daemon global-owner runtime cutover，不改变at-least-once dispatch窗口。 |
 | 诊断 / creator skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 #6117 #6233(closed) | `/doctor` 代码命令、`/stuck` 诊断技能、`/batch` prompt 技能、ACP/non-interactive `/skills` 列表输出；disabled skill wire/filtering 仅为 #6233 closed 方案记录。 |
 | Hooks / submitted prompt provenance | [hooks.md](hooks.md) | #7762 / #7877 / #10100 / #10288 / #10512(closed) / #11455 | `UserPromptSubmit.submitted_prompt` 保留扩展前 provenance；#10100 已合入 command hook process-group ownership、TERM→KILL 与 bounded stream drain；#10288 已合入 staged-input + detached supervisor 的 fire-and-forget 生命周期，#10512 closed hardening 未进入 `main`；#11455已合入WebShell/显式ACP逐请求声明与daemon trust边界，缺失时不从request text推断。 |
@@ -52,7 +52,7 @@
 >
 > W37 最终 follow-up：#11207已合入relaxed Conversations runtime cutover，#11208/#11322/#11323已交付连续历史/compact rail与交互收口，#11246/#11311/#11337/#11397已合入Mem0 Auto Recall/写入/删除与DELETE兼容，#11308/#11309已合入Channel worktree恢复/回收，#11339已合入五秒live-state轮询，#11398/#11447已交付浏览器通知基础、内容与点击导航，#11428/#11515已完成容量owner解耦与默认256注册，#11653已修复ACP child heap无限cgroup哨兵，#11727已交付Shell producer预算单一决策；#11614已合入whole-CLI Linux bwrap backend。
 >
-> W38 周内 follow-up：#11812已合入普通HTTP非回环WebShell的standalone UUID v4 fallback；#11911已提供显式`admit` ACP child数量准入，#11940已补首次拒绝后的零session warm child单候选回收。#11960仍是MCP App资源失败可见fallback的open修复，#12008仍是loaded runtime用户确认stop的open恢复方案；#11981/#12064/#12067分别是bwrap真实Linux CI、工具级总体迁移和内部execution foundation，均未进入`main`。#11781/#11819/#11938只修构建或CI，不扩张产品feature。
+> W38 周内 follow-up：#11812已合入普通HTTP非回环WebShell的standalone UUID v4 fallback；#11911已提供显式`admit` ACP child数量准入，#11940已补首次拒绝后的零session warm child单候选回收；#11960已合入MCP App资源失败的可见fallback，并保持模型输出和工具成功状态不变。#12008仍是loaded runtime用户确认stop的open恢复方案；#11981/#12064/#12067分别是bwrap真实Linux CI、工具级总体迁移和内部execution foundation，均未进入`main`。#11781/#11819/#11938只修构建或CI，不扩张产品feature。
 
 ## 使用口径
 
@@ -66,4 +66,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/README.md)（见其 07 子文档）。
 - 每篇「已知限制」综合 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-18_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-19_

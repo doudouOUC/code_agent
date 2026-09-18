@@ -4,9 +4,9 @@
 
 **主题**: ACP child 容量准入/回收/用户恢复、MCP App 资源失败可见性、Linux bwrap CI 与工具级执行沙箱拆分、HTTP standalone UUID 兼容
 
-**PR 统计**: 11 PRs - 6 merged / 5 open / 0 closed
-**当前已合并 PR 代码量**: +2,682 / -299，70 个文件变更
-**全量代码量**: +22,088 / -3,926，310 个文件变更
+**PR 统计**: 11 PRs - 7 merged / 4 open / 0 closed
+**当前已合并 PR 代码量**: +2,997 / -348，74 个文件变更
+**全量代码量**: +23,597 / -3,942，318 个文件变更
 **类型分布**: feat ×5, fix ×4, other ×1, test ×1
 **范围 (scope)**: serve/daemon ×3, web-shell ×3, sdk-typescript ×3, ci ×4, core ×3, linux-sandbox ×3
 
@@ -22,11 +22,11 @@
 | [#11911](https://github.com/QwenLM/qwen-code/pull/11911) | ✅ merged | @doudouOUC | feat(serve): add budget-based ACP child admission | +1177/-144 | 43 | 09-15 05:31 | 09-15 08:28 |
 | [#11938](https://github.com/QwenLM/qwen-code/pull/11938) | ✅ merged | @doudouOUC | fix(ci): isolate runner schedule fixture module scope | +2/-5 | 1 | 09-15 09:02 | 09-15 11:55 |
 | [#11940](https://github.com/QwenLM/qwen-code/pull/11940) | ✅ merged | @doudouOUC | feat(serve): reclaim idle ACP children when admission is full | +1379/-103 | 22 | 09-15 09:27 | 09-16 04:01 |
-| [#11960](https://github.com/QwenLM/qwen-code/pull/11960) | 🟡 open | @doudouOUC | fix(mcp): show MCP App resource load warnings | +240/-49 | 3 | 09-15 16:25 | — |
+| [#11960](https://github.com/QwenLM/qwen-code/pull/11960) | ✅ merged | @doudouOUC | fix(mcp): show MCP App resource load warnings | +315/-49 | 4 | 09-15 16:25 | 09-18 03:03 |
 | [#11981](https://github.com/QwenLM/qwen-code/pull/11981) | 🟡 open | @doudouOUC | test(ci): Add real Linux bwrap integration coverage | +815/-7 | 12 | 09-16 03:31 | — |
-| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | 🟡 open | @doudouOUC | feat(serve): let users stop workspace runtimes to release ACP capacity | +4476/-351 | 58 | 09-16 08:35 | — |
+| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | 🟡 open | @doudouOUC | feat(serve): let users stop workspace runtimes to release ACP capacity | +4798/-359 | 59 | 09-16 08:35 | — |
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | 🟡 open | @doudouOUC | feat(core): Move bwrap confinement to tool execution | +11282/-3180 | 148 | 09-17 04:11 | — |
-| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | 🟡 open | @doudouOUC | feat(core): Add the bwrap execution foundation | +2593/-40 | 19 | 09-17 05:31 | — |
+| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | 🟡 open | @doudouOUC | feat(core): Add the bwrap execution foundation | +3705/-48 | 25 | 09-17 05:31 | — |
 
 ---
 
@@ -40,11 +40,11 @@
 | [#11911](https://github.com/QwenLM/qwen-code/pull/11911) | `observe` 只报告 modeled child 上限，仍允许冷 workspace 在满额时继续 spawn，operator 无法限制 daemon 管理的 ACP 进程数量，客户端也拿不到可识别的容量失败。 | 最终新增 opt-in `--child-heap-mode admit`：共享 `ProcessRegistry` 把 reservation、attached 与 terminating child 一并计数，新 spawn 在超过 modeled limit 时于 OS spawn 前拒绝；REST/ACP 返回 `acp_child_capacity_exhausted` 与 503 元数据，WebShell 停止自动重试并保留普通、shell 与首个 `/goal` 草稿。status 区分 count admission 与仍未应用的 heap ceiling。 | 已更新daemon资源预算、协议/SDK、WebUI transport、Linux容量实测与daemon总览。完整实现见 [implementations/pr-11911.md](implementations/pr-11911.md)。 |
 | [#11938](https://github.com/QwenLM/qwen-code/pull/11938) | runner 调度测试生成的 fake `gh` 会继承临时父目录的 package module 类型；在 ESM 作用域中执行 CommonJS `require` 时，两条 subprocess 测试失败。 | 最终让 fixture 自带 `{"type":"module"}` package scope，并把 fake CLI 改为 `import fs from 'node:fs'`，使默认、ESM 与 CommonJS 临时父目录得到同一加载语义，不改变真实 runner 标签切换逻辑。 | CI 测试夹具修复，不新增长期产品 feature。完整实现见 [implementations/pr-11938.md](implementations/pr-11938.md)。 |
 | [#11940](https://github.com/QwenLM/qwen-code/pull/11940) | `admit` 满额时即使最旧 child 没有任何 live session 或待处理工作，新的冷 workspace 仍会被拒绝；注册、历史和 runtime 服务本可保留，只回收空闲物理 child。 | 最终在首次拒绝后取消 reservation，从同一 registry 的可信 runtime 中筛选零 session、零 prompt/connection/task/Channel/Voice/coordinator activity 的候选，按 `lastUsedAt` 选择一个并复核 channel identity 后终止 exact child，再做一次 fresh admission；workspace 注册、文件与持久化历史保留，loaded session 不会被自动回收。 | 已把最终边界登记到daemon资源预算、总览与Linux容量实测。完整实现见 [implementations/pr-11940.md](implementations/pr-11940.md)。 |
-| [#11960](https://github.com/QwenLM/qwen-code/pull/11960) | MCP 工具可成功返回数据，但 App resource 超限、超时、元数据错误或读取失败时，用户只看到缺失的 iframe，原因仅存在于 debug log。 | 当前 diff 把资源失败转换为 `mcp_app` 空 HTML fallback：可见警告包含 server/resource 与真实失败原因，超限报告 UTF-8 字节数，超时报告生效上限；原工具结果、LLM 内容和成功状态保持不变，caller cancellation 不新增警告。 | 变更聚焦工具展示降级，暂不新增长期 feature 专题。完整观察见 [implementations/pr-11960.md](implementations/pr-11960.md)。 |
+| [#11960](https://github.com/QwenLM/qwen-code/pull/11960) | MCP 工具可成功返回数据，但 App resource 超限、超时、元数据错误或读取失败时，用户只看到缺失的 iframe，原因仅存在于 debug log。 | 最终把资源失败转换为 `mcp_app` 空 HTML fallback：可见警告包含 server/resource 与真实失败原因，超限报告 UTF-8 字节数；host/SDK timeout 才标注生效上限，server 自报 `-32001` 保留原错误。原工具结果、LLM 内容和成功状态不变，caller cancellation 不新增警告。 | 变更聚焦工具展示降级，未新增长期 feature 专题。完整实现见 [implementations/pr-11960.md](implementations/pr-11960.md)。 |
 | [#11981](https://github.com/QwenLM/qwen-code/pull/11981) | #11614 的 whole-CLI bwrap 后端缺少真实 Linux CI，mock spawn 无法证明 mount/network enforcement、普通 CLI hop、writer ownership 与进程清理。 | 当前 draft 新增独立 Ubuntu workflow 与 14 项真实 bwrap 集成用例，显式命令在缺少 Linux/bwrap 时失败，普通 integration suite 排除该组；覆盖工作区/越界写、open/closed 网络、linked worktree、fake-model Shell、writer lease 与 SIGINT/SIGTERM cleanup。 | 已更新 Linux 内核沙箱专题；当前 CI 有 classify、lint/static 与 Ubuntu test 失败，不能视为已落地覆盖。完整观察见 [implementations/pr-11981.md](implementations/pr-11981.md)。 |
-| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | 自动回收只处理零 session runtime；loaded session 占满 ACP 名额时，用户缺少保留工作区/历史同时显式释放容量的恢复路径。 | 当前 diff 增加 stop-options 与 exact-identity stop 操作、additive capability/SDK/event，并在 WebShell 容量对话框中要求用户选择和确认；成功停止后等待 registry 释放，只允许原草稿一次 guarded continuation，被停止页面保留历史并要求显式 Resume。 | 已更新daemon session/protocol/SDK/WebUI、资源预算与总览；当前仍是 open diff。完整观察见 [implementations/pr-12008.md](implementations/pr-12008.md)。 |
+| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | 自动回收只处理零 session runtime；loaded session 占满 ACP 名额时，用户缺少保留工作区/历史同时显式释放容量的恢复路径。 | 当前 diff 增加 stop-options 与 exact-identity stop 操作、additive capability/SDK/event，并在 WebShell 容量对话框中要求用户选择和确认；成功停止后等待 registry 释放，只允许原草稿一次 guarded continuation。新增队列、deferred `/plan`、停止态 submit 与 rejected-intent fences，被停止页面保留历史并要求显式 Resume。 | 已更新daemon session/protocol/SDK/WebUI、资源预算与总览；当前仍是 open diff。完整观察见 [implementations/pr-12008.md](implementations/pr-12008.md)。 |
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | whole-CLI bwrap 同时约束模型网络与可信应用状态，而仅包 Shell 又会漏掉文件工具；需要把命令/文件副作用移到工具级 kernel boundary。 | 当前 draft 提供完整迁移参考：operator-only `tools.executionSandbox`、Shell/文件 worker、unsupported integration fail-closed、旧 bwrap selector 迁移错误、两架构无凭据验收 workflow，并删除 whole-CLI backend；该 148 文件方案正在拆分，不能视为 `main` 行为。 | 已更新 Linux 内核沙箱专题，标记为总体 draft/reference。完整观察见 [implementations/pr-12064.md](implementations/pr-12064.md)。 |
-| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | 工具级 bwrap 需要结构化 executable/argv/env/stdin、可信完成证据、进程监管和受限文件 worker，且不能在 setup 不确定时重放 payload。 | 当前第一拆分只交付内部 foundation：`executeLaunch` 与 bwrap relay/receipt、pipe/PTY 生命周期、binary file worker/version checks、两份 worker 打包和独立 Linux verifier；不开放 runtime policy、公开设置或工具路由，旧 whole-CLI backend 仍保留。 | 已更新 Linux 内核沙箱专题，明确 foundation 与公开启用边界。完整观察见 [implementations/pr-12067.md](implementations/pr-12067.md)。 |
+| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | 工具级 bwrap 需要结构化 executable/argv/env/stdin、可信完成证据、进程监管和受限文件 worker，且不能在 setup 不确定时重放 payload。 | 当前第一拆分只交付内部 foundation：`executeLaunch` 与 bwrap relay/receipt、最多 1 秒 post-exit drain、三态执行证据保留、16 KiB header 加精确长度的 binary file worker、两份 worker 打包和 36 项 Linux verifier；不开放 runtime policy、公开设置或工具路由。 | 已更新 Linux 内核沙箱专题，明确 foundation 与公开启用边界。完整观察见 [implementations/pr-12067.md](implementations/pr-12067.md)。 |
 
 ## PR 对应 feature 覆盖
 
@@ -59,6 +59,6 @@
 | [Linux 4c8g容量实测](../../feature/daemon-serve-mode/14-capacity-validation-linux-4c8g.md) | #11911/#11940(merged) | 修正 observe/admit 与自动回收的当前 `main` 口径，保留 heap/RSS enforcement 缺口。 |
 | [daemon总览](../../feature/daemon-serve-mode/README.md) | #11812/#11911/#11940(merged), #12008(open) | 同步容量三阶段、SDK/WebShell 与未合入用户恢复边界。 |
 | [Linux 内核沙箱](../../feature/linux-kernel-sandbox.md) | #11981/#12064/#12067(open) | 在 #11614 merged whole-CLI backend 基线上登记真实 CI draft、工具级总体迁移 draft 与第一拆分 foundation。 |
-| [feature 索引](../../feature/README.md) | #11911/#11940(merged), #11960/#11981/#12008/#12064/#12067(open) | 同步 W38 状态、长期专题入口与无专题的展示诊断边界。 |
+| [feature 索引](../../feature/README.md) | #11911/#11940/#11960(merged), #11981/#12008/#12064/#12067(open) | 同步 W38 状态、长期专题入口与无专题的展示诊断边界。 |
 
-_按个人 PR 口径更新于 2026-09-18_
+_按个人 PR 口径更新于 2026-09-19_

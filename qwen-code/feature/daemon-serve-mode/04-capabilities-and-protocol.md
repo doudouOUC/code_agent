@@ -698,5 +698,5 @@ sequenceDiagram
 ### #12008 — `workspace_runtime_stop`（open）
 
 - 当前 diff 只有在daemon拥有完整process accounting、activity/scheduled-task observation、confirmed stop与receipt snapshot时才广告`workspace_runtime_stop`；既有`workspace_runtime`不能隐含stop支持。
-- read-only options返回候选identity/session/block reason/token；mutation要求`confirmInterruptions:true`和exact channel/epoch/token/session集合。stale/blocked/incomplete/in-progress/failed/not-supported使用稳定409/503/501 taxonomy。
+- read-only options返回候选identity/session/block reason/token；mutation要求`confirmInterruptions:true`和exact channel/epoch/token/session集合。stale/blocked/incomplete/in-progress/failed/not-supported使用稳定409/503/501 taxonomy；in-flight close超时是503 failed且cleanup继续，close之间预算耗尽是409 incomplete且需要fresh preview。
 - 成功后事件沿用`session_closed`，additive `cause:'workspace_runtime_stop'`；不发`workspace_removed`。该tag、route和event cause当前仍是open方案，旧daemon/client按既有容量错误降级。

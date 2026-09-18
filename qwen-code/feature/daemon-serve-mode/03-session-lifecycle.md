@@ -1044,5 +1044,7 @@ sequenceDiagram
 
 - 当前 diff 为 loaded session 占满 ACP child 名额的场景增加只读 stop-options 与 exact-identity stop。confirmation 必须匹配 channel ID、runtime epoch、stop token 和用户看到的 session 集合；身份/集合变化返回 stale，不开始副作用。
 - accepted stop 逐个走既有 close/persist 语义并等待所选 child 的 registry release。close refusal、flush failure、超时或 release 未证明分别保留 incomplete/failed/unknown，不以全局process count下降替代selected child证明，也不自动重试stop。
+- stop budget在close RPC进行中耗尽时返回503 failed并继续隔离/清理；在两个close之间耗尽时返回409 incomplete、结束清理并要求fresh preview。`killSession`若因runtime stop暂缓，仍保留wanted-kill tombstone，避免incomplete stop后的下一次detach漏掉既有销毁意图。
 - 成功只保留workspace注册、文件和保存会话，不形成持久suspend。subscriber收到`session_closed{reason:'client_close',cause:'workspace_runtime_stop'}`，新版WebShell保留选择/历史并要求显式Resume；旧或离线client仍可能稍后触发正常re-entry。
+- release证明按平台收窄：POSIX registry跟踪owned process group，Windows只证明root settled exit，不能把`released:true`解释为所有descendant均已消失。
 - 该能力尚未进入`main`，不能把runtime stop route/event或stopped-session UX写成当前协议承诺。
