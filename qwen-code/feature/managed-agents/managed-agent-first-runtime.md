@@ -1,10 +1,12 @@
 # Managed Agents 首版运行契约
 
-更新日期：2026-09-19。依据 [HTML v1.3](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。
+更新日期：2026-09-19。依据 [HTML v1.4](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
 
 ## 1. 首版范围与运行条件
 
 首版验证配置采用一个 Java 实例及其 qwen serve Sidecar、预发布的静态 AgentBundle、Session 独占 Tool Runtime，并复用现有产品 REST/SSE 和 qwen 会话历史。一个 Runtime 可以服务所属 Session 的多轮 Prompt；“独占”不等于每轮新建 Runtime，也不等于一个 Session 一个 Harness 进程。Legacy 保留已有后端与工作区归属，不因新增 Sidecar 搬迁其工具环境。
+
+首版只支持普通工具调用，以 Read、Write、Edit 和前台 Shell 为最小验收集；其他普通工具按同一调用契约逐项验证后纳入。自动记忆、子 Agent、后台 Shell 暂不涉及，本轮不补充其专项设计，也不作为运行前提。前台 Shell 在当前工具调用内等待结果；不提供转后台或脱离调用继续工作的产品能力，但取消、超时和释放仍须核验它创建的后代进程。
 
 tenantId 相关语义和多租户设计按用户要求暂缓，不作为本轮运行验收项；既有鉴权和 Session/Workspace 访问校验继续适用。本文不以新增租户字段或多租户平台作为运行前提。
 
@@ -32,9 +34,11 @@ tenantId 相关语义和多租户设计按用户要求暂缓，不作为本轮�
 
 产品受理前的 Runtime 预热只能消费有限预留，不授权任何工具执行；输入被拒绝或取消后，未被领取的预热按第 6 节回收。
 
+Java 创建前固定 bundleRef、workspaceStorageRef 和稳定 sessionId/commandId；qwen 创建成功须持久提交 header/定义/Workspace 绑定。新增目标只读命令查询 `GET /session/{id}/commands/{commandId}?operation=...` 返回原 CommitReceipt/pending/not_found/blocked，查询不创建 Session 或模型执行。字段、能力协商及 not_found/回执过期的边界见[普通工具首版设计](managed-agent-ordinary-tools-integration.md#3-session-创建与受理回执)。
+
 ## 3. Broker 到 Runtime 的最小协议
 
-以下为 v1.3 的目标接口补充，不声称与当前 `/internal/runtime-broker/v1/*` 实现路径相同。Java 与 Runtime 的 HTTP/SSE 均由 Java 发起。所有写操作复用受控 command envelope 与严格 validator，不提供任意方法名/任意 JSON 的通用执行入口。
+以下为 v1.4 的目标接口补充，不声称与当前 `/internal/runtime-broker/v1/*` 实现路径相同。Java 与 Runtime 的 HTTP/SSE 均由 Java 发起。所有写操作复用受控 command envelope 与严格 validator，不提供任意方法名/任意 JSON 的通用执行入口。
 
 | Harness → Java Broker | 请求及响应语义 | Java → Runtime / 本地处理 |
 | --- | --- | --- |
@@ -42,12 +46,15 @@ tenantId 相关语义和多租户设计按用户要求暂缓，不作为本轮�
 | `POST /internal/agent-runtime/v1/manifest` | 原 binding 下读取版本化能力与 digest；未就绪明确 not_ready，不阻塞离线 Bundle 推理 | `GET /v1/manifest` |
 | `POST /internal/agent-runtime/v1/execute` | executionCallId 来自已提交 tool.intent；Broker 持久受理后返回 accepted 和原 ID，accepted 不等于工具完成 | `POST /v1/executions`；以原身份至多派发一次 |
 | `GET /internal/agent-runtime/v1/executions/{executionCallId}` | 返回原执行状态、原 Runtime 身份、有界进度、最终 receipt/result refs；不触发派发 | 查询 Ledger；必要时 `GET /v1/executions/{id}`，或消费 Java 已建立的原执行 SSE |
-| `POST /internal/agent-runtime/v1/control` | 封闭 operation：stageGate、enableGate、renewGate、revokeGate、queryGate、queryReceipt；写控制固定 commandId 与 grant，查询固定原 ID | 门禁操作经 `POST /v1/control` 映射既有 managed-runtime-control/1；queryReceipt 查原 Broker prepare/cancel/release/control 命令 |
+| `POST /internal/agent-runtime/v1/control` | 按 activation/tool/history/receipt 四个 domain 的封闭操作表；包含原 gate、工具准备/确认/preflight/只读状态/取消、文件历史和回执查询；写控制固定 commandId、digest 与资格 | `POST /v1/control` 适配原 managed-runtime-control/1 和 tool v2；queryReceipt 查原命令；完整枚举见下文链接 |
+| `GET /internal/agent-runtime/v1/resources/{resourceId}` | 原调用登记的资源，offset/length/purpose；受信 Session/绑定身份，最多 1 MiB 分片，校验完整内容 digest | `GET /v1/resources/{resourceId}`；Java 流式代理，qwen 持久资源仓库接收，不读取任意路径 |
 | `POST /internal/agent-runtime/v1/executions/{executionCallId}/ack` | 可信 coordinator 提交 qwen 的结果接收 CommitReceipt 与匹配 digest；重复返回原交付记录 | Broker 核验原绑定及提交证明后记 delivered；不因此直接 release Runtime |
 | `POST /internal/agent-runtime/v1/cancel` | 原 binding + 原 turn/scope/execution；持久 cancel_requested，返回取消受理与查询标识 | `POST /v1/executions/{id}/cancel`；尚未执行的等待者由 Broker 停止准入 |
 | `POST /internal/agent-runtime/v1/release` | 原 binding 和稳定 commandId；返回 draining 或已核实的 released receipt | `POST /v1/release`；通过 queryReceipt 跟踪实际完成 |
 
 Broker 的执行查询是首版 Harness 等待工具完成的必要能力，可做有界轮询；Java→Runtime 的事件订阅仍使用 `/v1/executions/{id}/events`。无需先新增一套 Harness→Broker SSE 服务。首次 execute 响应丢失后走原 ID 查询，不用重新 POST execute 代替 status，更不能生成新调用 ID。
+
+`/prepare` 只准备环境，不替代一次工具的真实 build。工具按 bindHistory/beginTurn → prepareInvocation/confirmation/confirm → preflight/最终 guard → execute 顺序接线；未执行取消走 cancelInvocation，不能为了 status/cancel 创建 execution。轮末 readHistory 和备份持久化后才提交 authority checkpoint/turn.settled；原 fileHistory.checkpoint 是轮次起始快照。封闭操作、版本及 ACK 丢失处理见[完整映射](managed-agent-ordinary-tools-integration.md#4-普通工具各阶段与-broker-映射)。
 
 作用域字段由已认证连接和服务端绑定核对。Session ID、Workspace generation、RuntimeBinding ID/incarnation、配置摘要和 executionCallId 必须贯穿 prepare/execute/query/cancel/release。activationEpoch 由 qwen authority 按 Session 颁发；Binding generation 表示原环境代际，两者不互相代替。全量 typed 字段与门禁顺序沿用[私有协议](managed-agent-control-protocol.md#4-runtime-的-activation-门禁)，局部门禁不是 G 的跨实例接管。
 
@@ -57,9 +64,13 @@ Broker 的执行查询是首版 Harness 等待工具完成的必要能力，可�
 
 ## 4. 静态 AgentBundle 与工具范围
 
-首版由可信配置发布步骤生成不可变 Bundle，保存 agentRevision、工具声明、提示/项目指令快照、权限策略、必要静态 Skill/MCP 描述及其资源引用。只有 Bundle 和引用闭包已发布、Harness 在不启动 Tool Runtime 的条件下可读，才允许创建该 Managed Session。首次运行缺少快照时返回 bundle_unavailable，不在准入路径启动 Runtime 做隐式发现，也不默默删掉项目指令。
+首版由可信配置发布步骤生成不可变 Bundle，保存 agentRevision、已纳入的普通工具声明、提示/项目指令快照、权限策略及其资源引用。未启用的 Skill/MCP 扩展不要求准备能力快照，相应目录为空；完整扩展仍按 H 交付。只有 Bundle 和引用闭包已发布、Harness 在不启动 Tool Runtime 的条件下可读，才允许创建该 Managed Session。首次运行缺少快照时返回 bundle_unavailable，不在准入路径启动 Runtime 做隐式发现，也不默默删掉项目指令。
+
+复用现有配置和 AgentBundle 工具目录表达首版范围，不新增一套开关或白名单协议。模型工具目录、Runtime 执行能力和 Session 初始化行为须一致：该 profile 不注册子 Agent 或后台任务能力，也不自动启动记忆任务。配置要求范围外能力时，沿用既有 selector 在创建前选择 Legacy；显式要求 Managed 而不兼容则拒绝准入，不能静默删掉用户配置后宣称兼容。这里约定目标配置，不表示现有实现已经具备这些限制。
 
 模型看到的声明来自同一份实际工具定义；Runtime ready 后核验原 revision 和执行视图对应的 manifest digest。不匹配时阻止工具调用并报告配置错误，不能临时改模型工具目录或换 Legacy 重跑。Session 绑定的 Agent revision 不随发布 latest 自动变化。
+
+首版以 Java/Sidecar 共享只读发布目录装载完整 Bundle，staging 校验后原子标记 revision ready；工具目录复用共享 TS 定义。bundleDigest、toolManifestDigest、Hosted 协议 capabilityDigest 分型核验；Runtime 工具实现构建/模板也须匹配。具体字段与发布失败窗口见[Bundle 接线](managed-agent-ordinary-tools-integration.md#2-bundle-发布与装载)。
 
 首版不开放 definition 热切换；升级 Agent 定义使用新 Session。原权限策略中的审批决定和明确支持的 Session 控制不是 definition 更新，但每次调用仍绑定其有效权限/配置版本。完整 workspace reload、动态 MCP、Hook/Skill 注册和安全边界升级按 H 实施，不把全量配置专项中的热更新规则直接套到此 profile。
 
@@ -93,6 +104,8 @@ Java 在外部创建前持久保存 provisionRequestId、目标 binding key/gene
 
 release 先拒绝新调用，等待实际工具/后代进程退出和资源引用收敛后返回 released。未决副作用、原执行回执或 Artifact 唯一副本不能按 idle TTL 删除。有限等待返回 pending/draining，不将 timeout 伪装成安全释放。
 
+工作区文件、原 ownerSessionId 的文件历史备份、qwen Transcript/资源仓库均独立于计算环境保存。干净 idle 回收后，后续工具可创建新 binding incarnation/Runtime Session ID，挂回同一 storage identity 并恢复原 history；不递增 workspaceGeneration、不迁移旧 execution。旧环境未知或备份缺失则阻塞。同 Workspace 的工具轮次从起始快照至 history 提交串行占用；Session 独占 Runtime 不宣称物理文件隔离。并发竞争、挂载证明与建议验证参数见[回收续轮设计](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)。
+
 跨 Session 共享作为可选 profile 保留原 workspace 级复用思路。启用前必须有 per-session ToolSessionBinding，独立保存配置/权限版本、原 Runtime Session ID、文件历史与 activation gate；定义环境模板兼容性和共享资源引用计数。两个 Session 同时运行且其中一个取消、关闭或升级时，另一个不受影响，才能打开复用开关。多 Java 副本还需持久唯一约束/CAS、provision owner 交接和旧回调拒绝；单进程互斥不能作为该能力的证明。
 
 ## 7. 审批与用户问答
@@ -105,7 +118,7 @@ SSE 恢复与状态查询只展示仍 pending 的 Action；取消和关闭结束
 
 ## 8. 首版验收与阶段关系
 
-以下检查是运行必备，不把后续共享存储、公共投影或多租户设计混入本轮门槛：
+以下检查针对普通工具首版配置，以 Read、Write、Edit 和前台 Shell 覆盖调用、写文件审批及进程取消。先核对实际 Bundle、Runtime manifest 和生效配置符合第 4 节，初始化及轮次结束不触发自动记忆、子 Agent 或后台 Shell；不要求实现或验收这些延期能力。后续共享存储、公共投影或多租户设计也不混入本轮门槛：
 
 | 编号 | 场景 | 通过条件 |
 | --- | --- | --- |
@@ -120,6 +133,8 @@ SSE 恢复与状态查询只展示仍 pending 的 Action；取消和关闭结束
 | M09 | 容量到限、创建超时、无工具预热和迟到回调 | 准入有界、重复创建被合并、未领取资源进入清理，未确认退出不提前释放容量 |
 | M10 | 需要交互的已开放工具 | 审批/拒绝/重复响应/重连/改参均经过原持久仲裁，无未批准执行或永久等待 |
 
+[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)覆盖 Bundle 发布、原命令查询、完整工具阶段、分片资源交付、文件历史提交、干净回收后的第二轮及 Workspace 并发。与 M01～M10 一起完成首版普通工具闭环，不以文档检查代替跨进程 E2E。
+
 多实例启用额外验证任意副本接收后续请求仍命中原 Session owner、双副本同时 provision 只有一个合法 active binding、旧 owner/迟到回调不能重新开放工作。共享 Runtime 启用额外验证不同版本/权限 Session 的并发、取消和释放隔离。未开启对应 profile 时，这两组不阻塞单实例独占首版。
 
-A 冻结本文最小契约；B 完成固定 owner 与受理；C 完成 Broker、独占 Runtime 和回执；E 接入 Sidecar，结合 F 的 M01～M10 验证首版。D 的完整公共 API/投影、G 的共享 Authority/自动接管和 H 的全量扩展继续后置。每项实现记录 commit、环境与证据，文档定义本身不勾选完成。
+A 冻结本文最小契约；B 完成固定 owner 与受理；C 完成 Broker、独占 Runtime 和回执；E 接入 Sidecar，结合 F 的 M01～M10 与 S01～S08 验证首版。D 的完整公共 API/投影、G 的共享 Authority/自动接管和 H 的全量扩展继续后置。每项实现记录 commit、环境与证据，文档定义本身不勾选完成。

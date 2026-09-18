@@ -1,5 +1,7 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
+> **普通工具接线（2026-09-19，HTML v1.4）：** 普通工具首版的资源内容通过 Java Broker 分片传递到 qwen 持久仓库，完整必要引用接收后再 ACK；精确路由、错误和释放顺序见[结果交付设计](managed-agent-ordinary-tools-integration.md#5-结果-bytes-传输与持久交付)。文件历史沿用原覆盖范围，不宣称任意 Shell 写入均可回滚。
+
 > **HTML 对齐（2026-09-18）：** 工具 schema、权限、媒体、Artifact、父子作用域和文件历史继续复用。Java 管理公共资源与授权，qwen 侧保留执行 Transcript/checkpoint，Runtime 执行副作用并保留物理回执；B 的有限双引擎与 H 的全量能力迁移分开验收。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 更新日期：2026-09-11。生产源码基线为 `a836081466`，本次修订基于方案 `2ec07afb727464ac2306282c9be2c086697f7768`，两者之间仅有文档变化。本稿覆盖[全量设计](managed-agent-full-design.md)的 C04/C06/C13/C14；第 2 节记录已核实源码，第 3～8 节是选定但尚未实现、尚未产品验收的完整契约。

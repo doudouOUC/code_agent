@@ -812,6 +812,7 @@
         <div class="nav-title">方案目录</div>
         <nav class="nav">
           <a href="#minimum-runtime">首版运行条件</a>
+          <a href="#ordinary-tools">普通工具接线</a>
           <a href="#overview">架构总览</a>
           <a href="#goals">目标与边界</a>
           <a href="#roles">组件职责</a>
@@ -830,7 +831,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.3 · 2026-09-19<br />
+          方案版本 v1.4 · 2026-09-19<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环。
         </div>
@@ -883,9 +884,17 @@
             </div>
           </div>
           <p class="lead">
-            v1.3 保留 v1.2 的总体架构，补充首版取舍：单 Java + qwen Sidecar、
+            v1.4 保留 v1.2 的总体架构和 v1.3 的首版取舍，补齐普通工具接线：单 Java + qwen Sidecar、
             预发布静态 AgentBundle、Session 独占 Runtime，复用现有产品 REST/SSE
             与正式历史。同 Session 多轮复用环境，Harness 仍可承载多个 Session。
+          </p>
+          <p>
+            首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；
+            自动记忆、子 Agent、后台 Shell 暂不涉及，本轮不补充其专项设计。
+            复用现有配置与 AgentBundle 工具目录表达范围，不新增开关协议。
+            普通工具所需的审批、输出与文件历史保存、Shell 后代进程的取消清理仍须完成。
+            该 profile 的初始化和轮次结束不自动启动延期能力；配置要求范围外能力时，
+            创建前按既有 selector 选择 Legacy，显式要求不兼容的 Managed 则拒绝准入。
           </p>
           <div class="callout warning">
             <strong>本轮范围：</strong>tenantId 语义与多租户设计暂缓，不作为本轮前置条件；
@@ -926,6 +935,65 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
             方法与字段、Bundle 发布、部署矩阵、生命周期、审批及 M01～M10 验收见
             <a href="managed-agent-first-runtime.md">首版运行契约</a>；
             这些是目标条件，不表示实现或测试已经完成。
+          </p>
+        </section>
+
+        <section id="ordinary-tools">
+          <div class="section-head">
+            <div>
+              <div class="section-index">00B / ORDINARY TOOL INTEGRATION</div>
+              <h2>普通工具首版接线</h2>
+            </div>
+          </div>
+          <p class="lead">
+            Read / Write / Edit / 前台 Shell 复用现有 TS 工具与权限流程。
+            本节补齐发布、会话、工具阶段、资源和环境生命周期之间的衔接；
+            自动记忆、子 Agent、后台 Shell 与 tenantId 语义继续暂缓。
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>接缝</th><th>v1.4 决策</th><th>失败边界</th></tr></thead>
+              <tbody>
+                <tr><td>Bundle 发布 / 装载</td><td>受信步骤复用共享 TS 定义生成不可变包；Java/Sidecar 共享只读目录，staging 校验资源闭包后原子发布。Session 固定 revision/ref；核验构建与模板。</td><td>缺资源、摘要或版本不符拒绝准入；bundleDigest、toolManifestDigest、Hosted capabilityDigest 分型，不能互相代替。</td></tr>
+                <tr><td>创建 / Prompt</td><td>创建前固定 sessionId/commandId、bundleRef、Workspace storage binding。qwen 持久 header/定义后确认创建，持久 input/WakeIntent 后确认 Prompt；原命令提供只读查询。</td><td>ACK 丢失查原 receipt；not_found/过期/owner 不明不是未执行证明，不能换 ID 或空 Session 重跑。</td></tr>
+                <tr><td>工具阶段</td><td>control 显式映射原 prepare/confirmation/confirm/preflight 及文件历史；新能力按版本协商，逐操作严格校验；Java 不重写调度与权限。</td><td>环境 prepare 不代替 invocation build；status/cancel 不创建 execution；改参使旧授权失效，unknown 不重新执行。</td></tr>
+                <tr><td>结果 bytes</td><td>Runtime 登记不可变输出；Java 代理授权资源分片；qwen 校验、持久接收完整必要引用后返回 CommitReceipt，再 ACK delivered。</td><td>下载失败只续读原内容，未转存不得删除唯一副本；ACK 不等于环境可释放。</td></tr>
+                <tr><td>回收后下一轮</td><td>持久 Workspace 与 file-history root 独立于计算环境。干净 released 后创建新 binding，挂回同一存储与稳定 history owner；Workspace generation 不变。</td><td>旧 execution 永远归旧 binding；存储缺失或原执行未知则阻塞，不从 Git clone/空目录伪造恢复。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3 style="margin-top: 28px">一轮工具调用的提交顺序</h3>
+          <pre>
+发布 Bundle → 创建 Session → 持久受理 Prompt → 模型先行
+  Tool Call → 提交 tool.intent → 等待 Runtime / manifest / activation gate
+  → bindHistory → Workspace 工具轮次占用 → beginTurn 起始快照
+  → prepareInvocation → 确认 / 原权限仲裁 → confirm（需要时）
+  → preflight → Harness 最终 guard → execute → 原执行查询
+  → 结果 bytes 持久接收 → result CommitReceipt → ACK delivered
+  → 模型继续 → 全部工具结算 → readHistory / 持久备份
+  → authority checkpoint + turn.settled → 释放占用 → Runtime idle
+  → 干净回收 → 下一轮新 binding 挂回原文件与历史</pre>
+          <div class="callout warning">
+            原 <code>fileHistory.checkpoint(promptId)</code> 确保的是轮次起始快照，
+            不是轮末持久提交。模型 Final、工具 ACK、Runtime release 分别核验。
+            Session 独占 Runtime 不等于文件隔离：首版同 Workspace 的工具轮次从起始快照
+            到 history 提交串行占用；外部文件变更仍按工具原有身份校验处理。
+          </div>
+          <h3 style="margin-top: 28px">首版验证与参数</h3>
+          <p>
+            验证初值：环境启动 120 秒、idle 5 分钟、每 owner 最多 4 个 Runtime 和 4 个活跃模型 Turn；
+            有界队列最多 32、等待 60 秒；Session 工具并发 1；前台 Shell 默认 120 秒、上限 600 秒；
+            审批最长 10 分钟，更短既有预算优先。资源分片最多 1 MiB，单次 RPC/读取空闲期限 30 秒，
+            长任务用 accepted + 原状态查询；状态轮询 250 ms 至 2 秒并加抖动。
+            模型、输出总量与存储保留沿用既有有限预算并在启动报告列出实际值，
+            超时或未知物理退出仍计入容量；这些初值不代表生产容量结论。
+          </p>
+          <p>
+            M01～M10 加 S01～S08 验证“Edit diff → 审批 → Shell 大输出 → 持久历史 → idle 回收
+            → 同 Session 下一轮读到修改”，并注入 ACK/下载丢失、存储缺失与取消。
+            调研锚点、精确字段、封闭操作枚举、资源提交顺序、回收竞争和验收清单见
+            <a href="managed-agent-ordinary-tools-integration.md">普通工具首版接线设计</a>。
+            现有代码已有阶段适配基础；新契约仍待实现和跨进程验收。
           </p>
         </section>
 
@@ -1444,8 +1512,9 @@ Prompt → Model → Tool Call
             </article>
           </div>
           <div class="callout">
-            AgentBundle 至少包含 System Prompt、Tool Schema、Skill 静态描述、MCP
-            能力快照、权限摘要和 <code>agentDefinitionRevision</code>。Runtime
+            AgentBundle 包含 System Prompt、Tool Schema、权限摘要和
+            <code>agentDefinitionRevision</code>；启用扩展时另含 Skill 静态描述和 MCP
+            能力快照。普通工具首版的未启用扩展目录为空，不要求预先生成扩展快照。Runtime
             启动后必须核验相同 revision/manifest digest。首版 definition 固定，更新定义使用新 Session；动态发现与完整热更新按 H 扩展。
           </div>
         </section>
@@ -1481,6 +1550,9 @@ POST /session/{id}/cancel
 POST /session/{id}/resume
 GET  /events</pre
               >
+              <p>v1.4 补充只读原命令查询（operation 为必填查询参数）：</p>
+              <pre>GET /session/{id}/commands/{commandId}</pre
+              >
             </article>
             <article class="card">
               <h3>qwen serve → Java 内部 Broker</h3>
@@ -1496,18 +1568,22 @@ POST /internal/agent-runtime/v1/cancel
 POST /internal/agent-runtime/v1/release
 GET  /internal/agent-runtime/v1/executions/{executionCallId}
 POST /internal/agent-runtime/v1/control
-POST /internal/agent-runtime/v1/executions/{executionCallId}/ack</pre
+POST /internal/agent-runtime/v1/executions/{executionCallId}/ack
+GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
               >
             </article>
           </div>
 
           <div class="callout">
-            v1.3 补充原 execution 查询、control 与结果 ack。execute 返回 accepted 后，
+            v1.4 补齐工具阶段、原命令查询与资源读取。execute 返回 accepted 后，
             Harness 可有界轮询原 ID，连接中断不能重新派发。
-            control 仅包含 stageGate / enableGate / renewGate / revokeGate / queryGate / queryReceipt；
-            门禁安装遵循原 authority 提交和 enable ACK 顺序。
-            qwen 结果接收 CommitReceipt 经可信入口核验后才记 delivered，
-            release 还需核对 checkpoint、资源引用和物理退出。
+            control 按 activation / tool / history / receipt 分型：包含
+            stageGate / enableGate / renewGate / revokeGate / queryGate、
+            prepareInvocation / getConfirmation / confirmInvocation / preflightInvocation /
+            cancelInvocation / queryInvocation、bindHistory / beginTurn / checkpoint / readHistory 及 queryReceipt。
+            每种操作单独校验，复用原门禁与 tool v2；status/cancel 不能创建 execution。
+            qwen 持久接收结果与必要 bytes 后的 CommitReceipt 经可信入口核验才记 delivered，
+            release 还需核对轮末 history/checkpoint、资源引用和物理退出。
             完整方法映射见 <a href="managed-agent-first-runtime.md#3-broker-到-runtime-的最小协议">运行契约</a>。
           </div>
           <h3 style="margin-top: 28px">Java → Runtime</h3>
@@ -1528,8 +1604,8 @@ POST /internal/agent-runtime/v1/executions/{executionCallId}/ack</pre
                 </tr>
                 <tr>
                   <td><code>POST /v1/control</code></td>
-                  <td>原门禁安装、启用、续租、撤销和查询</td>
-                  <td>gate receipt</td>
+                  <td>封闭门禁、工具 v2、history 与原回执操作</td>
+                  <td>类型化结果 / command receipt</td>
                 </tr>
                 <tr>
                   <td><code>POST /v1/prepare</code></td>
@@ -1560,6 +1636,11 @@ POST /internal/agent-runtime/v1/executions/{executionCallId}/ack</pre
                   <td><code>POST /v1/executions/{id}/cancel</code></td>
                   <td>请求物理取消</td>
                   <td>cancel accepted</td>
+                </tr>
+                <tr>
+                  <td><code>GET /v1/resources/{resourceId}</code></td>
+                  <td>原调用登记的授权资源分片</td>
+                  <td>bytes / 长度 / 内容摘要</td>
                 </tr>
                 <tr>
                   <td><code>POST /v1/release</code></td>
@@ -1689,6 +1770,8 @@ POST /internal/agent-runtime/v1/executions/{executionCallId}/ack</pre
                 <li>取消后迟到 ready 重新核验 Session、generation 和需求，无人持有则 draining。</li>
                 <li>Runtime endpoint 不由 Harness 或模型指定。</li>
                 <li>Workspace generation 变化时创建新 Binding。</li>
+                <li>干净 idle 回收后下一轮可创建新 binding，挂回原持久文件/history，Workspace generation 不变。</li>
+                <li>旧执行查询仍指向旧 binding；旧环境未知或持久存储缺失则阻塞，不能重放。</li>
                 <li>启动 deadline、idle 保留时间和容量有界；同 Session 第二、三轮可复用。</li>
                 <li>跨 Session 共享必须先有独立配置、权限、文件历史、gate 和释放引用计数。</li>
               </ul>
@@ -2178,7 +2261,7 @@ turn.settled          -> Turn terminal state</pre
             </div>
           </div>
           <div class="callout">
-            A～H 为能力阶段。首个运行闭环先完成 A/B/C/E 及 F 的 M01～M10；
+            A～H 为能力阶段。首个运行闭环先完成 A/B/C/E 及 F 的 M01～M10 和 S01～S08；
             完整 D 公共投影、G 共享 Authority 与 H 全量扩展按各自门槛后续开放。
           </div>
           <div class="timeline">
@@ -2336,7 +2419,7 @@ turn.settled          -> Turn terminal state</pre
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.3 · 2026-09-19 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.4 · 2026-09-19 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>

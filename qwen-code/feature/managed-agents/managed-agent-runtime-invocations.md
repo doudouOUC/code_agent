@@ -1,8 +1,12 @@
 # Managed Agent：Runtime invocation v2
 
+> **普通工具接线（2026-09-19，HTML v1.4）：** Hosted 的具体 control 操作、稳定命令回执、纯查询/未执行取消和文件历史顺序见[普通工具接线](managed-agent-ordinary-tools-integration.md#4-普通工具各阶段与-broker-映射)。原 fileHistory.checkpoint 是轮次起始快照；轮末须另行读取并持久提交 history/backup。
+
 > **HTML 对齐（2026-09-18）：** owned v2 的身份、scope、lease、权限、取消和原调用回执继续复用。B 仍需普通 daemon 双引擎与 selector；Hosted 工具链路为 Harness→Java Broker→Runtime。目标接口和现有 v2 wire 分开记录，R/D 只作历史切片索引。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 > **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md#6-独占-runtime-生命周期与可选共享)默认 Session 独占物理 Runtime、同 Session 多轮复用。workspace 级跨 Session 共享须先证明独立 ToolSessionBinding/配置/权限/gate/文件历史与释放；下文历史切片的并发能力不能代替 Hosted 验收。
+
+> 首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不涉及。普通工具仍须贯通 prepare/确认/preflight/execute、结果资源交付、文件历史及取消释放；前台 Shell 的后代进程清理仍属本轮必需。下文关于延期能力的全量契约和历史结果不作为首版已开放能力。
 
 历史状态更新：2026-09-10，源码复核基线 `a836081466`。阶段 1 的本地 macOS 验收与阶段 2 已记录的 Core/ACP 调度、独立子作用域、父文件历史结果保留；当时注册九种工具代理（Read/Write/Edit/Shell、Glob/可选 LS、Grep、NotebookEdit、Zoom），各自证据见[总方案能力表](managed-agent-daemon-default.md)及专项文档，不能将注册等同全部语义验收。四处普通默认入口与共同兼容 selector 当时尚未接线；原计划按[首阶段计划](managed-agent-daemon-default-plan.md)推进，现按 HTML 的 A～H 重新映射。下文按切片保留当时结果，“四类工具”等指历史注册切片，不是当前总能力清单。
 

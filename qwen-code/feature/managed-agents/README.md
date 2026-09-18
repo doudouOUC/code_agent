@@ -1,16 +1,16 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **当前基准：[HTML v1.3](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-19；在用户提供的 v1.2 上补充首版运行条件。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.4](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-19；在用户提供的 v1.2 上补充首版运行条件与普通工具接线。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
 ## 当前方案入口
 
-先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。v1.3 按本轮决定补充最小运行范围，详细方法、生命周期和验收见[首版运行契约](managed-agent-first-runtime.md)；原 v1.2 可从 Git 提交 `479432d` 追溯。
+先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.3 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.4 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
@@ -19,10 +19,14 @@
 
 首版验证采用单 Java + qwen Sidecar、预发布静态 Bundle、Session 独占 Runtime，复用现有产品 SSE/历史。tenantId 设计暂缓，不作为本轮前置项，既有访问检查继续执行。
 
+首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不涉及。复用现有配置与 Bundle 工具目录表达范围，普通工具所需的审批、结果/文件历史保存和取消清理仍是必需项。
+
 - 五项必需：qwen 持久受理后 ACK 与原请求幂等、Broker 完整调用/查询、固定 Bundle、Session 归属与持久存储、Runtime 有界创建/取消/释放。
 - 条件必需：已开放工具需要的审批必须可用；跨 Session 共享 Runtime 开启前完成独立配置/权限/gate/释放验收。
 - 多 Java 副本启用前完成原 owner 路由与跨副本 provision 去重；单实例验证不证明分布式能力。
 - D 的独立公共 Item/eventSequence 投影、G 的共享 Authority/自动接管和 H 的完整扩展可后置；首版按[运行验收 M01～M10](managed-agent-first-runtime.md#8-首版验收与阶段关系)交付。
+
+普通工具还须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)：真实 Edit 审批、Shell 大输出持久交付、文件历史提交、Runtime 干净回收后同 Session 继续下一轮，并覆盖 ACK 丢失、取消及存储故障。
 
 ## 1. 架构与职责
 
@@ -88,6 +92,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 
 | 专项 | 如何使用 |
 | --- | --- |
+| [普通工具首版接线](managed-agent-ordinary-tools-integration.md) | 源码调研依据、Bundle/Session 字段、完整 Broker 操作、bytes 交付、持久挂载/回收续轮与 S01～S08 |
 | [全量能力覆盖 C01～C18](managed-agent-full-design.md) | A～H 对应、能力范围和专项验收索引 |
 | [Session / Harness / Runtime](managed-agent-session-harness-runtime.md) | 三层职责、单一执行权威、checkpoint 与阶段 G 接管 |
 | [执行引擎选择与持久化](managed-session-execution-engine.md) | 阶段 B 的 selector、同 Bridge 双引擎、sticky owner |
