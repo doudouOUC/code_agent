@@ -546,8 +546,8 @@ daemon action只在producer提供字符串时写public `_meta["qwen.submittedPro
 
 #11911已让WebShell识别REST、ACP RPC data与standalone rollback三种`acp_child_capacity_exhausted`，显示本地化提示、停止自动create/load retry，并保留普通prompt、shell与首次`/goal`草稿。#11940的零session warm child回收发生在daemon内部，不新增UI；回收失败仍走相同容量提示。
 
-#12008当前open diff在真实容量错误、`workspace_runtime_stop` capability且发起操作可安全继续时显示专用chooser。默认不选择候选，disabled项展示独立ACP/schedule/task等阻塞原因；取消保持原draft。确认后只在selected runtime stop receipt为`stopped+released`、owner/draft/recovery generation仍匹配时继续一次。
+#12008最终在真实容量错误、`workspace_runtime_stop` capability且发起操作可安全继续时显示专用chooser。默认不选择候选，disabled项展示独立ACP/schedule/task等阻塞原因；取消保持原draft。确认后只在selected runtime stop receipt为`stopped+released`、owner/draft/recovery generation仍匹配时继续一次。
 
-收到`cause:'workspace_runtime_stop'`的新版页面保留saved session/transcript，抑制SSE reconnect、auto-load/ensure和held prompt自动提交，显示stopped状态并要求显式Resume。当前review follow-up还会在ChatPane同步提交与deferred `/plan`续跑时重查stopped状态，隔离cwd解析前stash的queued prompt，并在已有recovery intent或continuation失败时正确收敛chooser/resume latch。该UX尚未进入`main`；旧client仍按普通`client_close`行为处理。
+收到`cause:'workspace_runtime_stop'`的新版页面保留saved session/transcript，抑制SSE reconnect、auto-load/ensure和held prompt自动提交，显示stopped状态并要求显式Resume。最终review follow-up还会在ChatPane同步提交与deferred `/plan`续跑时重查stopped状态，隔离cwd解析前stash的queued prompt，并在已有recovery intent或continuation失败时正确收敛chooser/resume latch。该UX已进入`main`；旧client仍按普通`client_close`行为处理。
 
-_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-19_
+_生成于 2026-06-05；按个人 PR 口径更新于 2026-09-20_

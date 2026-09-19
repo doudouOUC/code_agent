@@ -10,8 +10,10 @@
 | [#11940](https://github.com/QwenLM/qwen-code/pull/11940) | ✅ merged | feat(serve): reclaim idle ACP children when admission is full | [pr-11940.md](pr-11940.md) |
 | [#11960](https://github.com/QwenLM/qwen-code/pull/11960) | ✅ merged | fix(mcp): show MCP App resource load warnings | [pr-11960.md](pr-11960.md) |
 | [#11981](https://github.com/QwenLM/qwen-code/pull/11981) | 🟡 open | test(ci): Add real Linux bwrap integration coverage | [pr-11981.md](pr-11981.md) |
-| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | 🟡 open | feat(serve): let users stop workspace runtimes to release ACP capacity | [pr-12008.md](pr-12008.md) |
+| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | ✅ merged | feat(serve): let users stop workspace runtimes to release ACP capacity | [pr-12008.md](pr-12008.md) |
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | 🟡 open | feat(core): Move bwrap confinement to tool execution | [pr-12064.md](pr-12064.md) |
-| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | 🟡 open | feat(core): Add the bwrap execution foundation | [pr-12067.md](pr-12067.md) |
+| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | ✅ merged | feat(core): Add the bwrap execution foundation | [pr-12067.md](pr-12067.md) |
+| [#12265](https://github.com/QwenLM/qwen-code/pull/12265) | 🟡 open | docs(serve): Document ACP child heap calibration | [pr-12265.md](pr-12265.md) |
+| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | 🟡 open draft | feat(cli): Move bwrap sandboxing to tool execution | [pr-12267.md](pr-12267.md) |
 
-_按个人 PR 口径更新于 2026-09-19_
+_按个人 PR 口径更新于 2026-09-20_

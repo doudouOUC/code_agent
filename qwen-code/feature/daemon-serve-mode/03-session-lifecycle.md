@@ -1040,11 +1040,11 @@ sequenceDiagram
 
 #11120 最终实现处理 active-work taxonomy缺口的放大效应：child无法回答 `close-if-unheld`时，daemon保留首次即时恢复重试，第二次起按60秒指数退避到1小时；任意 child回答、hold report或 child从 snapshot消失都会清零。candidate gate在 probe前生效，避免每次 snapshot占满 drain budget；未协商 active-work或已 condemned的 channel则绕过 probe，直接按既有授权本地收敛，避免 ghost entry阻塞排空。日志改用共享错误提取器保留 plain-object JSON-RPC detail，Session无 completion promise时以10ms timer poll替代 busy-spin。该实现不让 cron/goal/monitor/history mutation变成 negotiated hold，因此只抑制、诊断而不根治误判 idle。
 
-### #12008 — 用户确认的 workspace runtime stop（open）
+### #12008 — 用户确认的 workspace runtime stop（merged）
 
-- 当前 diff 为 loaded session 占满 ACP child 名额的场景增加只读 stop-options 与 exact-identity stop。confirmation 必须匹配 channel ID、runtime epoch、stop token 和用户看到的 session 集合；身份/集合变化返回 stale，不开始副作用。
+- 最终为 loaded session 占满 ACP child 名额的场景增加只读 stop-options 与 exact-identity stop。confirmation 必须匹配 channel ID、runtime epoch、stop token 和用户看到的 session 集合；身份/集合变化返回 stale，不开始副作用。
 - accepted stop 逐个走既有 close/persist 语义并等待所选 child 的 registry release。close refusal、flush failure、超时或 release 未证明分别保留 incomplete/failed/unknown，不以全局process count下降替代selected child证明，也不自动重试stop。
 - stop budget在close RPC进行中耗尽时返回503 failed并继续隔离/清理；在两个close之间耗尽时返回409 incomplete、结束清理并要求fresh preview。`killSession`若因runtime stop暂缓，仍保留wanted-kill tombstone，避免incomplete stop后的下一次detach漏掉既有销毁意图。
 - 成功只保留workspace注册、文件和保存会话，不形成持久suspend。subscriber收到`session_closed{reason:'client_close',cause:'workspace_runtime_stop'}`，新版WebShell保留选择/历史并要求显式Resume；旧或离线client仍可能稍后触发正常re-entry。
 - release证明按平台收窄：POSIX registry跟踪owned process group，Windows只证明root settled exit，不能把`released:true`解释为所有descendant均已消失。
-- 该能力尚未进入`main`，不能把runtime stop route/event或stopped-session UX写成当前协议承诺。
+- 该能力已进入`main`；旧 daemon 或未广告 capability 的客户端仍按既有容量错误降级。

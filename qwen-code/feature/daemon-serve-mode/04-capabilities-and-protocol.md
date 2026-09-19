@@ -695,8 +695,8 @@ sequenceDiagram
 - #11911 不新增 capability tag；`/daemon/status` additive 增加 `childHeap.mode:'admit'`、`admissionEnforced` 与 `runtime.memory.committedAcpChildren`，并以 REST 503 / ACP error data 的 `acp_child_capacity_exhausted` 表达满额。旧 daemon 可省略字段，客户端不能从 `limits.memory.enforced:false` 推断 count gate 未启用。
 - #11940 同样不新增公开 tag/route；它只在首次count拒绝后尝试回收一个零session/零activity warm child，再做一次fresh admission。失败继续使用 #11911 的容量错误。
 
-### #12008 — `workspace_runtime_stop`（open）
+### #12008 — `workspace_runtime_stop`（merged）
 
-- 当前 diff 只有在daemon拥有完整process accounting、activity/scheduled-task observation、confirmed stop与receipt snapshot时才广告`workspace_runtime_stop`；既有`workspace_runtime`不能隐含stop支持。
+- 最终只有在daemon拥有完整process accounting、activity/scheduled-task observation、confirmed stop与receipt snapshot时才广告`workspace_runtime_stop`；既有`workspace_runtime`不能隐含stop支持。
 - read-only options返回候选identity/session/block reason/token；mutation要求`confirmInterruptions:true`和exact channel/epoch/token/session集合。stale/blocked/incomplete/in-progress/failed/not-supported使用稳定409/503/501 taxonomy；in-flight close超时是503 failed且cleanup继续，close之间预算耗尽是409 incomplete且需要fresh preview。
-- 成功后事件沿用`session_closed`，additive `cause:'workspace_runtime_stop'`；不发`workspace_removed`。该tag、route和event cause当前仍是open方案，旧daemon/client按既有容量错误降级。
+- 成功后事件沿用`session_closed`，additive `cause:'workspace_runtime_stop'`；不发`workspace_removed`。该tag、route和event cause已进入`main`，旧daemon/client按既有容量错误降级。

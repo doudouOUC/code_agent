@@ -1,10 +1,10 @@
 # daemon 资源预算、容量模型与公平调度
 
-> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget、#9380 已合入的 ACP child peak old-generation measurement、#11428 已合入的容量策略常量解耦、#11515 已合入的默认256注册容量、#11653 已合入的无限 cgroup 哨兵修复、#11911 已合入的 opt-in ACP child 数量准入、#11940 已合入的空闲 child 回收，以及 #12008 当前 open 的用户确认 runtime stop。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
+> 口径：本文记录 #8093 closed draft 的 resource foundation 观察、#8245 已合入的 daemon memory budget reporting、#8423 已合入的 memory pressure observe mode、#8462 已合入的 active ACP child RSS aggregate、#8508 已合入的 child heap partition status model、#8911 已合入的 daemon ACP NDJSON buffers、#8947/#9007 已合入的 ACP transport resource guard 与 HTTP pre-attach buffer byte budget、#9380 已合入的 ACP child peak old-generation measurement、#11428 已合入的容量策略常量解耦、#11515 已合入的默认256注册容量、#11653 已合入的无限 cgroup 哨兵修复、#11911/#11940/#12008 已合入的 count 准入、空闲回收与用户确认 runtime stop，以及 #12265 当前 open 的 fixed-heap 校准证据。closed/open draft PR 只能作为当前方案记录，不能描述为 `main` 已落地能力。
 
 ## 背景
 
-multi-workspace daemon 已经把 workspace runtime、session ownership、EventBus replay、file/transcript paging 等边界拆开，但资源保护仍主要停留在 workspace/session 数量、MCP client budget 和各 route 的局部 byte cap。#11515已把注册上限提升到256，并用独立800 total-session与25 Channel owner边界避免按注册数线性放大其它策略；#11911进一步提供显式开启的managed ACP child数量准入，#11940在首次拒绝后可自动回收一个零session/零activity warm child，但两者仍不应用child heap ceiling或读取实时RAM。loaded session占满名额时，#12008当前open方案再提供用户确认的runtime stop；它不是自动eviction，也尚未进入`main`。
+multi-workspace daemon 已经把 workspace runtime、session ownership、EventBus replay、file/transcript paging 等边界拆开，但资源保护仍主要停留在 workspace/session 数量、MCP client budget 和各 route 的局部 byte cap。#11515已把注册上限提升到256，并用独立800 total-session与25 Channel owner边界避免按注册数线性放大其它策略；#11911进一步提供显式开启的managed ACP child数量准入，#11940在首次拒绝后可自动回收一个零session/零activity warm child，#12008再为loaded session提供用户确认的runtime stop。三者仍不应用child heap ceiling或读取实时RAM；#12265当前open证据只服务后续fixed-heap决策。
 
 #8093 的目标是把可复用的资源预算 primitive 单独拆出来，先让 reviewer 审完 accounting、fairness 和 failure taxonomy，再由后续 PR 接入具体 production routes。#8245 补 daemon status 的 memory denominator：把 configured/effective/modeled memory budget 先在 boot/status/protocol/SDK 上报告清楚，为后续 admission/enforcement 提供容量基线。#8423 在 denominator 之上新增 observe-only pressure ratio，#8462 把 ACP child RSS 从 primary-only 扩展为所有 live managed children 的 aggregate 观测，#8508 则在 modeled child pool 上发布每个 ACP child 的恒定 heap 分区模型；#11911只把该模型的最大child数量作为opt-in spawn gate，仍不应用per-child ceiling。#9380 已合入 enforcement 前需要的真实 old-generation peak measurement。#8911 是第一段已接入生产 daemon-owned ACP child 的 buffer bound：它限制 NDJSON frame 与 decoded inbound queue；#8947 已合入覆盖 ACP SDK dispatch 后的 handler/outbound/request 队列；#9007 已合入继续覆盖 ACP HTTP pre-attach buffered replies 和 delivery-owned leases。#11428 先把workspace注册上限、observe-only child建模上限与Channel控制事务预算从一个旧公开常量拆成三个owner；#11515随后只扩注册policy并给session、store与Channel增加各自边界。
 
@@ -145,11 +145,17 @@ status新增`childHeap.admissionEnforced`与`runtime.memory.committedAcpChildren
 
 回收后仍以process registry为权威，只做一次fresh reserve/decide；竞争请求抢走名额、取消、teardown失败或候选状态变化都会返回#11911既有容量错误，不尝试第二个victim，也不重放外层create/load/prompt。最终head同步了factory fixture与运维文档并已进入`main`。
 
-## User-directed Runtime Stop（#12008 当前 open）
+## User-directed Runtime Stop（#12008 已合入）
 
 #12008处理自动回收刻意排除的loaded session。daemon公开只读stop options和exact-identity stop操作，候选携带workspace/runtime identity、受影响session和阻塞原因；执行前重读session/activity并拒绝stale confirmation、独立ACP连接、scheduled work或其它不安全状态。关闭、持久化或process release不确定时返回partial/unknown结果，不自动重试。
 
-WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿；成功停止后等待registry释放，只允许原操作一次guarded continuation。被停止页面保留历史并显示stopped状态，需要显式Resume。该方案保持workspace注册/文件/保存会话，但会中断所选runtime内全部确认session，且当前仍是open diff。
+WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿；成功停止后等待registry释放，只允许原操作一次guarded continuation。被停止页面保留历史并显示stopped状态，需要显式Resume。该实现保持workspace注册/文件/保存会话，但会中断所选runtime内全部确认session，现已进入`main`。
+
+## ACP Child Heap Calibration Evidence（#12265 当前 open docs）
+
+#12265不修改生产设置或runtime，而是补齐fixed-heap决策所需的中英设计和机器可读摘要。设计确认旧collector没有child heap/GC字段；提交内的compact summary保留Node 24接受运行、协议批次、排除尝试、hash和决策，全量逐回合/raw-derived artifact改为单独归档。
+
+最新接受集按提交内`.acceptedRuns[]`复算为8次运行、184个真实模型回合和360次精确工具调用，覆盖两组长会话、一个MCP pair和一个四child重叠并发pair，各自比较3632 MiB baseline与544 MiB candidate。所有接受运行都记录`cleanupPassed: true`；此前错误调用未注册`tool_search`的并发尝试仍被排除。该证据只缩小校准不确定性：更广负载、多小时稳定性、其它主机和GC/延迟阈值仍未闭合，`observe`继续默认，per-child heap ceiling未进入production enforcement。
 
 ## 当前未接入项
 
@@ -168,7 +174,7 @@ WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿
 - #8947 已补 handler/outbound/request 队列 guard；#9007 已补 ACP HTTP pre-attach buffered reply byte budget 和 delivery-owned lease，但普通 live SSE/WS 新帧队列、单帧 stringify 瞬时放大、远端 exactly-once receipt 和完整 frame/session backpressure 不在本 PR 内。
 - #11428 只解耦三个容量owner；#11515已把注册默认/上限提升到256，#11911只增加opt-in child数量准入。800 total-session、25 Channel owner和modeled child count是独立策略，不是实时内存安全证明。
 - #11653只拒绝无限/超宿主cgroup值并复用状态模型的可用内存探测；raise-only guard仍可能让child继承高于模型ceiling的V8默认值，`admit`也不修正argv。
-- #11940已提供零session warm child单候选回收，但不会关闭loaded session；#12008的用户确认stop仍是open diff。
+- #11940只自动回收零session warm child；#12008已补用户确认loaded-runtime stop，但两者都不应用per-child heap ceiling。#12265当前只提供open校准证据，不能把544 MiB candidate写成生产上限。
 
 这些内容应在后续 PR 按 route ownership、error taxonomy 与 client compatibility 分批接入。
 
@@ -191,7 +197,8 @@ WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿
 - #11653 声明ACP bridge聚焦测试、真实Node argv探针及build/typecheck/lint/format/bundle检查通过；本文核对merged head、4个changed files和最新`main`落点，未在真实cgroup v1/v2 Linux主机复跑。
 - #11911 声明33项admission检查、完整build/typecheck/bundle、真实daemon create/ensure/load/ACP SSE及真实Chromium 10项验证通过；GitHub Linux lint/static、Ubuntu tests、Serve A/B、WebShell E2E与real-daemon/Java等主要lane通过。本文核对merged head、43个changed files及最新`main`的shared registry/policy、503/status/WebShell落点，未复跑低内存E2E。
 - #11940 声明780项定向单测和5组真实daemon的52项断言通过；本文核对merged head、22个changed files及最新`main`接线，未复跑真实daemon。
-- #12008 PR body记录2,863项定向单测和176项HTTP/ACP/browser断言通过；本文核对open head、59个changed files和#11911/#11940 baseline，后续review commits补submit/queue/plan fences、timeout taxonomy与process-release平台边界，GitHub当前classify、lint/static、Ubuntu tests、Serve A/B、WebShell E2E与real-daemon/Java等产品lane通过，未复跑浏览器E2E。
+- #12008 PR body记录2,863项定向单测和176项HTTP/ACP/browser断言通过；本文核对merged head、59个changed files、最新`main`落点及#11911/#11940 baseline，后续review commits补submit/queue/plan fences、timeout taxonomy与process-release平台边界，GitHub classify、lint/static、Ubuntu tests、Serve A/B、WebShell E2E与real-daemon/Java等产品lane通过，未复跑浏览器E2E。
+- #12265当前为docs-only open PR；本文读取双语设计与一份compact summary，并从Node 24接受集独立复算8 runs/184 turns/360 tools、4+4 arms和cleanup布尔值。未获得外部raw artifact，不能重放实验或独立重算提交内引用的下载物hash。
 
 ## PR 归因
 
@@ -211,6 +218,7 @@ WebShell在容量仍满时要求用户显式选择并确认，取消保留草稿
 | [#11653](https://github.com/QwenLM/qwen-code/pull/11653) | merged | 让ACP child spawn复用可用内存探测，拒绝v1/v2无限哨兵和超宿主constraint；50%、16 GiB、raise-only与cache策略不变。 |
 | [#11911](https://github.com/QwenLM/qwen-code/pull/11911) | merged | 新增opt-in `admit`，用共享registry的committed child count在spawn前拒绝超额，并贯通REST/ACP/WebShell/status；不应用heap ceiling。 |
 | [#11940](https://github.com/QwenLM/qwen-code/pull/11940) | merged | 首次拒绝后回收一个零session、零activity的LRU warm child，再做一次fresh admission；保留workspace与历史。 |
-| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | open | 当前diff让用户查看并确认停止loaded workspace runtime，区分in-flight失败与close间预算耗尽，并在名额释放后只继续原操作一次；尚未进入`main`。 |
+| [#12008](https://github.com/QwenLM/qwen-code/pull/12008) | merged | 让用户查看并确认停止loaded workspace runtime，区分in-flight失败与close间预算耗尽，并在registry证明名额释放后只继续原操作一次。 |
+| [#12265](https://github.com/QwenLM/qwen-code/pull/12265) | open | 发布ACP child fixed-heap中英设计与紧凑机器可读汇总；不改变production mode、argv或enforcement。 |
 
-_按个人 PR 口径更新于 2026-09-19_
+_按个人 PR 口径更新于 2026-09-20_

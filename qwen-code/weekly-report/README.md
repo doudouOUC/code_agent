@@ -5,8 +5,8 @@
 > 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
 **时间范围**: 2026-04-06 ~ 2026-09-20（持续更新）
-**总计**: 503 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37/W38 见对应周目录（W38 周内个人增量 +23,597 / -3,942，318 个文件变更）
+**总计**: 505 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37/W38 见对应周目录（W38 周内个人增量 +26,383 / -6,988，402 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -37,11 +37,11 @@
 | 2026-08-24 ~ 2026-08-30 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-24_2026-08-30) · [Obsidian](2026-08-24_2026-08-30/README.md)) (W35 最终版) | 27 | 25/0/2 | +69,193/-5,307 | standalone core/REST/SDK/WebUI context 与 WebShell UI 实现、trusted-loopback authority、sessionless user-language sync、Channel 命名任务/输出归因、session 初始化/cleanup、provider runtime sync、hook/ACP process tree、Mem0、OTel context usage |
 | 2026-08-31 ~ 2026-09-06 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-31_2026-09-06) · [Obsidian](2026-08-31_2026-09-06/README.md)) (W36 最终版) | 20 | 16/1/3 | +42,533/-1,627 | provider/SDK 错误详情、Channel worktree isolation/reset、Mem0 分发、standalone/WebShell、turn navigation 协议与客户端方案收敛、relaxed ownership/writer fences、close probe 抑制 |
 | 2026-09-07 ~ 2026-09-13 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-07_2026-09-13) · [Obsidian](2026-09-07_2026-09-13/README.md)) (W37 最终版) | 21 | 21/0/0 | +32,642/-1,392 | relaxed Conversations ownership runtime、WebShell 连续历史/turn rail/轮询/通知与点击导航、Mem0与Channel worktree、workspace容量扩展、Linux bwrap沙箱、ACP child heap哨兵修复、Shell输出预算单一决策 |
-| 2026-09-14 ~ 2026-09-20 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-14_2026-09-20) · [Obsidian](2026-09-14_2026-09-20/README.md)) (W38 周内累计) | 11 | 7/4/0 | +23,597/-3,942 | ACP容量三阶段、MCP App资源诊断、Linux bwrap真实CI与工具级沙箱拆分、HTTP standalone UUID兼容 |
+| 2026-09-14 ~ 2026-09-20 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-14_2026-09-20) · [Obsidian](2026-09-14_2026-09-20/README.md)) (W38 周内累计) | 13 | 9/4/0 | +26,383/-6,988 | ACP容量三阶段与堆校准证据、MCP App资源诊断、Linux bwrap真实CI与工具级沙箱拆分、HTTP standalone UUID兼容 |
 
 ## 类型分布
 
-feat ×242, fix ×184, refactor ×17, other ×14, docs ×14, chore ×7, perf ×17, test ×7, merge ×1
+feat ×243, fix ×184, refactor ×17, other ×14, docs ×15, chore ×7, perf ×17, test ×7, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

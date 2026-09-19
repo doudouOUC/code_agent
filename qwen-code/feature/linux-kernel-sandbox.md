@@ -1,7 +1,7 @@
 # Linux bwrap 内核沙箱技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前口径：#11614 已合入 whole-CLI bwrap backend；#11981、#12064、#12067 仍为 open，分别是当前真实 Linux CI follow-up、工具级迁移总体 draft 与第一拆分 foundation，不能写成 `main` 已具备工具级沙箱。
+> 当前口径：#11614 已合入 whole-CLI bwrap backend，#12067 已合入工具执行 foundation；#11981、#12064、#12267 仍为 open，分别是当前真实 Linux CI follow-up、工具级迁移总体 draft 与公开 CLI cutover stacked draft。`main` 尚未提供公开工具级 sandbox policy。
 
 ## 1. 已合入基线：whole-CLI bwrap（#11614）
 
@@ -29,22 +29,30 @@ operator-only `tools.executionSandbox` 要求显式 filesystem `read-only|worksp
 
 draft 覆盖 ordinary headless、Ink/OpenTUI `!`、prompt interpolation、Monitor、Read/Write/Edit 和部分同 workspace Agent/Code Mode；ACP/serve/web terminal、hooks/MCP/LSP、技能准备、Omni 等未适配路径被拒绝或禁用。它同时包含 x64/ARM64 public/runtime/adapter acceptance，但 148 文件总体改动正在拆分，不能作为当前产品契约。
 
-## 4. 第一拆分：execution foundation（#12067 当前 open）
+## 4. 第一拆分：execution foundation（#12067 merged）
 
-#12067 只抽取内部执行底座，不开放 runtime policy、公开设置或 tool routing：
+#12067 最终只抽取内部执行底座，不开放 runtime policy、公开设置或 tool routing：
 
 - `ShellExecutionService.executeLaunch` 接收绝对 executable/cwd、字面量 argv、精确 snapshot env 与可选 binary stdin；pipe 在 stdio close 或 child exit 后最多 1 秒 drain 中先到者结算，PTY spawn 后失败不得通过另一 transport 重放。
 - bwrap relay 用 payload 不继承的 status FD 和受保护 control file 记录最终 receipt；`confirmed/unconfirmed/interrupted/running` 与 stdout 分离，`payloadExitObserved` 保持 true/false/unknown 三态，只有明确 pre-exec 失败可按未执行清理，未知结果不授权 retry。
 - binary file worker 使用最多 16 KiB 的 newline JSON header 与精确 binary length，在 namespace 内做 atomic write、file-version 复核和 outside/symlink/special-file 拒绝；host 同时校验 trusted receipt、worker reply 与独立 diagnostics。
-- relay/worker 作为独立 bundle/package assets 发布，缺失时在执行前失败；当前 head 另补 scratch-root admission、CI 单测和更强的 Linux evidence，独立 verifier 覆盖 36 项真实 Linux adapter 行为。
+- relay/worker 作为独立 bundle/package assets 发布，缺失时在执行前失败；最终 head 另补 scratch-root admission、CI 单测和更强的 Linux evidence。portable verifier 把 inherited-stdio probe 放到共享 shell contract，不依赖特定 bwrap 版本的后台 descendant 语义，合计覆盖 36 项真实 Linux adapter 行为。
 
 旧 whole-CLI backend 在该拆分中仍存在。只有后续 policy/tool wiring 和完整 public cutover 合入后，工具级边界才会成为可用产品能力。
 
-## 5. 设计边界
+## 5. 公开 CLI cutover（#12267 当前 open stacked draft）
+
+#12267 堆叠在未合入的 runtime integration base 上，把 foundation 接到普通 headless 与 Ink/OpenTUI。operator-only `tools.executionSandbox` 要求明确 filesystem/network policy，SystemDefaults、User、System 和可信 programmatic runtime 才能提供；Workspace/project env、bare/safe mode 和 model 参数不能放宽。设置对象严格拒绝未知字段，Linux/bwrap 前置条件和探针失败均 fail closed。
+
+当前 diff 路由 Shell、Read、Write、Edit、Monitor、prompt interpolation 与终端 `!`，并在 footer/system info/status 显示 requested/effective backend。旧 `--sandbox bwrap`、`tools.sandbox:"bwrap"`、`QWEN_SANDBOX=bwrap` 和继承 `SANDBOX=bwrap` 返回迁移错误；whole-CLI bwrap restart 被删除，Docker/Podman/Seatbelt 保留。
+
+ACP/serve、web terminal、MCP/LSP、extensions/hooks/discovery、自动 worktree/Arena、custom executors、技能准备与其它未迁移 host effects 会在 listener、payload 或副作用前拒绝或禁用。exact-head Linux x64/aarch64 enforcement 被明确留给后续 acceptance workflow；macOS build/test 不能证明 kernel confinement。因为依赖 base 和验收都未闭合，该 draft 不能视为 `main` 的公开工具级 bwrap。
+
+## 6. 设计边界
 
 - bwrap 路径提供 write 与 command-network confinement，不承诺 secret confidentiality 或完整 host isolation；广泛 host read 与 pathname Unix socket 仍可用。
 - #11614 默认不自动启用；Landlock、seccomp、一次性提权、Windows/macOS 新 backend 均不在当前 `main` 能力内。
-- #11981 是 CI 方案且当前失败；#12064 是总体 draft；#12067 是未接线的内部 foundation，三者都不能替代 merged #11614 的现状描述。
+- #11981 是 CI 方案且当前失败；#12064 是总体 draft；#12067 是已合入但未接线的内部 foundation；#12267 是依赖未合入 runtime integration 且缺 exact-head Linux acceptance 的公开 cutover draft。
 - tool-level 迁移涉及安全边界、PTY/pipe 生命周期、文件并发和配置来源，必须逐拆分核对，不应从大 draft 的通过声明推断每个 extraction 已验证。
 
 ## PR 归因
@@ -54,6 +62,7 @@ draft 覆盖 ordinary headless、Ink/OpenTUI `!`、prompt interpolation、Monito
 | [#11614](https://github.com/QwenLM/qwen-code/pull/11614) | merged | 显式 whole-CLI bwrap backend、最小可写 roots、project-env 来源隔离与 `qwen sandbox` 检查/验证。 |
 | [#11981](https://github.com/QwenLM/qwen-code/pull/11981) | open draft | 为 whole-CLI backend 增加真实 Linux workflow 与 14 项 integration coverage；当前 GitHub checks 失败。 |
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | open draft | 工具级 bwrap 完整迁移参考、公开 policy/cutover 与跨架构 acceptance。 |
-| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | open | 从总体 draft 抽取 structured execution、trusted receipt、file worker 与 packaging foundation。 |
+| [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | merged | 从总体 draft 抽取 structured execution、trusted receipt、file worker、packaging foundation 与 36 项 portable Linux verifier。 |
+| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | open draft | 为普通 CLI/TUI 暴露 operator-only policy、删除 whole-CLI bwrap，并对未迁移 surface fail closed；仍依赖 stacked runtime integration 和后续 Linux acceptance。 |
 
-_按个人 PR 口径更新于 2026-09-19_
+_按个人 PR 口径更新于 2026-09-20_

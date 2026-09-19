@@ -564,9 +564,9 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - daemon status types additive支持`childHeap.mode:'admit'`、`admissionEnforced`与`committedAcpChildren`；旧daemon省略字段时兼容。
 - `limits.memory.enforced:false`仍只表示modeled heap ceiling未应用，不否定显式count gate。
 
-### #12008 — workspace runtime stop SDK（open）
+### #12008 — workspace runtime stop SDK（merged）
 
-- 当前diff增加只读stop options、exact confirmation和typed receipt/error；management方法固定走REST且不得自动重复POST。
-- lost response/partial outcome必须刷新matching receipt，只有`stopped && released`才允许caller自行决定是否继续；readback成功后也可能保留先前teardown warning。normalizer把已知close reason转换为可读文案，未知token降级为通用提示；该surface尚未进入发布SDK。
+- 最终增加只读stop options、exact confirmation和typed receipt/error；management方法固定走REST且不得自动重复POST。
+- lost response/partial outcome必须刷新matching receipt，只有`stopped && released`才允许caller自行决定是否继续；readback成功后也可能保留先前teardown warning。normalizer把已知close reason转换为可读文案，未知token降级为通用提示；该surface已进入发布SDK。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-19_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-20_

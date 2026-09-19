@@ -4,7 +4,7 @@
 > 起因：[#11386](https://github.com/QwenLM/qwen-code/issues/11386) 的设计文档 `docs/design/workspace-capacity-p1.md` §9 明确把 Linux、真实仓库、watcher/FD、真实负载列为未完成的部署证据；此前 P1 验证跑在 macOS 空目录上。
 > 复现脚本与逐次原始数据：[`repros/daemon-capacity-linux-4c8g/`](../../../repros/daemon-capacity-linux-4c8g/)。
 > 上游记录：#11386 评论区（容量验证 + 两次更正）、[#8182](https://github.com/QwenLM/qwen-code/issues/8182)（子进程堆授权）、[#11591](https://github.com/QwenLM/qwen-code/issues/11591)（git 状态开销，本次新开）。
-> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；#11911已增加显式`admit`下的modeled child数量准入，#11940已增加零session/零activity warm child单候选回收。下文数值保留为默认`observe`与修复前历史证据；约6 GiB以下raise-only守卫、per-child heap/RSS enforcement仍未解决。
+> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；#11911/#11940/#12008已完成显式`admit`数量准入、零session warm child回收和用户确认loaded-runtime stop。#12265当前open docs补Node 24 fixed-heap校准证据，但生产per-child heap/RSS enforcement仍未启用。下文数值保留为默认`observe`与修复前历史证据。
 
 ---
 
@@ -176,7 +176,13 @@ CI triage 同时指出：方向上若想给 `wait=1` 加 TTL，等于重开上�
   - 按响应性规划时用 heavy 的数字：末轮综合可达 307s。
 - **此结论取代了我最初「先 2 个并发、验证后到 4 个」的建议**——那是在没有任何真实负载数据时给的，对这类负载保守了 4–8 倍。两版都已在 #11386 评论区更正留痕。
 - 内核上限不构成约束：daemon 占 1 个 inotify 实例、每个子进程恰好 1 个，实例要到约 127 个并发子进程才耗尽，内存远早于此触顶。
-- 部署需要硬限制物理ACP child数量时应显式启用`admit`并按本机负载重算budget；满额后#11940只会回收零session warm child，不会自动终止loaded session。#12008的用户确认stop仍为open方案。
+- 部署需要硬限制物理ACP child数量时应显式启用`admit`并按本机负载重算budget；满额后#11940只自动回收零session warm child，loaded session需要使用#12008已合入的用户确认runtime stop。停止释放的是当前名额，不是下一次spawn的保留配额。
+
+### 7.1 #12265 Node 24 fixed-heap证据（当前 open docs）
+
+#12265没有重跑本页的256注册阶梯，而是补本页缺失的child heap/GC维度。提交内最新接受集在同类4 vCPU / 7265 MiB、无swap Linux主机上，用Node 24比较3632 MiB baseline与544 MiB实验上限：8次运行完成184个真实模型回合和360次精确工具调用，覆盖两组长会话、MCP pair与四child重叠并发pair；compact summary中的所有接受运行都记录`cleanupPassed: true`。
+
+这组证据不能直接替换本页的RSS并发结论，也不能把544 MiB提升为部署默认。V8 old-space、daemon tree RSS和modeled child count是不同量；更广真实负载、更大上下文、多小时稳定性、其它主机，以及可接受GC/延迟与rollout阈值仍待闭合。当前`main`仍只用`admit`限制count，`limits.memory.enforced:false`继续表示heap ceiling未应用。
 
 ---
 
@@ -188,6 +194,7 @@ CI triage 同时指出：方向上若想给 `wait=1` 加 TTL，等于重开上�
 - **cgroup 受限下的完整 sweep**：受限档只测了内存预算与子进程授权路径（各 2 个子进程），注册阶梯、churn、空闲观测都是无限制下跑的。
 - **深历史仓库**：素材仓库只有 2 个提交。
 - **多小时稳定性**：最长连续运行 19.9 分钟。
+- **fixed-heap校准外推**：#12265的Node 24接受集是单机/特定fixture/provider证据，尚不覆盖本页列出的全部MCP、终端、编译和多小时生产形态。
 - 工具授权由程序自动批准，而非人工应答；两种负载形态都用 `qwen3.8-flash`。
 
-_按个人 PR 口径更新于 2026-09-18_
+_按个人 PR 口径更新于 2026-09-20_
