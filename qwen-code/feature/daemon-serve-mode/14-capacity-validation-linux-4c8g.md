@@ -4,7 +4,7 @@
 > 起因：[#11386](https://github.com/QwenLM/qwen-code/issues/11386) 的设计文档 `docs/design/workspace-capacity-p1.md` §9 明确把 Linux、真实仓库、watcher/FD、真实负载列为未完成的部署证据；此前 P1 验证跑在 macOS 空目录上。
 > 复现脚本与逐次原始数据：[`repros/daemon-capacity-linux-4c8g/`](../../../repros/daemon-capacity-linux-4c8g/)。
 > 上游记录：#11386 评论区（容量验证 + 两次更正）、[#8182](https://github.com/QwenLM/qwen-code/issues/8182)（子进程堆授权）、[#11591](https://github.com/QwenLM/qwen-code/issues/11591)（git 状态开销，本次新开）。
-> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；#11911/#11940/#12008已完成显式`admit`数量准入、零session warm child回收和用户确认loaded-runtime stop。#12265当前open docs补Node 24 fixed-heap校准证据，但生产per-child heap/RSS enforcement仍未启用。下文数值保留为默认`observe`与修复前历史证据。
+> 后续状态：#11653已于2026-09-12合入，修复本次实测发现的无限cgroup哨兵误授16 GiB问题；#11911/#11940/#12008已完成显式`admit`数量准入、零session warm child回收和用户确认loaded-runtime stop。#12265已合入Node 24 fixed-heap校准证据；#12353仅是open的opt-in `enforce` draft，生产per-child heap/RSS enforcement仍未进入`main`。下文数值保留为默认`observe`与修复前历史证据。
 
 ---
 
@@ -178,11 +178,17 @@ CI triage 同时指出：方向上若想给 `wait=1` 加 TTL，等于重开上�
 - 内核上限不构成约束：daemon 占 1 个 inotify 实例、每个子进程恰好 1 个，实例要到约 127 个并发子进程才耗尽，内存远早于此触顶。
 - 部署需要硬限制物理ACP child数量时应显式启用`admit`并按本机负载重算budget；满额后#11940只自动回收零session warm child，loaded session需要使用#12008已合入的用户确认runtime stop。停止释放的是当前名额，不是下一次spawn的保留配额。
 
-### 7.1 #12265 Node 24 fixed-heap证据（当前 open docs）
+### 7.1 #12265 Node 24 fixed-heap证据（merged docs）
 
 #12265没有重跑本页的256注册阶梯，而是补本页缺失的child heap/GC维度。提交内最新接受集在同类4 vCPU / 7265 MiB、无swap Linux主机上，用Node 24比较3632 MiB baseline与544 MiB实验上限：8次运行完成184个真实模型回合和360次精确工具调用，覆盖两组长会话、MCP pair与四child重叠并发pair；compact summary中的所有接受运行都记录`cleanupPassed: true`。
 
 这组证据不能直接替换本页的RSS并发结论，也不能把544 MiB提升为部署默认。V8 old-space、daemon tree RSS和modeled child count是不同量；更广真实负载、更大上下文、多小时稳定性、其它主机，以及可接受GC/延迟与rollout阈值仍待闭合。当前`main`仍只用`admit`限制count，`limits.memory.enforced:false`继续表示heap ceiling未应用。
+
+### 7.2 #12353 fixed-heap执行方案（当前 open draft）
+
+#12353将本页校准链推进到显式`--child-heap-mode enforce`：所有managed ACP child复用daemon启动时解析的固定ceiling和共享count admission，spawn时替换 inherited fixed heap flag并拒绝percentage冲突；只有真实接线时status才报告`limits.memory.enforced:true`。默认`observe`与`admit`的heap行为不变。
+
+该 PR 的本地生命周期/单测证据不能补齐本页尚缺的生产校准。即使544 MiB接受集完成，fixed old-space也不限制总RSS、native分配或MCP后代；真实模型扩展、多小时、Linux/Windows、GC/延迟门槛与rollout/rollback仍未闭合。故本页部署建议继续以`main`的count admission/recovery为准，不能提前要求`enforce`。
 
 ---
 
@@ -197,4 +203,4 @@ CI triage 同时指出：方向上若想给 `wait=1` 加 TTL，等于重开上�
 - **fixed-heap校准外推**：#12265的Node 24接受集是单机/特定fixture/provider证据，尚不覆盖本页列出的全部MCP、终端、编译和多小时生产形态。
 - 工具授权由程序自动批准，而非人工应答；两种负载形态都用 `qwen3.8-flash`。
 
-_按个人 PR 口径更新于 2026-09-20_
+_按个人 PR 口径更新于 2026-09-21_

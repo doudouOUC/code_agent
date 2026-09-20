@@ -569,4 +569,15 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 最终增加只读stop options、exact confirmation和typed receipt/error；management方法固定走REST且不得自动重复POST。
 - lost response/partial outcome必须刷新matching receipt，只有`stopped && released`才允许caller自行决定是否继续；readback成功后也可能保留先前teardown warning。normalizer把已知close reason转换为可读文案，未知token降级为通用提示；该surface已进入发布SDK。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-20_
+### #12301 — Java Runtime Broker state foundation（open）
+
+- 当前 open PR 在 `packages/sdk-java/runtime-broker` 新增独立 Java 21 模块，定义 tenant/scope-aware Runtime Binding、Runtime Session、乐观版本、operation lease 与 Repository 契约，并提供线程安全内存参考实现。
+- 该模块不改变现有 Java SDK 的 Java 11 release target，也不包含 Spring、HTTP、JDBC、真实 Runtime provision 或 restart recovery；不能视为已发布 SDK surface 或生产 Broker。
+- Java workflow 只在 Java 21 matrix 执行新模块，并保留现有 SDK 的 Java 11/17 兼容覆盖；当前 PR 未合入。
+
+### #12353 — ACP child heap enforcement status（open draft）
+
+- 当前 open draft 把 `ChildHeapMode` 扩为 `off|observe|admit|enforce`，并继续通过 daemon status SDK types 暴露 `limits.memory.enforced`；只有 count admission 与 managed child heap wiring 均生效时该字段才为 true。
+- 这是 additive status/type 观察，不提供远程切换 heap mode 的 SDK 方法；默认 `observe` 与旧 daemon 缺字段兼容边界不变。PR 未合入，调用方不能提前依赖 `enforce`。
+
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-21_

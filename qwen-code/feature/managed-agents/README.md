@@ -12,6 +12,8 @@
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
+> **W38 upstream PR 快照（2026-09-21）：** #12301 当前以 open 独立 Java 21 模块提交 Runtime Binding/Session identity、CAS、operation lease 与内存 Repository，仅是状态 foundation；#12302 当前以 open Core diff 提交 Managed Session v1 header/event/commit marker、严格 parser/validation 与 transcript subtype reservation，尚无 production writer。#12358 是 495 文件、148 commit 的 open draft architecture preview，串联 Spring 服务、Hosted Harness、Runtime Broker、durable event/materialization 和 dual-path WebShell；本地单实例 smoke 不证明多节点/MQ/Redis/跨平台，且该 draft 必须拆成独立 review unit。三者都未进入 upstream `main`，不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
+
 ## 当前方案入口
 
 先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型；v1.8 同步 SQL 物化实现快照与 Runtime Broker JDBC Repository 边界；v1.9 补齐 Workspace 与 Session cwd 的 W0/W1/W2 设计。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
