@@ -576,6 +576,119 @@
         font-size: 12px;
       }
 
+      .tool-flow-diagram {
+        margin: 18px 0 14px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background:
+          radial-gradient(
+            circle at 12% 0%,
+            rgba(81, 214, 199, 0.08),
+            transparent 28rem
+          ),
+          rgba(4, 13, 21, 0.58);
+      }
+
+      .tool-flow-track {
+        display: grid;
+        gap: 13px;
+      }
+
+      .tool-flow-stage {
+        position: relative;
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 18px;
+        align-items: center;
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(13, 29, 43, 0.78);
+      }
+
+      .tool-flow-stage:not(:last-child)::after {
+        content: '↓';
+        position: absolute;
+        left: 105px;
+        bottom: -19px;
+        z-index: 2;
+        width: 20px;
+        color: var(--cyan);
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .tool-flow-stage h4 {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .tool-flow-index {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--cyan);
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+      }
+
+      .tool-flow-owner {
+        display: block;
+        margin-top: 6px;
+        color: #7f96aa;
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+
+      .tool-flow-steps {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .tool-flow-step {
+        padding: 7px 9px;
+        border: 1px solid rgba(104, 167, 255, 0.25);
+        border-radius: 9px;
+        background: rgba(104, 167, 255, 0.07);
+        color: #cce0ff;
+        font-family: var(--mono);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .tool-flow-step.commit {
+        border-color: rgba(81, 214, 199, 0.42);
+        background: rgba(81, 214, 199, 0.09);
+        color: #afe9e2;
+      }
+
+      .tool-flow-step.wait {
+        border-color: rgba(242, 189, 101, 0.42);
+        background: rgba(242, 189, 101, 0.08);
+        color: #efd3a5;
+      }
+
+      .tool-flow-step.execute {
+        border-color: rgba(181, 154, 255, 0.42);
+        background: rgba(181, 154, 255, 0.08);
+        color: #d7c9ff;
+      }
+
+      .tool-flow-arrow {
+        color: #6689aa;
+        font-size: 11px;
+      }
+
+      .tool-flow-diagram figcaption {
+        margin-top: 13px;
+        color: #8298ab;
+        font-size: 11px;
+      }
+
       .state-flow {
         display: flex;
         flex-wrap: wrap;
@@ -754,6 +867,16 @@
           bottom: -21px;
           transform: translateX(50%);
         }
+
+        .tool-flow-stage {
+          grid-template-columns: 1fr;
+          gap: 11px;
+        }
+
+        .tool-flow-stage:not(:last-child)::after {
+          left: 50%;
+          transform: translateX(-50%);
+        }
       }
 
       @media print {
@@ -785,6 +908,8 @@
         .table-wrap,
         .phase,
         .sequence-step,
+        .tool-flow-diagram,
+        .tool-flow-stage,
         .checklist li {
           break-inside: avoid;
           box-shadow: none;
@@ -971,6 +1096,112 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
             </table>
           </div>
           <h3 style="margin-top: 28px">一轮工具调用的提交顺序</h3>
+          <figure
+            class="tool-flow-diagram"
+            aria-label="普通工具从会话受理到执行、结果提交和运行时回收的五阶段流程"
+          >
+            <div class="tool-flow-track">
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">01 / ADMISSION</span>
+                  <h4>受理与模型先行</h4>
+                  <span class="tool-flow-owner">Java · Harness</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">发布 Bundle</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">创建 Session</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">持久 Prompt</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">CommitReceipt</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">模型先行</span>
+                </div>
+              </div>
+
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">02 / PREPARE</span>
+                  <h4>环境与历史准备</h4>
+                  <span class="tool-flow-owner">Harness · Broker · Workspace</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">Tool Call</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">tool.intent</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step wait">Runtime / manifest / gate</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">bindHistory</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">beginTurn 起始快照</span>
+                </div>
+              </div>
+
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">03 / EXECUTE</span>
+                  <h4>授权与执行</h4>
+                  <span class="tool-flow-owner">Harness · Runtime</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">prepareInvocation</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step wait">确认 / 权限仲裁</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">confirm</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">preflight</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step wait">Harness final guard</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step execute">execute / 原执行查询</span>
+                </div>
+              </div>
+
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">04 / RESULT COMMIT</span>
+                  <h4>结果持久提交</h4>
+                  <span class="tool-flow-owner">Runtime · Java · Harness</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step execute">结果 bytes</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">持久接收</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">result CommitReceipt</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">ACK delivered</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">模型继续</span>
+                </div>
+              </div>
+
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">05 / SETTLE</span>
+                  <h4>结算、释放与恢复</h4>
+                  <span class="tool-flow-owner">Harness · Workspace · Broker</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">全部工具结算</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">readHistory / 持久备份</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">checkpoint + turn.settled</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">释放 / Runtime idle</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">新 binding 挂回原历史</span>
+                </div>
+              </div>
+            </div>
+            <figcaption>
+              青色表示可靠提交点，琥珀色表示等待或仲裁，紫色表示实际执行；下方文字版保留完整协议顺序。
+            </figcaption>
+          </figure>
           <pre>
 发布 Bundle → 创建 Session → 持久受理 Prompt → 模型先行
   Tool Call → 提交 tool.intent → 等待 Runtime / manifest / activation gate
