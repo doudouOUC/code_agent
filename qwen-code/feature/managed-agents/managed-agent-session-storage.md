@@ -4,6 +4,8 @@
 
 > **HTML 对齐（2026-09-20）：** JSONL、SessionWriterLease、ChatRecord 和本地 lock schema 继续作为 qwen 侧执行权威/兼容存储的专项设计。Java 分配的 RFC UUID `sessionId` 同时标识公共 Session、qwen Session Authority、JSONL 与 Broker scope，不保存第二套 Harness Session ID；Java 仍保存公共投影、SessionBackendBinding、RuntimeBinding 和 Execution Ledger，G 才外置权威事件/checkpoint。两份投影不能相互覆盖原始执行事实。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
+> **Java 公开事件实现补充（2026-09-20）：** Java 侧的 MySQL 接受事务、Harness 有界批处理、提交后 SSE、短期 SQL 日志、MQ 分发、Item/Snapshot 物化和保留策略见[存储与事件设计](managed-agent-storage-event-architecture.md)。当前源码只完成 P0/P1 切片，仍按每个公开事件一条 SQL 记录兼容；这不改变下文 qwen 私有 JSONL/Session Authority 的权威地位，也不表示阶段 G 已完成。
+
 > **首版运行范围（2026-09-19）：** 正式 Transcript/checkpoint、资源及 Broker Ledger 使用明确持久保存位置；首版单实例/原 owner，Pod 替换或原卷不可用准确阻塞，不创建空 Session 替代。独立公共 Item/eventSequence 归 D；见[部署与存储矩阵](managed-agent-first-runtime.md#5-session-归属存储与事件)。
 
 更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3/§3.1 的封闭 kind 与 domain、§5 的记录与事务限额已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地；§4 的事务提交（先事件后 marker、`previousCommitDigest` 链、幂等键、写失败停止推进、完整前缀恢复扫描）由 `managed-session-authority.ts` 的 `LocalManagedSessionAuthority` 通过既有 `SessionWriterLease` 实现并有定向单测。仍未实现或验收：lock schema 3 的认证换锁、§2.1 资源仓库、RestoreBundle、坏尾截断的 lease 能力、目录/标题等各适配器与投影，以及四处普通 factory 接线。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
