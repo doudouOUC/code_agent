@@ -6,7 +6,7 @@
 
 - 公共资源前缀固定为 `/v1/agents`，Session 前缀固定为 `/v1/agents/sessions`；不再另建 `/v1/sessions` 或实验 `/managed/sessions*` 作为正式资源。
 - WebShell BFF 适配前缀固定为 `/api/agent/web-shell/v1`。适配层只改变传输形状，不建立另一套 Session、Turn、事件或幂等语义。
-- `POST /v1/agents/sessions`、Session 列表/查询、输入/取消事件以及 Session 事件查询/SSE 是当前阶段性实现。AgentDefinition、删除、Turn/Item/Artifact 资源仍为阶段 D 的 `planned` 接口。
+- `POST /v1/agents/sessions`、Session 列表/查询、输入/取消事件、Session 事件查询/SSE，以及带 Snapshot 水位的 Item 列表是当前阶段性实现。AgentDefinition、删除、Turn/Artifact 资源仍为阶段 D 的 `planned` 接口。
 - 旧 `/managed/sessions*` 只用于实验兼容；公共 API 完成准入、查询、事件和幂等覆盖后删除，不写入本契约。
 
 ## 2. 身份、租户与授权
@@ -50,11 +50,12 @@ HTML v1.7 的[扩展运行时](managed-agent-extension-runtime.md#11-webshell-�
 
 ## 7. 当前实现差异
 
-OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。以 `feature/managed-agents-p0-p8` 的 `c818c21910` 为基线，至少还有这些差异：
+OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。以 `feature/managed-agents-p0-p8` 的 `2695220a3a` 为实现基线，至少还有这些差异：
 
 - `PublicSession` 尚无 `agent_revision`、`capabilities`、`replay_floor_sequence` 和 `snapshot_through_sequence`。
-- `PublicEvent` 尚无 `schema_version`、`projection_version`、`item_id` 和 `content_part_id`；稳定 Item 身份需要 Harness 协议先提供。
+- `PublicEvent` 尚无 `schema_version`、`projection_version`、顶层 `item_id` 和 `content_part_id`；当前文本/工具投影已在 `data` 中携带确定性 Item/Part 身份，仍需按冻结字段上移并协商版本。
 - 公共事件 JSON 查询尚未返回真实 `has_more/next_cursor`，过期游标和 Snapshot reset 也未实现。
+- Item/Part、Snapshot 和连续物化进度已有 Flyway V2 与 SQL scanner 实现，Item 列表已返回 `snapshot_through_sequence`；固定 Snapshot 版本分页、长输出不可变分段和清理保护仍未实现。
 - WebShell `requestId` 尚未写入 trace 或回传，`WebShellStreamRequest.limit` 仍在 Java record 中但被忽略。
 - 错误响应尚无 `request_id` 及游标重置水位；Java 与 TypeScript 仍手写 DTO。
 

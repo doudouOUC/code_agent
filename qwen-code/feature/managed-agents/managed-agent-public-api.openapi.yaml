@@ -245,7 +245,7 @@ paths:
     get:
       tags: [Public Resources]
       operationId: listItems
-      x-qwen-implementation-status: planned
+      x-qwen-implementation-status: partial
       parameters:
         - name: after
           in: query
@@ -625,6 +625,15 @@ components:
         created_at: { type: integer, format: int64 }
         data: { type: object, additionalProperties: true }
         terminal: { type: boolean }
+    PublicContentPart:
+      type: object
+      required: [part_id, type, text, first_sequence, last_sequence]
+      properties:
+        part_id: { type: string, maxLength: 128 }
+        type: { type: string, enum: [input_text, output_text, reasoning] }
+        text: { type: string }
+        first_sequence: { type: integer, format: int64, minimum: 1 }
+        last_sequence: { type: integer, format: int64, minimum: 1 }
     PublicItem:
       type: object
       required: [id, object, session_id, type, revision, status, first_sequence, last_sequence, content]
@@ -639,7 +648,10 @@ components:
         status: { type: string }
         first_sequence: { type: integer, format: int64, minimum: 1 }
         last_sequence: { type: integer, format: int64, minimum: 1 }
-        content: { type: object, additionalProperties: true }
+        content: { type: array, items: { $ref: '#/components/schemas/PublicContentPart' } }
+        attributes: { type: object, additionalProperties: true }
+        created_at: { type: integer, format: int64 }
+        updated_at: { type: integer, format: int64 }
     PublicArtifact:
       type: object
       required: [id, object, session_id, size, sha256, media_type, created_at]
@@ -820,12 +832,39 @@ components:
         hasMore: { type: boolean }
     WebShellTranscript:
       type: object
-      required: [events, hasMore, lastSequence]
+      required: [items, events, coveredSequence, hasMore, lastSequence]
       properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WebShellItem' } }
         events: { type: array, items: { $ref: '#/components/schemas/WebShellEvent' } }
+        coveredSequence: { type: integer, format: int64, minimum: 0 }
         olderCursor: { type: [string, 'null'] }
         hasMore: { type: boolean }
         lastSequence: { type: integer, format: int64, minimum: 0 }
+    WebShellContentPart:
+      type: object
+      required: [partId, type, text, firstSequence, lastSequence]
+      properties:
+        partId: { type: string }
+        type: { type: string }
+        text: { type: string }
+        firstSequence: { type: integer, format: int64, minimum: 1 }
+        lastSequence: { type: integer, format: int64, minimum: 1 }
+    WebShellItem:
+      type: object
+      required: [itemId, sessionId, turnId, type, status, content, attributes, firstSequence, lastSequence, createdAt, updatedAt]
+      properties:
+        itemId: { type: string }
+        sessionId: { type: string, format: uuid }
+        turnId: { type: string }
+        type: { type: string }
+        role: { type: [string, 'null'] }
+        status: { type: string }
+        content: { type: array, items: { $ref: '#/components/schemas/WebShellContentPart' } }
+        attributes: { type: object, additionalProperties: true }
+        firstSequence: { type: integer, format: int64, minimum: 1 }
+        lastSequence: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
     WebShellEvent:
       type: object
       required: [sequence, eventId, sessionId, type, createdAt, data, terminal]

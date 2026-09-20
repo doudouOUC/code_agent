@@ -958,7 +958,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.7 · 2026-09-20<br />
+          方案版本 v1.8 · 2026-09-20<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环；公开事件先可靠提交，再向客户端推送。
         </div>
@@ -1011,9 +1011,9 @@
             </div>
           </div>
           <p class="lead">
-            v1.7 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
-            的普通工具接线、v1.5 的统一 Session 身份和 v1.6 的事件恢复边界，
-            并补充阶段 H 的扩展运行时。Java 在创建前生成全局唯一 RFC UUID，
+            v1.8 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
+            的普通工具接线、v1.5 的统一 Session 身份、v1.6 的事件恢复边界和
+            v1.7 的扩展运行时，并同步当前 P1 SQL 物化切片。Java 在创建前生成全局唯一 RFC UUID，
             公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
             使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
             首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
@@ -1047,7 +1047,7 @@
                 <tr><td>审批与用户问答</td><td>条件必需</td><td>已开放工具需要交互时，响应必须经 Java 回到原持久仲裁；不静默自动批准。</td></tr>
                 <tr><td>跨 Session 共享 Runtime</td><td>默认关闭</td><td>独立 ToolSessionBinding、配置/权限/gate/历史及引用计数通过验收后启用。</td></tr>
                 <tr><td>公开事件接受与 SSE</td><td>已有 P0/P1 切片</td><td>源游标、公开序号、Turn 终态和事件在一个事务中提交；同节点提交后直推，溢出或断线从 SQL 补齐。</td></tr>
-                <tr><td>稳定 Item / Snapshot 物化</td><td>后续</td><td>补稳定 itemId/contentPartId、批次日志/Outbox、物化进度与 Snapshot；当前逐事件 SQL 行不能作为最终容量形态。</td></tr>
+                <tr><td>稳定 Item / Snapshot 物化</td><td>已有 P1 SQL 切片</td><td>V2 已加入稳定 itemId/contentPartId、Item/Part、连续物化进度和 Snapshot；批次日志/Outbox 与保留清理仍属 P2，当前逐事件 SQL 行不能作为最终容量形态。</td></tr>
               </tbody>
             </table>
           </div>
@@ -2415,9 +2415,9 @@ interface AgentBundle {
           </p>
 
           <div class="callout">
-            当前独立 Spring 服务已经提供 Session 创建/列表/查询、输入/取消以及按
-            eventSequence 查询或 SSE 订阅的阶段性接口；这些仍是实验实现。稳定 Item、
-            Snapshot、Artifact、AgentDefinition、完整历史物化和生产兼容承诺继续属于 D。
+            当前独立 Spring 服务已经提供 Session 创建/列表/查询、输入/取消、按
+            eventSequence 查询或 SSE 订阅，以及带 Snapshot 水位的 Item 列表；这些仍是实验实现。
+            Artifact、AgentDefinition、Snapshot reset、固定版本历史分页和生产兼容承诺继续属于 D。
             D 对外开放前还必须完成源事件键、公共版本、源进度、原子提交以及重放/重建规则的验收。
           </div>
           <h3 style="margin-top: 28px">当前阶段性 Session/Event 接口</h3>
@@ -2428,6 +2428,7 @@ GET  /v1/agents/sessions?cursor=&amp;limit=
 GET  /v1/agents/sessions/{sessionId}
 POST /v1/agents/sessions/{sessionId}/events
 GET  /v1/agents/sessions/{sessionId}/events?after=&amp;limit=&amp;stream=
+GET  /v1/agents/sessions/{sessionId}/items?after=&amp;limit=
 
 WebShell adapter
 POST /api/agent/web-shell/v1/sessions/query
@@ -2545,8 +2546,8 @@ turn.settled          -> Turn terminal state</pre
           <div class="callout">
             <strong>实现基线：</strong
             ><code>feature/managed-agents-p0-p8</code> 的
-            <code>c818c21910</code> 已落地一部分
-            P0/P1。以下“当前切片”描述实际代码，
+            <code>2695220a3a</code> 已落地 P0 和基于 SQL 的 P1 物化切片。
+            以下“当前切片”描述实际代码，
             “目标链路”与“后续阶段”仍是待实现设计，不能作为生产能力声明。
           </div>
 
@@ -2564,7 +2565,12 @@ Hosted Harness source SSE
   → SessionEventHub（本进程、每 Session 有界 512 条）
   → Public SSE / WebShell SSE
       gap、overflow、断线：按公开 sequence 从 SQL 补齐
-      空闲 reconciliation 默认 5s</pre
+      空闲 reconciliation 默认 5s
+
+异步 SQL scanner（默认 100ms）
+  → 按 Session 连续读取已提交事件
+  → 同一事务更新 Item / Item Part + Snapshot + consumer progress
+  → WebShell 历史读取 Snapshot + 控制事件 + coveredSequence 后的 tail</pre
           >
           <div class="table-wrap">
             <table>
@@ -2604,6 +2610,16 @@ Hosted Harness source SSE
                   <td>
                     尚无 <code>managed_agent_event_batch</code> / Outbox
                     表，也未做长期保留清理。
+                  </td>
+                </tr>
+                <tr>
+                  <td>Item / Snapshot 物化</td>
+                  <td>
+                    Flyway V2 已增加 Item、Item Part、Snapshot 与消费进度；
+                    SQL scanner 只在内容和连续水位同事务提交后推进进度。
+                  </td>
+                  <td>
+                    兼容期仍保留原始逐事件行；长输出分段、固定 Snapshot 分页和清理尚未实现。
                   </td>
                 </tr>
                 <tr>
@@ -2651,8 +2667,8 @@ reconnect / history → SessionReplayService
             后端由部署配置选择，不按请求切换，也不以数据库双写作为迁移手段。
             MySQL 8.0 的目标增量结构已经在
             <a href="managed-agent-storage-schema.mysql.sql">v1.6 DDL</a>
-            中冻结；它包含 Event Batch、Item、Snapshot、Consumer Progress 和
-            Session Owner，但尚未作为 Java Flyway migration 执行。
+            中冻结。当前 Java Flyway V2 已落地 Item、Item Part、Snapshot 和
+            Consumer Progress 子集；Event Batch、Outbox 和 Session Owner 仍未迁移。
           </p>
           <div class="grid-2">
             <article class="card accent-blue">
@@ -2759,19 +2775,19 @@ owner 故障
                 <tr>
                   <td>P1</td>
                   <td>
-                    有界批处理、提交后本机直推；补稳定
+                    有界批处理、提交后本机直推、稳定
                     itemId/contentPartId、用户输入 Item 和 Snapshot。
                   </td>
                   <td>
-                    当前只完成前半；重连不重文、终态不越序、Snapshot 与 tail
-                    可一致拼接。
+                    当前 SQL 切片已完成，并通过 H2、前端投影和真实 MySQL
+                    的迁移、聚合、Snapshot/尾部与幂等验证；生产故障和容量验证仍待完成。
                   </td>
                 </tr>
                 <tr>
                   <td>P2</td>
                   <td>
-                    批次表/Outbox、Relay、RocketMQ 或 SQL
-                    scanner、物化器、保留清理和跨实例唤醒。
+                    批次表/Outbox、Relay、RocketMQ、保留清理、Snapshot reset
+                    和跨实例唤醒。
                   </td>
                   <td>
                     两个 Java
@@ -2816,9 +2832,11 @@ owner 故障
               >mvn -f packages/sdk-java/managed-agent-server/pom.xml
               verify</code
             >
-            在 <code>c818c21910</code> 上通过 20 个测试及
-            Checkstyle；测试数据库是 H2。 真实 MySQL、真实 Hosted Harness、双
-            JVM、跨节点通知、故障注入、吞吐与 TTFT 仍未形成生产级证明。
+            在当前分支通过 21 个 H2 单元/集成测试及 Checkstyle；独立
+            <code>ManagedAgentMySqlIT</code> 又在新建的真实 MySQL 26.7 库验证了
+            V1/V2 迁移、分片聚合、Snapshot/连续进度和幂等重放，WebShell 聚焦测试
+            12 项通过。真实 Hosted Harness、双 JVM、跨节点通知、故障注入、吞吐与
+            TTFT 仍未形成生产级证明。
           </div>
         </section>
 
@@ -3053,8 +3071,8 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
           </div>
           <div class="callout">
             A～H 为能力阶段。首个运行闭环先完成 A/B/C/E 及 F 的 M01～M10 和 S01～S08；
-            D 已有 Session/Event API 与本机提交后直推切片，但完整 Item/Snapshot
-            物化、跨实例通知、G 共享 Authority 与 H 全量扩展仍按各自门槛后续开放。
+            D 已有 Session/Event/Item API、本机提交后直推和 SQL Item/Snapshot
+            物化切片；批次 Outbox、清理、跨实例通知、G 共享 Authority 与 H 全量扩展仍按各自门槛后续开放。
           </div>
           <div class="timeline">
             <article class="phase">
@@ -3181,7 +3199,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
           <div class="section-head">
             <div>
               <div class="section-index">17 / CURRENT GAP</div>
-              <h2>现有基础与主要缺口（v1.6 代码快照）</h2>
+              <h2>现有基础与主要缺口（v1.8 代码快照）</h2>
             </div>
           </div>
           <div class="grid-2">
@@ -3201,6 +3219,8 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
+                <li>稳定 Item/Part 身份、V2 Item/Snapshot/消费进度表与 SQL scanner 物化。</li>
+                <li>WebShell Snapshot 加控制事件与尾部恢复；公共 Item 列表返回 Snapshot 水位。</li>
               </ul>
             </article>
             <article class="card accent-amber">
@@ -3210,13 +3230,13 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>按已冻结 OpenAPI 生成/校验 Java 与 TypeScript 类型，并补契约测试。</li>
-                <li>稳定 itemId/contentPartId、Item/Snapshot 物化与输入消息版本。</li>
-                <li>把已冻结 MySQL DDL 落成 Flyway migration，并实现 SQL 批次日志/Outbox、EventTransport、跨实例唤醒和保留清理。</li>
+                <li>完整事件 schema/projection version、Snapshot reset 与固定版本历史分页。</li>
+                <li>继续落地已冻结 MySQL DDL 中的 SQL 批次日志/Outbox、EventTransport、跨实例唤醒和保留清理。</li>
                 <li>生产身份到 tenant 的映射、资源授权、内部服务认证和跨租户隔离验收。</li>
                 <li>AgentBundle/Manifest 版本一致性。</li>
                 <li>Artifact Store 和 RuntimeTemplate。</li>
                 <li>Harness 私有 journal、资源闭包、共享 Session Authority 和可替换 Harness。</li>
-                <li>真实 MySQL、双 JVM、真实 Harness/Runtime 的故障与容量验证。</li>
+                <li>真实 MySQL 基础迁移/聚合已验证；双 JVM、真实 Harness/Runtime 的故障与容量验证仍待完成。</li>
                 <li>Legacy → Managed continuation。</li>
                 <li>MCP、Hooks、后台 Shell、Monitor、child/workflow/team、Channels 与 Automation 按 H0～H6 完整迁移。</li>
                 <li>删除旧 <code>/managed/sessions*</code> 实验控制面。</li>
@@ -3228,13 +3248,14 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             <code>feature/managed-agents-p0-p8</code> 的
             <code>fc32ab0c95</code> 统一 Session 身份；<code>c818c21910</code>
             进一步加入 <code>AgentStateStore</code>、有界事件批处理、事务内游标/序号/终态更新、
-            <code>afterCommit</code> 本机直推和 SQL 补发。验证只覆盖 H2 上的 20 个测试与
-            Checkstyle；这证明代码切片，不代表上表其余 A～H 能力或生产部署已经验收。
+            <code>afterCommit</code> 本机直推和 SQL 补发；当前后续切片又加入 V2
+            Item/Snapshot 物化和 WebShell Snapshot 加尾部恢复，并通过 H2、真实 MySQL
+            26.7、前端类型检查与聚焦测试。这证明代码切片，不代表上表其余 A～H 能力或生产部署已经验收。
           </div>
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.7 · 2026-09-20 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.8 · 2026-09-20 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>
