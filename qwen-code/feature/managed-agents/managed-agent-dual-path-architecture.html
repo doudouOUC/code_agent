@@ -831,7 +831,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.4 · 2026-09-19<br />
+          方案版本 v1.5 · 2026-09-20<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环。
         </div>
@@ -884,9 +884,12 @@
             </div>
           </div>
           <p class="lead">
-            v1.4 保留 v1.2 的总体架构和 v1.3 的首版取舍，补齐普通工具接线：单 Java + qwen Sidecar、
-            预发布静态 AgentBundle、Session 独占 Runtime，复用现有产品 REST/SSE
-            与正式历史。同 Session 多轮复用环境，Harness 仍可承载多个 Session。
+            v1.5 保留 v1.2 的总体架构、v1.3 的首版取舍和 v1.4
+            的普通工具接线，并固定一套 Session 身份：Java 在创建前生成全局唯一 RFC UUID，
+            公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
+            使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
+            首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
+            复用现有产品 REST/SSE 与正式历史。同 Session 多轮复用环境，Harness 仍可承载多个 Session。
           </p>
           <p>
             首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；
@@ -906,6 +909,7 @@
               <thead><tr><th>项目</th><th>首版要求</th><th>最小完成边界</th></tr></thead>
               <tbody>
                 <tr><td>Prompt 受理与幂等</td><td>必需</td><td>固定请求 ID；qwen 持久输入与 WakeIntent 后 Java 才 ACK，响应丢失查原请求；不新增 Java 提前 ACK 的输入队列。</td></tr>
+                <tr><td>统一 Session 身份</td><td>必需</td><td>公共 API、qwen/Harness、JSONL 与 Broker scope 共用 Java 预分配的 RFC UUID；数据库不保存公共 ID 到 Harness ID 的映射。</td></tr>
                 <tr><td>Broker 调用与查询</td><td>必需</td><td>同轮等待、原 execution 查询、门禁映射、取消和实际释放；execute accepted 不等于完成。</td></tr>
                 <tr><td>AgentBundle</td><td>必需</td><td>预发布不可变版本与资源闭包，Harness 离线可读；缺失拒绝准入，Runtime 核验 manifest。</td></tr>
                 <tr><td>Session 归属与存储</td><td>必需</td><td>固定后端、明确持久位置；重启无证明则阻塞，不能新建空 Session 替代。</td></tr>
@@ -918,7 +922,7 @@
           </div>
           <h3 style="margin-top: 28px">最小受理与故障边界</h3>
           <pre>
-Client stable request ID → Java 持久 ID / BackendBinding 映射
+Client stable request ID → Java 持久统一 Session UUID / BackendBinding
                         → qwen 提交 input + WakeIntent → CommitReceipt
                         → Java 返回 accepted
 模型推进与 Runtime 预热并行，不等待 Runtime ready。
@@ -952,10 +956,10 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
           </p>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>接缝</th><th>v1.4 决策</th><th>失败边界</th></tr></thead>
+              <thead><tr><th>接缝</th><th>v1.5 决策</th><th>失败边界</th></tr></thead>
               <tbody>
                 <tr><td>Bundle 发布 / 装载</td><td>受信步骤复用共享 TS 定义生成不可变包；Java/Sidecar 共享只读目录，staging 校验资源闭包后原子发布。Session 固定 revision/ref；核验构建与模板。</td><td>缺资源、摘要或版本不符拒绝准入；bundleDigest、toolManifestDigest、Hosted capabilityDigest 分型，不能互相代替。</td></tr>
-                <tr><td>创建 / Prompt</td><td>创建前固定 sessionId/commandId、bundleRef、Workspace storage binding。qwen 持久 header/定义后确认创建，持久 input/WakeIntent 后确认 Prompt；原命令提供只读查询。</td><td>ACK 丢失查原 receipt；not_found/过期/owner 不明不是未执行证明，不能换 ID 或空 Session 重跑。</td></tr>
+                <tr><td>创建 / Prompt</td><td>Java 创建前固定全局 RFC UUID sessionId、commandId、bundleRef、Workspace storage binding；同一 sessionId 直接交给公共 API、qwen/Harness、JSONL 与 Broker。qwen 持久 header/定义后确认创建，持久 input/WakeIntent 后确认 Prompt；原命令提供只读查询。</td><td>不得生成第二套 Harness Session ID；ACK 丢失查原 receipt；not_found/过期/owner 不明不是未执行证明，不能换 ID 或空 Session 重跑。</td></tr>
                 <tr><td>工具阶段</td><td>control 显式映射原 prepare/confirmation/confirm/preflight 及文件历史；新能力按版本协商，逐操作严格校验；Java 不重写调度与权限。</td><td>环境 prepare 不代替 invocation build；status/cancel 不创建 execution；改参使旧授权失效，unknown 不重新执行。</td></tr>
                 <tr><td>结果 bytes</td><td>Runtime 登记不可变输出；Java 代理授权资源分片；qwen 校验、持久接收完整必要引用后返回 CommitReceipt，再 ACK delivered。</td><td>下载失败只续读原内容，未转存不得删除唯一副本；ACK 不等于环境可释放。</td></tr>
                 <tr><td>回收后下一轮</td><td>持久 Workspace 与 file-history root 独立于计算环境。干净 released 后创建新 binding，挂回同一存储与稳定 history owner；Workspace generation 不变。</td><td>旧 execution 永远归旧 binding；存储缺失或原执行未知则阻塞，不从 Git clone/空目录伪造恢复。</td></tr>
@@ -1445,7 +1449,7 @@ Tool Runtime Pod（按需）</pre
           <pre>
 {
   "schemaVersion": 1,
-  "sessionId": "session_xxx",
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
   "executionEngine": "managed"
 }</pre
           >
@@ -1472,7 +1476,7 @@ Tool Runtime Pod（按需）</pre
             <article class="sequence-step">
               <div class="step-no">01</div>
               <h4>接收 Prompt</h4>
-              <p>Java 完成鉴权、原 Session 路由与稳定请求 ID 映射；qwen 持久受理后才返回 accepted。</p>
+              <p>Java 完成鉴权，按统一 sessionId 路由并持久命令 ID；qwen 使用同一个 Session UUID 持久受理后才返回 accepted。</p>
             </article>
             <article class="sequence-step">
               <div class="step-no">02</div>
@@ -1669,7 +1673,7 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
               <h3>SessionBackendBinding</h3>
               <pre>
 {
-  "sessionId": "session_xxx",
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
   "engine": "managed",
   "backendType": "qwen-serve-harness",
   "backendInstanceId": "harness_xxx",
@@ -1696,7 +1700,7 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
               <pre>
 {
   "executionCallId": "exec_xxx",
-  "sessionId": "session_xxx",
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
   "turnId": "turn_xxx",
   "runtimeBindingId": "binding_xxx",
   "activationEpoch": 3,
@@ -2084,9 +2088,9 @@ runtimeInstanceId · activationEpoch</pre
           </div>
           <p class="lead">
             对外 Agent API 由 Java Control Plane 提供，qwen serve 作为内部
-            Harness 执行引擎，Tool Runtime
-            始终隐藏在服务端。公共资源与内部进程、Pod、ACP Session 和
-            RuntimeBinding 解耦，避免执行实现变化破坏客户端协议。
+            Harness 执行引擎，Tool Runtime 始终隐藏在服务端。公共 Session UUID
+            直接作为 qwen/Harness Session 身份；Turn、Item、ACP attachment、内部进程、Pod、
+            Runtime Session 和 RuntimeBinding 继续解耦，避免执行实现变化破坏客户端协议。
           </p>
           <div class="callout">
             <strong>兼容目标：</strong>资源结构参考
@@ -2120,7 +2124,7 @@ runtimeInstanceId · activationEpoch</pre
                   <td><strong>Session</strong></td>
                   <td>租户、Agent、Workspace、BackendBinding</td>
                   <td>Managed Session Authority 与 Harness activation</td>
-                  <td>一个 Session 生命周期内只有一个执行引擎</td>
+                  <td>公共 API 与执行侧共用一个 RFC UUID；生命周期内只有一个执行引擎</td>
                 </tr>
                 <tr>
                   <td><strong>Turn</strong></td>
@@ -2246,10 +2250,12 @@ turn.settled          -> Turn terminal state</pre
             <code>/session + executionEngines</code> 作为 Harness 接线。
           </div>
           <div class="callout danger">
-            <strong>ID 边界：</strong>公共 agentId、sessionId、turnId、itemId 和
-            artifactId 必须由 Java 管控面管理；不得把 ACP clientId、Harness
-            instanceId、Runtime sessionId、Pod 名称或 Runtime endpoint 当作公共
-            ID 返回。
+            <strong>ID 边界：</strong>公共 sessionId 由 Java 创建前分配，并原样用于
+            qwen Session Authority、Managed Harness、JSONL 与 Runtime Broker scope；
+            不存在 publicSessionId 到 harnessSessionId 的映射。公共 agentId、turnId、itemId
+            和 artifactId 仍由 Java 管控面管理；不得把 ACP clientId/attachment、Harness
+            boot/instance、Runtime sessionId、Pod 名称、Runtime endpoint 或 execution ID
+            当作公共 ID 返回。
           </div>
         </section>
 
@@ -2364,7 +2370,9 @@ turn.settled          -> Turn terminal state</pre
               Items。
             </li>
             <li>
-              公共 API 不暴露 Runtime endpoint、Pod 名称和内部 ACP/Harness ID。
+              公共 API 与 qwen/Harness 共用同一个 Session UUID，但不暴露 Runtime
+              endpoint、Pod、ACP attachment、Harness boot/instance 或 Runtime
+              Session ID。
             </li>
           </ol>
           <div class="callout">
@@ -2416,10 +2424,18 @@ turn.settled          -> Turn terminal state</pre
               </ul>
             </article>
           </div>
+          <div class="callout" style="margin-top: 18px">
+            <strong>2026-09-20 实现对齐：</strong>实验分支
+            <code>feature/managed-agents-p0-p8</code> 的
+            <code>fc32ab0c95</code> 已让独立 Spring 服务使用同一个 RFC UUID
+            贯穿公共 API、Hosted Harness 与 Runtime Broker，并从未发布的 V1 schema
+            删除 <code>harness_session_id</code>。这证明统一身份切片，不代表上表其余
+            A～H 能力或生产部署已经验收。
+          </div>
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.4 · 2026-09-19 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.5 · 2026-09-20 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>

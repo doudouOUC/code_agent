@@ -1,6 +1,6 @@
 # Managed Agent 全量设计与交付覆盖表
 
-> **普通工具接线（2026-09-19，HTML v1.4）：** 普通工具首版的跨组件字段、调用、资源和回收续轮按[接线设计及 S01～S08](managed-agent-ordinary-tools-integration.md)交付；该补充不扩大到记忆、子 Agent 或后台 Shell。
+> **普通工具接线（2026-09-20，HTML v1.5；工具契约源自 v1.4）：** 普通工具首版的跨组件字段、调用、资源和回收续轮按[接线设计及 S01～S08](managed-agent-ordinary-tools-integration.md)交付；该补充不扩大到记忆、子 Agent 或后台 Shell。
 
 > **HTML 对齐（2026-09-18）：** C01～C18 继续作为能力、风险和验收清单，并映射到 A～H。B 的 daemon factory/双引擎、G 的权威事件与 checkpoint 外置、H 的全量能力迁移分别交付；原 R/F 编号仅保留为专项索引，不能另定产品实施顺序。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

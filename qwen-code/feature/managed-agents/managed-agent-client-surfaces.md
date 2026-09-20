@@ -4,6 +4,8 @@
 
 > **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md#7-审批与用户问答)要求已开放能力的审批/问答经过 Java 回到原持久仲裁；复用既有产品入口、SSE 和历史查询。独立公共 Item/eventSequence 投影属于 D，不阻塞首版 Hosted 运行；首版 accepted 必须等待 qwen 持久受理。
 
+> **统一 Session 身份（2026-09-20，HTML v1.5）：** Java 在创建前分配的 RFC UUID `sessionId` 同时用于公共 Agent API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope，不再维护公共 Session 到 Harness Session 的映射。ACP client/attachment、Harness boot/instance、Runtime Session 与执行 ID 仍保持内部化。
+
 更新日期：2026-09-11；基于源码 `a836081466` 和三层设计 `4cacfbd0ed`。本稿细化 C05/C14/C15/C18 的 Web Shell、REST、ACP、SDK 和管理路径；是待实现设计，现有公开接口仍按[兼容映射](managed-agent-session-method-map.md)逐项保留，独立 Managed 实验页不替代普通入口。
 
 ## 0. HTML 当前客户端链路
@@ -14,7 +16,7 @@
 本地前端 -> qwen serve 原有会话接口
 ```
 
-浏览器只访问 Java 的必要产品路由，不直连 Harness/Broker/Runtime；内部保留普通 `/session + executionEngines`。HTML 未指定 JavaAgentProvider，也未要求 Java 模拟全部 daemon 管理接口。阶段 D 提供 Agent、Session、Event、Turn、Item 的稳定公共资源，内部 ACP/Harness/Runtime ID 不作为公共 ID。
+浏览器只访问 Java 的必要产品路由，不直连 Harness/Broker/Runtime；内部保留普通 `/session + executionEngines`。HTML 未指定 JavaAgentProvider，也未要求 Java 模拟全部 daemon 管理接口。阶段 D 提供 Agent、Session、Event、Turn、Item 的稳定公共资源；公共 Session UUID 直接传给 qwen/Harness，ACP attachment、Harness boot/instance、Runtime Session 和 execution ID 不作为公共 ID。
 
 | 层次 | 提交 / 查询 | 事件与恢复 |
 | --- | --- | --- |

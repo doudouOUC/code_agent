@@ -1,6 +1,6 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.4](managed-agent-dual-path-architecture.html)。同步日期：2026-09-19；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.5](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -15,6 +15,8 @@
 A～H 保留为能力阶段；首个闭环使用 A/B/C/E 与 F 的必要验收，不依赖完整 D 公共投影或 G 共享 Authority。下文各节中的全量能力按所属阶段开放，不将完整目标自动视为首版必需。
 
 v1.4 的[普通工具接线设计](managed-agent-ordinary-tools-integration.md)固定 Bundle 发布/装载和 Session DTO、命令回执查询、完整 tool/history control、结果 bytes 交付与干净回收后的第二轮；补充验收 S01～S08 与 M01～M10 同属首版条件。
+
+v1.5 固定一套 Session 身份：Java 在创建前生成全局唯一 RFC UUID `sessionId`，公共 Agent API、qwen serve Session、Managed Harness Context、JSONL Transcript 和 Runtime Broker scope 全部使用这个值。不得生成或持久化第二套 Harness Session ID；现有私有协议若仍命名为 `harnessSessionId`，只能作为同值兼容别名。
 
 ## 1. 架构总览
 
@@ -55,7 +57,7 @@ flowchart LR
 | Java Runtime Broker | Runtime 生命周期、绑定、租约与逻辑执行账本 | RuntimeBrokerService、RuntimeBindingRepository、ToolExecutionRepository、RuntimeLeaseManager；独立内部路由、鉴权和资源预算，与产品服务同进程部署 |
 | Tool Runtime | 隔离 Workspace 和实际工具副作用 | 文件、Shell、Git、搜索、MCP、Artifact、进程树取消；提供原执行回执，不推进模型 |
 
-Java 管理公共 Agent、Session、Turn、Item、Artifact ID 和读模型；内部 ACP/Harness/Runtime ID 不作为公共 ID。qwen 侧的 Session Authority、正式 Transcript 和 checkpoint 保留执行事实与恢复依据，Java 的公共投影不成为第二份可以覆盖模型历史的日志。阶段 G 再将权威事件和 checkpoint 移入共享存储，明确迁移后的唯一写入权威和 activation fencing。
+Java 管理公共 Agent、Turn、Item、Artifact ID 和读模型，并在创建前分配唯一的 RFC UUID `sessionId`。同一个 `sessionId` 直接用于公共 Session、qwen Session Authority、Managed Harness Context、JSONL Transcript 与 Runtime Broker scope，Java 不保存“公共 Session → Harness Session”的第二套映射。ACP client/attachment、Harness boot/instance、Runtime Session、RuntimeBinding 和 execution ID 仍是内部身份，不作为公共 ID。qwen 侧的 Session Authority、正式 Transcript 和 checkpoint 保留执行事实与恢复依据，Java 的公共投影不成为第二份可以覆盖模型历史的日志。阶段 G 再将权威事件和 checkpoint 移入共享存储，明确迁移后的唯一写入权威和 activation fencing。
 
 Broker 的基础设施接口为 RuntimeProvisioner、RuntimeTransport、ArtifactStore、ExecutionEventSubscriber。将来确需独立扩缩容或隔离 Kubernetes 权限时，可替换为 RemoteRuntimeBrokerClient；首版不增加第二套部署服务。
 
@@ -100,7 +102,7 @@ Tool Runtime Pod / Process（按需）
 ```json
 {
   "schemaVersion": 1,
-  "sessionId": "session_xxx",
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
   "executionEngine": "managed"
 }
 ```
@@ -161,7 +163,7 @@ GET  /session/{id}/commands/{commandId}
 
 保留普通 `/session + executionEngines` 作为 Harness 接线。HTML 未规定前端 Provider 类名，也未要求 Java 实现全部 daemon 管理路由；不能从“复用契约”推导出两者。
 
-v1.4 创建 DTO 固定 sessionId/commandId、bundleRef 和服务端 Workspace storage binding，创建成功须取得 qwen 持久回执；Prompt 同样返回 input/WakeIntent 的 CommitReceipt。新增 commands 查询要求 operation 参数，只读原提交，不触发 create/prompt。not_found/回执过期不等于未执行证明；具体字段见[Session 接线](managed-agent-ordinary-tools-integration.md#3-session-创建与受理回执)。
+v1.4 创建 DTO 固定 sessionId/commandId、bundleRef 和服务端 Workspace storage binding，创建成功须取得 qwen 持久回执；Prompt 同样返回 input/WakeIntent 的 CommitReceipt。v1.5 要求该 `sessionId` 是 Java 预先分配并返回公共客户端的同一个 RFC UUID，qwen 不再另分配 Harness Session ID。新增 commands 查询要求 operation 参数，只读原提交，不触发 create/prompt。not_found/回执过期不等于未执行证明；具体字段见[Session 接线](managed-agent-ordinary-tools-integration.md#3-session-创建与受理回执)。
 
 ### 7.3 qwen serve 到 Java 内部 Broker
 
@@ -204,7 +206,7 @@ Runtime 不主动连接 Java。命令由 Java 发起 HTTP POST，事件由 Java 
 
 ```json
 {
-  "sessionId": "session_xxx",
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000",
   "engine": "managed",
   "backendType": "qwen-serve-harness",
   "backendInstanceId": "harness_xxx",
@@ -213,7 +215,7 @@ Runtime 不主动连接 Java。命令由 Java 发起 HTTP POST，事件由 Java 
 }
 ```
 
-上述 SessionBackendBinding 固定会话后端。RuntimeBinding 保存 runtimeBindingId、tenantId、workspaceId、runtimeInstanceId、epoch 和 state；ToolExecution 保存 executionCallId、sessionId、turnId、runtimeBindingId、activationEpoch 和 state。
+上述 SessionBackendBinding 以统一 `sessionId` 为键固定会话后端，只保存 owner、boot/generation、能力和路由信息，不保存第二套 Harness Session ID。RuntimeBinding 保存 runtimeBindingId、tenantId、workspaceId、runtimeInstanceId、epoch 和 state；ToolExecution 保存 executionCallId、sessionId、turnId、runtimeBindingId、activationEpoch 和 state。
 
 ToolExecution 的主路径为：
 
@@ -296,7 +298,7 @@ Runtime 的 Provisioning、Ready、Idle、Draining 分开计量，同时统计 T
 
 ## 14. 公共 Agent API
 
-首版复用现有产品 SSE/状态/历史，暂不建立独立持久 Item/eventSequence。阶段 D 由 Java 提供 Agent、Session、Event、Turn、Item MVP；Environment 和 Artifact 纳入资源模型。按照 HTML 的资源语义演进，不承诺第三方字段级完全兼容。公共资源与 ACP、进程、Pod、RuntimeBinding 解耦。
+首版复用现有产品 SSE/状态/历史，暂不建立独立持久 Item/eventSequence。阶段 D 由 Java 提供 Agent、Session、Event、Turn、Item MVP；Environment 和 Artifact 纳入资源模型。按照 HTML 的资源语义演进，不承诺第三方字段级完全兼容。公共 Session UUID 直接作为 qwen/Harness Session 身份；公共 Turn/Item/Artifact 与 ACP attachment、进程、Pod、Runtime Session、RuntimeBinding 解耦。
 
 | 资源 | Java 持有 / 投影 | 执行侧约束 |
 | --- | --- | --- |
@@ -385,18 +387,19 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 14. 多 Session 共享 Harness 时无 Context/权限串扰。
 15. Session 固定 Agent revision，更新 Agent 不改变已有 Session。
 16. 客户端断线后按 eventSequence 续传，查询相同 Turn/Items。
-17. 公共 API 不暴露 Runtime endpoint、Pod 或内部 ACP/Harness ID。
+17. 公共 API 返回的 Session UUID 与 qwen/Harness 使用的 Session UUID 相同，但不暴露 Runtime endpoint、Pod、ACP attachment、Harness boot/instance 或 Runtime Session ID。
 
 首个可交付闭环保持 qwen serve 外部协议和 TS Agent Loop，在 Java 中加入 Broker，用 15 秒 Runtime 延迟验证模型首输出、同轮工具等待、固定 owner 和无重复副作用。完整验收按所属阶段交付，不能把 HTML 中的验收清单当成已通过证据。
 
 ## 17. 实现快照与待对齐项
 
-HTML 第 17 节的“已有基础/待补齐”保留为原 v1.2 实现快照，v1.3/v1.4 新增运行契约不代表代码已完成：当时记录已有 qwen serve HTTP/SSE、双引擎接缝、进程内 Host、Local/Remote Provider、私有五操作、Auto Local 激活和部分 owner 恢复；当时待补 Broker/Ledger、JavaBrokerManagedRuntimeProvider、Hosted Profile、Java→Runtime HTTP/SSE、公共 API/投影、AgentBundle 校验、Artifact/RuntimeTemplate、共享 Authority、continuation、扩展迁移及旧实验控制面退役。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)，不能将这张历史表当作当前全量缺失项。
+HTML 第 17 节的“已有基础/待补齐”保留为原 v1.2 实现快照，v1.3/v1.4/v1.5 新增运行契约不代表代码已完成：当时记录已有 qwen serve HTTP/SSE、双引擎接缝、进程内 Host、Local/Remote Provider、私有五操作、Auto Local 激活和部分 owner 恢复；当时待补 Broker/Ledger、JavaBrokerManagedRuntimeProvider、Hosted Profile、Java→Runtime HTTP/SSE、公共 API/投影、AgentBundle 校验、Artifact/RuntimeTemplate、共享 Authority、continuation、扩展迁移及旧实验控制面退役。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)，不能将这张历史表当作当前全量缺失项。
 
 后续实现记录已报告其中部分工作进展，因此不能简单把该快照的所有“待补齐”当作今天的代码事实：
 
 | 项目 | HTML 目标 | 已知实现 / 本次文档处理 |
 | --- | --- | --- |
+| Session 身份 | 公共 API、qwen/Harness、JSONL 与 Broker scope 共用一个 RFC UUID，不保存第二套映射 | 实验分支 `feature/managed-agents-p0-p8` 的 [`fc32ab0c95`](https://github.com/doudouOUC/qwen-code/commit/fc32ab0c9502a0b44020ef1a66c88e9b3a2a1484) 已在独立 Spring 服务中贯通同值，并从未发布的 V1 schema 删除 `harness_session_id`；只证明该身份切片，不代表完整产品部署验收 |
 | Harness→Broker | `JavaBrokerManagedRuntimeProvider`、`/internal/agent-runtime/v1/*`（v1.3 增补查询/control/ack） | 本次源码抽查为 `BrokerManagedRuntimeProvider`、`/internal/runtime-broker/v1/tool-sessions:acquire`、`/control`、`executions`、查询、`:cancel`、`:release`；作为待适配差异，不冒称路径兼容 |
 | Java→Runtime | `/v1/prepare`、`/v1/executions` 等 HTTP/SSE | 现有 Broker 切片复用 Managed Runtime v1/v2 worker；目标接口需要显式适配及契约验收 |
 | Hosted Profile | loopback、内部鉴权、无本地 fallback | 本次源码可见对应 Profile 和版本/boot ID 检查；不据此认定 E/F 全部验收 |

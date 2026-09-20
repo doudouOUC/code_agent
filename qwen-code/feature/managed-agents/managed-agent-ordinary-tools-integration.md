@@ -1,6 +1,6 @@
 # Managed Agents 普通工具首版接线设计
 
-更新日期：2026-09-19。依据 [HTML v1.4](managed-agent-dual-path-architecture.html#ordinary-tools) 和[首版运行契约](managed-agent-first-runtime.md)。本文补齐 Bundle、Session、工具阶段、资源交付和环境回收之间的契约，定义目标行为与实施验收；不表示源码已经实现或 E2E 已通过。
+更新日期：2026-09-20。依据 [HTML v1.5](managed-agent-dual-path-architecture.html#ordinary-tools) 和[首版运行契约](managed-agent-first-runtime.md)。本文补齐 Bundle、Session、工具阶段、资源交付和环境回收之间的契约，定义目标行为与实施验收；不表示源码已经实现或 E2E 已通过。
 
 范围为单 Java + qwen Sidecar、Session 独占 Runtime、Read/Write/Edit/前台 Shell。其他普通工具逐项接入；自动记忆、子 Agent、后台 Shell 和 tenantId 语义不在本轮设计中。复用现有 TS Agent、工具、权限与文件历史实现，Java 不实现第二套工具调度或权限裁决。
 
@@ -59,7 +59,7 @@ Runtime 在准备时收到受信的工具配置投影、toolManifestDigest 和 r
 | `POST /session/{id}/prompt` | commandId、promptId/inputId、contentDigest、原 content blocks、原 Session binding | input + WakeIntent 持久提交；响应可兼容既有 promptId/lastEventId/eventEpoch，另带 admissionReceipt，不等待模型或 Runtime |
 | `GET /session/{id}/commands/{commandId}?operation=...` | 原 Session、操作类型、命令 ID；仅原有访问授权 | 只读返回 committed + 原 CommitReceipt、pending、not_found 或 recovery_blocked；不创建 Session、不启动模型 |
 
-创建前 Java 持久保存业务幂等键 → 内部 commandId/sessionId 与 payload digest 的映射；promptId 与 turnId 的映射同样先固定，符合现有 UUID 校验。稳定 commandId 属于业务命令，HTTP requestId 仅用于一次传输观测。命令键为现有授权范围 + Session + operation + commandId；同键不同内容返回 idempotency_conflict，保持[私有协议](managed-agent-control-protocol.md)的原 actor 检查。
+创建前 Java 生成全局唯一 RFC UUID `sessionId`，并把这个值同时作为公共 Session、qwen Session Authority、Managed Harness、JSONL 与 Broker scope 的身份；不保存公共 ID 到内部 Harness Session ID 的映射。Java 另行持久保存业务幂等键 → commandId 与 payload digest 的映射；promptId 与 turnId 的映射同样先固定。稳定 commandId 属于业务命令，HTTP requestId 仅用于一次传输观测。命令键为现有授权范围 + Session + operation + commandId；同键不同内容返回 idempotency_conflict，保持[私有协议](managed-agent-control-protocol.md)的原 actor 检查。
 
 创建响应丢失也按预先确定的 sessionId/commandId 查询。查询 committed 则 Java 补回原响应；pending 则继续有界等待；not_found 只有在原 owner、持久存储和读取边界均有效时才说明该边界未见提交，仍不能证明原请求永远不会到达。此时允许重送同一业务命令，由 authority 在处理效果前持久去重；不能另换 ID 或后端。owner 不明、存储损坏和 tombstone/receipt 过期明确返回不可确认，不能解释成 not_found。
 
@@ -219,7 +219,7 @@ Session 独占 Runtime 不等于独占工作区文件。首版对同一 Workspac
 | 编号 | 覆盖与通过条件 |
 | --- | --- |
 | S01 | Bundle staging 崩溃、引用缺失、同 revision 改写、错误构建/manifest 均拒绝；Session 固定 B1，不随 latest 漂移；首次初始化不访问 Runtime 工作区 |
-| S02 | Session create/prompt 的 ACK 丢失及 Java 重启后，查回同 ID/receipt；只读 command 查询不调用模型；过期/未知不能当未执行 |
+| S02 | 公共 API、qwen Session/JSONL 与 Broker scope 接收完全相同的 RFC UUID，数据库没有第二套 Harness Session ID；create/prompt ACK 丢失及 Java 重启后查回同 ID/receipt；只读 command 查询不调用模型；过期/未知不能当未执行 |
 | S03 | Edit prepare/confirm/preflight 各自丢 ACK；原回执/参数摘要保持一致；改参和文件变化触发重新确认；取消 prepared 调用不创建物理 execution |
 | S04 | 大于 1 MiB 输出分片、下载中断、错误 digest、磁盘不足与 ACK 丢失；物理执行一次，完整资源落盘才 ACK，回收后仍可读 |
 | S05 | beginTurn 与 checkpoint 同轮幂等，不重复起始快照；轮末 history/backup 未提交时不 settled/release；Shell 文件变动不被误报为完整可回滚历史 |

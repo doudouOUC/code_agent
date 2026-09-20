@@ -1,6 +1,6 @@
 # Managed Agents 首版运行契约
 
-更新日期：2026-09-19。依据 [HTML v1.4](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
+更新日期：2026-09-20。依据 [HTML v1.5](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
 
 ## 1. 首版范围与运行条件
 
@@ -26,8 +26,8 @@ tenantId 相关语义和多租户设计按用户要求暂缓，不作为本轮�
 ## 2. Prompt 受理与最小幂等链路
 
 1. 可重试的创建 Session、Prompt、Cancel 和审批响应都携带稳定请求标识。沿用现有业务 ID；产品接口没有对应字段时由调用者提供 `Idempotency-Key`。作用域为原授权范围、目标 Session（创建时为创建入口）、操作类型和请求键，同键不同规范化内容返回 `409 idempotency_conflict`。服务端新生成且只出现在可能丢失的响应里的 ID，不能作为客户端唯一重试依据。
-2. Java 在第一次转发前持久保存请求键、内容摘要、分配的公共 ID 与目标 BackendBinding；重试沿用原映射。该记录用于路由/查询，不保存第二份模型 Transcript，也不意味着已经接受模型执行。
-3. Java 将同一业务 ID 映射到 qwen 的 commandId、inputId/turnId。qwen 经固定 engine 的 authority 持久提交输入及 WakeIntent，返回原 CommitReceipt；只有此时 Java 才返回 accepted。响应不等待模型完成或 Runtime ready。没有此映射能力的 qwen 版本不能启用该 Managed profile。
+2. Java 在第一次转发前生成并持久保存全局唯一 RFC UUID `sessionId`、请求键、内容摘要与目标 BackendBinding；公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope 使用同一个 `sessionId`，不得保存第二套 Harness Session ID 或映射。重试沿用原 ID。该记录用于路由/查询，不保存第二份模型 Transcript，也不意味着已经接受模型执行。
+3. Java 将同一业务命令映射到 qwen 的 commandId、inputId/turnId，但不转换 Session ID。qwen 经固定 engine 的 authority 持久提交输入及 WakeIntent，返回原 CommitReceipt；只有此时 Java 才返回 accepted。响应不等待模型完成或 Runtime ready。没有调用方 Session UUID、持久命令回执或原命令查询能力的 qwen 版本不能启用该 Managed profile。
 4. 等待 ACK 超时或连接断开时返回暂时不可确认的结果，保留原请求标识；先向原 authority 查原命令。重试仍使用相同 ID，由其持久去重，不能换 turnId 或 backend 重跑。无法核验提交记录时保持 unavailable/recovery_blocked，不将一次 404 或本地 Map 为空当作未执行证明。
 5. Java 首版没有“自己持久保存输入即 ACK，然后后台负责送达”的语义，因此不要求新增输入 outbox。若未来引入这种早 ACK，必须同时实现持久交付队列和崩溃恢复，不能只修改响应时机。
 6. 同 Session 沿用现有串行 Turn/有界排队规则。Cancel 指向原 turn/scope，先经 qwen 持久提交取消意图再确认受理；实际模型、工具和进程树的结算另行查询。断开 SSE 不产生 Cancel。
@@ -38,7 +38,7 @@ Java 创建前固定 bundleRef、workspaceStorageRef 和稳定 sessionId/command
 
 ## 3. Broker 到 Runtime 的最小协议
 
-以下为 v1.4 的目标接口补充，不声称与当前 `/internal/runtime-broker/v1/*` 实现路径相同。Java 与 Runtime 的 HTTP/SSE 均由 Java 发起。所有写操作复用受控 command envelope 与严格 validator，不提供任意方法名/任意 JSON 的通用执行入口。
+以下为 v1.4 的工具目标接口补充，并遵循 v1.5 的统一 Session 身份；不声称与当前 `/internal/runtime-broker/v1/*` 实现路径相同。Java 与 Runtime 的 HTTP/SSE 均由 Java 发起。所有写操作复用受控 command envelope 与严格 validator，不提供任意方法名/任意 JSON 的通用执行入口。
 
 | Harness → Java Broker | 请求及响应语义 | Java → Runtime / 本地处理 |
 | --- | --- | --- |
@@ -118,7 +118,7 @@ SSE 恢复与状态查询只展示仍 pending 的 Action；取消和关闭结束
 
 ## 8. 首版验收与阶段关系
 
-以下检查针对普通工具首版配置，以 Read、Write、Edit 和前台 Shell 覆盖调用、写文件审批及进程取消。先核对实际 Bundle、Runtime manifest 和生效配置符合第 4 节，初始化及轮次结束不触发自动记忆、子 Agent 或后台 Shell；不要求实现或验收这些延期能力。后续共享存储、公共投影或多租户设计也不混入本轮门槛：
+以下检查针对普通工具首版配置，以 Read、Write、Edit 和前台 Shell 覆盖调用、写文件审批及进程取消。所有场景先断言公共响应、qwen Session/JSONL 和 Broker scope 使用同一个规范 RFC UUID `sessionId`，数据库不存在第二套 Harness Session ID。再核对实际 Bundle、Runtime manifest 和生效配置符合第 4 节，初始化及轮次结束不触发自动记忆、子 Agent 或后台 Shell；不要求实现或验收这些延期能力。后续共享存储、公共投影或多租户设计也不混入本轮门槛：
 
 | 编号 | 场景 | 通过条件 |
 | --- | --- | --- |

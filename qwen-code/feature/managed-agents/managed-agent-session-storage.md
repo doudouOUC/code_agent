@@ -1,8 +1,8 @@
 # Managed Session：记录格式、提交与协议限额
 
-> **普通工具接线（2026-09-19，HTML v1.4）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。
+> **普通工具接线（2026-09-20，HTML v1.5）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。
 
-> **HTML 对齐（2026-09-18）：** JSONL、SessionWriterLease、ChatRecord 和本地 lock schema 继续作为 qwen 侧执行权威/兼容存储的专项设计。Java 保存公共 ID/投影、SessionBackendBinding、RuntimeBinding 和 Execution Ledger，不再把特定 Java 数据表列为首阶段全部 Session 状态的唯一存储；G 才外置权威事件/checkpoint。两份投影不能相互覆盖原始执行事实。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
+> **HTML 对齐（2026-09-20）：** JSONL、SessionWriterLease、ChatRecord 和本地 lock schema 继续作为 qwen 侧执行权威/兼容存储的专项设计。Java 分配的 RFC UUID `sessionId` 同时标识公共 Session、qwen Session Authority、JSONL 与 Broker scope，不保存第二套 Harness Session ID；Java 仍保存公共投影、SessionBackendBinding、RuntimeBinding 和 Execution Ledger，G 才外置权威事件/checkpoint。两份投影不能相互覆盖原始执行事实。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 > **首版运行范围（2026-09-19）：** 正式 Transcript/checkpoint、资源及 Broker Ledger 使用明确持久保存位置；首版单实例/原 owner，Pod 替换或原卷不可用准确阻塞，不创建空 Session 替代。独立公共 Item/eventSequence 归 D；见[部署与存储矩阵](managed-agent-first-runtime.md#5-session-归属存储与事件)。
 
@@ -14,17 +14,17 @@
 | --- | --- | --- |
 | Session engine / 后端绑定 | qwen 固定执行 owner，Java 保存 SessionBackendBinding 路由 | 始终不能因重连或失败重选引擎 |
 | 正式 Transcript / checkpoint / 执行恢复依据 | qwen Session Authority，复用本地 writer 与兼容约束 | G 外置到共享存储；明确唯一写入 authority 和 activation fencing |
-| Agent/Session/Turn/Item/Artifact 公共 ID 与读模型 | Java 产品控制面 | D 建立稳定公共 API 和事件投影，不产生第二份权威模型历史 |
+| Agent/Session/Turn/Item/Artifact 公共 ID 与读模型 | Java 产品控制面；Session UUID 同值传给 qwen Authority/JSONL/Broker | D 建立稳定公共 API 和事件投影，不产生第二份权威模型历史或第二套 Harness Session ID |
 | RuntimeBinding / ToolExecution | Java 内嵌 Broker 的 Repository / Ledger | Java 重启按原 executionCallId 查询，不换 Runtime 重放 |
 | 物理工具回执 / 文件产物 | 原 Tool Runtime 与持久 Artifact 存储 | 未决调用或唯一副本未转存前不释放 |
 
-首版复用现有产品 SSE 与 qwen 正式历史；D 开放的独立公共流才使用 eventSequence / Last-Event-ID。daemon eventEpoch、私有 sequence、JSONL UUID 和旧实验 cursor 各有命名空间，投影显式转换。HTML 没有冻结 `chat_session` 等 Java 表结构；此前表映射保存在[历史产品方案](managed-agent-java-hosted-runtime-history.md)，不能替代目标权威边界。
+首版复用现有产品 SSE 与 qwen 正式历史；D 开放的独立公共流才使用 eventSequence / Last-Event-ID。daemon eventEpoch、私有 sequence、JSONL 记录 UUID 和旧实验 cursor 各有命名空间，投影显式转换；这里的记录/游标身份不改变统一的 Session UUID。HTML 没有冻结 `chat_session` 等 Java 表结构；此前表映射保存在[历史产品方案](managed-agent-java-hosted-runtime-history.md)，不能替代目标权威边界。
 
 下面的 JSONL/ChatRecord/lock schema 为局部存储及兼容的详细方案，其具体实现/测试状态沿原日期记录。不能因本文定义了 durable checkpoint，就宣称 G 的共享存储和跨实例恢复已验收。
 
 ## 1. 唯一载体与版本决策
 
-普通 Managed 继续使用所属 workspace/runtimeBaseDir 的原 Session JSONL 路径，不新建一份竞争历史。增加三种 ChatRecord system subtype：`managed_session_header_v1`、`managed_session_event_v1`、`managed_session_commit_v1`。`uuid/parentUuid/sessionId/timestamp` 保留原字段；event 内的领域内容是唯一事实，普通 user/assistant/tool/Goal/artifact 内容由 reader 投影产生，不再同时追加等价旧记录。legacy 和实验日志保持原格式。
+普通 Managed 继续使用所属 workspace/runtimeBaseDir 下以统一 `sessionId` 定位的原 Session JSONL 路径，不新建一份竞争历史。增加三种 ChatRecord system subtype：`managed_session_header_v1`、`managed_session_event_v1`、`managed_session_commit_v1`。`uuid/parentUuid/sessionId/timestamp` 保留原字段，其中记录 `uuid` 与 Session UUID 是不同层级；event 内的领域内容是唯一事实，普通 user/assistant/tool/Goal/artifact 内容由 reader 投影产生，不再同时追加等价旧记录。legacy 和实验日志保持原格式。
 
 header 记录 `formatVersion=1, minimumReader=managed-session/1, sessionKey, engine=managed, definitionRef, rootSnapshotRef, createdBy, baseTranscriptProof?`。历史导入保留已封存的旧记录前缀，header 引用其长度、hash 和活动尾；新事件从 sequence=1 起，所有新读者同时重建前缀与已提交增量。创建空会话只提交 header，不触发 prompt 或工具。
 
