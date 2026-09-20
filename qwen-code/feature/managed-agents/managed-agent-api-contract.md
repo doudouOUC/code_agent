@@ -1,6 +1,6 @@
 # Managed Agent Public API 与 WebShell 契约
 
-状态：v1.6 设计冻结；日期：2026-09-20。机器可读契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)。该文件是 Java DTO、WebShell TypeScript 类型和契约测试的单一来源；当前源码未生成这些类型，OpenAPI 中用 `x-qwen-implementation-status` 区分“已有路由但契约未完全对齐”的 `partial` 与尚未实现的 `planned`，全部契约通过后才改为 `implemented`。
+状态：v1.9 目标契约；日期：2026-09-21。保留 v1.6 事件契约，新增尚未实现的 Workspace/cwd 契约。机器可读契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)。该文件是 Java DTO、WebShell TypeScript 类型和契约测试的单一来源；当前源码未生成这些类型，OpenAPI 中用 `x-qwen-implementation-status` 区分“已有路由但契约未完全对齐”的 `partial` 与尚未实现的 `planned`，全部契约通过后才改为 `implemented`。
 
 ## 1. 路由与兼容范围
 
@@ -46,12 +46,13 @@
 
 HTML v1.7 的[扩展运行时](managed-agent-extension-runtime.md#11-webshell-与公共接口)在当前 Session/Turn/Item API 上增加 Task、MCP catalog、Hook catalog、Automation 和 Channel/Delivery 资源。WebShell 仍只访问 Java BFF，不直连 Harness 或 Runtime；后台输出与 Monitor 原始行通过受控 Artifact/分页游标读取，不写入每行一个主对话事件。
 
-阶段 H 的路由和 DTO 尚未加入 v1.6 OpenAPI，因此仍属于设计候选，不能被生产发现或 SDK 暴露。实现 H0 前先在 `managed-agent-public-api.openapi.yaml` 冻结 `SessionTaskView`、任务查询/取消、幂等命令和错误，再按 H1～H6 分别加入 MCP、Hooks、Channel 与 Automation 资源。daemon 已有的 `/session/:id/tasks`、`/session/:id/hooks`、workspace MCP 和 `/scheduled-tasks` 只作为内部适配来源，不能原样升级为租户级公共契约。
+阶段 H 的 Task/MCP/Hook/Channel/Automation 路由和 DTO 尚未加入 OpenAPI，因此仍属于设计候选，不能被生产发现或 SDK 暴露。实现 H0 前先在 `managed-agent-public-api.openapi.yaml` 冻结 `SessionTaskView`、任务查询/取消、幂等命令和错误，再按 H1～H6 分别加入 MCP、Hooks、Channel 与 Automation 资源。daemon 已有的 `/session/:id/tasks`、`/session/:id/hooks`、workspace MCP 和 `/scheduled-tasks` 只作为内部适配来源，不能原样升级为租户级公共契约。
 
 ## 7. 当前实现差异
 
 OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。以 `feature/managed-agents-p0-p8` 的 `2695220a3a` 为实现基线，至少还有这些差异：
 
+- Workspace 选择/绑定、Registry 查询、cwd operation 与能力字段均未实现；当前 Broker 从启动配置读取单一工作区。
 - `PublicSession` 尚无 `agent_revision`、`capabilities`、`replay_floor_sequence` 和 `snapshot_through_sequence`。
 - `PublicEvent` 尚无 `schema_version`、`projection_version`、顶层 `item_id` 和 `content_part_id`；当前文本/工具投影已在 `data` 中携带确定性 Item/Part 身份，仍需按冻结字段上移并协商版本。
 - 公共事件 JSON 查询尚未返回真实 `has_more/next_cursor`，过期游标和 Snapshot reset 也未实现。
@@ -71,3 +72,22 @@ OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。�
 - `Last-Event-ID`、历史补齐、实时切换、慢连接溢出及 `cursor_expired` 不重文、不跳序。
 - 租户 Header 只能由可信入口注入；跨租户查询、SSE、取消和 Artifact 下载均不可见。
 - `planned` 路由在实现前不出现在生产发现文档或 SDK 中；实现后同步改为 `implemented` 并补契约测试。
+
+## 9. Workspace 与 Session cwd（v1.9，planned）
+
+完整语义见 [Workspace/cwd 设计](managed-agent-workspace-context.md)（[English](managed-agent-workspace-context.en.md)）。以下路由和新增字段已加入 OpenAPI，但尚未加入 Java/TypeScript 实现。生产发现、SDK 生成和 WebShell 功能入口必须按实现状态过滤到字段级，不能只过滤整条路由；服务端不能静默忽略客户端指定的 Workspace。
+
+| 契约 | 目标行为 |
+| --- | --- |
+| `GET /v1/agents/workspaces`、`GET /v1/agents/workspaces/{workspaceId}` | 只返回已授权的预注册 Workspace，按稳定 ID 分页；不暴露挂载路径、storageId 或凭据 |
+| 创建 Session 的 `workspace` | 公共字段 `workspace_id/cwd_relative`；BFF 为 `workspaceId/cwdRelative`。缺省只允许解析显式租户默认值，首次准入后固定；重试先查原结果 |
+| Session 的 `workspace` | 返回逻辑身份、相对 cwd、context revision 和状态；旧 unbound 记录省略该对象并阻塞执行，不用当前默认配置补身份 |
+| `POST /v1/agents/sessions/{sessionId}/cwd` | 同 Workspace 的异步切换，必需 `cwd_relative/expected_context_revision` 与幂等键；202 表示命令已受理 |
+| `GET /v1/agents/sessions/{sessionId}/operations/{operationId}` | 查询原 cwd operation；completed 才带已提交的新 revision，查询不要求 Runtime 在线 |
+| BFF `/workspaces/query`、`/sessions/cwd/change`、`/operations/query` | 位于 `/api/agent/web-shell/v1`，语义相同，使用 camelCase 请求和响应 |
+
+`workspace_context/cwd_change`（BFF `workspaceContext/cwdChange`）缺省 false；未声明能力时 UI 不显示相应写操作。`workspace.state=ready` 只表示当前上下文已提交，不表示 Runtime ready 或 activation gate 已打开。`changing` 期间拒绝新的 prompt 和工具准入。W2 初版在活动/排队 Turn、未决审批/执行或后台资源 hold 存在时拒绝切换。
+
+cwd operation 的状态为 `pending/installing/completed/failed/recovery_blocked`。Java 收齐 Runtime 与 Harness 的持久安装回执后，在同一事务提交 Session cwd/revision、operation completed 与公开 `session.context.changed` 事件。事件使用既有 PublicEvent 封装，`data` 为 `{operation_id, workspace_id, cwd_relative, context_revision}`，不带绝对路径；WebShell adapter 映射为 camelCase。客户端漏事件后以 Session 和原 operation 查询为准。安装失败只在证明未安装或完整回滚后恢复旧状态，结果未知保持 blocked。
+
+新增错误：`400 workspace_required/invalid_cwd/unsupported_feature`；`404 workspace_not_found/operation_not_found`（含跨租户/无访问权）；`409 workspace_unavailable/workspace_generation_conflict/context_revision_conflict/session_context_busy/recovery_blocked`。准入之后发现路径无效等错误保存在 operation 的 `failure_code`；HTTP 202 不能解释为验证和安装都已完成。幂等重试先按原摘要返回同一 operation 和最新持久状态，再检查新的 CAS/忙碌条件。

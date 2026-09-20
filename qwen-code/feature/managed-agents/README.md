@@ -1,8 +1,10 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **当前基准：[HTML v1.8](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-20；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约、扩展运行模型和当前 SQL 物化切片。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.9](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-21；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约、扩展运行模型、当前 SQL 物化切片及 Workspace/cwd 契约。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
 > **存储与事件实现补充（2026-09-20）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交、提交后本机 SSE 直推、V2 Item/Snapshot 物化及 WebShell Snapshot 加尾部恢复；SQL 批次日志/Outbox、RocketMQ/Redis Transport、PostgreSQL 适配器及完整持久恢复仍是后续实现。这一补充细化 D/F/G，不改变既有组件职责与 A～H 顺序。
+>
+> **Workspace/cwd 设计补充（2026-09-21）：** [中文方案](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md) 区分稳定 Workspace、Session 相对 cwd 与 Runtime 挂载路径，补齐创建绑定、冷恢复、受控目录切换、后台任务归属及旧数据迁移。[OpenAPI](managed-agent-public-api.openapi.yaml) 与 [增量目标 DDL](managed-agent-workspace-schema.mysql.sql) 同步；W0/W1/W2 均为待实现设计，当前 Java 仍使用全局静态工作区配置。
 >
 > **Runtime Broker JDBC 补充（2026-09-20）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的 JDBC/MySQL 持久化、四表 schema、数据库时钟租约与 fencing 契约。对应代码已在 [`c9c68760a2`](https://github.com/doudouOUC/qwen-code/commit/c9c68760a2fe7d016bcabca0723e80bcbae38953) 完成 Repository 边界及 H2/真实 MySQL 验证；Spring DataSource/Flyway 接线、双 Java 实例恢复及 Runtime lease reconcile 仍未完成。
 >
@@ -12,11 +14,11 @@
 
 ## 当前方案入口
 
-先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型；v1.8 同步 SQL 物化实现快照与 Runtime Broker JDBC Repository 边界。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
+先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型；v1.8 同步 SQL 物化实现快照与 Runtime Broker JDBC Repository 边界；v1.9 补齐 Workspace 与 Session cwd 的 W0/W1/W2 设计。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.8 | 决定组件职责、部署、目标协议、状态、公共 API、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.9 | 决定组件职责、部署、目标协议、状态、公共 API、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
@@ -31,6 +33,8 @@
 - 条件必需：已开放工具需要的审批必须可用；跨 Session 共享 Runtime 开启前完成独立配置/权限/gate/释放验收。
 - 多 Java 副本启用前完成原 owner 路由与跨副本 provision 去重；单实例验证不证明分布式能力。
 - D 的独立公共 Item/eventSequence 投影、G 的共享 Authority/自动接管和 H 的完整扩展可后置；首版按[运行验收 M01～M10](managed-agent-first-runtime.md#8-首版验收与阶段关系)交付。
+
+多 Workspace 接入与 H 阶段扩展前先交付 [W0 持久 Workspace 绑定](managed-agent-workspace-context.md#8-实施顺序与验收)；W1 随恢复阶段验收，W2 目录切换不阻塞固定 cwd 的最小闭环。它们细化 A/B/C/D/G/H 的依赖，不替代原阶段编号。
 
 普通工具还须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)：真实 Edit 审批、Shell 大输出持久交付、文件历史提交、Runtime 干净回收后同 Session 继续下一轮，并覆盖 ACK 丢失、取消及存储故障。
 

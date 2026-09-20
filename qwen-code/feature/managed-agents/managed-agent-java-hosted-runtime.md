@@ -1,6 +1,6 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.8](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.9](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -19,6 +19,8 @@ v1.4 的[普通工具接线设计](managed-agent-ordinary-tools-integration.md)�
 v1.5 固定一套 Session 身份：Java 在创建前生成全局唯一 RFC UUID `sessionId`，公共 Agent API、qwen serve Session、Managed Harness Context、JSONL Transcript 和 Runtime Broker scope 全部使用这个值。不得生成或持久化第二套 Harness Session ID；现有私有协议若仍命名为 `harnessSessionId`，只能作为同值兼容别名。
 
 v1.8 将 Runtime Broker 持久化拆成明确的 Repository 边界：[中文 JDBC 方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 定义 Binding allocation slot、Runtime binding、Runtime Session 和 Tool execution 四表 schema，使用数据库时钟、行锁、version 与 generation fencing 协调多 JVM。对应代码切片已通过 H2 和真实 MySQL 契约验证，但尚未接入 Spring DataSource/Flyway，也不证明 Java 重启后可自动接管原 Runtime 进程。
+
+Workspace 与 Session cwd 的 v1.9 补充见[中文专项](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)及 [HTML Workspace 章节](managed-agent-dual-path-architecture.html#workspace-context)：当前全局静态配置仍待替换为持久 Session 绑定，W0 创建/归属、W1 恢复、W2 受控切换均尚未实现。
 
 ## 1. 架构总览
 

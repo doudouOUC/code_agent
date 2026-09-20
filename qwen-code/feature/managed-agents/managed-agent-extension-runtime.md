@@ -38,6 +38,8 @@ Java 可信入口 → SQL 事务提交领域记录 + outbox + WakeIntent
 
 浏览器始终从 Java 的公共 Session/Event/Item/Task 投影读取。Runtime 输出不能绕过 SQL 接受点直接成为正式前端事件；同节点可以在事务提交后直接推 SSE，断线按 Session 公开 sequence 补齐。
 
+v1.9 补充的 [Workspace/cwd 契约](managed-agent-workspace-context.md#6-mcphookschannels自动化和子任务) 是这些能力的共同前提：W0 先持久绑定 Session 与 Workspace，所有 Shell、Monitor、MCP、Hook 和 child 固定启动时的 cwd/contextRevision/config revision 与原 Runtime。父 Session 切换目录不迁移已有任务；W2 首版有资源 hold 就拒绝切换。Channel 固定授权路由，Automation 在准入时冻结目标上下文；changing 期间延后准入，不能回退到 daemon primary 或默认工作区。无 Session 的操作使用独立 WorkspaceOperationGrant。
+
 ## 2. 当前源码接缝与缺口
 
 以下按 qwen-code `feature/managed-agents-p0-p8` 的源码快照 `756087dbcd` 核对；这些本地/daemon 能力不等于 Hosted Managed 已接线。

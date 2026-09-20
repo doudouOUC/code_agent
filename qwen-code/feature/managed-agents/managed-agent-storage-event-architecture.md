@@ -206,7 +206,7 @@ RocketMQ 的组内顺序需要单生产者串行发送；跨生产者接管仍�
 
 MySQL 8.0 的列、索引、约束及迁移不变量已经冻结在 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。`managed_agent_event_batch.batch_offset` 只用于 Relay/消费者的全局顺序扫描；公共 API 不返回它。`eventCount=0` 表示只推进 Harness 源游标的检查点，不发布 MQ，也不占用公开 sequence。`managed_agent_session_owner.ownerGeneration` 是 Java/Harness 接管 fence，和 Runtime `activationEpoch` 分开。
 
-所有写事务采用 `READ COMMITTED`，按 Session → Turn → SessionOwner 的顺序取得行锁；Snapshot/Item 物化按 batch 连续进度执行 CAS。MySQL 使用二进制/大小写敏感语义保存稳定 ID 与摘要；PostgreSQL 适配器使用等价约束、自增 sequence 和事务外重试，不能在已经失败的事务中继续查询冲突结果。两种实现必须通过相同的事务、幂等、分页和故障注入测试。
+所有写事务采用 `READ COMMITTED`，按 Session → Turn → SessionOwner 的顺序取得行锁；v1.9 Workspace 准入/变更如需锁 Registry，则统一在 Session 前取得，Registry 失效流程也不得逆序；Snapshot/Item 物化按 batch 连续进度执行 CAS。MySQL 使用二进制/大小写敏感语义保存稳定 ID 与摘要；PostgreSQL 适配器使用等价约束、自增 sequence 和事务外重试，不能在已经失败的事务中继续查询冲突结果。两种实现必须通过相同的事务、幂等、分页和故障注入测试。
 
 批次按 `(tenantId, sessionId, firstSequence)` 定位，并支持查找覆盖请求起点的批次；分页在应用层展开事件。长期 Item 可以在内容块结束、终态或有上限的周期检查点更新；不要每个 delta 都重写累计增长的整段正文。长输出使用不可变分段及清单，避免累计写放大。
 
@@ -226,6 +226,8 @@ RocketMQ 自身会按保留和空间策略清理，包括尚未消费的数据�
 合并主要减少行数、索引和重复封装；内容字节不会凭空消失。原始速率约为 `C × r × s` 字节/秒，未压缩的窗口容量约为 `C × r × s × W`，还要计入 SQL/MQ 副本和索引。例如 `C=100`、`r=20` 次/秒、`s=200` 字节时，仅原始内容就是 `34.56GB/天`；`100ms` 合并平均约合入两个事件，并不能保证数量级下降。若测得 SQL 批次日志仍超出预算，就不能以“已经加 MQ”为由直接上线，应缩短经确认的窗口、限制并发或推进第 12 节的源日志方案。
 
 ## 9. Harness 与 Runtime 恢复
+
+Workspace 与 Session cwd 的 v1.9 目标契约见[专项设计](managed-agent-workspace-context.md)。当前 Java Session 尚未持久保存该绑定，Broker 使用启动时的单一静态 Workspace。新增 Registry、Session context 与 cwd operation ledger 的[增量 DDL](managed-agent-workspace-schema.mysql.sql)以实际 Flyway V1/V2 为基线；尚未作为生产 migration 执行，与本文批次日志/Outbox 目标 DDL 分开。恢复必须保留稳定 workspaceStorageId 与 cwdRelative，挂载后的绝对路径只是内部安装快照。目录变更的持久 operation、两端安装回执与 Java 提交屏障见专项 W2，不能以一条 Session UPDATE 代替。
 
 当前本地聊天文件由 Storage 与 ChatRecordingService 放在运行目录下的 `projects/<sanitized-cwd>/chats/<sessionId>.jsonl`；根目录受 `QWEN_RUNTIME_DIR`、运行配置和用户目录影响。JSONL 在磁盘上并不自动意味着无法解耦，关键是进程替换后能否寻址、恢复字节并阻止旧写者继续提交。
 

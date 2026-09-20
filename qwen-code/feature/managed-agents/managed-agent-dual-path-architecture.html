@@ -807,7 +807,7 @@
 
       @media (max-width: 1080px) {
         .page {
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1fr);
         }
 
         .sidebar {
@@ -853,11 +853,11 @@
         .grid-3,
         .grid-4,
         .checklist {
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1fr);
         }
 
         .sequence {
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1fr);
         }
 
         .sequence-step:not(:last-child)::after {
@@ -869,7 +869,7 @@
         }
 
         .tool-flow-stage {
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1fr);
           gap: 11px;
         }
 
@@ -946,6 +946,7 @@
           <a href="#fast-path">首次 Prompt</a>
           <a href="#protocols">通信协议</a>
           <a href="#state">状态模型</a>
+          <a href="#workspace-context">Workspace 与 cwd</a>
           <a href="#lifecycle">Runtime 生命周期</a>
           <a href="#migration">Legacy 迁移</a>
           <a href="#recovery">故障恢复</a>
@@ -958,7 +959,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.8 · 2026-09-20<br />
+          方案版本 v1.9 · 2026-09-21<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环；公开事件先可靠提交，再向客户端推送。
         </div>
@@ -1011,9 +1012,9 @@
             </div>
           </div>
           <p class="lead">
-            v1.8 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
+            v1.9 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
             的普通工具接线、v1.5 的统一 Session 身份、v1.6 的事件恢复边界和
-            v1.7 的扩展运行时，并同步当前 P1 SQL 物化切片。Java 在创建前生成全局唯一 RFC UUID，
+            v1.7 的扩展运行时、v1.8 的 SQL 物化切片，并补齐 Workspace 与 Session cwd 的目标契约。Java 在创建前生成全局唯一 RFC UUID，
             公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
             使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
             首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
@@ -1981,6 +1982,124 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
           </p>
         </section>
 
+        <section id="workspace-context">
+          <div class="section-head">
+            <div>
+              <div class="section-index">08B / WORKSPACE CONTEXT · PLANNED</div>
+              <h2>Workspace 归属与 Session 工作目录</h2>
+            </div>
+          </div>
+          <p class="lead">
+            Workspace 是稳定的资源归属，Session 保存相对工作目录，Runtime 负责解析实际挂载路径。
+            容器重建不能改变 Session 归属；Harness 的进程 cwd、私有日志目录与工具执行 cwd 分开。
+            旧 daemon 的本地目录路由可复用，但 Hosted 请求必须先经过 Java 的租户授权和持久绑定。
+          </p>
+          <div class="callout warning">
+            <strong>当前实现边界：</strong>Java 的 Session DTO 和 SQL 尚无 Workspace 绑定；
+            EmbeddedRuntimeBroker 启动时读取一组全局 workspace 配置。
+            以下 W0/W1/W2、OpenAPI 新字段与增量 DDL 均为目标设计，未实现前不宣告能力。
+          </div>
+          <figure class="tool-flow-diagram" aria-labelledby="workspace-flow-caption">
+            <div class="tool-flow-track">
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">01 / AUTHORIZE</span>
+                  <h4>Workspace Registry</h4>
+                  <span class="tool-flow-owner">Java · 可信租户与授权范围</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">稳定 workspaceId</span>
+                  <span class="tool-flow-step">generation / storageId</span>
+                  <span class="tool-flow-step">trust / config revision</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">02 / COMMIT</span>
+                  <h4>Session 持久上下文</h4>
+                  <span class="tool-flow-owner">Java SQL · 与创建命令同事务</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step commit">workspace 绑定</span>
+                  <span class="tool-flow-step commit">cwdRelative</span>
+                  <span class="tool-flow-step commit">contextRevision</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">03 / INSTALL</span>
+                  <h4>Runtime 实际目录</h4>
+                  <span class="tool-flow-owner">Broker / Harness / Runtime</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">持久卷 / 已验证快照</span>
+                  <span class="tool-flow-step wait">realpath + 安装回执</span>
+                  <span class="tool-flow-step execute">同 revision gate → 工具</span>
+                </div>
+              </div>
+            </div>
+            <figcaption id="workspace-flow-caption">
+              模型可以先行；工具与 Workspace 命令必须等目录、权限、资源闭包及 activation 校验通过。
+              私有日志与挂载点都不能代替稳定 Workspace 身份。
+            </figcaption>
+          </figure>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>字段</th><th>职责与恢复边界</th><th>对前端</th></tr></thead>
+              <tbody>
+                <tr><td>workspaceId</td><td>租户内稳定身份；路径相同也不能视为同一资源</td><td>可见，经授权</td></tr>
+                <tr><td>workspaceGeneration / workspaceStorageId</td><td>原工作区版本和持久存储；换代、丢卷不自动替换</td><td>内部</td></tr>
+                <tr><td>cwdRelative</td><td>相对 Workspace 根目录；根为「.」，拒绝越界和 symlink 逃逸</td><td>可见</td></tr>
+                <tr><td>canonicalWorkspaceCwd / effectiveCwd</td><td>当前 Runtime 的根和实际执行目录；恢复时重新解析</td><td>内部，不进入公共事件</td></tr>
+                <tr><td>contextConfigRef</td><td>已冻结的配置上下文引用；恢复时仍需校验当前 trust 与授权</td><td>内部</td></tr>
+                <tr><td>contextRevision</td><td>上下文 CAS 与安装确认；区别于 Runtime/Harness epoch</td><td>可见</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="grid-2">
+            <article class="card accent-blue">
+              <h3>创建与冷恢复</h3>
+              <p>创建时选择已授权 Workspace 与相对 cwd，Java 同事务保存命令和绑定。
+                缺省只允许显式租户默认值；续轮和重试使用原绑定，不回退到 daemon primary。</p>
+              <p>冷恢复按 storageId 找回文件与历史，核对 generation、trust 和上下文回执。
+                挂载点变更必须支持历史路径重映射；否则保持原挂载点或准确阻塞。</p>
+              <pre>同一 Workspace / storageId
+cwdRelative = services/api
+旧：/mnt/repo/services/api
+新：/work/repo/services/api
+逻辑目录不变，实际路径经恢复校验后解析</pre>
+            </article>
+            <article class="card accent-amber">
+              <h3>受控目录切换</h3>
+              <p>同 Workspace 的 POST /cwd 受理持久 operation，202 不代表已生效。
+                活动/排队 Turn、未决审批/工具和后台资源 hold 存在时先拒绝切换。</p>
+              <p>锁 Session / CAS → changing 阻止新准入 → 关闭 gate 并准备配置 →
+                Harness + Runtime 持久安装回执 → Java 提交 cwd/revision/事件 → 新 activation。</p>
+              <p>任何 ACK 或提交结果未知都查询原 operation；无法证明一致就保持 blocked。
+                不通过共享 process.chdir() 修改多个 Session 的执行目录。</p>
+            </article>
+          </div>
+          <h3>扩展能力沿用同一上下文</h3>
+          <p>Shell、Monitor、MCP、Hook 和 child 固定启动时的 cwd、配置 revision 与原 Runtime；
+            父 Session 切换目录不迁移已有任务。Channel 保存授权路由，Automation 冻结运行上下文；
+            独立 worktree 单独绑定存储，无 Session 操作使用 WorkspaceOperationGrant。</p>
+          <div class="state-flow" aria-label="Workspace 设计实施顺序">
+            <span class="state">W0 · 持久绑定与接口</span><span class="state-arrow">→</span>
+            <span class="state">W1 · 恢复与存量迁移</span><span class="state-arrow">→</span>
+            <span class="state">W2 · 受控目录切换</span>
+          </div>
+          <p>W0 是多 Workspace 接入与 H 扩展的前置条件，可与 MQ/Outbox 独立推进。
+            W1 随持久恢复验收，W2 不阻塞固定 cwd 的最小闭环。
+            存量无绑定 Session 先保持只读；有原 Workspace 证据才回填，不能使用升级时的默认目录。</p>
+          <p>
+            详细契约：<a href="managed-agent-workspace-context.md">中文设计</a> ·
+            <a href="managed-agent-workspace-context.en.md">English</a> ·
+            <a href="managed-agent-public-api.openapi.yaml">OpenAPI v1.9</a> ·
+            <a href="managed-agent-workspace-schema.mysql.sql">基于实际 V1/V2 的增量目标 DDL</a>。
+            Workspace 查询、Session workspace 字段、cwd operation 和能力位均标为 planned。
+          </p>
+        </section>
+
         <section id="lifecycle">
           <div class="section-head">
             <div>
@@ -1990,7 +2109,8 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
           </div>
           <p class="lead">
             首版默认 Session 独占 Runtime：归属绑定原 Workspace scope、
-            workspaceGeneration、canonicalCwd 和 sessionId，同 Session 多轮复用。
+            workspaceGeneration 和 sessionId，同 Session 多轮复用。当前 binding 的 canonicalCwd
+            是已验证安装快照；可移植归属与 Session cwd 按<a href="#workspace-context">Workspace 契约</a>解析。
             原 workspace 级跨 Session 复用作为可选优化，须先通过逻辑绑定与隔离验收。
             Hosted tenantId 来自可信鉴权上下文并贯穿 binding；本地 profile 的
             workspace 派生键只作兼容字段，不能冒充已认证租户。
@@ -3175,6 +3295,8 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             <li>Harness 崩溃后旧 epoch 的迟到写入被拒绝。</li>
             <li>Java重启后可以查询原 executionCallId。</li>
             <li>不同 tenant/workspace 无法复用 RuntimeBinding。</li>
+            <li>Session 创建、重试、续轮和冷恢复保持原 Workspace；同名空目录、换代或路径越界不能冒充恢复。</li>
+            <li>并发 prompt/cwd 变更只有一方准入；安装/ACK/commit 各点崩溃后恢复同一 operation，后台任务保留原 cwd。</li>
             <li>大输出通过 artifactRef 返回，不压垮 SSE 和 Java堆。</li>
             <li>多 Session 共享 Harness 时没有 Context 与权限串扰。</li>
             <li>
@@ -3198,7 +3320,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             <li>Channel/Automation 重投使用原 inputId/runId/deliveryId，未知派发不重跑模型或双发。</li>
           </ol>
           <div class="callout">
-            <strong>下一项可交付证明：</strong>在保持 qwen serve 与 TS Agent Loop
+            <strong>事件链路的下一项可交付证明：</strong>在保持 qwen serve 与 TS Agent Loop
             不变的前提下，使用真实 MySQL、真实 Hosted Harness 和两个 Java 实例验证
             事件跨实例低延迟可见、重连补齐、命令幂等和单活 Turn；再加入 15 秒 Runtime
             延迟，分别记录首 token、首个工具等待和完整 Turn 时延。
@@ -3209,7 +3331,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
           <div class="section-head">
             <div>
               <div class="section-index">17 / CURRENT GAP</div>
-              <h2>现有基础与主要缺口（v1.8 代码快照）</h2>
+              <h2>现有基础与主要缺口（v1.9 设计对照）</h2>
             </div>
           </div>
           <div class="grid-2">
@@ -3240,6 +3362,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>将 Runtime Broker JDBC Repository 接入 Spring DataSource/Flyway，并完成 lease reconcile、双 Java 实例恢复与调度验证。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
+                <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>
                 <li>按已冻结 OpenAPI 生成/校验 Java 与 TypeScript 类型，并补契约测试。</li>
                 <li>完整事件 schema/projection version、Snapshot reset 与固定版本历史分页。</li>
                 <li>继续落地已冻结 MySQL DDL 中的 SQL 批次日志/Outbox、EventTransport、跨实例唤醒和保留清理。</li>
@@ -3269,7 +3392,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.8 · 2026-09-20 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.9 · 2026-09-21 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>

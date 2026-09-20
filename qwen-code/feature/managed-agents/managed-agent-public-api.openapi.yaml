@@ -1,11 +1,13 @@
 openapi: 3.1.0
 info:
   title: Qwen Managed Agent Public and WebShell API
-  version: 1.6.0
+  version: 1.9.0
   description: >-
     Canonical contract for the public Managed Agent resources and the WebShell
     adapter. partial means that the route exists but generated types and full
-    contract tests are pending; planned means that the route is not implemented.
+    contract tests are pending; planned means that the route or field is not implemented.
+    Workspace context and cwd operations are v1.9 target contracts, not current
+    server capabilities. Filter planned fields as well as routes from production SDKs.
 servers:
   - url: /
 security:
@@ -435,6 +437,182 @@ paths:
               schema:
                 $ref: '#/components/schemas/WebShellAdmission'
         '409': { $ref: '#/components/responses/Conflict' }
+  /v1/agents/workspaces:
+    get:
+      tags:
+      - Public Resources
+      operationId: listWorkspaces
+      x-qwen-implementation-status: planned
+      description: Only authorized preregistered workspaces, ordered by stable workspace id. Opaque cursors are
+        bound to tenant and filters; no physical paths are exposed.
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/ListLimit'
+      responses:
+        '200':
+          description: Authorized durable resource view; no Runtime startup required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicWorkspaceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/workspaces/{workspaceId}:
+    parameters:
+    - name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    get:
+      tags:
+      - Public Resources
+      operationId: getWorkspace
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Authorized durable resource view; no Runtime startup required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicWorkspace'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/sessions/{sessionId}/cwd:
+    parameters:
+    - $ref: '#/components/parameters/SessionId'
+    post:
+      tags:
+      - Public Sessions
+      operationId: changeSessionCwd
+      x-qwen-implementation-status: planned
+      description: 'W2: same-workspace only. Replay the original operation before revision/busy checks. Reject
+        active or queued input and context holds. Poll the operation or await session.context.changed; do not
+        treat 202 as activation.'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeCwdRequest'
+      responses:
+        '202':
+          description: Durable cwd operation; acceptance does not mean the new cwd is active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicCwdOperation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/agents/sessions/{sessionId}/operations/{operationId}:
+    parameters:
+    - $ref: '#/components/parameters/SessionId'
+    - name: operationId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    get:
+      tags:
+      - Public Sessions
+      operationId: getSessionCwdOperation
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Authorized durable resource view; no Runtime startup required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicCwdOperation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/agent/web-shell/v1/workspaces/query:
+    post:
+      tags:
+      - WebShell
+      operationId: webShellQueryWorkspaces
+      x-qwen-implementation-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellListRequest'
+      responses:
+        '200':
+          description: Authorized durable resource view; no Runtime startup required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellWorkspacePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/agent/web-shell/v1/sessions/cwd/change:
+    post:
+      tags:
+      - WebShell
+      operationId: webShellChangeCwd
+      x-qwen-implementation-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellChangeCwdRequest'
+      responses:
+        '202':
+          description: Durable cwd operation; acceptance does not mean the new cwd is active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellCwdOperation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/agent/web-shell/v1/operations/query:
+    post:
+      tags:
+      - WebShell
+      operationId: webShellQueryCwdOperation
+      x-qwen-implementation-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellOperationRequest'
+      responses:
+        '200':
+          description: Authorized durable resource view; no Runtime startup required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellCwdOperation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     trustedTenant:
@@ -538,6 +716,11 @@ components:
           type: boolean
           default: false
           description: Phase one requires false; stream through the events route.
+        workspace:
+          $ref: '#/components/schemas/WorkspaceSelection'
+          x-qwen-implementation-status: planned
+          description: W0. If omitted, resolve and persist an explicit tenant default at first admission; no default
+            means workspace_required. Replay must retain the original binding even if the default changes.
     SessionEventRequest:
       oneOf:
         - $ref: '#/components/schemas/InputMessageEventRequest'
@@ -588,6 +771,11 @@ components:
         snapshot_through_sequence: { type: integer, format: int64, minimum: 0, default: 0 }
         capabilities:
           $ref: '#/components/schemas/SessionCapabilities'
+        workspace:
+          $ref: '#/components/schemas/WorkspaceContext'
+          x-qwen-implementation-status: planned
+          description: Absent for unbound legacy records, whose execution stays blocked pending evidence-based migration.
+            Ready means committed context, not an active Runtime gate.
     SessionCapabilities:
       type: object
       additionalProperties: false
@@ -597,6 +785,14 @@ components:
         snapshots: { type: boolean }
         artifacts: { type: boolean }
         resync: { type: boolean }
+        workspace_context:
+          type: boolean
+          default: false
+          x-qwen-implementation-status: planned
+        cwd_change:
+          type: boolean
+          default: false
+          x-qwen-implementation-status: planned
     PublicTurn:
       type: object
       required: [id, object, session_id, status, created_at]
@@ -767,6 +963,9 @@ components:
         title: { type: [string, 'null'], maxLength: 512 }
         input: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/InputBlock' } }
         metadata: { $ref: '#/components/schemas/WebShellMetadata' }
+        workspace:
+          $ref: '#/components/schemas/WebShellWorkspaceSelection'
+          x-qwen-implementation-status: planned
     WebShellSubmitRequest:
       type: object
       additionalProperties: false
@@ -823,6 +1022,19 @@ components:
         activeTurn: { oneOf: [{ $ref: '#/components/schemas/WebShellTurn' }, { type: 'null' }] }
         environment: { type: [object, 'null'], additionalProperties: true }
         lastSequence: { type: integer, format: int64, minimum: 0 }
+        workspace:
+          $ref: '#/components/schemas/WebShellWorkspaceContext'
+          x-qwen-implementation-status: planned
+        capabilities:
+          type: object
+          x-qwen-implementation-status: planned
+          properties:
+            workspaceContext:
+              type: boolean
+              default: false
+            cwdChange:
+              type: boolean
+              default: false
     WebShellSessionPage:
       type: object
       required: [data, hasMore]
@@ -894,3 +1106,363 @@ components:
             request_id: { type: [string, 'null'] }
             replay_floor_sequence: { type: [integer, 'null'], format: int64 }
             snapshot_through_sequence: { type: [integer, 'null'], format: int64 }
+    WorkspaceRelativePath:
+      type: string
+      minLength: 1
+      maxLength: 1024
+      description: Logical directory relative to the authorized workspace root; dot denotes root. Use slash separators.
+        Reject absolute paths, drive prefixes, backslashes, NUL and parent segments. Runtime must verify directory
+        existence, realpath containment and symlink safety before activation; schema validation alone is insufficient.
+      x-qwen-implementation-status: planned
+    WorkspaceSelection:
+      type: object
+      additionalProperties: false
+      required:
+      - workspace_id
+      properties:
+        workspace_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        cwd_relative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+          default: .
+      x-qwen-implementation-status: planned
+    WorkspaceContext:
+      type: object
+      additionalProperties: false
+      required:
+      - workspace_id
+      - cwd_relative
+      - context_revision
+      - state
+      properties:
+        workspace_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        cwd_relative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+        context_revision:
+          type: integer
+          format: int64
+          minimum: 1
+        state:
+          type: string
+          enum:
+          - ready
+          - changing
+          - recovery_blocked
+      x-qwen-implementation-status: planned
+    PublicWorkspace:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - object
+      - display_name
+      - state
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        object:
+          const: agent.workspace
+        display_name:
+          type: string
+          maxLength: 512
+        state:
+          type: string
+          enum:
+          - active
+          - draining
+          - removed
+      x-qwen-implementation-status: planned
+    PublicWorkspaceList:
+      type: object
+      additionalProperties: false
+      required:
+      - object
+      - data
+      - has_more
+      properties:
+        object:
+          const: list
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicWorkspace'
+        has_more:
+          type: boolean
+        next_cursor:
+          type:
+          - string
+          - 'null'
+      x-qwen-implementation-status: planned
+    ChangeCwdRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - cwd_relative
+      - expected_context_revision
+      properties:
+        cwd_relative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+        expected_context_revision:
+          type: integer
+          format: int64
+          minimum: 1
+      x-qwen-implementation-status: planned
+    CwdOperationStatus:
+      type: string
+      enum:
+      - pending
+      - installing
+      - completed
+      - failed
+      - recovery_blocked
+      x-qwen-implementation-status: planned
+    PublicCwdOperation:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - session_id
+      - type
+      - status
+      - expected_context_revision
+      - target_cwd_relative
+      - replayed
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        session_id:
+          type: string
+          format: uuid
+        type:
+          const: cwd_change
+        status:
+          $ref: '#/components/schemas/CwdOperationStatus'
+        expected_context_revision:
+          type: integer
+          format: int64
+          minimum: 1
+        target_cwd_relative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+        result_context_revision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        failure_code:
+          type:
+          - string
+          - 'null'
+          maxLength: 128
+        replayed:
+          type: boolean
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            status:
+              const: completed
+          required:
+          - status
+        then:
+          required:
+          - result_context_revision
+          properties:
+            result_context_revision:
+              type: integer
+              format: int64
+              minimum: 1
+      description: A completed operation returns the committed target revision. A replay returns the same operation
+        identity and latest durable status, with replayed=true; polling itself is not replay.
+    WebShellWorkspaceSelection:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceId
+      properties:
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        cwdRelative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+          default: .
+      x-qwen-implementation-status: planned
+    WebShellWorkspaceContext:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceId
+      - cwdRelative
+      - contextRevision
+      - state
+      properties:
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        cwdRelative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+        contextRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        state:
+          type: string
+          enum:
+          - ready
+          - changing
+          - recovery_blocked
+      x-qwen-implementation-status: planned
+    WebShellWorkspace:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceId
+      - displayName
+      - state
+      properties:
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        displayName:
+          type: string
+          maxLength: 512
+        state:
+          type: string
+          enum:
+          - active
+          - draining
+          - removed
+      x-qwen-implementation-status: planned
+    WebShellWorkspacePage:
+      type: object
+      additionalProperties: false
+      required:
+      - data
+      - hasMore
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebShellWorkspace'
+        hasMore:
+          type: boolean
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      x-qwen-implementation-status: planned
+    WebShellChangeCwdRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - sessionId
+      - idempotencyKey
+      - cwdRelative
+      - expectedContextRevision
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 128
+        cwdRelative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+        expectedContextRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        requestId:
+          type:
+          - string
+          - 'null'
+          maxLength: 128
+      x-qwen-implementation-status: planned
+    WebShellOperationRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - sessionId
+      - operationId
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 64
+      x-qwen-implementation-status: planned
+    WebShellCwdOperation:
+      type: object
+      additionalProperties: false
+      required:
+      - operationId
+      - sessionId
+      - type
+      - status
+      - expectedContextRevision
+      - targetCwdRelative
+      - replayed
+      properties:
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        sessionId:
+          type: string
+          format: uuid
+        type:
+          const: cwd_change
+        status:
+          $ref: '#/components/schemas/CwdOperationStatus'
+        expectedContextRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        targetCwdRelative:
+          $ref: '#/components/schemas/WorkspaceRelativePath'
+        resultContextRevision:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        failureCode:
+          type:
+          - string
+          - 'null'
+          maxLength: 128
+        replayed:
+          type: boolean
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            status:
+              const: completed
+          required:
+          - status
+        then:
+          required:
+          - resultContextRevision
+          properties:
+            resultContextRevision:
+              type: integer
+              format: int64
+              minimum: 1
+      description: A completed operation returns the committed target revision. A replay returns the same operation
+        identity and latest durable status, with replayed=true; polling itself is not replay.
