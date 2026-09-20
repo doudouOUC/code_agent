@@ -1,10 +1,10 @@
 # Managed Agent 全量设计与交付覆盖表
 
-> **普通工具接线（2026-09-20，HTML v1.5；工具契约源自 v1.4）：** 普通工具首版的跨组件字段、调用、资源和回收续轮按[接线设计及 S01～S08](managed-agent-ordinary-tools-integration.md)交付；该补充不扩大到记忆、子 Agent 或后台 Shell。
+> **普通工具接线（2026-09-20，HTML v1.6；工具契约源自 v1.4）：** 普通工具首版的跨组件字段、调用、资源和回收续轮按[接线设计及 S01～S08](managed-agent-ordinary-tools-integration.md)交付；该补充不扩大到记忆、子 Agent 或后台 Shell。
 
 > **HTML 对齐（2026-09-18）：** C01～C18 继续作为能力、风险和验收清单，并映射到 A～H。B 的 daemon factory/双引擎、G 的权威事件与 checkpoint 外置、H 的全量能力迁移分别交付；原 R/F 编号仅保留为专项索引，不能另定产品实施顺序。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
-> **首版运行范围（2026-09-19）：** 按[运行契约](managed-agent-first-runtime.md)收敛到五项基础必需；审批随已开放工具启用，共享 Runtime/多实例随对应 profile 验收。tenantId 设计暂缓；完整 D 投影、G 接管与 H 扩展不作为最小闭环前置。C01～C18 是全量目标，不表示首版全部开启。
+> **首版运行范围（2026-09-19）：** 按[运行契约](managed-agent-first-runtime.md)收敛到五项基础必需；审批随已开放工具启用，共享 Runtime/多实例随对应 profile 验收。Hosted tenant scope 按 v1.6 的可信入口注入与资源级校验执行；完整 D 投影、G 接管与 H 扩展不作为最小闭环前置。C01～C18 是全量目标，不表示首版全部开启。
 
 > 首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不涉及，本轮不补充其专项设计。下文相应覆盖项保留为后续目标，普通工具的审批、结果资源、文件历史与取消清理仍须贯通。
 
@@ -14,7 +14,7 @@
 
 HTML 的 B 先让兼容的新普通 Session 通过统一接口使用完整 Managed Agent，Legacy 与未覆盖用途继续共存；H 再逐项扩大能力。职责保持分层：Session 保存权威执行状态，Harness 复用原 Agent，Runtime 执行所属环境的本地操作，coordinator 负责准入、激活和关闭；Hosted 的 Runtime 生命周期与执行账本由 Java Broker 管理。Web Shell、REST、ACP、SDK、Channels、定时、Goal/Live、子任务/记忆和旧会话操作都在覆盖表中；不把延期实现解释为延期设计。
 
-全量指本仓库 daemon 能力的完整迁移及明确的平台/故障契约，不承诺任意外部副作用 exactly-once、任意进程快照或任意旧二进制可写新格式。原 daemon 专项不单独交付恶意进程安全沙箱、通用 SaaS 平台、Kubernetes/VM 模板或独立 CLI/TUI 默认替换；当前整体方案包含 Java 托管控制面，租户语义与多租户设计本轮暂缓；不要求以 Kubernetes 作为协议前提。
+全量指本仓库 daemon 能力的完整迁移及明确的平台/故障契约，不承诺任意外部副作用 exactly-once、任意进程快照或任意旧二进制可写新格式。原 daemon 专项不单独交付恶意进程安全沙箱、通用 SaaS 平台、Kubernetes/VM 模板或独立 CLI/TUI 默认替换；当前整体方案包含 Java 托管控制面，Hosted 租户范围由可信入口注入并在所有资源操作中校验；终端身份、配额和隔离测试在生产开放前完成。不要求以 Kubernetes 作为协议前提。
 
 两条全局口径与上面的目标边界同级，各专项不得各自放宽：
 

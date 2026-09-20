@@ -1981,7 +1981,8 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
             首版默认 Session 独占 Runtime：归属绑定原 Workspace scope、
             workspaceGeneration、canonicalCwd 和 sessionId，同 Session 多轮复用。
             原 workspace 级跨 Session 复用作为可选优化，须先通过逻辑绑定与隔离验收。
-            tenantId 语义本轮不扩展设计。
+            Hosted tenantId 来自可信鉴权上下文并贯穿 binding；本地 profile 的
+            workspace 派生键只作兼容字段，不能冒充已认证租户。
           </p>
           <p>
             环境 ready 与 activation gate 分开：没有活跃 Turn 时可以预热并保持 gate closed；
@@ -2438,9 +2439,12 @@ POST /api/agent/web-shell/v1/turns/cancel</pre
           <p>
             WebShell 的流式接口因使用 POST 请求体与可信租户 Header，由前端通过
             <code>fetch + response.body</code> 解析 SSE，不使用浏览器原生
-            <code>EventSource</code>。当前 Java records 与 TypeScript interfaces
-            分别维护，尚无 OpenAPI/Schema 单一来源；<code>requestId</code> 和流请求的
-            <code>limit</code> 也尚未形成有效服务端语义，冻结生产契约前应实现或删除。
+            <code>EventSource</code>。v1.6 已新增
+            <a href="managed-agent-api-contract.md">接口语义契约</a>和
+            <a href="managed-agent-public-api.openapi.yaml">OpenAPI 3.1</a>
+            作为单一设计源：<code>requestId</code> 只用于 trace，流请求删除无效的
+            <code>limit</code>。当前 Java records 与 TypeScript interfaces
+            尚未由 Schema 生成或校验，所以这些仍是实现缺口，不能据文档宣称已兼容。
           </p>
           <h3 style="margin-top: 28px">阶段 D 扩展接口</h3>
           <pre>
@@ -2643,6 +2647,10 @@ reconnect / history → SessionReplayService
           <p>
             首个关系存储后端继续使用 MySQL；PostgreSQL 作为同一业务契约的后续适配器。
             后端由部署配置选择，不按请求切换，也不以数据库双写作为迁移手段。
+            MySQL 8.0 的目标增量结构已经在
+            <a href="managed-agent-storage-schema.mysql.sql">v1.6 DDL</a>
+            中冻结；它包含 Event Batch、Item、Snapshot、Consumer Progress 和
+            Session Owner，但尚未作为 Java Flyway migration 执行。
           </p>
           <div class="grid-2">
             <article class="card accent-blue">
@@ -2698,6 +2706,34 @@ reconnect / history → SessionReplayService
             只有持久源日志、fencing、回放和容量数据都证明可行后，才评估 MQ-first
             接受路径。
           </div>
+
+          <h3 style="margin-top: 28px">多实例 owner、通知与恢复顺序</h3>
+          <pre>
+任意入口 Java
+  → SQL 查询 managed_agent_session_owner
+  → 认证内部 RPC 转发 Prompt / Cancel / Approval 到 Harness owner
+  → owner 以 ownerGeneration 接受 Harness 事件
+  → SQL acceptBatch transaction
+      ├─ afterCommit → 本节点 Hub → SSE
+      └─ RocketMQ 通知
+          ├─ 每 Java 节点独立广播订阅 → 本地活跃 SSE（SQL sequence 补洞）
+          └─ 共享物化消费组 → Item / Snapshot
+
+owner 故障
+  → 新节点 CAS ownerGeneration + 1
+  → 从 SessionArtifactStore 校验 journal/checkpoint/resource closure
+  → Broker 按原 executionCallId 核对未决副作用
+      ├─ 可证明 → 新 Harness 取得 writer fence 后恢复
+      └─ unknown / 资源缺失 → recovery_blocked
+  → 旧 generation 的事件、journal 与工具回执全部拒绝</pre
+          >
+          <p>
+            私有 journal segment、checkpoint 和资源闭包保存为不可变 Artifact；SQL
+            只保存 owner、最新已提交 <code>journalRevision</code>、manifest 引用和摘要。
+            Pod 临时磁盘与 Runtime generation 目录不能成为恢复所需唯一副本。详细 CAS、
+            Transport 适配器和恢复 manifest 见
+            <a href="managed-agent-storage-event-architecture.md">存储与事件设计</a>。
+          </p>
 
           <h3 style="margin-top: 28px">后续实施顺序</h3>
           <div class="table-wrap">
@@ -2768,7 +2804,7 @@ reconnect / history → SessionReplayService
           <p>
             完整的数据结构、重放拼接、清理条件、故障语义和容量公式见
             <a
-              href="https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.zh-CN.md"
+              href="managed-agent-storage-event-architecture.md"
               >《Managed Agent 存储、事件与会话恢复设计》</a
             >。
           </p>
@@ -2871,7 +2907,7 @@ reconnect / history → SessionReplayService
             首版运行验收以 <a href="managed-agent-first-runtime.md#8-首版验收与阶段关系">M01～M10</a>
             为准：慢启动首 token、同轮工具、受理/执行 ACK 丢失、取消/迟到 ready、独占隔离、
             重启恢复或准确阻塞、SSE 重连、容量与审批。多副本/共享 Runtime 只在启用时追加门槛。
-            以下保留 A～H 全量清单；租户语义仍需单独验收，公开序号已有实验切片，
+            以下保留 A～H 全量清单；跨租户隔离在生产开放前单独验收，公开序号已有实验切片，
             稳定 Item/Snapshot 属于 D，跨实例接管属于 G。
           </p>
           <ol class="checklist">
@@ -2945,9 +2981,10 @@ reconnect / history → SessionReplayService
                 <li>Runtime Broker Repository 与 Execution Ledger 持久化。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
-                <li>OpenAPI/Schema 单一契约来源及 Java/TypeScript 契约测试。</li>
+                <li>按已冻结 OpenAPI 生成/校验 Java 与 TypeScript 类型，并补契约测试。</li>
                 <li>稳定 itemId/contentPartId、Item/Snapshot 物化与输入消息版本。</li>
-                <li>SQL 批次日志/Outbox、EventTransport、跨实例唤醒和保留清理。</li>
+                <li>把已冻结 MySQL DDL 落成 Flyway migration，并实现 SQL 批次日志/Outbox、EventTransport、跨实例唤醒和保留清理。</li>
+                <li>生产身份到 tenant 的映射、资源授权、内部服务认证和跨租户隔离验收。</li>
                 <li>AgentBundle/Manifest 版本一致性。</li>
                 <li>Artifact Store 和 RuntimeTemplate。</li>
                 <li>Harness 私有 journal、资源闭包、共享 Session Authority 和可替换 Harness。</li>

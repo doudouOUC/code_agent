@@ -1,6 +1,6 @@
 # Managed Agent：Runtime invocation v2
 
-> **普通工具接线（2026-09-20，HTML v1.5；工具契约源自 v1.4）：** Hosted 的具体 control 操作、稳定命令回执、纯查询/未执行取消和文件历史顺序见[普通工具接线](managed-agent-ordinary-tools-integration.md#4-普通工具各阶段与-broker-映射)。原 fileHistory.checkpoint 是轮次起始快照；轮末须另行读取并持久提交 history/backup。
+> **普通工具接线（2026-09-20，HTML v1.6；工具契约源自 v1.4）：** Hosted 的具体 control 操作、稳定命令回执、纯查询/未执行取消和文件历史顺序见[普通工具接线](managed-agent-ordinary-tools-integration.md#4-普通工具各阶段与-broker-映射)。原 fileHistory.checkpoint 是轮次起始快照；轮末须另行读取并持久提交 history/backup。
 
 > **HTML 对齐（2026-09-18）：** owned v2 的身份、scope、lease、权限、取消和原调用回执继续复用。B 仍需普通 daemon 双引擎与 selector；Hosted 工具链路为 Harness→Java Broker→Runtime。目标接口和现有 v2 wire 分开记录，R/D 只作历史切片索引。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

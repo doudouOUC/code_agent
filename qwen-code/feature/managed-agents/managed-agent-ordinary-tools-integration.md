@@ -1,6 +1,6 @@
 # Managed Agents 普通工具首版接线设计
 
-更新日期：2026-09-20。依据 [HTML v1.5](managed-agent-dual-path-architecture.html#ordinary-tools) 和[首版运行契约](managed-agent-first-runtime.md)。本文补齐 Bundle、Session、工具阶段、资源交付和环境回收之间的契约，定义目标行为与实施验收；不表示源码已经实现或 E2E 已通过。
+更新日期：2026-09-20。依据 [HTML v1.6](managed-agent-dual-path-architecture.html#ordinary-tools) 和[首版运行契约](managed-agent-first-runtime.md)。本文补齐 Bundle、Session、工具阶段、资源交付和环境回收之间的契约，定义目标行为与实施验收；不表示源码已经实现或 E2E 已通过。
 
 范围为单 Java + qwen Sidecar、Session 独占 Runtime、Read/Write/Edit/前台 Shell。其他普通工具逐项接入；自动记忆、子 Agent、后台 Shell 和 tenantId 语义不在本轮设计中。复用现有 TS Agent、工具、权限与文件历史实现，Java 不实现第二套工具调度或权限裁决。
 

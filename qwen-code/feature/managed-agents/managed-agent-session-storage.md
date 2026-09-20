@@ -1,6 +1,6 @@
 # Managed Session：记录格式、提交与协议限额
 
-> **普通工具接线（2026-09-20，HTML v1.5）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。
+> **普通工具接线（2026-09-20，HTML v1.6）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。
 
 > **HTML 对齐（2026-09-20）：** JSONL、SessionWriterLease、ChatRecord 和本地 lock schema 继续作为 qwen 侧执行权威/兼容存储的专项设计。Java 分配的 RFC UUID `sessionId` 同时标识公共 Session、qwen Session Authority、JSONL 与 Broker scope，不保存第二套 Harness Session ID；Java 仍保存公共投影、SessionBackendBinding、RuntimeBinding 和 Execution Ledger，G 才外置权威事件/checkpoint。两份投影不能相互覆盖原始执行事实。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

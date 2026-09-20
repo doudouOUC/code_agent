@@ -1,6 +1,6 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.5](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.6](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -8,7 +8,7 @@
 
 当前交付以[首版运行契约](managed-agent-first-runtime.md)为准：五项基础必需为 Prompt 持久受理与幂等、Broker 调用及原执行查询、预发布 AgentBundle、Session 固定归属与持久存储、Runtime 有界生命周期。需要交互的已开放工具必须接通审批；跨 Session 共享 Runtime 仅在隔离验收后开放。独立公共 SSE/Item 投影按 D 后置，既有产品 SSE/历史查询必须可用。
 
-首版验证配置为单 Java + qwen Sidecar、静态 Bundle、Session 独占 Runtime；同 Session 多轮复用，Harness 仍可承载多个 Session。多实例部署必须先补原 owner 路由和跨副本 provision 去重，不能使用单实例证明。tenantId 相关设计暂缓，不作为本轮运行验收项；不改变既有鉴权和 Session/Workspace 校验。
+首版验证配置为单 Java + qwen Sidecar、静态 Bundle、Session 独占 Runtime；同 Session 多轮复用，Harness 仍可承载多个 Session。多实例部署必须先补原 owner 路由和跨副本 provision 去重，不能使用单实例证明。Hosted 请求由可信入口从已认证身份注入 `X-Qwen-Tenant-Id`，Session/Workspace/Turn/Event/Artifact 均按租户范围校验；终端用户身份系统与跨租户生产验收不作为单实例运行烟测的前置条件。
 
 首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不涉及。范围复用现有配置和 Bundle 表达，不新增开关协议；普通工具审批、输出/文件历史保存及 Shell 后代进程的取消清理仍须完成。范围外能力的配置在创建前按既有 selector 处理，不能静默裁剪后进入 Managed。
 
@@ -229,7 +229,7 @@ accepted -> dispatched -> runtime_accepted -> started -> completed -> delivered
 
 ## 9. Runtime 复用与生命周期
 
-首版默认 Session 独占 Runtime；binding 绑定原 Workspace scope、workspaceGeneration、canonicalCwd 与 sessionId，同 Session 多轮复用。同 key 只允许一个 active provision。原 workspace 级跨 Session 复用方案作为可选优化，启用前必须有独立 ToolSessionBinding、配置/权限/文件历史/gate 和共享资源引用计数；不同 Session 的 activationEpoch 不作为整个 Runtime 的同一计数器。endpoint 由服务端决定，不能由 Harness 或模型指定。tenantId 语义本轮不扩展设计。
+首版默认 Session 独占 Runtime；binding 绑定原 Workspace scope、workspaceGeneration、canonicalCwd 与 sessionId，同 Session 多轮复用。同 key 只允许一个 active provision。原 workspace 级跨 Session 复用方案作为可选优化，启用前必须有独立 ToolSessionBinding、配置/权限/文件历史/gate 和共享资源引用计数；不同 Session 的 activationEpoch 不作为整个 Runtime 的同一计数器。endpoint 由服务端决定，不能由 Harness 或模型指定。Hosted `tenantId` 来自可信鉴权上下文并贯穿 binding；本地 profile 的 workspace 派生键仅为兼容字段，不能冒充已认证租户。
 
 ```text
 absent -> provisioning -> preparing -> ready -> idle -> draining -> released
@@ -268,7 +268,7 @@ Legacy Session A（保留原历史与 owner）
 
 ## 12. 安全与 Artifact
 
-租户语义和多租户专项按本轮决定暂缓；下列租户条目保留为全量目标，不作为首版已具备能力或本轮验收门槛。现有认证和 Session/Workspace 访问检查继续执行。
+Hosted 租户范围在 v1.6 固定为可信入口注入，并且必须贯穿 Session、Turn、Event、Broker 与 Artifact。参考 Spring 服务只验证 Header 形状，不等于终端用户认证已经完成；生产开放前必须实现身份到租户的映射、资源授权、内部服务认证和跨租户隔离测试。
 
 - 浏览器只访问 Java；Hosted qwen serve 仅监听 loopback，由同 Pod 的 Java 调用。
 - Java 仅代理必要 Session、Prompt、Cancel、Event 及已开放能力所需审批/问答 API，不将整个 daemon 管理面公开。
@@ -299,6 +299,8 @@ Runtime 的 Provisioning、Ready、Idle、Draining 分开计量，同时统计 T
 ## 14. 公共 Agent API
 
 首版复用现有产品 SSE/状态/历史，暂不建立独立持久 Item/eventSequence。阶段 D 由 Java 提供 Agent、Session、Event、Turn、Item MVP；Environment 和 Artifact 纳入资源模型。按照 HTML 的资源语义演进，不承诺第三方字段级完全兼容。公共 Session UUID 直接作为 qwen/Harness Session 身份；公共 Turn/Item/Artifact 与 ACP attachment、进程、Pod、Runtime Session、RuntimeBinding 解耦。
+
+公共 REST 与 WebShell adapter 的生产目标以 [API 语义契约](managed-agent-api-contract.md)和 [OpenAPI 3.1](managed-agent-public-api.openapi.yaml)为单一来源。下面的资源列表用于说明阶段范围；字段、Header、错误、分页与 SSE 行为不再由本文件重复定义。当前源码仍维护手写 Java records 和 TypeScript interfaces，生成/校验接线完成前不能宣称契约已实现。
 
 | 资源 | Java 持有 / 投影 | 执行侧约束 |
 | --- | --- | --- |
@@ -332,16 +334,17 @@ HTML 的第一版公共接口：
 POST   /v1/agents
 GET    /v1/agents/{agentId}
 POST   /v1/agents/{agentId}
-POST   /v1/agent-sessions
-GET    /v1/agent-sessions/{sessionId}
-DELETE /v1/agent-sessions/{sessionId}
-POST   /v1/agent-sessions/{sessionId}/events
-GET    /v1/agent-sessions/{sessionId}/events
-GET    /v1/agent-sessions/{sessionId}/turns
-GET    /v1/agent-sessions/{sessionId}/turns/{turnId}
-GET    /v1/agent-sessions/{sessionId}/items
-GET    /v1/agent-sessions/{sessionId}/artifacts
-GET    /v1/agent-sessions/{sessionId}/artifacts/{artifactId}/content
+POST   /v1/agents/sessions
+GET    /v1/agents/sessions
+GET    /v1/agents/sessions/{sessionId}
+DELETE /v1/agents/sessions/{sessionId}
+POST   /v1/agents/sessions/{sessionId}/events
+GET    /v1/agents/sessions/{sessionId}/events
+GET    /v1/agents/sessions/{sessionId}/turns
+GET    /v1/agents/sessions/{sessionId}/turns/{turnId}
+GET    /v1/agents/sessions/{sessionId}/items
+GET    /v1/agents/sessions/{sessionId}/artifacts
+GET    /v1/agents/sessions/{sessionId}/artifacts/{artifactId}/content
 ```
 
 可重试写入必须使用调用前可确定的稳定幂等键；只在响应中返回的新生成 ID 不足以处理首次响应丢失。创建 Session 固定 agentRevision、executionEngine、workspaceGeneration；首版沿用第 6 节的 qwen 持久受理后 ACK，不等待 Turn 完成。Cancel 是持久输入事件，不以断开 HTTP 代替。将来若 Java 自己持久输入后提前 ACK，必须同步交付 outbox/恢复语义，不能仅改变响应时机。
@@ -369,7 +372,7 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 
 ## 16. 核心验收
 
-首版使用[运行验收 M01～M10](managed-agent-first-runtime.md#8-首版验收与阶段关系)及[普通工具 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。以下为跨 A～H 的全量清单；跨租户项本轮暂缓，共享 Runtime/多副本项只在启用时前置，公共 eventSequence/Items 归 D，跨实例接管归 G。
+首版使用[运行验收 M01～M10](managed-agent-first-runtime.md#8-首版验收与阶段关系)及[普通工具 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。以下为跨 A～H 的全量清单；跨租户隔离在生产开放前验收，共享 Runtime/多副本项只在启用时前置，公共 eventSequence/Items 归 D，跨实例接管归 G。
 
 1. Runtime 人为延迟 15 秒，模型首 token 仍提前返回。
 2. 无 Tool Turn 在 Runtime 未就绪时可以完成。
@@ -393,7 +396,7 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 
 ## 17. 实现快照与待对齐项
 
-HTML 第 17 节的“已有基础/待补齐”保留为原 v1.2 实现快照，v1.3/v1.4/v1.5 新增运行契约不代表代码已完成：当时记录已有 qwen serve HTTP/SSE、双引擎接缝、进程内 Host、Local/Remote Provider、私有五操作、Auto Local 激活和部分 owner 恢复；当时待补 Broker/Ledger、JavaBrokerManagedRuntimeProvider、Hosted Profile、Java→Runtime HTTP/SSE、公共 API/投影、AgentBundle 校验、Artifact/RuntimeTemplate、共享 Authority、continuation、扩展迁移及旧实验控制面退役。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)，不能将这张历史表当作当前全量缺失项。
+HTML 第 17 节的“已有基础/待补齐”保留为原 v1.2 实现快照，v1.3～v1.6 新增运行契约不代表代码已完成：当时记录已有 qwen serve HTTP/SSE、双引擎接缝、进程内 Host、Local/Remote Provider、私有五操作、Auto Local 激活和部分 owner 恢复；当时待补 Broker/Ledger、JavaBrokerManagedRuntimeProvider、Hosted Profile、Java→Runtime HTTP/SSE、公共 API/投影、AgentBundle 校验、Artifact/RuntimeTemplate、共享 Authority、continuation、扩展迁移及旧实验控制面退役。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)，不能将这张历史表当作当前全量缺失项。
 
 后续实现记录已报告其中部分工作进展，因此不能简单把该快照的所有“待补齐”当作今天的代码事实：
 

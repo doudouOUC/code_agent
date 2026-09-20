@@ -4,6 +4,8 @@
 
 状态：提议；对应的 `qwen-code` 源码分支已实现其中一部分 P0/P1。日期：2026-09-20。本文按下面的集成代码快照设计，不表示完整架构已经通过生产验收。
 
+v1.6 的机器可读接口契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)，接口语义见[Public API 与 WebShell 契约](managed-agent-api-contract.md)，MySQL 8.0 的目标增量结构见 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。这三项冻结目标结构，不表示当前 Java 服务已经生成 DTO、执行迁移或通过契约测试。
+
 ## 1. 决策
 
 保留 WebShell → Java 控制面 → Hosted Harness → Runtime Broker → Tool-only Runtime 的分工。Harness 运行 Qwen Agent 循环，Java 负责准入、状态、事件投影和客户端接口，Runtime 负责工具与工作区。模型推理与 Runtime 预热仍并行，实际调用工具时才等待 Runtime。
@@ -103,8 +105,9 @@ interface AgentStateStore {
 }
 
 interface EventTransport {
-    CompletionStage<PublishReceipt> publish(CommittedBatch batch);
+    CompletionStage<PublishReceipt> publish(CommittedBatchDescriptor batch);
     Subscription consume(ConsumerSpec consumer, BatchHandler handler);
+    TransportHealth health();
 }
 
 interface SessionArtifactStore {
@@ -126,6 +129,16 @@ interface SessionArtifactStore {
 Broker 复用 `RuntimeBindingRepository`、`RuntimeSessionRepository`、`ToolExecutionRepository`，为其增加 MySQL/PostgreSQL 实现。不要另造一套 Broker 存储 API；涉及多个仓库的不变量仍需由其业务操作明确事务或 CAS 边界。
 
 EventTransport 的通用保证保持较小：允许重复和跨重连乱序，应用按已提交序号检查、去重及补洞。适配器可以增强顺序和吞吐，不能静默降低确认或恢复语义。第一批只实现确实要部署的后端与共同契约测试，不预先实现全部 MQ。
+
+`CommittedBatchDescriptor` 只包含 `schemaVersion`、租户范围、`sessionId`、`batchId`、序号区间、`eventCount`、`payloadSha256` 和 SQL `batchOffset`，正文由消费者按范围从 `AgentStateStore` 读取。`publish` 只有收到 Broker 的持久确认才成功；超时返回 unknown 并由 Relay 使用同一 `batchId` 重试。`BatchHandler` 只有在副作用与 `managed_agent_consumer_progress` 同事务提交后才 ACK，异常或超时必须重投。
+
+| 适配器 | 必须实现 | 不得假设 |
+| --- | --- | --- |
+| `RocketMqEventTransport` | 以 `(tenantId, sessionId)` 为 message group；同步或异步等待持久发送确认；共享物化消费组与每节点 SSE 广播组分开配置 | FIFO 不提供 writer fencing；Broker offset 不是浏览器游标 |
+| `RedisStreamsEventTransport` | 明确 consumer group、pending reclaim、持久化/副本配置和最大长度；裁剪前检查 SQL 修复窗口 | 写入内存即等于跨故障持久；`XTRIM` 后仍可回放 |
+| `SqlEventTransport` | 首版固定 `shardId=0`，用 `managed_agent_consumer_progress` 的 lease/CAS 顺序扫描 `batch_offset`，处理后推进连续进度；扩分片必须新增 assignment epoch 并迁移进度 | 它不是第二份 Outbox，也不提供跨节点低延迟广播；不能直接改变取模数 |
+
+部署一次只选择一个物化 Transport。数据库、Transport 和 ArtifactStore 都通过接口注入，但“可替换”只表示实现同一契约并通过共同测试，不表示运行中热切换或所有后端能力完全相同。
 
 ## 6. 事件协议与接受事务
 
@@ -154,9 +167,14 @@ SQL 提交响应丢失时，先按稳定提交身份核对结果；已提交的�
 
 同节点由提交回调推送完整批次。每个节点的 Hub 为同一 Session 共享有界缓冲，再分发给多个浏览器连接；慢连接超限就断开并要求续传，不阻塞 Harness，也不取消 Turn。
 
-小规模多实例部署使用服务发现中的已认证 Java 节点发送合并的 `sessionId + committedSequence` 通知。收到通知且有本地订阅的节点，按 Session 范围读取一次，再发给全部本地连接。通知只作唤醒提示；按节点批量检查活跃 Session 水位作为丢通知修复路径，检查频率与心跳协调。这仍有跨节点范围读取，但消除了每个浏览器固定 `200ms` 轮询。
+第一版生产多实例拓扑固定如下，不再在广播、共享消费组和任意节点执行之间运行时切换：
 
-节点广播随节点数放大，必须压测并限定首版规模；规模扩大后再采用 Session 分片路由。不能把多个 SSE 节点放进一个 MQ 消费组，就假设每个节点都会收到相同事件。MQ 物化消费与 SSE 节点通知是不同的职责。
+1. `managed_agent_session_owner` 保存 Harness owner 节点、单调 `ownerGeneration` 和数据库时间租约。Prompt、Cancel、Approval 与恢复命令到达任意入口节点后，入口查询 owner 并通过认证的内部 RPC 转发；owner 变化必须先 CAS 提升 generation，旧 owner 的接受事务被数据库拒绝。
+2. SSE 连接可以停留在任意入口节点。提交节点在 `afterCommit` 先推本地 Hub；Outbox Relay 再向 `managed-agent-public-event-v1` 发布仅含 batch 身份、水位和摘要的通知。每个 Java 节点使用独立广播订阅身份，只对本机有订阅的 Session 读取 SQL 批次并唤醒 Hub。
+3. RocketMQ 通知不是可靠历史。每个节点周期核对本机活跃订阅的 SQL 水位；启动、重连、消息重复、乱序和漏通知都由公开 sequence 修复。消息体不得携带私有 Harness 数据或完整大对象。
+4. Item/Snapshot 物化使用共享消费组，每个 batch 只需一个消费者处理；SSE 广播订阅与物化消费组分开。达到广播规模阈值后，下一阶段将 SSE 订阅也按 Session hash 路由到固定节点，不能直接把所有节点放进同一个共享组而丢掉通知。
+
+节点离开先停止接收新 Session、把 owner 状态改为 `draining`、停止续租并等待在途接受事务结束；新节点取得更高 generation 后才能恢复。旧节点即使延迟恢复也不能以旧 generation 提交事件或工具回执。
 
 ### 7.2 无缝衔接历史与实时
 
@@ -185,6 +203,10 @@ RocketMQ 的组内顺序需要单生产者串行发送；跨生产者接管仍�
 | `managed_agent_snapshot`          | 一致的 Transcript 版本、`coveredSequence`、活动 Item 状态及终态；不能只有水位而没有可恢复的对应内容。         |
 | `managed_agent_consumer_progress` | 每个必要投影的连续消费进度；发布进度独立记录，不能用 Broker ACK 代替物化进度。                                |
 | Session/Turn 增量列               | 租约 generation、日志最低/最高水位、存储版本、恢复状态和持久化资源引用。                                      |
+
+MySQL 8.0 的列、索引、约束及迁移不变量已经冻结在 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。`managed_agent_event_batch.batch_offset` 只用于 Relay/消费者的全局顺序扫描；公共 API 不返回它。`eventCount=0` 表示只推进 Harness 源游标的检查点，不发布 MQ，也不占用公开 sequence。`managed_agent_session_owner.ownerGeneration` 是 Java/Harness 接管 fence，和 Runtime `activationEpoch` 分开。
+
+所有写事务采用 `READ COMMITTED`，按 Session → Turn → SessionOwner 的顺序取得行锁；Snapshot/Item 物化按 batch 连续进度执行 CAS。MySQL 使用二进制/大小写敏感语义保存稳定 ID 与摘要；PostgreSQL 适配器使用等价约束、自增 sequence 和事务外重试，不能在已经失败的事务中继续查询冲突结果。两种实现必须通过相同的事务、幂等、分页和故障注入测试。
 
 批次按 `(tenantId, sessionId, firstSequence)` 定位，并支持查找覆盖请求起点的批次；分页在应用层展开事件。长期 Item 可以在内容块结束、终态或有上限的周期检查点更新；不要每个 delta 都重写累计增长的整段正文。长输出使用不可变分段及清单，避免累计写放大。
 
@@ -216,6 +238,58 @@ RocketMQ 自身会按保留和空间策略清理，包括尚未消费的数据�
 3. 在同一 Session UUID 下取得新的写者 generation，恢复 Harness authority，再创建可替换的 Runtime 执行句柄。
 4. 对不确定工具调用按原 `executionCallId` 查询或核对。停止响应、超时或进程死亡不证明工具未产生副作用；无法确定时阻止自动重放。
 5. 只从协议明确允许的恢复边界继续。私有日志恢复、公开 SSE 补发、运行中模型请求续算是三件不同的事。
+
+生产存储位置固定为：私有 journal segment、checkpoint 和资源闭包写入 `SessionArtifactStore` 的不可变对象；SQL 保存 Session owner、最新已提交 `journalRevision`、manifest 引用与摘要。Harness 或 Java Pod 的临时磁盘只允许作为写入缓存，不能成为恢复所需唯一副本。Workspace 使用独立持久卷或已验证快照引用，Runtime generation 目录不承担长期保存。
+
+每个 Harness manifest 至少包含：
+
+```json
+{
+  "schemaVersion": 1,
+  "tenantId": "internal-scope",
+  "sessionId": "uuid",
+  "ownerGeneration": 7,
+  "journalRevision": 42,
+  "journalSegments": [{"ref": "...", "sha256": "...", "size": 123}],
+  "checkpointRef": {"ref": "...", "sha256": "...", "size": 456},
+  "resourceClosureRef": {"ref": "...", "sha256": "...", "size": 789},
+  "workspaceStorageId": "...",
+  "workspaceGeneration": 4,
+  "lastSettledTurnId": "...",
+  "inFlightExecutionIds": ["..."],
+  "createdAt": 0
+}
+```
+
+manifest 提交使用 `(sessionId, expectedJournalRevision, ownerGeneration)` CAS。不可变对象全部上传并核验摘要后才能提交新 revision；CAS 失败的对象成为可延迟回收的 orphan。SQL 中的 `journalRevision` 只指向已验证的完整闭包，不能先推进 revision 再异步补资源。
+
+```mermaid
+sequenceDiagram
+    participant N1 as old Java owner
+    participant DB as Agent SQL
+    participant AS as SessionArtifactStore
+    participant N2 as new Java owner
+    participant H as replacement Harness
+    participant B as Runtime Broker
+
+    N1-xDB: lease stops renewing
+    N2->>DB: CAS claim ownerGeneration + 1
+    DB-->>N2: new owner and journalRevision
+    N2->>AS: read and verify manifest closure
+    N2->>B: reconcile every in-flight executionCallId
+    alt receipt proves terminal or never dispatched
+        B-->>N2: verified state
+        N2->>H: boot with generation, manifest, checkpoint
+        H->>DB: CAS acquire writer at journalRevision
+        H-->>N2: recovery ready
+    else side effect remains unknown or resource missing
+        B-->>N2: unknown
+        N2->>DB: mark recovery_blocked
+    end
+    N1-xDB: stale generation commit rejected
+```
+
+节点接管的成功条件是新 writer fence、资源闭包校验与未决执行核对同时成立。只有公开事件可补发而 Harness 私有状态不可恢复时，Session 保持可读并进入 `recovery_blocked`，不能从 Item/Snapshot 反向拼出模型上下文继续运行。
 
 资源先不可变发布并校验，再通过带 expected revision 与 writer generation 的条件提交发布 manifest/日志提交点。上传成功但提交失败产生可回收孤儿；提交点不能引用尚未持久化的对象。对象存储插件之外，必须有实际拒绝旧 generation 的权威提交机制，不能仅依赖本地锁或“租约已经过期”的客户端判断。
 

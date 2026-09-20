@@ -1,6 +1,6 @@
 # Managed Agents 首版运行契约
 
-更新日期：2026-09-20。依据 [HTML v1.5](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
+更新日期：2026-09-20。依据 [HTML v1.6](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
 
 ## 1. 首版范围与运行条件
 
@@ -8,7 +8,7 @@
 
 首版只支持普通工具调用，以 Read、Write、Edit 和前台 Shell 为最小验收集；其他普通工具按同一调用契约逐项验证后纳入。自动记忆、子 Agent、后台 Shell 暂不涉及，本轮不补充其专项设计，也不作为运行前提。前台 Shell 在当前工具调用内等待结果；不提供转后台或脱离调用继续工作的产品能力，但取消、超时和释放仍须核验它创建的后代进程。
 
-tenantId 相关语义和多租户设计按用户要求暂缓，不作为本轮运行验收项；既有鉴权和 Session/Workspace 访问校验继续适用。本文不以新增租户字段或多租户平台作为运行前提。
+Hosted `tenantId` 必须由可信入口从已认证身份注入，并贯穿 Session、Workspace、Turn、Event 与 Broker 校验。本地单实例烟测不以前置完整身份平台为条件，但生产流量开放前必须完成资源级授权、内部服务认证和跨租户隔离验收。
 
 | 项目 | 首版要求 | 后置边界 |
 | --- | --- | --- |

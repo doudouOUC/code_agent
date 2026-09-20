@@ -4,7 +4,9 @@
 
 > **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md#7-审批与用户问答)要求已开放能力的审批/问答经过 Java 回到原持久仲裁；复用既有产品入口、SSE 和历史查询。独立公共 Item/eventSequence 投影属于 D，不阻塞首版 Hosted 运行；首版 accepted 必须等待 qwen 持久受理。
 
-> **统一 Session 身份（2026-09-20，HTML v1.5）：** Java 在创建前分配的 RFC UUID `sessionId` 同时用于公共 Agent API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope，不再维护公共 Session 到 Harness Session 的映射。ACP client/attachment、Harness boot/instance、Runtime Session 与执行 ID 仍保持内部化。
+> **统一 Session 身份（2026-09-20，HTML v1.6）：** Java 在创建前分配的 RFC UUID `sessionId` 同时用于公共 Agent API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope，不再维护公共 Session 到 Harness Session 的映射。ACP client/attachment、Harness boot/instance、Runtime Session 与执行 ID 仍保持内部化。
+
+> **v1.6 接口冻结：** 公共 REST 与 WebShell adapter 的路由、DTO、错误、幂等、分页和 SSE 语义以 [API 契约](managed-agent-api-contract.md)及 [OpenAPI](managed-agent-public-api.openapi.yaml)为单一来源。当前 Java/TypeScript 尚未由该 Schema 生成，属于实现与契约测试缺口。
 
 更新日期：2026-09-11；基于源码 `a836081466` 和三层设计 `4cacfbd0ed`。本稿细化 C05/C14/C15/C18 的 Web Shell、REST、ACP、SDK 和管理路径；是待实现设计，现有公开接口仍按[兼容映射](managed-agent-session-method-map.md)逐项保留，独立 Managed 实验页不替代普通入口。
 
@@ -22,7 +24,7 @@
 | --- | --- | --- |
 | 当前产品入口 | `/sessions`、`/sessions/{id}/prompt`、`/cancel` | `/sessions/{id}/events`，Java 产品 SSE |
 | Java→qwen serve | `/session`、`/session/{id}/prompt`、`/cancel`、`/resume` | `/events` 与 daemon Load/Resume/SSE 契约 |
-| 阶段 D 公共 Agent API | `/v1/agents`、`/v1/agent-sessions`、Session events/turns/items/artifacts | 单调 eventSequence、Last-Event-ID；公共 Item/Turn 从权威记录投影 |
+| 阶段 D 公共 Agent API | `/v1/agents`、`/v1/agents/sessions`、Session events/turns/items/artifacts | 单调 eventSequence、Last-Event-ID；公共 Item/Turn 从权威记录投影；字段以 OpenAPI 为准 |
 
 所有可重试写请求使用调用前确定的稳定幂等键；首版等待 qwen 输入及 WakeIntent 持久提交后返回 accepted，Java 不提前 ACK 并另建异步交付队列。断线不取消后台 Turn。Cancel 是持久输入事件，不能把 HTTP 关闭或接受回执当作物理完成。私有 eventEpoch/sequence、旧实验 cursor 与公共 eventSequence 必须显式映射，不互相替代。
 

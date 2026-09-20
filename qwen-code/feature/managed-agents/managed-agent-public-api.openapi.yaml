@@ -1,0 +1,857 @@
+openapi: 3.1.0
+info:
+  title: Qwen Managed Agent Public and WebShell API
+  version: 1.6.0
+  description: >-
+    Canonical contract for the public Managed Agent resources and the WebShell
+    adapter. partial means that the route exists but generated types and full
+    contract tests are pending; planned means that the route is not implemented.
+servers:
+  - url: /
+security:
+  - trustedTenant: []
+tags:
+  - name: Public Sessions
+  - name: Public Resources
+  - name: WebShell
+paths:
+  /v1/agents:
+    post:
+      tags: [Public Resources]
+      operationId: createAgent
+      x-qwen-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDefinitionRequest'
+      responses:
+        '202':
+          description: Immutable agent revision published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefinition'
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/agents/{agentId}:
+    parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema: { type: string, minLength: 1, maxLength: 128 }
+    get:
+      tags: [Public Resources]
+      operationId: getAgent
+      x-qwen-implementation-status: planned
+      parameters:
+        - name: revision
+          in: query
+          required: false
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: Requested or current agent revision.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefinition'
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Public Resources]
+      operationId: updateAgent
+      x-qwen-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDefinitionRequest'
+      responses:
+        '202':
+          description: New immutable revision published for this agent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefinition'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/agents/sessions:
+    post:
+      tags: [Public Sessions]
+      operationId: createSession
+      x-qwen-implementation-status: partial
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '202':
+          description: Session accepted after durable command admission.
+          headers:
+            X-Qwen-Idempotent-Replay:
+              $ref: '#/components/headers/IdempotentReplay'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSession'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [Public Sessions]
+      operationId: listSessions
+      x-qwen-implementation-status: partial
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/ListLimit'
+      responses:
+        '200':
+          description: Sessions ordered by updated_at and id descending.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSessionList'
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /v1/agents/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Public Sessions]
+      operationId: getSession
+      x-qwen-implementation-status: partial
+      responses:
+        '200':
+          description: Session state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSession'
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Public Sessions]
+      operationId: deleteSession
+      x-qwen-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Durable deletion or archival workflow accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandAdmission'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/agents/sessions/{sessionId}/events:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      tags: [Public Sessions]
+      operationId: postSessionEvent
+      x-qwen-implementation-status: partial
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionEventRequest'
+      responses:
+        '202':
+          description: Input or cancellation durably accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandAdmission'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [Public Sessions]
+      operationId: getSessionEvents
+      x-qwen-implementation-status: partial
+      description: >-
+        Returns JSON by default. Accept text/event-stream or stream=true to
+        receive SSE. Last-Event-ID takes precedence over after.
+      parameters:
+        - $ref: '#/components/parameters/AfterSequence'
+        - $ref: '#/components/parameters/EventLimit'
+        - name: stream
+          in: query
+          schema: { type: boolean, default: false }
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: { type: integer, format: int64, minimum: 0 }
+      responses:
+        '200':
+          description: Event page or SSE stream.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicEventList'
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE frames whose id is the public sequence.
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/CursorExpired' }
+  /v1/agents/sessions/{sessionId}/turns:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Public Resources]
+      operationId: listTurns
+      x-qwen-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/ListLimit'
+      responses:
+        '200':
+          description: Turn page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTurnList'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/agents/sessions/{sessionId}/turns/{turnId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/TurnId'
+    get:
+      tags: [Public Resources]
+      operationId: getTurn
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Turn state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTurn'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/agents/sessions/{sessionId}/items:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Public Resources]
+      operationId: listItems
+      x-qwen-implementation-status: planned
+      parameters:
+        - name: after
+          in: query
+          schema: { type: integer, format: int64, minimum: 0, default: 0 }
+        - $ref: '#/components/parameters/ListLimit'
+      responses:
+        '200':
+          description: Materialized items and snapshot watermark.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicItemList'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/agents/sessions/{sessionId}/artifacts:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Public Resources]
+      operationId: listArtifacts
+      x-qwen-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/ListLimit'
+      responses:
+        '200':
+          description: Artifact metadata page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicArtifactList'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/agents/sessions/{sessionId}/artifacts/{artifactId}/content:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/ArtifactId'
+    get:
+      tags: [Public Resources]
+      operationId: getArtifactContent
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Authorized artifact bytes with integrity metadata.
+          headers:
+            Digest:
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/agent/web-shell/v1/sessions/query:
+    post:
+      tags: [WebShell]
+      operationId: webShellListSessions
+      x-qwen-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellListRequest'
+      responses:
+        '200':
+          description: WebShell session page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellSessionPage'
+  /api/agent/web-shell/v1/sessions/get:
+    post:
+      tags: [WebShell]
+      operationId: webShellGetSession
+      x-qwen-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellSessionRequest'
+      responses:
+        '200':
+          description: WebShell session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellSession'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/agent/web-shell/v1/transcript/query:
+    post:
+      tags: [WebShell]
+      operationId: webShellTranscript
+      x-qwen-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellTranscriptRequest'
+      responses:
+        '200':
+          description: Event transcript page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellTranscript'
+  /api/agent/web-shell/v1/events/stream:
+    post:
+      tags: [WebShell]
+      operationId: webShellStreamEvents
+      x-qwen-implementation-status: partial
+      description: POST SSE consumed through fetch response.body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellStreamRequest'
+      responses:
+        '200':
+          description: SSE stream.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '409': { $ref: '#/components/responses/CursorExpired' }
+  /api/agent/web-shell/v1/sessions/create:
+    post:
+      tags: [WebShell]
+      operationId: webShellCreateSession
+      x-qwen-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellCreateRequest'
+      responses:
+        '202':
+          description: Session admitted.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellAdmission'
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/agent/web-shell/v1/turns/submit:
+    post:
+      tags: [WebShell]
+      operationId: webShellSubmitTurn
+      x-qwen-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellSubmitRequest'
+      responses:
+        '202':
+          description: Turn admitted.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellAdmission'
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/agent/web-shell/v1/turns/cancel:
+    post:
+      tags: [WebShell]
+      operationId: webShellCancelTurn
+      x-qwen-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebShellCancelRequest'
+      responses:
+        '202':
+          description: Cancellation durably admitted.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebShellAdmission'
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    trustedTenant:
+      type: apiKey
+      in: header
+      name: X-Qwen-Tenant-Id
+      description: Injected by the trusted authenticated gateway, never trusted from browser input.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TurnId:
+      name: turnId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 64 }
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string, maxLength: 512 }
+    ListLimit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    AfterSequence:
+      name: after
+      in: query
+      required: false
+      schema: { type: integer, format: int64, minimum: 0, default: 0 }
+    EventLimit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+  headers:
+    IdempotentReplay:
+      schema: { type: boolean }
+      description: True when the original result was returned for the same idempotency key and digest.
+    RequestId:
+      schema: { type: string, maxLength: 128 }
+      description: Trace-only correlation identifier; never an idempotency key.
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: State, idempotency, or recovery conflict.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Resource absent or outside the caller tenant scope.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    CursorExpired:
+      description: Replay cursor is older than the retained replay floor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  schemas:
+    InputBlock:
+      type: object
+      additionalProperties: false
+      required: [type, text]
+      properties:
+        type: { type: string, enum: [input_text] }
+        text: { type: string, minLength: 1, maxLength: 1000000 }
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [agent_id]
+      properties:
+        agent_id: { type: string, minLength: 1, maxLength: 128 }
+        agent_revision:
+          type: [string, 'null']
+          maxLength: 128
+          description: Optional explicit revision; omitted resolves current revision atomically at admission.
+        input:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/InputBlock' }
+        metadata: { type: object, additionalProperties: true }
+        stream:
+          type: boolean
+          default: false
+          description: Phase one requires false; stream through the events route.
+    SessionEventRequest:
+      oneOf:
+        - $ref: '#/components/schemas/InputMessageEventRequest'
+        - $ref: '#/components/schemas/CancelEventRequest'
+      discriminator:
+        propertyName: type
+    InputMessageEventRequest:
+      type: object
+      additionalProperties: false
+      required: [type, input]
+      properties:
+        type: { const: agent.session.input.message }
+        input:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/InputBlock' }
+    CancelEventRequest:
+      type: object
+      additionalProperties: false
+      required: [type, turn_id]
+      properties:
+        type: { const: agent.session.cancel }
+        turn_id: { type: string, minLength: 1, maxLength: 64 }
+    CommandAdmission:
+      type: object
+      required: [session_id, status, replayed]
+      properties:
+        session_id: { type: string, format: uuid }
+        turn_id: { type: [string, 'null'], maxLength: 64 }
+        status: { type: string }
+        replayed: { type: boolean }
+    PublicSession:
+      type: object
+      required: [id, object, agent_id, agent_revision, status, created_at, updated_at, last_event_id, capabilities]
+      properties:
+        id: { type: string, format: uuid }
+        object: { const: agent.session }
+        agent_id: { type: string }
+        agent_revision: { type: string }
+        status: { type: string, enum: [active, closing, closed, failed, recovery_blocked] }
+        created_at: { type: integer, format: int64 }
+        updated_at: { type: integer, format: int64 }
+        metadata: { type: object, additionalProperties: true }
+        active_turn: { oneOf: [{ $ref: '#/components/schemas/PublicTurn' }, { type: 'null' }] }
+        last_event_id: { type: integer, format: int64, minimum: 0 }
+        replay_floor_sequence: { type: integer, format: int64, minimum: 0, default: 0 }
+        snapshot_through_sequence: { type: integer, format: int64, minimum: 0, default: 0 }
+        capabilities:
+          $ref: '#/components/schemas/SessionCapabilities'
+    SessionCapabilities:
+      type: object
+      additionalProperties: false
+      required: [items, snapshots, artifacts, resync]
+      properties:
+        items: { type: boolean }
+        snapshots: { type: boolean }
+        artifacts: { type: boolean }
+        resync: { type: boolean }
+    PublicTurn:
+      type: object
+      required: [id, object, session_id, status, created_at]
+      properties:
+        id: { type: string, maxLength: 64 }
+        object: { const: agent.turn }
+        session_id: { type: string, format: uuid }
+        input_item_id: { type: [string, 'null'], maxLength: 64 }
+        status: { type: string, enum: [accepted, running, completed, failed, cancelled, recovery_blocked] }
+        created_at: { type: integer, format: int64 }
+        completed_at: { type: [integer, 'null'], format: int64 }
+        error_code: { type: [string, 'null'], maxLength: 128 }
+    PublicEvent:
+      type: object
+      required: [schema_version, projection_version, sequence, event_id, session_id, type, created_at, data, terminal]
+      properties:
+        schema_version: { type: integer, minimum: 1 }
+        projection_version: { type: integer, minimum: 1 }
+        sequence: { type: integer, format: int64, minimum: 1 }
+        event_id: { type: string, maxLength: 64 }
+        session_id: { type: string, format: uuid }
+        turn_id: { type: [string, 'null'], maxLength: 64 }
+        item_id: { type: [string, 'null'], maxLength: 64 }
+        content_part_id: { type: [string, 'null'], maxLength: 64 }
+        type: { type: string, maxLength: 128 }
+        created_at: { type: integer, format: int64 }
+        data: { type: object, additionalProperties: true }
+        terminal: { type: boolean }
+    PublicItem:
+      type: object
+      required: [id, object, session_id, type, revision, status, first_sequence, last_sequence, content]
+      properties:
+        id: { type: string, maxLength: 64 }
+        object: { const: agent.item }
+        session_id: { type: string, format: uuid }
+        turn_id: { type: [string, 'null'], maxLength: 64 }
+        type: { type: string, enum: [message, reasoning, tool_call, tool_result, approval, error] }
+        role: { type: [string, 'null'], enum: [user, assistant, tool, system, null] }
+        revision: { type: integer, minimum: 1 }
+        status: { type: string }
+        first_sequence: { type: integer, format: int64, minimum: 1 }
+        last_sequence: { type: integer, format: int64, minimum: 1 }
+        content: { type: object, additionalProperties: true }
+    PublicArtifact:
+      type: object
+      required: [id, object, session_id, size, sha256, media_type, created_at]
+      properties:
+        id: { type: string, maxLength: 128 }
+        object: { const: agent.artifact }
+        session_id: { type: string, format: uuid }
+        turn_id: { type: [string, 'null'], maxLength: 64 }
+        size: { type: integer, format: int64, minimum: 0 }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        media_type: { type: string }
+        created_at: { type: integer, format: int64 }
+    AgentDefinitionRequest:
+      type: object
+      additionalProperties: false
+      required: [model, instructions, tools, permission_policy]
+      properties:
+        model: { type: object, additionalProperties: true }
+        instructions: { type: string, maxLength: 1000000 }
+        tools: { type: array, maxItems: 1000, items: { type: object, additionalProperties: true } }
+        skills: { type: array, maxItems: 1000, items: { type: object, additionalProperties: true } }
+        mcp_servers: { type: array, maxItems: 100, items: { type: object, additionalProperties: true } }
+        permission_policy: { type: object, additionalProperties: true }
+        environment_template_id: { type: [string, 'null'], maxLength: 128 }
+        metadata: { type: object, additionalProperties: true }
+    AgentDefinition:
+      type: object
+      required: [id, object, revision, digest, created_at]
+      properties:
+        id: { type: string, maxLength: 128 }
+        object: { const: agent }
+        revision: { type: string, maxLength: 128 }
+        digest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        created_at: { type: integer, format: int64 }
+        metadata: { type: object, additionalProperties: true }
+    PublicSessionList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object: { const: list }
+        data: { type: array, items: { $ref: '#/components/schemas/PublicSession' } }
+        has_more: { type: boolean }
+        next_cursor: { type: [string, 'null'] }
+    PublicEventList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object: { const: list }
+        data: { type: array, items: { $ref: '#/components/schemas/PublicEvent' } }
+        has_more: { type: boolean }
+        next_cursor: { type: [string, 'null'] }
+    PublicTurnList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object: { const: list }
+        data: { type: array, items: { $ref: '#/components/schemas/PublicTurn' } }
+        has_more: { type: boolean }
+        next_cursor: { type: [string, 'null'] }
+    PublicItemList:
+      type: object
+      required: [object, data, has_more, snapshot_through_sequence]
+      properties:
+        object: { const: list }
+        data: { type: array, items: { $ref: '#/components/schemas/PublicItem' } }
+        has_more: { type: boolean }
+        next_cursor: { type: [string, 'null'] }
+        snapshot_through_sequence: { type: integer, format: int64, minimum: 0 }
+    PublicArtifactList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object: { const: list }
+        data: { type: array, items: { $ref: '#/components/schemas/PublicArtifact' } }
+        has_more: { type: boolean }
+        next_cursor: { type: [string, 'null'] }
+    WebShellListRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        cursor: { type: [string, 'null'], maxLength: 512 }
+        limit: { type: [integer, 'null'], minimum: 1, maximum: 100, default: 20 }
+    WebShellSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, format: uuid }
+    WebShellTranscriptRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, format: uuid }
+        cursor: { type: [string, 'null'], maxLength: 512 }
+        limit: { type: [integer, 'null'], minimum: 1, maximum: 1000, default: 100 }
+    WebShellStreamRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, format: uuid }
+        afterSequence: { type: [integer, 'null'], format: int64, minimum: 0, default: 0 }
+    WebShellCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, agentId]
+      properties:
+        requestId: { type: [string, 'null'], maxLength: 128, description: Trace correlation only. }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128 }
+        agentId: { type: string, minLength: 1, maxLength: 128 }
+        environmentId: { type: [string, 'null'], description: Planned; phase one rejects non-blank values. }
+        title: { type: [string, 'null'], maxLength: 512 }
+        input: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/InputBlock' } }
+        metadata: { $ref: '#/components/schemas/WebShellMetadata' }
+    WebShellSubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, sessionId]
+      properties:
+        requestId: { type: [string, 'null'], maxLength: 128, description: Trace correlation only. }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128 }
+        sessionId: { type: string, format: uuid }
+        input: { type: array, minItems: 1, maxItems: 100, items: { $ref: '#/components/schemas/InputBlock' } }
+        metadata: { $ref: '#/components/schemas/WebShellMetadata' }
+    WebShellCancelRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, sessionId, turnId]
+      properties:
+        requestId: { type: [string, 'null'], maxLength: 128, description: Trace correlation only. }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128 }
+        sessionId: { type: string, format: uuid }
+        turnId: { type: string, minLength: 1, maxLength: 64 }
+    WebShellMetadata:
+      type: [object, 'null']
+      additionalProperties: false
+      properties:
+        clientId: { type: string, minLength: 1, maxLength: 128 }
+    WebShellAdmission:
+      type: object
+      required: [sessionId, status, replayed]
+      properties:
+        sessionId: { type: string, format: uuid }
+        turnId: { type: [string, 'null'], maxLength: 64 }
+        status: { type: string }
+        replayed: { type: boolean }
+    WebShellTurn:
+      type: object
+      required: [turnId, sessionId, status, submittedAt]
+      properties:
+        turnId: { type: string }
+        sessionId: { type: string, format: uuid }
+        status: { type: string }
+        submittedAt: { type: integer, format: int64 }
+        completedAt: { type: [integer, 'null'], format: int64 }
+        errorCode: { type: [string, 'null'] }
+        usage: { type: [object, 'null'], additionalProperties: true }
+    WebShellSession:
+      type: object
+      required: [sessionId, agentId, status, createdAt, updatedAt, lastSequence]
+      properties:
+        sessionId: { type: string, format: uuid }
+        title: { type: [string, 'null'] }
+        agentId: { type: string }
+        status: { type: string }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+        activeTurn: { oneOf: [{ $ref: '#/components/schemas/WebShellTurn' }, { type: 'null' }] }
+        environment: { type: [object, 'null'], additionalProperties: true }
+        lastSequence: { type: integer, format: int64, minimum: 0 }
+    WebShellSessionPage:
+      type: object
+      required: [data, hasMore]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/WebShellSession' } }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    WebShellTranscript:
+      type: object
+      required: [events, hasMore, lastSequence]
+      properties:
+        events: { type: array, items: { $ref: '#/components/schemas/WebShellEvent' } }
+        olderCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+        lastSequence: { type: integer, format: int64, minimum: 0 }
+    WebShellEvent:
+      type: object
+      required: [sequence, eventId, sessionId, type, createdAt, data, terminal]
+      properties:
+        schemaVersion: { type: integer, minimum: 1, default: 1 }
+        projectionVersion: { type: integer, minimum: 1, default: 1 }
+        sequence: { type: integer, format: int64, minimum: 1 }
+        eventId: { type: string, maxLength: 64 }
+        sessionId: { type: string, format: uuid }
+        turnId: { type: [string, 'null'], maxLength: 64 }
+        itemId: { type: [string, 'null'], maxLength: 64 }
+        contentPartId: { type: [string, 'null'], maxLength: 64 }
+        type: { type: string, maxLength: 128 }
+        createdAt: { type: integer, format: int64 }
+        data: { type: object, additionalProperties: true }
+        terminal: { type: boolean }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: [string, 'null'] }
+            replay_floor_sequence: { type: [integer, 'null'], format: int64 }
+            snapshot_through_sequence: { type: [integer, 'null'], format: int64 }

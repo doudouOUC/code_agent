@@ -1,25 +1,25 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **当前基准：[HTML v1.5](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-20；在用户提供的 v1.2 上补充首版运行条件、普通工具接线与统一 Session 身份。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.6](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-20；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份，以及事件接受、SSE、存储和恢复契约。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
-> **存储与事件实现补充（2026-09-20）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交和提交后本机 SSE 直推；SQL 批次日志、Item/Snapshot 物化、RocketMQ/Redis Transport、PostgreSQL 适配器及持久恢复仍是后续阶段。这一补充细化 D/F/G，不改变 HTML v1.5 的组件职责与 A～H 顺序。
+> **存储与事件实现补充（2026-09-20）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交和提交后本机 SSE 直推；Schema 生成、SQL 批次日志、Item/Snapshot 物化、RocketMQ/Redis Transport、PostgreSQL 适配器及持久恢复仍是后续实现。这一补充细化 D/F/G，不改变 HTML v1.6 的组件职责与 A～H 顺序。
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
 ## 当前方案入口
 
-先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`。Java 公开事件的接受、直推、续传、MQ 与长期物化边界见[存储与事件设计](managed-agent-storage-event-architecture.md)。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
+先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.5 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.6 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
 
 ## 首版运行范围
 
-首版验证采用单 Java + qwen Sidecar、预发布静态 Bundle、Session 独占 Runtime，复用现有产品 SSE/历史。tenantId 设计暂缓，不作为本轮前置项，既有访问检查继续执行。
+首版验证采用单 Java + qwen Sidecar、预发布静态 Bundle、Session 独占 Runtime，复用现有产品 SSE/历史。Hosted 请求必须由可信入口从已认证身份注入 `X-Qwen-Tenant-Id`，所有资源按 `(tenantId, resourceId)` 校验；终端用户身份系统、配额与跨租户故障验收在生产开放前完成，不阻塞单实例运行烟测。
 
 首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不涉及。复用现有配置与 Bundle 工具目录表达范围，普通工具所需的审批、结果/文件历史保存和取消清理仍是必需项。
 
@@ -100,6 +100,8 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [执行引擎选择与持久化](managed-session-execution-engine.md) | 阶段 B 的 selector、同 Bridge 双引擎、sticky owner |
 | [Session 存储](managed-agent-session-storage.md) | 本地权威日志、writer、公共投影与共享存储的边界 |
 | [Java 存储、事件与恢复](managed-agent-storage-event-architecture.md) | `AgentStateStore`、事件批次、提交后 SSE、SQL/MQ/物化边界、MySQL/PostgreSQL 与恢复阶段 |
+| [Public API 与 WebShell 契约](managed-agent-api-contract.md) / [OpenAPI](managed-agent-public-api.openapi.yaml) | 统一公共/WebShell 路由、DTO、错误、幂等、分页、SSE 与租户范围 |
+| [MySQL v1.6 目标结构](managed-agent-storage-schema.mysql.sql) | Event Batch、Item、Snapshot、Consumer Progress 与 Session Owner 的精确增量 DDL |
 | [Session 兼容](managed-agent-session-compatibility.md) / [方法映射](managed-agent-session-method-map.md) | 复用 daemon 契约及原调用者审计 |
 | [完整 Harness](managed-agent-harness.md) | TS Agent 装配、逻辑 handle、安全点与恢复范围 |
 | [私有协议](managed-agent-control-protocol.md) | Java/daemon/Broker/Runtime 边界、fencing、原调用恢复 |

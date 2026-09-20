@@ -1,6 +1,6 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
-> **普通工具接线（2026-09-20，HTML v1.5；工具契约源自 v1.4）：** 普通工具 Bundle 的字段、共享定义发布、只读装载与摘要分型按[首版接线设计](managed-agent-ordinary-tools-integration.md#2-bundle-发布与装载)执行；未启用扩展不隐式发现。
+> **普通工具接线（2026-09-20，HTML v1.6；工具契约源自 v1.4）：** 普通工具 Bundle 的字段、共享定义发布、只读装载与摘要分型按[首版接线设计](managed-agent-ordinary-tools-integration.md#2-bundle-发布与装载)执行；未启用扩展不隐式发现。
 
 > **HTML 对齐（2026-09-18）：** 版本化 AgentBundle 为 Harness 提供模型、instructions、Tool Schema、Skill 静态描述、MCP 能力快照和权限摘要，Runtime ready 后核验 revision/digest。Workspace 工具、MCP 和本地副作用在 Runtime 执行；未迁移的 Hooks/动态 MCP/Extension 使新 Session 保留 Legacy，完整扩展按 H 启用。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
