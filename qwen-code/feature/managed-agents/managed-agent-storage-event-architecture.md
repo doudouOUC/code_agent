@@ -1,10 +1,12 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+> **v1.10 修订（2026-09-21）：** [v1.10 契约收敛](managed-agent-contract-closure.md)替换全局 offset 扫描，区分入口受理边界，补齐真实 V1/V2 的增量迁移及容量/清理门槛。全部新增批次/MQ/命令交付能力仍为目标设计。
+
 > **源码实现（2026-09-20）：** `qwen-code` 分支 [`feature/managed-agents-p0-p8`](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的提交 [`2695220a3a`](https://github.com/doudouOUC/qwen-code/commit/2695220a3ad1ca2654633aed4a7cef46c7469d74) 已实现本文所列 P0 和基于 SQL 的 P1 物化切片。源码仓库同时保留[中文设计](https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.zh-CN.md)和[英文设计](https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.md)。
 
 状态：总体架构仍为提议；对应的 `qwen-code` 源码分支已实现 P0 和基于 SQL 的 P1 物化切片。日期：2026-09-20。本文按下面的集成代码快照设计，不表示完整架构已经通过生产验收。
 
-v1.6 的机器可读接口契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)，接口语义见[Public API 与 WebShell 契约](managed-agent-api-contract.md)，MySQL 8.0 的目标增量结构见 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。这三项冻结目标结构；当前 Java 已执行其中 V2 Item/Snapshot 子集，但尚未从 OpenAPI 生成 DTO、通过完整契约测试或迁移目标 DDL 的其余部分。
+v1.10 的机器可读接口契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)，接口语义见[Public API 与 WebShell 契约](managed-agent-api-contract.md)，MySQL 8.0 的目标增量结构见 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。这三项定义目标结构；当前 Java 已执行实际 V2 Item/Part/latest Snapshot/per-Session progress，但尚未从 OpenAPI 生成 DTO、通过完整契约测试或迁移目标 DDL 的其余部分。
 
 ## 1. 决策
 
@@ -80,7 +82,7 @@ flowchart TD
   RT --> WS[Durable workspace / result artifacts]
 ```
 
-1. Java 在一个事务里保存 Prompt 的命令幂等、Turn、输入及控制事件，返回已接受的 Turn 身份。
+1. 阶段 D 的 `java_durable` Profile 在一个事务里保存 Prompt 幂等、Turn、不可变输入、控制事件及 command delivery，返回 Turn/operation 身份和 `admission_stage=java_durable`。这表示平台承担投递责任，不表示 qwen 已受理；现有产品 `/sessions` 的 `qwen_confirmed` Profile 仍等 qwen CommitReceipt 才 ACK。两种入口不动态互换，详见 [v1.10 契约收敛](managed-agent-contract-closure.md)。
 2. Coordinator 取得带代际的租约，按稳定 `promptId` 提交 Harness，同时预热 Runtime。提交响应丢失时核对原提交，不创建新 Prompt 重跑。
 3. Java 解析 Harness SSE，投影、去重并组成有大小上限的批次。`acceptBatch` 提交成功后，本节点直接把返回的事件发给 SSE Hub，无须再次读取数据库或等待 MQ。
 4. Relay 读取同一批次日志并发往配置的 EventTransport；消费者聚合 Message/Item。无 MQ 部署由数据库批次扫描器执行相同的物化事务。
@@ -136,7 +138,7 @@ EventTransport 的通用保证保持较小：允许重复和跨重连乱序，�
 | --- | --- | --- |
 | `RocketMqEventTransport` | 以 `(tenantId, sessionId)` 为 message group；同步或异步等待持久发送确认；共享物化消费组与每节点 SSE 广播组分开配置 | FIFO 不提供 writer fencing；Broker offset 不是浏览器游标 |
 | `RedisStreamsEventTransport` | 明确 consumer group、pending reclaim、持久化/副本配置和最大长度；裁剪前检查 SQL 修复窗口 | 写入内存即等于跨故障持久；`XTRIM` 后仍可回放 |
-| `SqlEventTransport` | 首版固定 `shardId=0`，用 `managed_agent_consumer_progress` 的 lease/CAS 顺序扫描 `batch_offset`，处理后推进连续进度；扩分片必须新增 assignment epoch 并迁移进度 | 它不是第二份 Outbox，也不提供跨节点低延迟广播；不能直接改变取模数 |
+| `SqlEventTransport` | 扫描全部 pending/过期 leased 的 `managed_agent_batch_delivery`，短事务认领；按原 claim generation 确认，物化与 V2 每 Session 连续进度同事务提交 | 自增 ID 不是提交顺序，禁止用全局最大 offset 作为扫描下界；任务只存元数据，不复制 batch 正文 |
 
 部署一次只选择一个物化 Transport。数据库、Transport 和 ArtifactStore 都通过接口注入，但“可替换”只表示实现同一契约并通过共同测试，不表示运行中热切换或所有后端能力完全相同。
 
@@ -152,7 +154,7 @@ EventTransport 的通用保证保持较小：允许重复和跨重连乱序，�
 
 1. 按统一顺序锁 Session 与 Turn，验证租户、活动 Turn、数据库时间租约、单调递增的 owner generation 及源 epoch。过期写者不能提交，即使它还活着。
 2. 丢弃当前 epoch 下已提交源游标以前的输入，再进行合并。IngressBatch 在提交前保留源事件边界，以便处理重试批次与已接受前缀重叠；不同 epoch 不能用数字大小比较。
-3. 为新公开事件分配连续 `sequence`，保存不可变批次，推进源游标和 Session 水位；终态与其终态事件同事务更新。全部被过滤时只提交游标检查点，不产生空公开事件。
+3. 为新公开事件分配连续 `sequence`，保存不可变批次和当前 consumer set 的必要 delivery 任务，推进源游标和 Session 水位；终态与其终态事件同事务更新。全部被过滤时只提交游标检查点，不产生空公开事件或分发任务。
 4. 事务提交后才向 Hub 发布；命令产生的控制事件使用同一序号分配机制。Runtime 异步回调还需验证对应操作的 generation/状态，拒绝失效操作的晚到结果。
 
 SQL 提交响应丢失时，先按稳定提交身份核对结果；已提交的批次复用原 `batchId`、序号和内容，不重新分配序号。相同身份携带不同摘要属于协议冲突，应停止该流并报警。接受凭据和源游标去重元数据至少保留到承诺的重试窗口结束，不能随短期正文一起提前删除。
@@ -180,7 +182,7 @@ SQL 提交响应丢失时，先按稳定提交身份核对结果；已提交的�
 
 先注册本地订阅并缓冲通知，再读取一致的 Snapshot 和日志高水位 `H`，发送 `(afterSequence, H]` 内的数据，然后排空缓冲中 `sequence > H` 的部分。客户端和服务端均按序号去重；遇到缺口先补齐，不能直接跳过。范围分页需短期读取租约或等效保护，避免清理任务在分页中间删掉数据；保护到期时显式重试或重置。
 
-保留现有 SSE 的数字 `id` / `Last-Event-ID`，由服务端固定到已鉴权的 Session；前端使用十进制字符串或安全整数策略，避免大序号精度丢失。新增能力协商后返回 `minReplaySequence`、`lastSequence`、`coveredSequence`。超出保留窗口时，流建立前返回明确的游标过期错误；流建立后发送不推进业务序号的 `resync.required` 控制帧并关闭。
+保留现有 SSE 的数字 `id` / `Last-Event-ID`，由服务端固定到已鉴权的 Session；前端使用十进制字符串或安全整数策略，避免大序号精度丢失。新增能力协商后公共 Session 返回 `replay_floor_sequence`、`last_event_id`、`snapshot_through_sequence`；BFF 对应 `replayFloorSequence/lastSequence/snapshotThroughSequence`，Transcript 的内容覆盖水位仍为 `coveredSequence`。超出保留窗口时，流建立前返回明确的游标过期错误；流建立后发送不推进业务序号的 `agent.session.resync_required` 控制帧并关闭。
 
 前端拿到物化 Snapshot，整体替换其覆盖的状态，再从 `coveredSequence` 之后读取尾部，不能把同一段文本追加两次。Snapshot 必须绑定一致版本的 Item 内容及水位；若历史分页，所有页面固定在同一 Snapshot 版本。清理仅能推进到已物化的连续前缀，保证该 Snapshot 之后仍有连续日志。旧客户端未具备重置能力前，不能对它依赖的数据启用过期删除。
 
@@ -200,11 +202,11 @@ RocketMQ 的组内顺序需要单生产者串行发送；跨生产者接管仍�
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `managed_agent_event_batch`       | 单行保存一个有界批次、序号区间和编码后的公开事件；兼作 Outbox 与续传日志，不再额外复制一张相同的 SQL Outbox。 |
 | `managed_agent_item`              | 按稳定 Item/Part 保存展示内容、类型、状态、修订号及大对象引用。                                               |
-| `managed_agent_snapshot`          | 一致的 Transcript 版本、`coveredSequence`、活动 Item 状态及终态；不能只有水位而没有可恢复的对应内容。         |
+| `managed_agent_snapshot_version`  | 新增不可变 Transcript 版本、`coveredSequence`、活动 Item 状态及终态；不能只有水位而没有可恢复的对应内容。         |
 | `managed_agent_consumer_progress` | 每个必要投影的连续消费进度；发布进度独立记录，不能用 Broker ACK 代替物化进度。                                |
 | Session/Turn 增量列               | 租约 generation、日志最低/最高水位、存储版本、恢复状态和持久化资源引用。                                      |
 
-MySQL 8.0 的列、索引、约束及迁移不变量已经冻结在 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。`managed_agent_event_batch.batch_offset` 只用于 Relay/消费者的全局顺序扫描；公共 API 不返回它。`eventCount=0` 表示只推进 Harness 源游标的检查点，不发布 MQ，也不占用公开 sequence。`managed_agent_session_owner.ownerGeneration` 是 Java/Harness 接管 fence，和 Runtime `activationEpoch` 分开。
+MySQL 8.0 的目标增量 DDL 见 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)，适用于真实 V1/V2 之后，保留已有 Item/Part/latest Snapshot/per-Session progress，新增 `snapshot_version` 供不可变分页。`batch_offset` 只作内部定位与排序，不是提交水位，公共 API 不返回它。Relay/SQL 物化均认领持久 delivery 任务，算法、锁序、迟到 ACK 与 GC receipt 见 [v1.10 契约收敛](managed-agent-contract-closure.md)；旧 v1.6 “另建同名表的 additive V2” 已废止。`eventCount=0` 表示只推进 Harness 源游标的检查点，不发布 MQ，也不占用公开 sequence。`managed_agent_session_owner.ownerGeneration` 是 Java/Harness 接管 fence，和 Runtime `activationEpoch` 分开。
 
 所有写事务采用 `READ COMMITTED`，按 Session → Turn → SessionOwner 的顺序取得行锁；v1.9 Workspace 准入/变更如需锁 Registry，则统一在 Session 前取得，Registry 失效流程也不得逆序；Snapshot/Item 物化按 batch 连续进度执行 CAS。MySQL 使用二进制/大小写敏感语义保存稳定 ID 与摘要；PostgreSQL 适配器使用等价约束、自增 sequence 和事务外重试，不能在已经失败的事务中继续查询冲突结果。两种实现必须通过相同的事务、幂等、分页和故障注入测试。
 
@@ -219,7 +221,7 @@ MySQL 8.0 的列、索引、约束及迁移不变量已经冻结在 [`managed-ag
 - 所有必要消费者都已完成；启用 MQ 时也已完成分发及必要下游处理。新增消费者先从 Snapshot 初始化，不能假设旧批次仍在。
 - 不存在调查、恢复或资源引用 pin；按有界分页删除，避免长期持锁。
 
-`W` 是待确认参数，不预设永久保存。可用 `24h` 作为容量测算示例，但它不是已经承诺的产品配置。超过窗口并不等于无条件删除；若消费者长时间落后，限流、暂停新 Turn 并告警，不能无限积压或静默丢弃。
+生产 `W` 必须显式配置，不预设永久保存。[v1.10 契约收敛](managed-agent-contract-closure.md)给出开发/预发起点 W=1h、重试 R=24h、reader/claim lease、lag/bytes 准入阈值及恢复迟滞；生产值需压测并批准容量预算。下面 `24h` 仅是容量测算，不是默认续传承诺。超过窗口并不等于无条件删除；若消费者长时间落后，限流、暂停新 Turn 并告警，不能无限积压或静默丢弃。
 
 RocketMQ 自身会按保留和空间策略清理，包括尚未消费的数据，应用不能假设“未 ACK 就永远保留”。必要进度落后时由 SQL 日志承担修复来源，并在容量边界前停止接受新工作。[RocketMQ storage policy](https://rocketmq.apache.org/docs/featureBehavior/11messagestorepolicy/)
 

@@ -1,5 +1,7 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+> **v1.10 补充：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节补齐上下文安装的私有协议与回执映射。空闲 MCP 连接在封准入后可排空，不作为到达排空步骤前的硬阻塞；Runtime 回收仍把未关闭连接计入 hold。第 6 节增加 actor 授权/幂等域；command SQL delta 在本 Workspace delta 之后应用。
+
 [English](managed-agent-workspace-context.en.md) | [简体中文](managed-agent-workspace-context.md)
 
 状态：v1.9 目标设计，尚未实现。日期：2026-09-21。补充 [HTML 总方案](managed-agent-dual-path-architecture.html#workspace-context)、[公共接口](managed-agent-api-contract.md)和[扩展运行时](managed-agent-extension-runtime.md)。本轮只更新文档、OpenAPI 与目标 DDL，不表示 Java 已支持多 Workspace 或 Session 目录切换。
@@ -54,7 +56,7 @@ WebShell 选择 workspaceId + cwdRelative
 
 只支持同一 Workspace 授权范围内切换；跨 Workspace、进入新的独立 worktree 或改变共享写入边界需单独准入，首版创建新 Session。不能把 shell 命令里的 `cd` 当作持久 Session 目录切换。
 
-1. 需要 Registry 锁时统一按 Registry → Session → Turn → SessionOwner 顺序，不需要时从 Session 开始；Registry 失效流程不得逆序取锁。锁定 Session 并按预期 revision 做 CAS；活动 Turn、排队/已准入的输入、未决工具、审批、后台 Shell/Monitor/async Hook、共享写 child 或 MCP 操作/连接 hold 存在时返回 `session_context_busy`。幂等重试必须先返回原 operation。
+1. 需要 Registry 锁时统一按 Registry → Session → Turn → SessionOwner 顺序，不需要时从 Session 开始；Registry 失效流程不得逆序取锁。锁定 Session 并按预期 revision 做 CAS；活动 Turn、排队/已准入的输入、未决工具、审批、后台 Shell/Monitor/async Hook、共享写 child 或活动 MCP 操作/未决回执存在时返回 `session_context_busy`。幂等重试必须先返回原 operation。
 2. 同事务保存不可变目标、原上下文和 `operationId`，置 `context_state=changing`，封新 prompt、调度输入与工具准入。并发输入与变更竞争同一准入屏障，只有一方成功。
 3. 使用窄化维护 OperationGrant，在原 owner 安装关闭的 gate；验证目标目录，准备新的配置/trust/权限视图、MCP/Hook catalog 和 cwd 相关缓存。关闭需要重建的空闲 stdio MCP 连接；失败不允许混合新旧配置继续执行。
 4. Runtime 和 Harness 分别持久记录安装回执；文件历史根保留 Workspace 语义，read cache 按新上下文隔离，模型收到目录变化的可信上下文。收齐回执后，Java 事务更新 cwd、contextConfigRef、revision、operation 终态并提交公开事件。

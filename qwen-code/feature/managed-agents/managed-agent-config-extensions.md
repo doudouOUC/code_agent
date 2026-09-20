@@ -1,5 +1,7 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+> **v1.10 Workspace 接线：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节冻结 `managed-context/1` 外层 `ContextBinding`，映射 ActivationGrant、InvocationBinding、config_install、两端安装回执及 journal/checkpoint/RestoreBundle。复用既有 `config.bound/domain.committed`，不修改严格 Tool v2 内层或增加另一份配置权威；未协商或 revision/digest/generation 不匹配时不开 gate。
+
 > **阶段 H 统一设计（2026-09-20，HTML v1.7）：** 本文继续作为 MCP/Hooks 的字段级规范；它们与 Channels、自动化、子 Agent、后台 Shell、Monitor 的共同 owner、任务投影、Runtime hold 和恢复规则见[扩展运行时设计](managed-agent-extension-runtime.md)。
 
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具 Bundle 的字段、共享定义发布、只读装载与摘要分型按[首版接线设计](managed-agent-ordinary-tools-integration.md#2-bundle-发布与装载)执行；未启用扩展不隐式发现。

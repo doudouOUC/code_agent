@@ -1,5 +1,7 @@
 # Managed Agent Workspace and Session cwd Contract
 
+> **v1.10 clarification:** [Contract closure](managed-agent-contract-closure.en.md) section 4 binds context installation to private envelopes and receipts. Idle MCP connections are drainable after sealing admission, not hard blockers before the drain step. Runtime reclamation still treats an open connection as a hold. Section 6 adds actor-scoped authorization/idempotency; apply the command SQL delta after this Workspace delta.
+
 [English](managed-agent-workspace-context.en.md) | [简体中文](managed-agent-workspace-context.md)
 
 Status: v1.9 target design, not implemented. Date: 2026-09-21. Supplements the [HTML architecture](managed-agent-dual-path-architecture.html#workspace-context), [public contract](managed-agent-api-contract.md), and [extension runtime](managed-agent-extension-runtime.md). This change updates documentation, OpenAPI, and target DDL only; it does not enable multiple Workspaces or Session cwd changes in Java.
@@ -54,7 +56,7 @@ Input, cancellation, tools, and tasks route through the persistent Session bindi
 
 Only the same authorized Workspace scope is supported. Another Workspace, independent worktree, or changed shared-write boundary needs separate admission; initially create a new Session. A shell command's `cd` does not change persistent Session cwd.
 
-1. Use the global lock order Registry → Session → Turn → SessionOwner when a Registry lock is needed; otherwise start at Session. Registry invalidation cannot take these locks in reverse order. Lock Session and CAS the expected revision. Reject with session_context_busy if an active Turn, queued/admitted input, unresolved tool, approval, background Shell/Monitor/async Hook, shared-write child, or MCP operation/connection hold exists. Check idempotent replay first.
+1. Use the global lock order Registry → Session → Turn → SessionOwner when a Registry lock is needed; otherwise start at Session. Registry invalidation cannot take these locks in reverse order. Lock Session and CAS the expected revision. Reject with session_context_busy if an active Turn, queued/admitted input, unresolved tool, approval, background Shell/Monitor/async Hook, shared-write child, or active MCP operation/unsettled receipt exists. Check idempotent replay first.
 2. Atomically save the immutable target, prior context, and operationId; set context_state=changing and block new prompt, scheduled-input, and tool admission. Input and cwd mutation compete on the same barrier; only one may enter.
 3. Use a narrow maintenance OperationGrant to install a closed gate on the original owner. Verify the target and prepare configuration, trust, permissions, MCP/Hook catalogs, and cwd-sensitive caches. Close idle stdio MCP connections requiring reconstruction. Never proceed with mixed old/new configuration.
 4. Runtime and Harness persist installation receipts. File history retains Workspace-root semantics; read caches are isolated by context and the model receives trusted directory-change context. After both receipts, Java atomically updates cwd, contextConfigRef, revision, operation status, and the public event.

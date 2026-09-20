@@ -1,14 +1,16 @@
--- Managed Agent v1.6 target schema for MySQL 8.0.
--- This is the design source for the additive V2 migration. It is not evidence
--- that the current Java service has applied these tables.
+-- Managed Agent v1.10 DESIGN delta for MySQL 8.0, AFTER actual V1 + V2.
+-- Preserve V2 Item/Part/latest Snapshot/per-session Consumer Progress.
+-- Not a registered Flyway migration or evidence of runtime implementation.
+-- Future migration numbers must be allocated on the implementation branch.
 
 ALTER TABLE managed_agent_session
     ADD COLUMN storage_version INT NOT NULL DEFAULT 1,
     ADD COLUMN replay_floor_sequence BIGINT NOT NULL DEFAULT 0,
-    ADD COLUMN snapshot_through_sequence BIGINT NOT NULL DEFAULT 0;
+    ADD COLUMN snapshot_through_sequence BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN consumer_set_version INT NOT NULL DEFAULT 1;
 
 ALTER TABLE managed_agent_turn
-    ADD COLUMN input_item_id VARCHAR(64),
+    ADD COLUMN input_item_id VARCHAR(128),
     ADD COLUMN input_revision BIGINT NOT NULL DEFAULT 1,
     ADD COLUMN input_digest CHAR(64)
         CHARACTER SET ascii COLLATE ascii_bin;
@@ -118,48 +120,7 @@ CREATE INDEX managed_agent_event_batch_replay_idx
 CREATE INDEX managed_agent_event_batch_expiry_idx
     ON managed_agent_event_batch (expires_at, batch_offset);
 
-CREATE TABLE managed_agent_item (
-    tenant_id VARCHAR(128) NOT NULL,
-    session_id VARCHAR(64) NOT NULL,
-    item_id VARCHAR(64) NOT NULL,
-    turn_id VARCHAR(64),
-    item_type VARCHAR(32) NOT NULL,
-    role VARCHAR(16),
-    status VARCHAR(32) NOT NULL,
-    revision BIGINT NOT NULL,
-    projection_version INT NOT NULL,
-    first_sequence BIGINT NOT NULL,
-    last_sequence BIGINT NOT NULL,
-    content_json LONGTEXT NOT NULL,
-    content_digest CHAR(64)
-        CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-    created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL,
-    deleted_at BIGINT,
-    version BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (tenant_id, session_id, item_id),
-    CONSTRAINT managed_agent_item_session_fk
-        FOREIGN KEY (tenant_id, session_id)
-        REFERENCES managed_agent_session (tenant_id, session_id),
-    CONSTRAINT managed_agent_item_revision_ck CHECK (revision > 0),
-    CONSTRAINT managed_agent_item_sequence_ck
-        CHECK (first_sequence > 0 AND first_sequence <= last_sequence),
-    CONSTRAINT managed_agent_item_role_ck
-        CHECK (role IS NULL OR role IN ('user', 'assistant', 'tool', 'system')),
-    CONSTRAINT managed_agent_item_type_ck
-        CHECK (item_type IN ('message', 'reasoning', 'tool_call',
-                             'tool_result', 'approval', 'error'))
-);
-
-CREATE INDEX managed_agent_item_sequence_idx
-    ON managed_agent_item
-        (tenant_id, session_id, first_sequence, item_id);
-
-CREATE INDEX managed_agent_item_turn_idx
-    ON managed_agent_item
-        (tenant_id, session_id, turn_id, first_sequence);
-
-CREATE TABLE managed_agent_snapshot (
+CREATE TABLE managed_agent_snapshot_version (
     tenant_id VARCHAR(128) NOT NULL,
     session_id VARCHAR(64) NOT NULL,
     snapshot_id VARCHAR(64) NOT NULL,
@@ -172,52 +133,112 @@ CREATE TABLE managed_agent_snapshot (
     created_at BIGINT NOT NULL,
     expires_at BIGINT,
     PRIMARY KEY (tenant_id, session_id, snapshot_id),
-    UNIQUE KEY managed_agent_snapshot_watermark_uq
+    UNIQUE KEY managed_agent_snapshot_version_watermark_uq
         (tenant_id, session_id, through_sequence, projection_version),
-    CONSTRAINT managed_agent_snapshot_session_fk
+    CONSTRAINT managed_agent_snapshot_version_session_fk
         FOREIGN KEY (tenant_id, session_id)
         REFERENCES managed_agent_session (tenant_id, session_id),
-    CONSTRAINT managed_agent_snapshot_sequence_ck
+    CONSTRAINT managed_agent_snapshot_version_sequence_ck
         CHECK (through_sequence >= 0),
-    CONSTRAINT managed_agent_snapshot_count_ck CHECK (item_count >= 0)
+    CONSTRAINT managed_agent_snapshot_version_count_ck CHECK (item_count >= 0)
 );
 
-CREATE INDEX managed_agent_snapshot_latest_idx
-    ON managed_agent_snapshot
+CREATE INDEX managed_agent_snapshot_version_latest_idx
+    ON managed_agent_snapshot_version
         (tenant_id, session_id, projection_version, through_sequence DESC);
 
-CREATE TABLE managed_agent_consumer_progress (
-    consumer_name VARCHAR(128) NOT NULL,
-    shard_id INT NOT NULL,
-    last_batch_offset BIGINT NOT NULL DEFAULT 0,
+-- The V2 progress PK remains (tenant_id, session_id, consumer_name).
+-- Its covered_sequence is a per-session contiguous business watermark.
+ALTER TABLE managed_agent_consumer_progress
+    ADD COLUMN lease_owner VARCHAR(128),
+    ADD COLUMN lease_until BIGINT,
+    ADD COLUMN claim_generation BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN last_error_code VARCHAR(128);
+
+CREATE TABLE managed_agent_batch_delivery (
+    tenant_id VARCHAR(128) NOT NULL,
+    session_id VARCHAR(64) NOT NULL,
+    batch_id VARCHAR(64) NOT NULL,
+    consumer_name VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    consumer_set_version INT NOT NULL,
+    state VARCHAR(16) NOT NULL DEFAULT 'pending',
+    available_at BIGINT NOT NULL,
     lease_owner VARCHAR(128),
     lease_until BIGINT,
+    claim_generation BIGINT NOT NULL DEFAULT 0,
+    attempts INT NOT NULL DEFAULT 0,
     last_error_code VARCHAR(128),
-    last_error_at BIGINT,
-    updated_at BIGINT NOT NULL,
-    version BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (consumer_name, shard_id),
-    CONSTRAINT managed_agent_consumer_progress_shard_ck
-        CHECK (shard_id >= 0),
-    CONSTRAINT managed_agent_consumer_progress_offset_ck
-        CHECK (last_batch_offset >= 0)
+    completed_at BIGINT,
+    PRIMARY KEY (tenant_id, session_id, batch_id, consumer_name),
+    CONSTRAINT managed_agent_batch_delivery_batch_fk
+        FOREIGN KEY (tenant_id, session_id, batch_id)
+        REFERENCES managed_agent_event_batch (tenant_id, session_id, batch_id),
+    CONSTRAINT managed_agent_batch_delivery_state_ck
+        CHECK (state IN ('pending', 'leased', 'done', 'blocked')),
+    CONSTRAINT managed_agent_batch_delivery_claim_ck
+        CHECK (claim_generation >= 0 AND attempts >= 0
+            AND (state <> 'leased' OR
+                (lease_owner IS NOT NULL AND lease_until IS NOT NULL
+                 AND claim_generation > 0))),
+    CONSTRAINT managed_agent_batch_delivery_done_ck
+        CHECK (state <> 'done' OR completed_at IS NOT NULL)
 );
 
--- Migration invariants:
--- 0. Existing rows remain storage_version = 1. Admission explicitly creates
---    a version-2 session only after batch, item and replay code is enabled.
--- 1. acceptBatch locks session -> turn -> owner in that order, validates the
---    owner generation, inserts one stable batch, then advances source cursor,
---    public sequence and terminal state in the same transaction.
--- 2. event_count = 0 is a cursor-only checkpoint and is never published.
---    Cursor-only checkpoints are produced by Harness; Java control events use
---    producer_kind = 'java' and have no Harness source cursor.
--- 3. Consumers advance last_batch_offset only after the corresponding side
---    effect and consumer-specific deduplication commit.
---    The first SQL scanner uses shard_id = 0. Adding shards requires an
---    explicit assignment epoch and progress migration; changing the modulus
---    in place would skip or duplicate ownership.
--- 4. A snapshot is published by CAS-updating session.snapshot_through_sequence
---    only after every item through that sequence is committed.
--- 5. replay_floor_sequence advances only when a usable snapshot exists and
---    every required consumer is beyond the batches being deleted.
+CREATE INDEX managed_agent_batch_delivery_pending_idx
+    ON managed_agent_batch_delivery (consumer_name, state, available_at);
+CREATE INDEX managed_agent_batch_delivery_expired_idx
+    ON managed_agent_batch_delivery (consumer_name, state, lease_until);
+
+-- Compact deduplication receipts survive payload GC through the retry horizon.
+-- Insert before deleting a batch, in the SAME cleanup transaction.
+CREATE TABLE managed_agent_batch_receipt (
+    tenant_id VARCHAR(128) NOT NULL,
+    session_id VARCHAR(64) NOT NULL,
+    batch_id VARCHAR(64) NOT NULL,
+    payload_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin,
+    source_boot_id VARCHAR(36),
+    source_event_epoch VARCHAR(64),
+    source_last_event_id BIGINT,
+    first_sequence BIGINT,
+    last_sequence BIGINT,
+    retry_until BIGINT NOT NULL,
+    PRIMARY KEY (tenant_id, session_id, batch_id),
+    UNIQUE KEY managed_agent_batch_receipt_source_uq
+        (tenant_id, session_id, source_boot_id, source_event_epoch,
+         source_last_event_id),
+    CONSTRAINT managed_agent_batch_receipt_session_fk
+        FOREIGN KEY (tenant_id, session_id)
+        REFERENCES managed_agent_session (tenant_id, session_id),
+    CONSTRAINT managed_agent_batch_receipt_range_ck
+        CHECK ((first_sequence IS NULL AND last_sequence IS NULL)
+            OR (first_sequence IS NOT NULL AND last_sequence IS NOT NULL
+                AND first_sequence > 0 AND last_sequence >= first_sequence))
+);
+CREATE INDEX managed_agent_batch_receipt_expiry_idx
+    ON managed_agent_batch_receipt (retry_until);
+
+-- Invariants (application transaction predicates, not implied by DDL):
+-- 1. Existing sessions remain storage_version=1. Cutover under the Session lock
+--    installs a verified baseline snapshot/consumer set, then starts batches H+1.
+-- 2. acceptBatch: Session -> Turn -> Owner; insert immutable batch + all required
+--    delivery rows and advance source cursor/public sequence/terminal state.
+--    Registry, when needed, precedes Session. No public events => no delivery.
+-- 3. Claim ALL pending/expired work with bounded SKIP LOCKED reads. batch_offset
+--    is only a locator/order key, NEVER a persistent lower-bound scan cursor.
+--    Claim-only transactions release locks before materialization starts.
+-- 4. Materialize: Session -> Turn/Owner if needed -> V2 progress -> delivery ->
+--    Item/Snapshot. Validate contiguous sequence and live claim generation;
+--    commit effects + progress + done together. MQ I/O stays outside locks.
+-- 5. Relay uses a per-session relay lease in V2 progress. Claim Session -> relay
+--    progress -> earliest unfinished delivery, then release the transaction.
+--    Confirm using BOTH live generations/leases. A stale publisher may send a
+--    duplicate; consumers still validate/deduplicate/repair public sequence.
+-- 6. Publish immutable snapshot_version before advancing snapshot_through_sequence.
+--    V2 mutable latest Snapshot is retained for legacy readers, not page pinning.
+-- 7. GC validates W, snapshot content, all necessary tasks and pins under Session
+--    lock; retain compact receipt, delete done tasks, delete batch, advance floor.
+--    Batch/source dedupe checks BOTH retained receipts and live batch rows.
+-- 8. Stable IDs require exact comparisons. Existing V1/V2 columns retain their
+--    collation for upgrade compatibility: before enabling new writes audit ID
+--    collisions, and use validated canonical IDs/exact comparison in adapters.
+--    Do not silently rewrite existing tenant/session keys in this delta.

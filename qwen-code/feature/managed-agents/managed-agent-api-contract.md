@@ -1,6 +1,6 @@
 # Managed Agent Public API 与 WebShell 契约
 
-状态：v1.9 目标契约；日期：2026-09-21。保留 v1.6 事件契约，新增尚未实现的 Workspace/cwd 契约。机器可读契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)。该文件是 Java DTO、WebShell TypeScript 类型和契约测试的单一来源；当前源码未生成这些类型，OpenAPI 中用 `x-qwen-implementation-status` 区分“已有路由但契约未完全对齐”的 `partial` 与尚未实现的 `planned`，全部契约通过后才改为 `implemented`。
+状态：v1.10 目标契约；日期：2026-09-21。保留事件与 Workspace/cwd 契约，新增 planned 的持久 operation、Action 交互、Session 生命周期及可信 actor 授权。机器可读契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)。该文件是 Java DTO、WebShell TypeScript 类型和契约测试的单一来源；当前源码未生成这些类型，OpenAPI 中用 `x-qwen-implementation-status` 区分“已有路由但契约未完全对齐”的 `partial` 与尚未实现的 `planned`，全部契约通过后才改为 `implemented`。
 
 ## 1. 路由与兼容范围
 
@@ -18,7 +18,7 @@
 ## 3. 幂等、请求关联与错误
 
 - 所有会创建或推进业务状态的请求必须携带调用前生成的稳定幂等键。公共 REST 使用 `Idempotency-Key` Header；WebShell adapter 使用请求体的 `idempotencyKey`。
-- 同一个租户、操作和幂等键携带相同摘要时返回原结果，并用 `replayed: true` 或 `X-Qwen-Idempotent-Replay: true` 表示重放；同键不同摘要返回 `409 idempotency_conflict`。
+- 目标唯一域为 tenant/session/operation/actor/key（创建时用 create scope），当前权限复核后，相同摘要返回原结果，并用 `replayed: true` 或 `X-Qwen-Idempotent-Replay: true` 表示重放；同键不同摘要返回 `409 idempotency_conflict`。
 - `requestId` 只用于 trace 关联，不参与业务幂等。WebShell 当前 DTO 中该字段尚未生效；接入生成类型时必须把它写入 trace 并回传 `X-Request-Id`，未实现前客户端不得依赖它。
 - 错误统一为 `{"error":{"code":"...","message":"...","request_id":"..."}}`。至少冻结 `invalid_request`、`invalid_limit`、`invalid_cursor`、`invalid_event_cursor`、`unsupported_event`、`unsupported_feature`、`idempotency_conflict`、`session_not_found`、`turn_not_found`、`session_not_active`、`turn_active`、`cursor_expired`、`recovery_blocked`、`over_capacity` 和 `internal_error`。
 
@@ -34,7 +34,7 @@
 
 ## 5. 版本与能力协商
 
-公共 JSON 和 SSE 事件携带 `schemaVersion` 与 `projectionVersion`。Session 响应携带 `capabilities`，至少声明 `items`、`snapshots`、`artifacts` 和 `resync` 是否可用。服务端不得向未声明 Snapshot reset 能力的客户端清理其所需增量。
+公共 JSON 和 SSE 事件携带 `schema_version` 与 `projection_version`，BFF 映射为 `schemaVersion/projectionVersion`。Session 响应携带 `capabilities`，至少声明 `items`、`snapshots`、`artifacts` 和 `resync` 是否可用。服务端不得向未声明 Snapshot reset 能力的客户端清理其所需增量。
 
 兼容规则如下：
 
@@ -83,7 +83,7 @@ OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。�
 | 创建 Session 的 `workspace` | 公共字段 `workspace_id/cwd_relative`；BFF 为 `workspaceId/cwdRelative`。缺省只允许解析显式租户默认值，首次准入后固定；重试先查原结果 |
 | Session 的 `workspace` | 返回逻辑身份、相对 cwd、context revision 和状态；旧 unbound 记录省略该对象并阻塞执行，不用当前默认配置补身份 |
 | `POST /v1/agents/sessions/{sessionId}/cwd` | 同 Workspace 的异步切换，必需 `cwd_relative/expected_context_revision` 与幂等键；202 表示命令已受理 |
-| `GET /v1/agents/sessions/{sessionId}/operations/{operationId}` | 查询原 cwd operation；completed 才带已提交的新 revision，查询不要求 Runtime 在线 |
+| `GET /v1/agents/sessions/{sessionId}/operations/{operationId}` | 查询 cwd、command 或 lifecycle operation 的封闭 union；cwd completed 才带新 revision，查询不要求 Runtime 在线 |
 | BFF `/workspaces/query`、`/sessions/cwd/change`、`/operations/query` | 位于 `/api/agent/web-shell/v1`，语义相同，使用 camelCase 请求和响应 |
 
 `workspace_context/cwd_change`（BFF `workspaceContext/cwdChange`）缺省 false；未声明能力时 UI 不显示相应写操作。`workspace.state=ready` 只表示当前上下文已提交，不表示 Runtime ready 或 activation gate 已打开。`changing` 期间拒绝新的 prompt 和工具准入。W2 初版在活动/排队 Turn、未决审批/执行或后台资源 hold 存在时拒绝切换。
@@ -91,3 +91,17 @@ OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。�
 cwd operation 的状态为 `pending/installing/completed/failed/recovery_blocked`。Java 收齐 Runtime 与 Harness 的持久安装回执后，在同一事务提交 Session cwd/revision、operation completed 与公开 `session.context.changed` 事件。事件使用既有 PublicEvent 封装，`data` 为 `{operation_id, workspace_id, cwd_relative, context_revision}`，不带绝对路径；WebShell adapter 映射为 camelCase。客户端漏事件后以 Session 和原 operation 查询为准。安装失败只在证明未安装或完整回滚后恢复旧状态，结果未知保持 blocked。
 
 新增错误：`400 workspace_required/invalid_cwd/unsupported_feature`；`404 workspace_not_found/operation_not_found`（含跨租户/无访问权）；`409 workspace_unavailable/workspace_generation_conflict/context_revision_conflict/session_context_busy/recovery_blocked`。准入之后发现路径无效等错误保存在 operation 的 `failure_code`；HTTP 202 不能解释为验证和安装都已完成。幂等重试先按原摘要返回同一 operation 和最新持久状态，再检查新的 CAS/忙碌条件。
+
+
+## 7. v1.10 准入、Action 与生命周期
+
+完整约束与角色矩阵见 [契约收敛](managed-agent-contract-closure.md)。阶段 D 目标 `java_durable` 入口返回 operation/admission stage/delivery state，202 仅表示保存并承担投递责任；兼容产品入口仍等 qwen receipt。新增字段及 capability 默认关闭，不能仅靠新 OpenAPI 宣称代码支持。
+
+| 公共 Session 路由 | BFF 路由 | 返回/边界 |
+| --- | --- | --- |
+| `GET actions` / `GET actions/{actionId}` | `actions/query` / `actions/get` | pending 列表与原 Action 的当前状态；permission/question 封闭 DTO |
+| `POST actions/{actionId}/responses` | `actions/respond` | 202 command operation；原 input/policy revision、option/question ID，原仲裁决定 `vote_recorded` 或 `decided` |
+| `POST close` / `POST archive` / `DELETE session` | `sessions/close` / `sessions/archive` / `sessions/delete` | 各自明确的 durable operation；archive 仅接受 closed，delete 不删除共享 Workspace |
+| `GET operations/{operationId}` | `operations/query` | cwd/command/lifecycle union，delete tombstone 重试期内仍可查；不是任意执行入口 |
+
+所有入口再校验可信 tenant + actor、资源 ACL 和原 Action responder 资格。reader/operator/owner 与服务委托范围不混用；无权读取返回 404，有读取权但无操作权返回 403。幂等域包含 tenant/session/operation/actor/key；不能凭同租户取回他人的幂等回执。新增 API、actor 验证和能力开关均待实现。close/删除仍执行既有 Hooks/资源结算门槛，202 不证明工具已停止。

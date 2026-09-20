@@ -1,17 +1,19 @@
 openapi: 3.1.0
 info:
   title: Qwen Managed Agent Public and WebShell API
-  version: 1.9.0
+  version: 1.10.0
   description: >-
     Canonical contract for the public Managed Agent resources and the WebShell
     adapter. partial means that the route exists but generated types and full
     contract tests are pending; planned means that the route or field is not implemented.
     Workspace context and cwd operations are v1.9 target contracts, not current
-    server capabilities. Filter planned fields as well as routes from production SDKs.
+    server capabilities. v1.10 adds planned command admission, Actions, lifecycle and actor authorization.
+    Filter planned fields as well as routes from production SDKs.
 servers:
   - url: /
 security:
   - trustedTenant: []
+    trustedActor: []
 tags:
   - name: Public Sessions
   - name: Public Resources
@@ -88,43 +90,43 @@ paths:
       operationId: createSession
       x-qwen-implementation-status: partial
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+      - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/CreateSessionRequest'
+            schema: {$ref: '#/components/schemas/CreateSessionRequest'}
       responses:
         '202':
           description: Session accepted after durable command admission.
           headers:
-            X-Qwen-Idempotent-Replay:
-              $ref: '#/components/headers/IdempotentReplay'
+            X-Qwen-Idempotent-Replay: {$ref: '#/components/headers/IdempotentReplay'}
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/PublicSession'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: {$ref: '#/components/schemas/PublicSession'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '409': {$ref: '#/components/responses/Conflict'}
     get:
       tags: [Public Sessions]
       operationId: listSessions
       x-qwen-implementation-status: partial
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/ListLimit'
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/ListLimit'}
+      - name: include_archived
+        in: query
+        schema: {type: boolean, default: false}
+        x-qwen-implementation-status: planned
       responses:
         '200':
           description: Sessions ordered by updated_at and id descending.
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/PublicSessionList'
-        '400': { $ref: '#/components/responses/BadRequest' }
+              schema: {$ref: '#/components/schemas/PublicSessionList'}
+        '400': {$ref: '#/components/responses/BadRequest'}
   /v1/agents/sessions/{sessionId}:
     parameters:
-      - $ref: '#/components/parameters/SessionId'
+    - {$ref: '#/components/parameters/SessionId'}
     get:
       tags: [Public Sessions]
       operationId: getSession
@@ -134,24 +136,25 @@ paths:
           description: Session state.
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/PublicSession'
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: {$ref: '#/components/schemas/PublicSession'}
+        '404': {$ref: '#/components/responses/NotFound'}
     delete:
       tags: [Public Sessions]
       operationId: deleteSession
       x-qwen-implementation-status: planned
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+      - {$ref: '#/components/parameters/IdempotencyKey'}
       responses:
         '202':
-          description: Durable deletion or archival workflow accepted.
+          description: Deletion accepted; seal admission and settle/clean up before content deletion. Shared Workspace
+            is retained. Query the original operation through its tombstone after completion.
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/CommandAdmission'
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: {$ref: '#/components/schemas/PublicCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/agents/sessions/{sessionId}/events:
     parameters:
       - $ref: '#/components/parameters/SessionId'
@@ -518,30 +521,26 @@ paths:
           $ref: '#/components/responses/Conflict'
   /v1/agents/sessions/{sessionId}/operations/{operationId}:
     parameters:
-    - $ref: '#/components/parameters/SessionId'
+    - {$ref: '#/components/parameters/SessionId'}
     - name: operationId
       in: path
       required: true
-      schema:
-        type: string
-        minLength: 1
-        maxLength: 64
+      schema: {type: string, minLength: 1, maxLength: 64}
     get:
-      tags:
-      - Public Sessions
+      tags: [Public Sessions]
       operationId: getSessionCwdOperation
       x-qwen-implementation-status: planned
       responses:
         '200':
-          description: Authorized durable resource view; no Runtime startup required.
+          description: Authorized cwd, command or lifecycle operation; available without Runtime startup and through
+            the deletion retry horizon.
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/PublicCwdOperation'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+              schema: {$ref: '#/components/schemas/PublicOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /api/agent/web-shell/v1/workspaces/query:
     post:
       tags:
@@ -592,27 +591,246 @@ paths:
           $ref: '#/components/responses/Conflict'
   /api/agent/web-shell/v1/operations/query:
     post:
-      tags:
-      - WebShell
+      tags: [WebShell]
       operationId: webShellQueryCwdOperation
       x-qwen-implementation-status: planned
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/WebShellOperationRequest'
+            schema: {$ref: '#/components/schemas/WebShellOperationRequest'}
       responses:
         '200':
-          description: Authorized durable resource view; no Runtime startup required.
+          description: Authorized command/cwd/lifecycle operation; query survives Runtime downtime and deletion within
+            the retry horizon.
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/WebShellCwdOperation'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+              schema: {$ref: '#/components/schemas/WebShellOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/agents/sessions/{sessionId}/actions:
+    parameters:
+    - {$ref: '#/components/parameters/SessionId'}
+    get:
+      tags: [Public Sessions]
+      operationId: listSessionActions
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Authorized pending Actions; use original action lookup to query terminal state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicActionList'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      parameters:
+      - {$ref: '#/components/parameters/Cursor'}
+      - {$ref: '#/components/parameters/ListLimit'}
+  /v1/agents/sessions/{sessionId}/actions/{actionId}:
+    parameters:
+    - {$ref: '#/components/parameters/SessionId'}
+    - {$ref: '#/components/parameters/ActionId'}
+    get:
+      tags: [Public Sessions]
+      operationId: getSessionAction
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Current durable Action view, including terminal decisions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicAction'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/agents/sessions/{sessionId}/actions/{actionId}/responses:
+    parameters:
+    - {$ref: '#/components/parameters/SessionId'}
+    - {$ref: '#/components/parameters/ActionId'}
+    post:
+      tags: [Public Sessions]
+      operationId: respondToSessionAction
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Response durably queued for the original arbiter. 202 is not final approval.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ActionResponseRequest'}
+  /v1/agents/sessions/{sessionId}/close:
+    parameters:
+    - {$ref: '#/components/parameters/SessionId'}
+    post:
+      tags: [Public Sessions]
+      operationId: closeSession
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Close seals input and awaits ordered cleanup.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+  /v1/agents/sessions/{sessionId}/archive:
+    parameters:
+    - {$ref: '#/components/parameters/SessionId'}
+    post:
+      tags: [Public Sessions]
+      operationId: archiveSession
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Archive requires a closed Session and retains history.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+  /api/agent/web-shell/v1/actions/query:
+    post:
+      tags: [WebShell]
+      operationId: queryWebShellActions
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Same authorized operation semantics as the public API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebShellActionPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebShellActionQueryRequest'}
+  /api/agent/web-shell/v1/actions/get:
+    post:
+      tags: [WebShell]
+      operationId: getWebShellAction
+      x-qwen-implementation-status: planned
+      responses:
+        '200':
+          description: Same authorized operation semantics as the public API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebShellAction'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebShellActionGetRequest'}
+  /api/agent/web-shell/v1/actions/respond:
+    post:
+      tags: [WebShell]
+      operationId: respondWebShellAction
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Same authorized operation semantics as the public API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebShellCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebShellActionRespondRequest'}
+  /api/agent/web-shell/v1/sessions/close:
+    post:
+      tags: [WebShell]
+      operationId: closeWebShellSession
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Same authorized operation semantics as the public API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebShellCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebShellLifecycleRequest'}
+  /api/agent/web-shell/v1/sessions/archive:
+    post:
+      tags: [WebShell]
+      operationId: archiveWebShellSession
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Same authorized operation semantics as the public API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebShellCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebShellLifecycleRequest'}
+  /api/agent/web-shell/v1/sessions/delete:
+    post:
+      tags: [WebShell]
+      operationId: deleteWebShellSession
+      x-qwen-implementation-status: planned
+      responses:
+        '202':
+          description: Same authorized operation semantics as the public API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebShellCommandOperation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebShellLifecycleRequest'}
 components:
   securitySchemes:
     trustedTenant:
@@ -620,7 +838,15 @@ components:
       in: header
       name: X-Qwen-Tenant-Id
       description: Injected by the trusted authenticated gateway, never trusted from browser input.
+    trustedActor: {type: apiKey, in: header, name: X-Qwen-Actor-Id, x-qwen-implementation-status: planned, description: Verified
+        actor injected by the authenticated gateway together with tenant; browser-supplied headers are stripped. Resource
+        ACLs and Action responder eligibility are mandatory. This header is not a browser credential.}
   parameters:
+    ActionId:
+      name: actionId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 128}
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -669,6 +895,11 @@ components:
       schema: { type: string, maxLength: 128 }
       description: Trace-only correlation identifier; never an idempotency key.
   responses:
+    Forbidden:
+      description: Resource is readable but actor lacks this operation or original Action responder permission.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
     BadRequest:
       description: Invalid request.
       content:
@@ -749,62 +980,105 @@ components:
       type: object
       required: [session_id, status, replayed]
       properties:
-        session_id: { type: string, format: uuid }
-        turn_id: { type: [string, 'null'], maxLength: 64 }
-        status: { type: string }
-        replayed: { type: boolean }
+        session_id: {type: string, format: uuid}
+        turn_id:
+          type: [string, 'null']
+          maxLength: 64
+        status: {type: string}
+        replayed: {type: boolean}
+        operation_id: {type: string, minLength: 1, maxLength: 64, x-qwen-implementation-status: planned}
+        admission_stage:
+          type: string
+          enum: [java_durable, harness_confirmed]
+          x-qwen-implementation-status: planned
+        delivery_state:
+          type: string
+          enum: [pending, leased, confirmed, blocked]
+          x-qwen-implementation-status: planned
+      dependentRequired:
+        operation_id: [operation_id, admission_stage, delivery_state]
+        admission_stage: [operation_id, admission_stage, delivery_state]
+        delivery_state: [operation_id, admission_stage, delivery_state]
+      description: With durable_operations enabled, all three target fields are returned. accepted means Java durable
+        delivery responsibility, not model execution. Missing fields retain the deployed legacy response semantics.
     PublicSession:
       type: object
       required: [id, object, agent_id, agent_revision, status, created_at, updated_at, last_event_id, capabilities]
       properties:
-        id: { type: string, format: uuid }
-        object: { const: agent.session }
-        agent_id: { type: string }
-        agent_revision: { type: string }
-        status: { type: string, enum: [active, closing, closed, failed, recovery_blocked] }
-        created_at: { type: integer, format: int64 }
-        updated_at: { type: integer, format: int64 }
-        metadata: { type: object, additionalProperties: true }
-        active_turn: { oneOf: [{ $ref: '#/components/schemas/PublicTurn' }, { type: 'null' }] }
-        last_event_id: { type: integer, format: int64, minimum: 0 }
-        replay_floor_sequence: { type: integer, format: int64, minimum: 0, default: 0 }
-        snapshot_through_sequence: { type: integer, format: int64, minimum: 0, default: 0 }
-        capabilities:
-          $ref: '#/components/schemas/SessionCapabilities'
-        workspace:
-          $ref: '#/components/schemas/WorkspaceContext'
+        creation_operation_id:
+          type: string
+          minLength: 1
+          maxLength: 64
           x-qwen-implementation-status: planned
-          description: Absent for unbound legacy records, whose execution stays blocked pending evidence-based migration.
-            Ready means committed context, not an active Runtime gate.
+          description: Original create_session operation; creation retries resolve this identity before allocating another Session.
+        id: {type: string, format: uuid}
+        object: {const: agent.session}
+        agent_id: {type: string}
+        agent_revision: {type: string}
+        status:
+          type: string
+          enum: [active, closing, closed, failed, recovery_blocked]
+        created_at: {type: integer, format: int64}
+        updated_at: {type: integer, format: int64}
+        metadata: {type: object, additionalProperties: true}
+        active_turn:
+          oneOf:
+          - {$ref: '#/components/schemas/PublicTurn'}
+          - {type: 'null'}
+        last_event_id: {type: integer, format: int64, minimum: 0}
+        replay_floor_sequence: {type: integer, format: int64, minimum: 0, default: 0}
+        snapshot_through_sequence: {type: integer, format: int64, minimum: 0, default: 0}
+        capabilities: {$ref: '#/components/schemas/SessionCapabilities'}
+        workspace: {$ref: '#/components/schemas/WorkspaceContext', x-qwen-implementation-status: planned, description: 'Absent
+            for unbound legacy records, whose execution stays blocked pending evidence-based migration. Ready means
+            committed context, not an active Runtime gate.'}
+        archived_at:
+          type: [integer, 'null']
+          format: int64
+          x-qwen-implementation-status: planned
     SessionCapabilities:
       type: object
       additionalProperties: false
       required: [items, snapshots, artifacts, resync]
       properties:
-        items: { type: boolean }
-        snapshots: { type: boolean }
-        artifacts: { type: boolean }
-        resync: { type: boolean }
-        workspace_context:
-          type: boolean
-          default: false
-          x-qwen-implementation-status: planned
-        cwd_change:
-          type: boolean
-          default: false
-          x-qwen-implementation-status: planned
+        items: {type: boolean}
+        snapshots: {type: boolean}
+        artifacts: {type: boolean}
+        resync: {type: boolean}
+        workspace_context: {type: boolean, default: false, x-qwen-implementation-status: planned}
+        cwd_change: {type: boolean, default: false, x-qwen-implementation-status: planned}
+        durable_operations: {type: boolean, default: false, x-qwen-implementation-status: planned}
+        actions: {type: boolean, default: false, x-qwen-implementation-status: planned}
+        session_lifecycle: {type: boolean, default: false, x-qwen-implementation-status: planned}
     PublicTurn:
       type: object
       required: [id, object, session_id, status, created_at]
       properties:
-        id: { type: string, maxLength: 64 }
-        object: { const: agent.turn }
-        session_id: { type: string, format: uuid }
-        input_item_id: { type: [string, 'null'], maxLength: 64 }
-        status: { type: string, enum: [accepted, running, completed, failed, cancelled, recovery_blocked] }
-        created_at: { type: integer, format: int64 }
-        completed_at: { type: [integer, 'null'], format: int64 }
-        error_code: { type: [string, 'null'], maxLength: 128 }
+        id: {type: string, maxLength: 64}
+        object: {const: agent.turn}
+        session_id: {type: string, format: uuid}
+        input_item_id:
+          type: [string, 'null']
+          maxLength: 64
+        status:
+          type: string
+          enum: [accepted, running, completed, failed, cancelled, recovery_blocked]
+        created_at: {type: integer, format: int64}
+        completed_at:
+          type: [integer, 'null']
+          format: int64
+        error_code:
+          type: [string, 'null']
+          maxLength: 128
+        operation_id: {type: string, minLength: 1, maxLength: 64, x-qwen-implementation-status: planned}
+        admission_stage:
+          type: string
+          enum: [java_durable, harness_confirmed]
+          x-qwen-implementation-status: planned
+        delivery_state:
+          type: string
+          enum: [pending, leased, confirmed, blocked]
+          x-qwen-implementation-status: planned
     PublicEvent:
       type: object
       required: [schema_version, projection_version, sequence, event_id, session_id, type, created_at, data, terminal]
@@ -928,8 +1202,15 @@ components:
       type: object
       additionalProperties: false
       properties:
-        cursor: { type: [string, 'null'], maxLength: 512 }
-        limit: { type: [integer, 'null'], minimum: 1, maximum: 100, default: 20 }
+        cursor:
+          type: [string, 'null']
+          maxLength: 512
+        limit:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 100
+          default: 20
+        includeArchived: {type: boolean, default: false, x-qwen-implementation-status: planned}
     WebShellSessionRequest:
       type: object
       additionalProperties: false
@@ -994,47 +1275,93 @@ components:
       type: object
       required: [sessionId, status, replayed]
       properties:
-        sessionId: { type: string, format: uuid }
-        turnId: { type: [string, 'null'], maxLength: 64 }
-        status: { type: string }
-        replayed: { type: boolean }
+        sessionId: {type: string, format: uuid}
+        turnId:
+          type: [string, 'null']
+          maxLength: 64
+        status: {type: string}
+        replayed: {type: boolean}
+        operationId: {type: string, minLength: 1, maxLength: 64, x-qwen-implementation-status: planned}
+        admissionStage:
+          type: string
+          enum: [java_durable, harness_confirmed]
+          x-qwen-implementation-status: planned
+        deliveryState:
+          type: string
+          enum: [pending, leased, confirmed, blocked]
+          x-qwen-implementation-status: planned
+      dependentRequired:
+        operationId: [operationId, admissionStage, deliveryState]
+        admissionStage: [operationId, admissionStage, deliveryState]
+        deliveryState: [operationId, admissionStage, deliveryState]
+      description: With durable_operations enabled, all three target fields are returned. accepted means Java durable
+        delivery responsibility, not model execution. Missing fields retain the deployed legacy response semantics.
     WebShellTurn:
       type: object
       required: [turnId, sessionId, status, submittedAt]
       properties:
-        turnId: { type: string }
-        sessionId: { type: string, format: uuid }
-        status: { type: string }
-        submittedAt: { type: integer, format: int64 }
-        completedAt: { type: [integer, 'null'], format: int64 }
-        errorCode: { type: [string, 'null'] }
-        usage: { type: [object, 'null'], additionalProperties: true }
+        turnId: {type: string}
+        sessionId: {type: string, format: uuid}
+        status: {type: string}
+        submittedAt: {type: integer, format: int64}
+        completedAt:
+          type: [integer, 'null']
+          format: int64
+        errorCode:
+          type: [string, 'null']
+        usage:
+          type: [object, 'null']
+          additionalProperties: true
+        operationId: {type: string, minLength: 1, maxLength: 64, x-qwen-implementation-status: planned}
+        admissionStage:
+          type: string
+          enum: [java_durable, harness_confirmed]
+          x-qwen-implementation-status: planned
+        deliveryState:
+          type: string
+          enum: [pending, leased, confirmed, blocked]
+          x-qwen-implementation-status: planned
     WebShellSession:
       type: object
       required: [sessionId, agentId, status, createdAt, updatedAt, lastSequence]
       properties:
-        sessionId: { type: string, format: uuid }
-        title: { type: [string, 'null'] }
-        agentId: { type: string }
-        status: { type: string }
-        createdAt: { type: integer, format: int64 }
-        updatedAt: { type: integer, format: int64 }
-        activeTurn: { oneOf: [{ $ref: '#/components/schemas/WebShellTurn' }, { type: 'null' }] }
-        environment: { type: [object, 'null'], additionalProperties: true }
-        lastSequence: { type: integer, format: int64, minimum: 0 }
-        workspace:
-          $ref: '#/components/schemas/WebShellWorkspaceContext'
+        creationOperationId:
+          type: string
+          minLength: 1
+          maxLength: 64
           x-qwen-implementation-status: planned
+          description: Original create_session operation; creation retries resolve this identity before allocating another Session.
+        sessionId: {type: string, format: uuid}
+        title:
+          type: [string, 'null']
+        agentId: {type: string}
+        status: {type: string}
+        createdAt: {type: integer, format: int64}
+        updatedAt: {type: integer, format: int64}
+        activeTurn:
+          oneOf:
+          - {$ref: '#/components/schemas/WebShellTurn'}
+          - {type: 'null'}
+        environment:
+          type: [object, 'null']
+          additionalProperties: true
+        lastSequence: {type: integer, format: int64, minimum: 0}
+        workspace: {$ref: '#/components/schemas/WebShellWorkspaceContext', x-qwen-implementation-status: planned}
         capabilities:
           type: object
           x-qwen-implementation-status: planned
           properties:
-            workspaceContext:
-              type: boolean
-              default: false
-            cwdChange:
-              type: boolean
-              default: false
+            workspaceContext: {type: boolean, default: false}
+            cwdChange: {type: boolean, default: false}
+            durableOperations: {type: boolean, default: false, x-qwen-implementation-status: planned}
+            actions: {type: boolean, default: false, x-qwen-implementation-status: planned}
+            sessionLifecycle: {type: boolean, default: false, x-qwen-implementation-status: planned}
+        archivedAt:
+          type: [integer, 'null']
+          format: int64
+          x-qwen-implementation-status: planned
+        replayFloorSequence: {type: integer, format: int64, minimum: 0, x-qwen-implementation-status: planned}
+        snapshotThroughSequence: {type: integer, format: int64, minimum: 0, x-qwen-implementation-status: planned}
     WebShellSessionPage:
       type: object
       required: [data, hasMore]
@@ -1466,3 +1793,505 @@ components:
               minimum: 1
       description: A completed operation returns the committed target revision. A replay returns the same operation
         identity and latest durable status, with replayed=true; polling itself is not replay.
+
+    ActionOption:
+      type: object
+      additionalProperties: false
+      required: [id, label]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        label: {type: string, minLength: 1, maxLength: 256}
+        description: {type: string, maxLength: 1024}
+      x-qwen-implementation-status: planned
+    ActionQuestion:
+      type: object
+      additionalProperties: false
+      required: [id, prompt, required, multiple, allow_text, options]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        prompt: {type: string, minLength: 1, maxLength: 2048}
+        required: {type: boolean}
+        multiple: {type: boolean}
+        allow_text: {type: boolean}
+        options:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/ActionOption'}
+      x-qwen-implementation-status: planned
+    ActionSource:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind:
+          enum: [tool_call, automation_run, team_plan, user_operation]
+        id: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+    PermissionAction:
+      type: object
+      additionalProperties: false
+      required: [id, session_id, kind, source, state, input_revision, policy_revision, created_at, expires_at, options]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        session_id: {type: string, format: uuid}
+        kind: {const: permission}
+        source: {$ref: '#/components/schemas/ActionSource'}
+        state:
+          enum: [requested, decided, cancelled, expired]
+        input_revision: {type: integer, format: int64, minimum: 1}
+        policy_revision: {type: string, minLength: 1, maxLength: 128}
+        created_at: {type: integer, format: int64}
+        expires_at: {type: integer, format: int64}
+        decision_receipt_id: {type: string, minLength: 1, maxLength: 128}
+        options:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/ActionOption'}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            state: {const: decided}
+          required: [state]
+        then:
+          required: [decision_receipt_id]
+    QuestionAction:
+      type: object
+      additionalProperties: false
+      required: [id, session_id, kind, source, state, input_revision, policy_revision, created_at, expires_at, questions]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        session_id: {type: string, format: uuid}
+        kind: {const: question}
+        source: {$ref: '#/components/schemas/ActionSource'}
+        state:
+          enum: [requested, decided, cancelled, expired]
+        input_revision: {type: integer, format: int64, minimum: 1}
+        policy_revision: {type: string, minLength: 1, maxLength: 128}
+        created_at: {type: integer, format: int64}
+        expires_at: {type: integer, format: int64}
+        decision_receipt_id: {type: string, minLength: 1, maxLength: 128}
+        questions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: '#/components/schemas/ActionQuestion'}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            state: {const: decided}
+          required: [state]
+        then:
+          required: [decision_receipt_id]
+    PublicAction:
+      oneOf:
+      - {$ref: '#/components/schemas/PermissionAction'}
+      - {$ref: '#/components/schemas/QuestionAction'}
+      x-qwen-implementation-status: planned
+    PublicActionList:
+      type: object
+      additionalProperties: false
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/PublicAction'}
+        has_more: {type: boolean}
+        next_cursor:
+          type: [string, 'null']
+          maxLength: 512
+      x-qwen-implementation-status: planned
+    QuestionAnswer:
+      type: object
+      additionalProperties: false
+      required: [question_id]
+      properties:
+        question_id: {type: string, minLength: 1, maxLength: 128}
+        option_ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 128}
+        text: {type: string, minLength: 1, maxLength: 8192}
+      x-qwen-implementation-status: planned
+      anyOf:
+      - required: [option_ids]
+      - required: [text]
+    PermissionResponse:
+      type: object
+      additionalProperties: false
+      required: [kind, input_revision, policy_revision, option_id]
+      properties:
+        kind: {const: permission}
+        input_revision: {type: integer, format: int64, minimum: 1}
+        policy_revision: {type: string, minLength: 1, maxLength: 128}
+        option_id: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+    QuestionResponse:
+      type: object
+      additionalProperties: false
+      required: [kind, input_revision, policy_revision, answers]
+      properties:
+        kind: {const: question}
+        input_revision: {type: integer, format: int64, minimum: 1}
+        policy_revision: {type: string, minLength: 1, maxLength: 128}
+        answers:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: '#/components/schemas/QuestionAnswer'}
+      x-qwen-implementation-status: planned
+    ActionResponseRequest:
+      oneOf:
+      - {$ref: '#/components/schemas/PermissionResponse'}
+      - {$ref: '#/components/schemas/QuestionResponse'}
+      x-qwen-implementation-status: planned
+      description: Validate IDs, required answers, selection cardinality, text eligibility and current responder permission
+        against the original Action. Unknown/expired/cancelled/conflicting revisions cannot grant execution.
+    ActionResolution:
+      type: object
+      additionalProperties: false
+      required: [action_id, outcome, receipt_id]
+      properties:
+        action_id: {type: string, minLength: 1, maxLength: 128}
+        outcome:
+          enum: [vote_recorded, decided]
+        receipt_id: {type: string, minLength: 1, maxLength: 128}
+        decision_receipt_id: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            outcome: {const: decided}
+          required: [outcome]
+        then:
+          required: [decision_receipt_id]
+    PublicCommandOperation:
+      type: object
+      additionalProperties: false
+      required: [id, session_id, type, status, admission_stage, delivery_state, replayed]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 64}
+        session_id: {type: string, format: uuid}
+        type:
+          enum: [create_session, submit_input, cancel, action_response, close, archive, delete]
+        status:
+          enum: [pending, running, completed, failed, cancelled, recovery_blocked]
+        admission_stage:
+          enum: [java_durable, harness_confirmed]
+        delivery_state:
+          enum: [pending, leased, confirmed, blocked]
+        receipt_id: {type: string, minLength: 1, maxLength: 128}
+        action_resolution: {$ref: '#/components/schemas/ActionResolution'}
+        failure_code: {type: string, minLength: 1, maxLength: 128}
+        replayed: {type: boolean}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          anyOf:
+          - properties:
+              status: {const: completed}
+            required: [status]
+          - properties:
+              admission_stage: {const: harness_confirmed}
+            required: [admission_stage]
+          - properties:
+              delivery_state: {const: confirmed}
+            required: [delivery_state]
+        then:
+          required: [receipt_id]
+      - if:
+          properties:
+            type: {const: action_response}
+            status: {const: completed}
+          required: [type, status]
+        then:
+          required: [action_resolution]
+      - if:
+          properties:
+            type:
+              enum: [create_session, submit_input, cancel, close, archive, delete]
+          required: [type]
+        then:
+          not:
+            required: [action_resolution]
+      description: Receipt IDs are opaque authorized product handles, not private journal or storage refs. Input/cancel
+        completion is command acceptance, not Turn completion or physical stop. Action completion may only record one
+        vote. Lifecycle completion requires its cleanup facts; archive may remain java_durable because Java is its authority.
+    PublicOperation:
+      oneOf:
+      - {$ref: '#/components/schemas/PublicCwdOperation'}
+      - {$ref: '#/components/schemas/PublicCommandOperation'}
+      x-qwen-implementation-status: planned
+    WebShellAction:
+      oneOf:
+      - {$ref: '#/components/schemas/WebShellPermissionAction'}
+      - {$ref: '#/components/schemas/WebShellQuestionAction'}
+      x-qwen-implementation-status: planned
+    WebShellActionResolution:
+      type: object
+      additionalProperties: false
+      required: [actionId, outcome, receiptId]
+      properties:
+        actionId: {type: string, minLength: 1, maxLength: 128}
+        outcome:
+          enum: [vote_recorded, decided]
+        receiptId: {type: string, minLength: 1, maxLength: 128}
+        decisionReceiptId: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            outcome: {const: decided}
+          required: [outcome]
+        then:
+          required: [decisionReceiptId]
+    WebShellQuestionAnswer:
+      type: object
+      additionalProperties: false
+      required: [questionId]
+      properties:
+        questionId: {type: string, minLength: 1, maxLength: 128}
+        optionIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 128}
+        text: {type: string, minLength: 1, maxLength: 8192}
+      x-qwen-implementation-status: planned
+      anyOf:
+      - required: [optionIds]
+      - required: [text]
+    WebShellActionQuestion:
+      type: object
+      additionalProperties: false
+      required: [id, prompt, required, multiple, allowText, options]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        prompt: {type: string, minLength: 1, maxLength: 2048}
+        required: {type: boolean}
+        multiple: {type: boolean}
+        allowText: {type: boolean}
+        options:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/WebShellActionOption'}
+      x-qwen-implementation-status: planned
+    WebShellCommandOperation:
+      type: object
+      additionalProperties: false
+      required: [operationId, sessionId, type, status, admissionStage, deliveryState, replayed]
+      properties:
+        operationId: {type: string, minLength: 1, maxLength: 64}
+        sessionId: {type: string, format: uuid}
+        type:
+          enum: [create_session, submit_input, cancel, action_response, close, archive, delete]
+        status:
+          enum: [pending, running, completed, failed, cancelled, recovery_blocked]
+        admissionStage:
+          enum: [java_durable, harness_confirmed]
+        deliveryState:
+          enum: [pending, leased, confirmed, blocked]
+        receiptId: {type: string, minLength: 1, maxLength: 128}
+        actionResolution: {$ref: '#/components/schemas/WebShellActionResolution'}
+        failureCode: {type: string, minLength: 1, maxLength: 128}
+        replayed: {type: boolean}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          anyOf:
+          - properties:
+              status: {const: completed}
+            required: [status]
+          - properties:
+              admissionStage: {const: harness_confirmed}
+            required: [admissionStage]
+          - properties:
+              deliveryState: {const: confirmed}
+            required: [deliveryState]
+        then:
+          required: [receiptId]
+      - if:
+          properties:
+            type: {const: action_response}
+            status: {const: completed}
+          required: [type, status]
+        then:
+          required: [actionResolution]
+      - if:
+          properties:
+            type:
+              enum: [create_session, submit_input, cancel, close, archive, delete]
+          required: [type]
+        then:
+          not:
+            required: [actionResolution]
+      description: Receipt IDs are opaque authorized product handles, not private journal or storage refs. Input/cancel
+        completion is command acceptance, not Turn completion or physical stop. Action completion may only record one
+        vote. Lifecycle completion requires its cleanup facts; archive may remain java_durable because Java is its authority.
+    WebShellQuestionAction:
+      type: object
+      additionalProperties: false
+      required: [actionId, sessionId, kind, source, state, inputRevision, policyRevision, createdAt, expiresAt, questions]
+      properties:
+        actionId: {type: string, minLength: 1, maxLength: 128}
+        sessionId: {type: string, format: uuid}
+        kind: {const: question}
+        source: {$ref: '#/components/schemas/WebShellActionSource'}
+        state:
+          enum: [requested, decided, cancelled, expired]
+        inputRevision: {type: integer, format: int64, minimum: 1}
+        policyRevision: {type: string, minLength: 1, maxLength: 128}
+        createdAt: {type: integer, format: int64}
+        expiresAt: {type: integer, format: int64}
+        decisionReceiptId: {type: string, minLength: 1, maxLength: 128}
+        questions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: '#/components/schemas/WebShellActionQuestion'}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            state: {const: decided}
+          required: [state]
+        then:
+          required: [decisionReceiptId]
+    WebShellPermissionAction:
+      type: object
+      additionalProperties: false
+      required: [actionId, sessionId, kind, source, state, inputRevision, policyRevision, createdAt, expiresAt, options]
+      properties:
+        actionId: {type: string, minLength: 1, maxLength: 128}
+        sessionId: {type: string, format: uuid}
+        kind: {const: permission}
+        source: {$ref: '#/components/schemas/WebShellActionSource'}
+        state:
+          enum: [requested, decided, cancelled, expired]
+        inputRevision: {type: integer, format: int64, minimum: 1}
+        policyRevision: {type: string, minLength: 1, maxLength: 128}
+        createdAt: {type: integer, format: int64}
+        expiresAt: {type: integer, format: int64}
+        decisionReceiptId: {type: string, minLength: 1, maxLength: 128}
+        options:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/WebShellActionOption'}
+      x-qwen-implementation-status: planned
+      allOf:
+      - if:
+          properties:
+            state: {const: decided}
+          required: [state]
+        then:
+          required: [decisionReceiptId]
+    WebShellPermissionResponse:
+      type: object
+      additionalProperties: false
+      required: [kind, inputRevision, policyRevision, optionId]
+      properties:
+        kind: {const: permission}
+        inputRevision: {type: integer, format: int64, minimum: 1}
+        policyRevision: {type: string, minLength: 1, maxLength: 128}
+        optionId: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+    WebShellActionPage:
+      type: object
+      additionalProperties: false
+      required: [data, hasMore]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/WebShellAction'}
+        hasMore: {type: boolean}
+        nextCursor:
+          type: [string, 'null']
+          maxLength: 512
+      x-qwen-implementation-status: planned
+    WebShellActionSource:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind:
+          enum: [tool_call, automation_run, team_plan, user_operation]
+        id: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+    WebShellActionResponseRequest:
+      oneOf:
+      - {$ref: '#/components/schemas/WebShellPermissionResponse'}
+      - {$ref: '#/components/schemas/WebShellQuestionResponse'}
+      x-qwen-implementation-status: planned
+      description: Validate IDs, required answers, selection cardinality, text eligibility and current responder permission
+        against the original Action. Unknown/expired/cancelled/conflicting revisions cannot grant execution.
+    WebShellActionOption:
+      type: object
+      additionalProperties: false
+      required: [id, label]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        label: {type: string, minLength: 1, maxLength: 256}
+        description: {type: string, maxLength: 1024}
+      x-qwen-implementation-status: planned
+    WebShellQuestionResponse:
+      type: object
+      additionalProperties: false
+      required: [kind, inputRevision, policyRevision, answers]
+      properties:
+        kind: {const: question}
+        inputRevision: {type: integer, format: int64, minimum: 1}
+        policyRevision: {type: string, minLength: 1, maxLength: 128}
+        answers:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: '#/components/schemas/WebShellQuestionAnswer'}
+      x-qwen-implementation-status: planned
+    WebShellOperation:
+      oneOf:
+      - {$ref: '#/components/schemas/WebShellCwdOperation'}
+      - {$ref: '#/components/schemas/WebShellCommandOperation'}
+      x-qwen-implementation-status: planned
+    WebShellActionQueryRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId: {type: string, format: uuid}
+        cursor: {type: string, maxLength: 512}
+        limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+      x-qwen-implementation-status: planned
+    WebShellActionGetRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, actionId]
+      properties:
+        sessionId: {type: string, format: uuid}
+        actionId: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned
+    WebShellActionRespondRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, actionId, idempotencyKey, response]
+      properties:
+        sessionId: {type: string, format: uuid}
+        actionId: {type: string, minLength: 1, maxLength: 128}
+        idempotencyKey: {type: string, minLength: 1, maxLength: 128}
+        response: {$ref: '#/components/schemas/WebShellActionResponseRequest'}
+      x-qwen-implementation-status: planned
+    WebShellLifecycleRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId, idempotencyKey]
+      properties:
+        sessionId: {type: string, format: uuid}
+        idempotencyKey: {type: string, minLength: 1, maxLength: 128}
+      x-qwen-implementation-status: planned

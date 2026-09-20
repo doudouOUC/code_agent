@@ -38,7 +38,7 @@ Java 可信入口 → SQL 事务提交领域记录 + outbox + WakeIntent
 
 浏览器始终从 Java 的公共 Session/Event/Item/Task 投影读取。Runtime 输出不能绕过 SQL 接受点直接成为正式前端事件；同节点可以在事务提交后直接推 SSE，断线按 Session 公开 sequence 补齐。
 
-v1.9 补充的 [Workspace/cwd 契约](managed-agent-workspace-context.md#6-mcphookschannels自动化和子任务) 是这些能力的共同前提：W0 先持久绑定 Session 与 Workspace，所有 Shell、Monitor、MCP、Hook 和 child 固定启动时的 cwd/contextRevision/config revision 与原 Runtime。父 Session 切换目录不迁移已有任务；W2 首版有资源 hold 就拒绝切换。Channel 固定授权路由，Automation 在准入时冻结目标上下文；changing 期间延后准入，不能回退到 daemon primary 或默认工作区。无 Session 的操作使用独立 WorkspaceOperationGrant。
+v1.9 补充的 [Workspace/cwd 契约](managed-agent-workspace-context.md#6-mcphookschannels自动化和子任务) 是这些能力的共同前提：W0 先持久绑定 Session 与 Workspace，所有 Shell、Monitor、MCP、Hook 和 child 固定启动时的 cwd/contextRevision/config revision 与原 Runtime。父 Session 切换目录不迁移已有任务；W2 首版遇活动调用/任务 hold 拒绝切换；纯空闲 MCP 连接先封准入再排空，不在第一步永久阻塞（见 [v1.10](managed-agent-contract-closure.md#4-workspace-与私有协议接线)）。Channel 固定授权路由，Automation 在准入时冻结目标上下文；changing 期间延后准入，不能回退到 daemon primary 或默认工作区。无 Session 的操作使用独立 WorkspaceOperationGrant。
 
 ## 2. 当前源码接缝与缺口
 
@@ -268,7 +268,7 @@ interface BackgroundProcessBinding {
 
 | 资源 | 至少需要的额度 | Runtime/Session hold | 恢复重点 |
 | --- | --- | --- | --- |
-| MCP | workspace 连接、Session binding、inflight operation | stdio 连接或调用未结算时 hold | catalog revision、connection generation、远端 unknown |
+| MCP | workspace 连接、Session binding、inflight operation | Runtime 回收：未关闭 stdio 连接/未结算调用均 hold；W2：活动调用硬阻塞，空闲连接可受控排空 | catalog revision、connection generation、远端 unknown |
 | Hooks | 每 occurrence 数、prompt Hook 模型预算、async process | async command/function handler 未结算时 hold | occurrence/ordinal 去重、once 消费、handler 可重建 |
 | Channels | ingress、staged bytes、delivery/segment backlog | 不因纯 outbox 常驻 Runtime | provider receipt、部分发送、账号 generation |
 | 自动化 | active run、每时段触发、模型/工具预算 | 运行目标 Session 按实际工作 hold | scanner fencing、overlap/catch-up、dispatch unknown |

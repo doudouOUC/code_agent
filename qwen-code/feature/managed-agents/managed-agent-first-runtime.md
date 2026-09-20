@@ -1,5 +1,7 @@
 # Managed Agents 首版运行契约
 
+> **v1.10 入口范围：** 本文“qwen 持久受理后 Java ACK”限定现有产品 `/sessions` 的 `qwen_confirmed` Profile。阶段 D 公共 `/v1/agents` 的 `java_durable` Profile 另需 SQL command delivery、operation 查询及崩溃恢复；两者不得静默切换，见 [v1.10 契约收敛](managed-agent-contract-closure.md)。
+
 更新日期：2026-09-20。依据 [HTML v1.7](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
 
 ## 1. 首版范围与运行条件
@@ -29,7 +31,7 @@ Hosted `tenantId` 必须由可信入口从已认证身份注入，并贯穿 Sess
 2. Java 在第一次转发前生成并持久保存全局唯一 RFC UUID `sessionId`、请求键、内容摘要与目标 BackendBinding；公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope 使用同一个 `sessionId`，不得保存第二套 Harness Session ID 或映射。重试沿用原 ID。该记录用于路由/查询，不保存第二份模型 Transcript，也不意味着已经接受模型执行。
 3. Java 将同一业务命令映射到 qwen 的 commandId、inputId/turnId，但不转换 Session ID。qwen 经固定 engine 的 authority 持久提交输入及 WakeIntent，返回原 CommitReceipt；只有此时 Java 才返回 accepted。响应不等待模型完成或 Runtime ready。没有调用方 Session UUID、持久命令回执或原命令查询能力的 qwen 版本不能启用该 Managed profile。
 4. 等待 ACK 超时或连接断开时返回暂时不可确认的结果，保留原请求标识；先向原 authority 查原命令。重试仍使用相同 ID，由其持久去重，不能换 turnId 或 backend 重跑。无法核验提交记录时保持 unavailable/recovery_blocked，不将一次 404 或本地 Map 为空当作未执行证明。
-5. Java 首版没有“自己持久保存输入即 ACK，然后后台负责送达”的语义，因此不要求新增输入 outbox。若未来引入这种早 ACK，必须同时实现持久交付队列和崩溃恢复，不能只修改响应时机。
+5. 本文兼容入口首版没有“Java 保存输入即 ACK”的语义，不要求输入 outbox。阶段 D 的公共入口已将该能力作为独立目标 Profile 设计，须先实现持久交付队列与原命令对账，不能只修改响应时机。
 6. 同 Session 沿用现有串行 Turn/有界排队规则。Cancel 指向原 turn/scope，先经 qwen 持久提交取消意图再确认受理；实际模型、工具和进程树的结算另行查询。断开 SSE 不产生 Cancel。
 
 产品受理前的 Runtime 预热只能消费有限预留，不授权任何工具执行；输入被拒绝或取消后，未被领取的预热按第 6 节回收。
