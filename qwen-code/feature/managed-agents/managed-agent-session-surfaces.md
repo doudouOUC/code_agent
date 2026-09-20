@@ -1,6 +1,6 @@
 # Managed Agent session surfaces
 
-> Historical experimental surface. The current baseline is [HTML v1.6](managed-agent-dual-path-architecture.html) and its [dual-path specification](managed-agent-java-hosted-runtime.md). The canonical RFC UUID `sessionId` is shared by the public API, qwen/Harness, JSONL, and Broker scope. Keep ordinary `/session + executionEngines`; phase D introduces Java public resources and retires `/managed/sessions*` only after admission, events, queries, and idempotency are covered. This document preserves P8 UI and presentation evidence; it does not mandate a new frontend Provider class.
+> Historical experimental surface. The current baseline is [HTML v1.7](managed-agent-dual-path-architecture.html) and its [dual-path specification](managed-agent-java-hosted-runtime.md). The canonical RFC UUID `sessionId` is shared by the public API, qwen/Harness, JSONL, and Broker scope. Keep ordinary `/session + executionEngines`; phase D introduces Java public resources and retires `/managed/sessions*` only after admission, events, queries, and idempotency are covered. This document preserves P8 UI and presentation evidence; it does not mandate a new frontend Provider class.
 
 > 同步说明（2026-09-08）：本文与实验分支 [feature/managed-agents-p0-p8](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的 [8b1fd03c9a](https://github.com/doudouOUC/qwen-code/commit/8b1fd03c9a3a681ac535cb17eebe01a2fb728fd0) 对齐；不代表 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) `main` 已具备该能力。
 

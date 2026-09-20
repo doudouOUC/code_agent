@@ -1,6 +1,6 @@
 # Session / Harness / Runtime 私有协议
 
-> **普通工具接线（2026-09-20，HTML v1.6；工具契约源自 v1.4）：** Hosted 普通工具在[接线设计](managed-agent-ordinary-tools-integration.md)中冻结 Session 命令只读查询、activation/tool/history/receipt 封闭操作及资源分片映射。Hosted 作用域由可信入口注入的 tenantId 与资源身份共同约束；status/cancel 不创建 execution，原回执查询不授予新执行资格。
+> **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** Hosted 普通工具在[接线设计](managed-agent-ordinary-tools-integration.md)中冻结 Session 命令只读查询、activation/tool/history/receipt 封闭操作及资源分片映射。Hosted 作用域由可信入口注入的 tenantId 与资源身份共同约束；status/cancel 不创建 execution，原回执查询不授予新执行资格。
 
 > **HTML 对齐（2026-09-18）：** Java→qwen serve 复用 daemon 会话契约，Harness→Java 内嵌 Broker→Runtime 为独立私有工具链路。qwen 侧执行 Transcript/checkpoint 与 Java 公共投影分开，完整 Authority 外置和可替换 Harness 在 G。下文 managed-session/1、managed-runtime-control/1 是专项设计命名，不代替 HTML 的 HTTP 目标接口，也不声明已经部署。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

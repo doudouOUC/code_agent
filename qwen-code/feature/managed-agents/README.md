@@ -1,18 +1,20 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **当前基准：[HTML v1.6](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-20；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份，以及事件接受、SSE、存储和恢复契约。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.7](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-20；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约，并收敛阶段 H 的统一扩展运行模型。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
-> **存储与事件实现补充（2026-09-20）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交和提交后本机 SSE 直推；Schema 生成、SQL 批次日志、Item/Snapshot 物化、RocketMQ/Redis Transport、PostgreSQL 适配器及持久恢复仍是后续实现。这一补充细化 D/F/G，不改变 HTML v1.6 的组件职责与 A～H 顺序。
+> **存储与事件实现补充（2026-09-20）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交和提交后本机 SSE 直推；Schema 生成、SQL 批次日志、Item/Snapshot 物化、RocketMQ/Redis Transport、PostgreSQL 适配器及持久恢复仍是后续实现。这一补充细化 D/F/G，不改变既有组件职责与 A～H 顺序。
+>
+> **阶段 H 设计补充（2026-09-20）：** [扩展运行时设计](managed-agent-extension-runtime.md)统一 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的执行 owner、持久资源、任务投影、Runtime hold 和恢复语义。该文档补齐设计，不表示 Hosted Managed 已启用这些能力。
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
 ## 当前方案入口
 
-先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
+先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.6 | 决定组件职责、部署、目标协议、状态、公共 API 和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.7 | 决定组件职责、部署、目标协议、状态、公共 API、扩展运行时和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
@@ -86,7 +88,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | E | Hosted Harness | Java Pod + qwen serve Sidecar；推理/provisioning 并行；禁止本地 Tool fallback |
 | F | 可靠性与故障注入 | ACK/SSE/started 断线、三端崩溃、Cancel 竞争、Artifact 失败 |
 | G | Session Authority 外置 | 共享事件/checkpoint、可替换 Harness、activation epoch/fencing、取消粘性 |
-| H | 扩大 Managed 范围 | Built-in Tools、Skills、MCP、Hooks、Media、Channels、Scheduled Tasks、Worktree、历史操作逐项迁移 |
+| H | 扩大 Managed 范围 | 先建立共用领域账本/任务投影，再迁移 MCP、Hooks、后台 Shell/Monitor、child/workflow/team、Channels、Automation；Media、Worktree 和历史操作沿专项验收 |
 
 完整完成门槛见[实施与验收](managed-agent-java-hosted-runtime.md#15-ah-实施顺序)。P0～P9a、D1～D5、R1～R5/F1～F8 只作历史切片索引；C01～C18 继续覆盖完整能力面，并映射至 A～H。
 
@@ -110,6 +112,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [恢复与运行](managed-agent-recovery-operations.md) | F/G 故障、物理回执、平台和容量验收 |
 | [Runtime invocation v2](managed-agent-runtime-invocations.md) | 复用工具身份、权限、执行回执和取消语义 |
 | [配置与扩展](managed-agent-config-extensions.md) | AgentBundle、MCP/Skills/Hooks 版本和执行归属 |
+| [扩展运行时](managed-agent-extension-runtime.md) | MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的共同状态机、任务投影、恢复和 H0～H6 顺序 |
 | [全部工具与文件历史](managed-agent-tools-history.md) | 工具族、Artifact、备份、撤销、迁移 |
 | [子作用域](managed-agent-child-scopes.md) / [自动任务](managed-agent-automation.md) | 扩展范围的持久准入、调度、交付与父子关系 |
 | [搜索](managed-agent-search-tools.md) / [Grep](managed-agent-grep-tools.md) / [Notebook](managed-agent-notebook-tools.md) / [媒体](managed-agent-media.md) | 局部工具能力与有限验收，不能外推全部阶段完成 |

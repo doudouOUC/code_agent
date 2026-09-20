@@ -1,12 +1,14 @@
 # Managed Agent 全量设计与交付覆盖表
 
-> **普通工具接线（2026-09-20，HTML v1.6；工具契约源自 v1.4）：** 普通工具首版的跨组件字段、调用、资源和回收续轮按[接线设计及 S01～S08](managed-agent-ordinary-tools-integration.md)交付；该补充不扩大到记忆、子 Agent 或后台 Shell。
+> **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具首版的跨组件字段、调用、资源和回收续轮按[接线设计及 S01～S08](managed-agent-ordinary-tools-integration.md)交付；该补充不扩大到记忆、子 Agent 或后台 Shell。
+
+> **阶段 H 统一设计（2026-09-20）：** [扩展运行时设计](managed-agent-extension-runtime.md)定义 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的共同 owner、持久状态、任务投影、恢复和 H0～H6 顺序；各专项字段级契约继续有效。
 
 > **HTML 对齐（2026-09-18）：** C01～C18 继续作为能力、风险和验收清单，并映射到 A～H。B 的 daemon factory/双引擎、G 的权威事件与 checkpoint 外置、H 的全量能力迁移分别交付；原 R/F 编号仅保留为专项索引，不能另定产品实施顺序。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 > **首版运行范围（2026-09-19）：** 按[运行契约](managed-agent-first-runtime.md)收敛到五项基础必需；审批随已开放工具启用，共享 Runtime/多实例随对应 profile 验收。Hosted tenant scope 按 v1.6 的可信入口注入与资源级校验执行；完整 D 投影、G 接管与 H 扩展不作为最小闭环前置。C01～C18 是全量目标，不表示首版全部开启。
 
-> 首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不涉及，本轮不补充其专项设计。下文相应覆盖项保留为后续目标，普通工具的审批、结果资源、文件历史与取消清理仍须贯通。
+> 首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；自动记忆、子 Agent、后台 Shell 暂不启用。其目标设计已经收敛到[扩展运行时](managed-agent-extension-runtime.md)，仍不作为首版运行前提；普通工具的审批、结果资源、文件历史与取消清理须先贯通。
 
 历史更新日期：2026-09-11；生产源码基线 `a836081466`，上一轮核心设计 `4cacfbd0ed`。本稿将 daemon 默认替换的 C01～C18 纳入详细设计，包括原先延期能力。设计覆盖、源码实现、产品验收分别记录。
 
@@ -49,11 +51,11 @@ HTML 的 B 先让兼容的新普通 Session 通过统一接口使用完整 Manag
 | C05 审批与问答            | [客户端](managed-agent-client-surfaces.md)、[协议](managed-agent-control-protocol.md)：领域action、票与最终持久决定、原参数绑定、失联策略                        | B/D/F/G；H03/U03 |
 | C06 媒体/产物             | [媒体](managed-agent-media.md)、[工具与历史](managed-agent-tools-history.md)：模型与物理处理分离、资源pin/授权、完整内容和取消                                   | C/D/F/H；T03/T04/U04 |
 | C07 Skills/指令           | [配置与扩展](managed-agent-config-extensions.md)：可信根和文件版本、模型展开、脚本Runtime执行及热更新                                                            | A/H；E03 |
-| C08 MCP                   | [配置与扩展](managed-agent-config-extensions.md)：stdio/http、工具/resources/prompts、鉴权与动态版本、未知效果恢复                                               | B/H；E04/E05 |
-| C09 Hooks                 | [配置与扩展](managed-agent-config-extensions.md)：触发矩阵、命令/HTTP/模型owner、输入输出和次数、取消/失败                                                       | B/H；E06/E07 |
-| C10 Channels              | [自动任务与交付](managed-agent-automation.md)：事件接收、Session路由、附件、持久delivery outbox和unknown策略                                                     | H；A01/A02 |
-| C11 定时/内部继续         | [自动任务与交付](managed-agent-automation.md)：手动persistent/per_run、自动fresh child/原队列、Goal/Live、run锁与去重                                            | H；A03/A04/A05 |
-| C12 child/background/记忆 | [自动任务与交付](managed-agent-automation.md)、[子作用域](managed-agent-child-scopes.md)：稳定child运行、父接受、团队/任务板/信箱、后台进程和记忆发布            | G/H；A06/A07 |
+| C08 MCP                   | [配置与扩展](managed-agent-config-extensions.md)及[扩展运行时](managed-agent-extension-runtime.md)：stdio/http、binding/catalog、工具/resources/prompts、鉴权与未知效果恢复 | B/H；E04/E05/H1 |
+| C09 Hooks                 | [配置与扩展](managed-agent-config-extensions.md)及[扩展运行时](managed-agent-extension-runtime.md)：触发矩阵、四类执行 owner、occurrence、模型资格、async 恢复 | B/H；E06/E07/H2 |
+| C10 Channels              | [自动任务与交付](managed-agent-automation.md)及[扩展运行时](managed-agent-extension-runtime.md)：入站路由/附件、正式结果 outbox、逐段 receipt 和 unknown 策略 | H；A01/A02/H5 |
+| C11 定时/内部继续         | [自动任务与交付](managed-agent-automation.md)及[扩展运行时](managed-agent-extension-runtime.md)：definition/run、单扫描者、overlap/catch-up、Goal/Live | H；A03/A04/A05/H6 |
+| C12 child/background/记忆 | [自动任务与交付](managed-agent-automation.md)、[子作用域](managed-agent-child-scopes.md)及[扩展运行时](managed-agent-extension-runtime.md)：child/父接受、团队、后台 Shell、Monitor 和任务投影 | G/H；A06/A07/H0/H3/H4 |
 | C13 物理历史/撤销         | [工具与历史](managed-agent-tools-history.md)：maintenance gate、文件前后像与操作日志、部分失败恢复，不称跨文件原子                                               | H；T05/T06 |
 | C14 旧会话/fork/转换      | [存储](managed-agent-session-storage.md)、[工具与历史](managed-agent-tools-history.md)：schema guard、旧前缀、独立新Session转换、原owner保留                     | B/G/H；S02/S06/T07 |
 | C15 事件/用量/通知        | [客户端](managed-agent-client-surfaces.md)：正式sequence与兼容bus、attempt用量、终态/物理holds、通知去重                                                         | D/F/G；U04/U05/U07 |
@@ -81,7 +83,7 @@ HTML 的 B 先让兼容的新普通 Session 通过统一接口使用完整 Manag
 
 当前顺序固定为 A 冻结协议与基线 → B 同 daemon 双引擎 → C Java 内嵌 Broker → D 公共 Agent API MVP → E Hosted Sidecar → F 故障验收 → G Authority 外置 → H 扩大能力。各 C 项在上表给出所属阶段；同一能力可能跨多个阶段，局部通过不能替代后续阶段的门槛。
 
-H 按 HTML 依次迁移 Built-in Tools、Skills、MCP、Hooks、Media、Channels、Scheduled Tasks、Worktree 和历史操作。已有工具专项可复用；未覆盖用途保持 Legacy。阶段 G 的完整共享存储/可替换 Harness 不因旧 R2.S1～S3 排在前面就成为 B 的全部前置条件，B 仍必须具备必要的持久 owner、安全准入和恢复保护。
+H 按[扩展运行时](managed-agent-extension-runtime.md#13-阶段-h-实施顺序)拆为 H0 共用领域账本/任务投影，H1 MCP，H2 Hooks，H3 后台 Shell/Monitor，H4 child/workflow/team，H5 Channels，H6 Automation；Built-in Tools、Skills、Media、Worktree、历史和 Memory 继续按原专项接入。已有工具专项可复用；未覆盖用途保持 Legacy。阶段 G 的完整共享存储/可替换 Harness 不因旧 R2.S1～S3 排在前面就成为 B 的全部前置条件，B 仍必须具备必要的持久 owner、安全准入和恢复保护。
 
 下面保留旧任务编号用于定位源码接缝和既有验收，不再据此重排 A～H。
 

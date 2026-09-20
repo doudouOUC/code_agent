@@ -4,7 +4,7 @@
 
 ## 1. 路由与兼容范围
 
-- 公共资源前缀固定为 `/v1/agents`，Session 前缀固定为 `/v1/agents/sessions`；不再使用 `/v1/agents/sessions`。
+- 公共资源前缀固定为 `/v1/agents`，Session 前缀固定为 `/v1/agents/sessions`；不再另建 `/v1/sessions` 或实验 `/managed/sessions*` 作为正式资源。
 - WebShell BFF 适配前缀固定为 `/api/agent/web-shell/v1`。适配层只改变传输形状，不建立另一套 Session、Turn、事件或幂等语义。
 - `POST /v1/agents/sessions`、Session 列表/查询、输入/取消事件以及 Session 事件查询/SSE 是当前阶段性实现。AgentDefinition、删除、Turn/Item/Artifact 资源仍为阶段 D 的 `planned` 接口。
 - 旧 `/managed/sessions*` 只用于实验兼容；公共 API 完成准入、查询、事件和幂等覆盖后删除，不写入本契约。
@@ -42,7 +42,13 @@
 2. 删除或改变必填字段、游标语义和状态含义时提升 API 主版本。
 3. `schemaVersion` 决定事件封装；`projectionVersion` 决定 Item/Snapshot 解释。重放必须返回最初接受时的版本，不能用最新版投影器重写历史事件。
 
-## 6. 当前实现差异
+## 6. 阶段 H 扩展资源
+
+HTML v1.7 的[扩展运行时](managed-agent-extension-runtime.md#11-webshell-与公共接口)在当前 Session/Turn/Item API 上增加 Task、MCP catalog、Hook catalog、Automation 和 Channel/Delivery 资源。WebShell 仍只访问 Java BFF，不直连 Harness 或 Runtime；后台输出与 Monitor 原始行通过受控 Artifact/分页游标读取，不写入每行一个主对话事件。
+
+阶段 H 的路由和 DTO 尚未加入 v1.6 OpenAPI，因此仍属于设计候选，不能被生产发现或 SDK 暴露。实现 H0 前先在 `managed-agent-public-api.openapi.yaml` 冻结 `SessionTaskView`、任务查询/取消、幂等命令和错误，再按 H1～H6 分别加入 MCP、Hooks、Channel 与 Automation 资源。daemon 已有的 `/session/:id/tasks`、`/session/:id/hooks`、workspace MCP 和 `/scheduled-tasks` 只作为内部适配来源，不能原样升级为租户级公共契约。
+
+## 7. 当前实现差异
 
 OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。以 `feature/managed-agents-p0-p8` 的 `c818c21910` 为基线，至少还有这些差异：
 
@@ -54,7 +60,7 @@ OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。�
 
 这些差异必须通过实现、生成类型和契约测试关闭；不能为了让 Schema 暂时通过而删除目标字段。
 
-## 7. 契约生成与验收
+## 8. 契约生成与验收
 
 实现时由 OpenAPI 生成或校验 Java DTO 与 TypeScript 类型，并运行以下同一套契约测试：
 

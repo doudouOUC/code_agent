@@ -1,5 +1,7 @@
 # Managed 子任务执行与持久文件历史
 
+> **阶段 H 统一设计（2026-09-20，HTML v1.7）：** 本文保留已有子作用域实现与历史证据；目标 Hosted child Session、父结果 accepted/consumed、工作区隔离、关闭级联及 WebShell Task 投影以[扩展运行时设计](managed-agent-extension-runtime.md#8-子-agent)为准。
+
 > **HTML 对齐（2026-09-18）：** 父子作用域、稳定 Runtime ID、文件历史 owner、取消和结果接管作为专项能力保留；同 daemon 双引擎与固定 owner 属于 B，完整后台/子任务能力按 H 的兼容与验收范围启用。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 状态：2026-09-09，本阶段实现及下列 macOS 验收已完成；daemon 默认入口尚未切换。代码基线为 `174e072ac4`，本文件随其后续实现提交。完整迁移目标见 [daemon 默认替换方案](managed-agent-daemon-default.md)，工具调用契约见 [Runtime invocation v2](managed-agent-runtime-invocations.md)。

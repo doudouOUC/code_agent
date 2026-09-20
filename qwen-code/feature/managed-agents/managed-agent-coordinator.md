@@ -1,6 +1,6 @@
 # Managed coordinator：调度、装配与关闭
 
-> **普通工具接线（2026-09-20，HTML v1.6；工具契约源自 v1.4）：** 普通工具首版同 Workspace 的工具轮次从起始快照至 history 持久提交串行占用；新 Turn 与 idle 回收按 binding 状态串行决策。具体准备、结果结算及释放次序见[接线设计](managed-agent-ordinary-tools-integration.md)，不因文件历史 checkpoint RPC 成功提前释放轮次。
+> **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具首版同 Workspace 的工具轮次从起始快照至 history 持久提交串行占用；新 Turn 与 idle 回收按 binding 状态串行决策。具体准备、结果结算及释放次序见[接线设计](managed-agent-ordinary-tools-integration.md)，不因文件历史 checkpoint RPC 成功提前释放轮次。
 
 > **HTML 对齐（2026-09-18）：** B 保留同 daemon 的双引擎、coordinator 与固定 owner；C 在 Java 内嵌 Broker，持久化 RuntimeBinding/Execution Ledger 并管理 Runtime 生命周期；D 由 Java 提供公共资源投影；G 再外置 Session Authority。执行协调、产品路由与资源调度不合并为第二套模型循环。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

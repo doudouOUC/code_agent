@@ -1,6 +1,6 @@
 # Managed Agents 首版运行契约
 
-更新日期：2026-09-20。依据 [HTML v1.6](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
+更新日期：2026-09-20。依据 [HTML v1.7](managed-agent-dual-path-architecture.html#minimum-runtime) 和[双链路总方案](managed-agent-java-hosted-runtime.md)。本文落实本轮审查后的首版取舍，不声明实现或测试已经完成；A～H 仍是全量能力的阶段编号。Bundle/Session DTO、完整工具阶段、资源传输与回收续轮的具体接线见[普通工具首版设计](managed-agent-ordinary-tools-integration.md)。
 
 ## 1. 首版范围与运行条件
 

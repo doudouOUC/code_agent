@@ -4,7 +4,7 @@
 
 > **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md#7-审批与用户问答)要求已开放能力的审批/问答经过 Java 回到原持久仲裁；复用既有产品入口、SSE 和历史查询。独立公共 Item/eventSequence 投影属于 D，不阻塞首版 Hosted 运行；首版 accepted 必须等待 qwen 持久受理。
 
-> **统一 Session 身份（2026-09-20，HTML v1.6）：** Java 在创建前分配的 RFC UUID `sessionId` 同时用于公共 Agent API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope，不再维护公共 Session 到 Harness Session 的映射。ACP client/attachment、Harness boot/instance、Runtime Session 与执行 ID 仍保持内部化。
+> **统一 Session 身份（2026-09-20，HTML v1.7）：** Java 在创建前分配的 RFC UUID `sessionId` 同时用于公共 Agent API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope，不再维护公共 Session 到 Harness Session 的映射。ACP client/attachment、Harness boot/instance、Runtime Session 与执行 ID 仍保持内部化。
 
 > **v1.6 接口冻结：** 公共 REST 与 WebShell adapter 的路由、DTO、错误、幂等、分页和 SSE 语义以 [API 契约](managed-agent-api-contract.md)及 [OpenAPI](managed-agent-public-api.openapi.yaml)为单一来源。当前 Java/TypeScript 尚未由该 Schema 生成，属于实现与契约测试缺口。
 

@@ -953,11 +953,12 @@
           <a href="#capacity">容量与观测</a>
           <a href="#agent-api">Agent API</a>
           <a href="#event-storage">事件与存储</a>
+          <a href="#extension-runtime">扩展运行时</a>
           <a href="#delivery">实施阶段</a>
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.6 · 2026-09-20<br />
+          方案版本 v1.7 · 2026-09-20<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环；公开事件先可靠提交，再向客户端推送。
         </div>
@@ -1010,9 +1011,9 @@
             </div>
           </div>
           <p class="lead">
-            v1.6 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
-            的普通工具接线和 v1.5 的统一 Session 身份，并补充事件接受、SSE
-            直推、异步分发与恢复边界。Java 在创建前生成全局唯一 RFC UUID，
+            v1.7 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
+            的普通工具接线、v1.5 的统一 Session 身份和 v1.6 的事件恢复边界，
+            并补充阶段 H 的扩展运行时。Java 在创建前生成全局唯一 RFC UUID，
             公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
             使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
             首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
@@ -1020,7 +1021,8 @@
           </p>
           <p>
             首版只支持普通工具，以 Read、Write、Edit 和前台 Shell 为最小验收集；
-            自动记忆、子 Agent、后台 Shell 暂不涉及，本轮不补充其专项设计。
+            自动记忆、子 Agent、后台 Shell 暂不在首版启用；其目标契约在阶段 H
+            的扩展运行时中定义，不作为当前运行前提。
             复用现有配置与 AgentBundle 工具目录表达范围，不新增开关协议。
             普通工具所需的审批、输出与文件历史保存、Shell 后代进程的取消清理仍须完成。
             该 profile 的初始化和轮次结束不自动启动延期能力；配置要求范围外能力时，
@@ -2820,6 +2822,228 @@ owner 故障
           </div>
         </section>
 
+        <section id="extension-runtime">
+          <div class="section-head">
+            <div>
+              <div class="section-index">14C / EXTENSION RUNTIME</div>
+              <h2>扩展能力的统一运行模型</h2>
+            </div>
+          </div>
+          <p class="lead">
+            MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor
+            不各自建立调度器和会话真相。它们共用 Session Authority、Runtime
+            Broker、Artifact、Outbox、activation fence 与恢复协议：Harness
+            始终是唯一模型推进者，Java 持久化产品资源，Tool Runtime 执行物理副作用。
+          </p>
+          <div class="callout warning">
+            <strong>范围说明：</strong>以下是阶段 H 的目标设计。当前 Hosted Managed
+            首版仍只开放 Read、Write、Edit 和前台 Shell；源码中已有 MCP、Hook、Task、
+            Channel、Schedule、Agent、Shell 与 Monitor 实现，不代表它们已经完成远程
+            Runtime、持久恢复或多实例验收。
+          </div>
+
+          <figure class="tool-flow-diagram" aria-labelledby="extension-runtime-caption">
+            <div class="tool-flow-track">
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">01 / DEFINE</span>
+                  <h4>冻结定义与能力</h4>
+                  <span class="tool-flow-owner">AgentBundle / workspace control</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step commit">definition revision</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">catalog / policy</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">secret handle</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">02 / ACCEPT</span>
+                  <h4>持久受理业务意图</h4>
+                  <span class="tool-flow-owner">Java + Session Authority</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step commit">domain record</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">outbox</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">WakeIntent</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">03 / ADVANCE</span>
+                  <h4>唯一模型推进</h4>
+                  <span class="tool-flow-owner">Managed Harness</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step wait">activation fence</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step execute">model / hook plan</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">tool / child intent</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">04 / EFFECT</span>
+                  <h4>执行物理副作用</h4>
+                  <span class="tool-flow-owner">Runtime Broker + Tool Runtime</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step wait">operation gate</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step execute">MCP / Hook / Process</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step commit">receipt / Artifact</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">05 / DELIVER</span>
+                  <h4>接收、投影与恢复</h4>
+                  <span class="tool-flow-owner">Authority / Outbox / WebShell</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step commit">accept receipt</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step">Task / Item view</span>
+                  <span class="tool-flow-arrow">→</span>
+                  <span class="tool-flow-step wait">query or blocked</span>
+                </div>
+              </div>
+            </div>
+            <figcaption id="extension-runtime-caption">
+              定义、运行、物理结果和交付分别持久化；MQ 只转发已提交事实，浏览器仍按 Session
+              公开 sequence 读取 Java 投影。
+            </figcaption>
+          </figure>
+
+          <h3 style="margin-top: 28px">统一 owner 与持久资源</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>能力</th>
+                  <th>执行 owner</th>
+                  <th>权威记录</th>
+                  <th>关键恢复边界</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>MCP</td>
+                  <td>Harness 使用固定 catalog；Runtime 持有 stdio/HTTP 连接</td>
+                  <td><code>mcp_configuration</code> / <code>mcp_operation</code></td>
+                  <td>固定 server revision 与 connection generation；远端结果未知不重发</td>
+                </tr>
+                <tr>
+                  <td>Hooks</td>
+                  <td>Harness 编排；command/HTTP 在 Runtime，prompt 在 Harness</td>
+                  <td><code>hook_registration</code> / <code>hook_execution</code></td>
+                  <td>occurrence/ordinal 去重；async 命令保留物理 owner；once 不恢复资格</td>
+                </tr>
+                <tr>
+                  <td>Channels</td>
+                  <td>可信 adapter 接入/发送；Harness 只消费正式 input</td>
+                  <td><code>channel_route</code> / <code>channel_delivery</code></td>
+                  <td>附件先转存；逐段 receipt；无 provider 查询时发送 unknown 不重试</td>
+                </tr>
+                <tr>
+                  <td>Automation</td>
+                  <td>Scheduler 只 claim；目标 Session Harness 执行</td>
+                  <td><code>schedule</code> / <code>automation_run</code></td>
+                  <td>稳定 occurrence；单扫描者 fencing；fresh child 未知不回父双发</td>
+                </tr>
+                <tr>
+                  <td>子 Agent</td>
+                  <td>独立 child Session/Harness；父子通过 outbox/ACK</td>
+                  <td><code>child_run</code> / <code>child_acceptance</code></td>
+                  <td>child terminal、parent accepted、parent consumed 三个事实分开</td>
+                </tr>
+                <tr>
+                  <td>后台 Shell</td>
+                  <td>Runtime process owner</td>
+                  <td><code>child_run(kind=shell)</code> + 原工具 receipt</td>
+                  <td>日志 Artifact、真实进程树退出；PID/sidecar 不足以证明可恢复</td>
+                </tr>
+                <tr>
+                  <td>Monitor</td>
+                  <td>Runtime watch；Authority 接受有意义的观测</td>
+                  <td><code>monitor_run</code> + 观测水位</td>
+                  <td>相同观测合并；占 Runtime hold；不可重建 target 准确 blocked</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid-3" style="margin-top: 20px">
+            <article class="card accent-blue">
+              <h3>一个 Task 读模型</h3>
+              <p>
+                WebShell 统一展示 child、workflow、shell、monitor 和 automation run，
+                但 Task 只是由领域记录重建的投影。它不保存第二份执行真相，也不暴露
+                runtimeBindingId、generation、Runtime endpoint、绝对路径、原始 PID 或凭据。
+              </p>
+            </article>
+            <article class="card accent-green">
+              <h3>三个完成状态</h3>
+              <p>
+                逻辑运行、物理执行、交付/父接收分别结算。模型完成不能冒充 Channel
+                delivered；子任务 terminal 不能冒充父 consumed；cancel ACK 不能冒充进程退出。
+              </p>
+            </article>
+            <article class="card accent-amber">
+              <h3>有界日志与通知</h3>
+              <p>
+                Shell 与 Monitor 原始输出写分段 Artifact，公共事件只携带状态、摘要和游标。
+                高频相同观测先聚合，没有变化时不创建新模型 Turn，避免每行永久膨胀事件表。
+              </p>
+            </article>
+          </div>
+
+          <h3 style="margin-top: 28px">后台 Shell 与 Monitor 的差别</h3>
+          <div class="grid-2">
+            <article class="card accent-purple">
+              <h3>后台 Shell</h3>
+              <ul>
+                <li>启动后返回持久 process handle，模型可以继续本轮或后续工作。</li>
+                <li>输出以 Artifact + cursor 读取；运行期间阻止 Runtime idle release。</li>
+                <li>默认随 Session close 执行 terminate + drain；只有显式 detached 才移交 owner。</li>
+                <li>Runtime 丢失且无法凭 supervisor attach 时进入 recovery_blocked，不重跑命令。</li>
+              </ul>
+            </article>
+            <article class="card accent-purple">
+              <h3>Monitor</h3>
+              <ul>
+                <li>持续观察目标并生成单调 observation sequence，不等于定时 Automation。</li>
+                <li>Runtime 聚合/去抖，Authority 接受后按策略生成一个通知 input + WakeIntent。</li>
+                <li>不占 active Turn，但占进程、日志、monitor quota 与 Runtime hold。</li>
+                <li>纯观察目标可从定义重建；依赖旧句柄或 offset 时 degraded/blocked。</li>
+              </ul>
+            </article>
+          </div>
+
+          <h3 style="margin-top: 28px">阶段 H 的实施顺序</h3>
+          <pre>
+H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
+  → H1 MCP definition + binding + catalog + operation
+  → H2 Hook plan + occurrence + 四类 runner
+  → H3 后台 Shell + Monitor + Runtime hold + 日志 Artifact
+  → H4 child / workflow / team + 父 accepted / consumed
+  → H5 Channel ingress / route / delivery outbox
+  → H6 Schedule / Automation / Goal / Live / loop / webhook</pre
+          >
+          <p>
+            完整字段、接口、恢复矩阵与验收见
+            <a href="managed-agent-extension-runtime.md">《Managed Agent 扩展运行时设计》</a>。
+            每个子阶段按 capability 独立放行；未覆盖用途继续选 Legacy，不能因为 Task
+            列表或 validator 已认识一种类型就宣称能力可用。
+          </p>
+        </section>
+
         <section id="delivery">
           <div class="section-head">
             <div>
@@ -2888,9 +3112,9 @@ owner 故障
             <article class="phase">
               <h3>阶段 H：扩大 Managed 范围</h3>
               <p>
-                依次迁移 Built-in
-                Tools、Skills、MCP、Hooks、Media、Channels、Scheduled
-                Tasks、Worktree 和历史操作。
+                H0 先建立领域账本、Outbox 与统一 Task 投影；随后按 H1～H6
+                迁移 MCP、Hooks、后台 Shell/Monitor、child/workflow/team、Channels
+                和 Automation。Media、Worktree、历史与 Memory 沿各专项验收。
               </p>
             </article>
           </div>
@@ -2940,6 +3164,10 @@ owner 故障
             <li>事务回滚时 Hub 不发布事件；提交成功后同节点 SSE 无需等待数据库轮询。</li>
             <li>Hub overflow、断线或跨节点丢通知后按公开 sequence 补齐，不重复或跳过事件。</li>
             <li>两个 Java 实例共享真实 MySQL 时，命令幂等、单活 Turn、序号和终态保持一致。</li>
+            <li>MCP/Hook 定义更新不改变在途调用，lost ACK 只查询原 operation。</li>
+            <li>后台 Shell/Monitor 运行期间 Runtime 不会 idle release，停止后真实进程树退出。</li>
+            <li>child terminal、父 accepted 与父 consumed 可分别恢复，不重复创建 child 或通知。</li>
+            <li>Channel/Automation 重投使用原 inputId/runId/deliveryId，未知派发不重跑模型或双发。</li>
           </ol>
           <div class="callout">
             <strong>下一项可交付证明：</strong>在保持 qwen serve 与 TS Agent Loop
@@ -2990,7 +3218,7 @@ owner 故障
                 <li>Harness 私有 journal、资源闭包、共享 Session Authority 和可替换 Harness。</li>
                 <li>真实 MySQL、双 JVM、真实 Harness/Runtime 的故障与容量验证。</li>
                 <li>Legacy → Managed continuation。</li>
-                <li>MCP、Hooks、Channels 等完整迁移。</li>
+                <li>MCP、Hooks、后台 Shell、Monitor、child/workflow/team、Channels 与 Automation 按 H0～H6 完整迁移。</li>
                 <li>删除旧 <code>/managed/sessions*</code> 实验控制面。</li>
               </ul>
             </article>
@@ -3006,7 +3234,7 @@ owner 故障
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.6 · 2026-09-20 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.7 · 2026-09-20 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>

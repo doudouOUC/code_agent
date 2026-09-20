@@ -1,6 +1,6 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.6](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.7](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -364,7 +364,7 @@ D 开放公共接口前须冻结源事件键、公共 Item 版本、源进度与
 | E：Hosted Harness | Java Pod + qwen serve Sidecar | Prompt 与 provisioning 并行，loopback/鉴权，禁止本地工具 fallback |
 | F：可靠性与故障注入 | 已有部署下的完整故障矩阵 | ACK 丢失、SSE 重连、started 后断线、Harness/Java/Runtime 崩溃、Cancel 竞争、Artifact 失败 |
 | G：Session Authority 外置 | 共享权威事件、checkpoint、可替换 Harness | activation epoch/fencing、原调用对账；通过接管验收后取消粘性要求 |
-| H：扩大 Managed 范围 | 扩展完整能力面 | 按 HTML 顺序迁移 Built-in Tools、Skills、MCP、Hooks、Media、Channels、Scheduled Tasks、Worktree、历史操作；逐项验收 |
+| H：扩大 Managed 范围 | 扩展完整能力面 | 按[扩展运行时](managed-agent-extension-runtime.md#13-阶段-h-实施顺序)先交付 H0 共用账本/任务投影，再迁移 MCP、Hooks、后台 Shell/Monitor、child/workflow/team、Channels 和 Automation；Media、Worktree、历史与 Memory 沿专项逐项验收 |
 
 阶段编号表示能力归属，不要求完整 D 先于 E 首次运行。A/B/C/E 与 F 的最小验收先完成[首版闭环](managed-agent-first-runtime.md#8-首版验收与阶段关系)，D/G/H 按各自能力门槛后续开放。
 

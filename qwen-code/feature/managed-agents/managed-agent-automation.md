@@ -1,5 +1,7 @@
 # Managed 自动任务、Channels 与子任务交付
 
+> **阶段 H 统一设计（2026-09-20，HTML v1.7）：** 本文保留 Channels、Schedule、child/team/memory 的字段级契约；它们与 MCP、Hooks、后台 Shell、Monitor 的共同 owner、任务投影、Runtime hold 和 H0～H6 顺序见[扩展运行时设计](managed-agent-extension-runtime.md)。
+
 > **HTML 对齐（2026-09-18）：** 领域准入、幂等、父接受、取消和交付语义继续复用。HTML 第一阶段将 Channel、Scheduled Task 等用途留在 Legacy，完整扩展按阶段 H 逐项迁移；执行记录与 Java 公共投影分开，不能提前把全部领域状态搬成 Java 首阶段 Session authority。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 更新日期：2026-09-11；生产源码基线 `a836081466`，前版设计 `4cacfbd0ed`。本文定义[全量设计](managed-agent-full-design.md)的 C10/C11/C12：Channels 入站和交付，定时与内部继续，child/background/memory。以下新增协议、持久记录和恢复流程均待实现，已有实验或限定场景验证不证明本稿完成。首阶段仍延期这些能力的完整迁移；全量设计在本文给出，不延期决定其职责和失败语义。
@@ -29,7 +31,7 @@
 
 所有 Session 业务事实只通过所属 authority 的单 writer 条件事务提交，领域事件固定为 `domain.committed {domain,version:1,operationId,recordRef}`。recordRef 的内容按下表封闭 schema 验证，不提供任意 append 或任意方法调用。
 
-本表以及 §5 的 Goal/Todo/plan、§6.1 的 team/session_message 共 15 个 domain，均按[存储 §3.1](managed-agent-session-storage.md#31-domain-注册索引)注册，正文使用 `kind=managed-<domain>, schemaVersion=1`。不把 goal_state/child_run/memory_job 改写为未定义的同义名；各阶段只启用已验收的用途和 schema。
+本表以及 §5 的 Goal/Todo/plan、§6.1 的 team/session_message 共 16 个 domain，均按[存储 §3.1](managed-agent-session-storage.md#31-domain-注册索引)注册，正文使用 `kind=managed-<domain>, schemaVersion=1`。不把 goal_state/child_run/monitor_run/memory_job 改写为未定义的同义名；各阶段只启用已验收的用途和 schema。
 
 | domain           | authority 内的权威内容                                | 生产者与消费者                                 |
 | ---------------- | ----------------------------------------------------- | ---------------------------------------------- |
@@ -39,6 +41,7 @@
 | automation_run   | trigger、occurrence、冻结目标、派发和 fallback 状态   | 扫描者、手动入口、Goal/Live 等受控内部来源     |
 | child_run        | launch/父链/scope/运行/终态、结果 outbox              | 原子任务编排 owner；父工具结果与背景任务投影   |
 | child_acceptance | 父接受 receipt、对应工具结果或输入、消费位置          | 父 authority；relay、父 Harness 与资源回收     |
+| monitor_run      | 定义、Runtime binding、观测水位、通知策略、终态       | Runtime 观察进程；Session authority 接受观测并投影任务 |
 | memory_job       | 源事件区间、目标 store、维护阶段、cursor 和结果       | MemoryManager 适配；Runtime 回执、记忆状态投影 |
 
 命令沿用 `CommandMeta`、`SessionKey`、`DurableRef`、`CommitReceipt`、错误和限额。响应在 CommitReceipt 外返回 `{operationId,state,throughSequence,receiptRef?}`；查询返回已提交事实，不能把 Map 空、404 或超时映射成未执行。幂等范围为 SessionKey+operation+commandId，同 ID 不同业务摘要冲突；expectedSequence 是可重读后更新的前置条件。旧 epoch 的重复成功请求只返回原 receipt，不恢复新派发权。

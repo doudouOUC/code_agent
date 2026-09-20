@@ -1,6 +1,6 @@
 # Managed Session：记录格式、提交与协议限额
 
-> **普通工具接线（2026-09-20，HTML v1.6）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。
+> **普通工具接线（2026-09-20，HTML v1.7）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。
 
 > **HTML 对齐（2026-09-20）：** JSONL、SessionWriterLease、ChatRecord 和本地 lock schema 继续作为 qwen 侧执行权威/兼容存储的专项设计。Java 分配的 RFC UUID `sessionId` 同时标识公共 Session、qwen Session Authority、JSONL 与 Broker scope，不保存第二套 Harness Session ID；Java 仍保存公共投影、SessionBackendBinding、RuntimeBinding 和 Execution Ledger，G 才外置权威事件/checkpoint。两份投影不能相互覆盖原始执行事实。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
@@ -8,7 +8,7 @@
 
 > **首版运行范围（2026-09-19）：** 正式 Transcript/checkpoint、资源及 Broker Ledger 使用明确持久保存位置；首版单实例/原 owner，Pod 替换或原卷不可用准确阻塞，不创建空 Session 替代。独立公共 Item/eventSequence 归 D；见[部署与存储矩阵](managed-agent-first-runtime.md#5-session-归属存储与事件)。
 
-更新日期：2026-09-11；源码基线 `a836081466`，本次修订基于方案 `2ec07afb72`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3/§3.1 的封闭 kind 与 domain、§5 的记录与事务限额已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地；§4 的事务提交（先事件后 marker、`previousCommitDigest` 链、幂等键、写失败停止推进、完整前缀恢复扫描）由 `managed-session-authority.ts` 的 `LocalManagedSessionAuthority` 通过既有 `SessionWriterLease` 实现并有定向单测。仍未实现或验收：lock schema 3 的认证换锁、§2.1 资源仓库、RestoreBundle、坏尾截断的 lease 能力、目录/标题等各适配器与投影，以及四处普通 factory 接线。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
+更新日期：2026-09-20；历史源码基线 `a836081466`，本次修订基于方案 `2ec07afb72` 并对照 Managed 分支快照 `756087dbcd`。本文是全量目标的规范性设计，补齐[私有协议](managed-agent-control-protocol.md)原有的格式和限额冻结项。§1 的三个 subtype 与 header 字段、§2 的共用字段规则、§3 的封闭 kind、§5 的记录与事务限额，以及 §3.1 中除 v1.7 新增 `monitor_run` 外的 32 个 domain，已作为 `packages/core/src/managed-runtime/managed-session-records.ts` 落地；`monitor_run` 属于 H0 待实现 validator。§2.1 的本地资源仓库、RestoreBundle、§4 的事务提交和坏尾截断 lease 能力已经进入源码并有定向单测。仍未实现或验收：lock schema 3 的认证换锁、资源回收/孤儿/pin 闭包、扩展运行时适配器与完整投影，以及普通 factory 的默认接线。现有公开签名仍按[268 项兼容映射](managed-agent-session-method-map.md)保留。
 
 ## 0. HTML 的权威记录与公共投影
 
@@ -142,18 +142,19 @@ Action 请求的来源与资格固定如下。`requestAction` 只允许注册领
 
 ### 3.1 domain 注册索引
 
-下列 30 个名称构成全量目标的 v1 集合，event version=1、recordRef.kind=`managed-<domain>`、schemaVersion=1。正文 schema、生产者和消费/原子要求归对应专项；实现须从此索引检查完整集合，不得重新发明同义名。阶段、用途与 capability 决定当前可用子集：解析器认识一个名称不表示该功能已实现或获准执行。延期能力继续原准入规则，不提前扩大默认范围。新 domain 或正文的不兼容改动必须遵守上面的 reader/version 扩展规则。
+下列 33 个名称构成全量目标的 v1 集合，event version=1、recordRef.kind=`managed-<domain>`、schemaVersion=1。正文 schema、生产者和消费/原子要求归对应专项；实现须从此索引检查完整集合，不得重新发明同义名。阶段、用途与 capability 决定当前可用子集：解析器认识一个名称不表示该功能已实现或获准执行。延期能力继续原准入规则，不提前扩大默认范围。新 domain 或正文的不兼容改动必须遵守上面的 reader/version 扩展规则。
 
 | 专项/正文来源                                      | domain                                                                                                                                        |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | [配置与扩展](managed-agent-config-extensions.md)§7 | `config_install`、`workspace_initialization`、`skill_activation`、`mcp_configuration`、`mcp_operation`、`hook_registration`、`hook_execution` |
 | [工具与历史](managed-agent-tools-history.md)§1.1   | `tool_stage`、`resource`、`publication`、`workspace_operation`、`history_rewind`、`history_copy`、`history_maintenance`                       |
 | [自动任务](managed-agent-automation.md)§2          | `channel_route`、`channel_delivery`、`schedule`、`automation_run`、`child_run`、`child_acceptance`、`memory_job`                              |
+| [扩展运行时](managed-agent-extension-runtime.md)§10 | `monitor_run`                                                                                                                               |
 | [自动任务](managed-agent-automation.md)§5          | `goal_state`、`todo_state`、`plan_mode`                                                                                                       |
 | [自动任务](managed-agent-automation.md)§6.1        | `team_state`、`team_task`、`team_message`、`team_plan`、`session_message`                                                                     |
-| 本节会话元数据                                     | `session_metadata`                                                                                                                            |
+| 本节、[工具与历史](managed-agent-tools-history.md)及[客户端](managed-agent-client-surfaces.md) | `session_metadata`、`file_history`、`session_source` |
 
-`session_metadata` 正文为原 operationId、revision、previousRecordRef（首次为 null）和原标题值/清除语义；由受权重命名入口通过 authority 提交，目录/标题 reader 消费。涉及物理维护的 history_maintenance 只引用该元数据结果，不存第二份可独立更改的标题。workspace 配置控制记录和 RuntimeReceiptStore 仍属各自 owner，本索引不要求把无 Session 事实写进 Session 日志。
+`session_metadata` 正文为原 operationId、revision、previousRecordRef（首次为 null）和原标题值/清除语义；由受权重命名入口通过 authority 提交，目录/标题 reader 消费。`file_history` 保存 recorder 已持久接受的文件历史快照引用，`session_source` 保存创建来源的原记录形态；两者已经进入当前 validator，但是否启用仍由独立 admission allow-list 决定。涉及物理维护的 history_maintenance 只引用这些结果，不存第二份可独立更改的标题或备份。workspace 配置控制记录和 RuntimeReceiptStore 仍属各自 owner，本索引不要求把无 Session 事实写进 Session 日志。
 
 ## 4. 成功提交、损坏与重启
 
