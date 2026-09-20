@@ -1,6 +1,6 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.7](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.8](managed-agent-dual-path-architecture.html)。同步日期：2026-09-20；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -17,6 +17,8 @@ A～H 保留为能力阶段；首个闭环使用 A/B/C/E 与 F 的必要验收�
 v1.4 的[普通工具接线设计](managed-agent-ordinary-tools-integration.md)固定 Bundle 发布/装载和 Session DTO、命令回执查询、完整 tool/history control、结果 bytes 交付与干净回收后的第二轮；补充验收 S01～S08 与 M01～M10 同属首版条件。
 
 v1.5 固定一套 Session 身份：Java 在创建前生成全局唯一 RFC UUID `sessionId`，公共 Agent API、qwen serve Session、Managed Harness Context、JSONL Transcript 和 Runtime Broker scope 全部使用这个值。不得生成或持久化第二套 Harness Session ID；现有私有协议若仍命名为 `harnessSessionId`，只能作为同值兼容别名。
+
+v1.8 将 Runtime Broker 持久化拆成明确的 Repository 边界：[中文 JDBC 方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 定义 Binding allocation slot、Runtime binding、Runtime Session 和 Tool execution 四表 schema，使用数据库时钟、行锁、version 与 generation fencing 协调多 JVM。对应代码切片已通过 H2 和真实 MySQL 契约验证，但尚未接入 Spring DataSource/Flyway，也不证明 Java 重启后可自动接管原 Runtime 进程。
 
 ## 1. 架构总览
 
@@ -396,7 +398,7 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 
 ## 17. 实现快照与待对齐项
 
-HTML 第 17 节的“已有基础/待补齐”保留为原 v1.2 实现快照，v1.3～v1.6 新增运行契约不代表代码已完成：当时记录已有 qwen serve HTTP/SSE、双引擎接缝、进程内 Host、Local/Remote Provider、私有五操作、Auto Local 激活和部分 owner 恢复；当时待补 Broker/Ledger、JavaBrokerManagedRuntimeProvider、Hosted Profile、Java→Runtime HTTP/SSE、公共 API/投影、AgentBundle 校验、Artifact/RuntimeTemplate、共享 Authority、continuation、扩展迁移及旧实验控制面退役。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)，不能将这张历史表当作当前全量缺失项。
+HTML 第 17 节已更新为 v1.8 代码快照，仍只能表达已有代码切片与待验收边界，不能用来宣布 A～H 已完成。较原 v1.2～v1.7，当前快照已经补入 Java 存储/事件物化和 Runtime Broker JDBC Repository；Spring 生产接线、跨实例通知、Runtime 进程恢复、双 JVM 故障验证及完整 Hosted Profile 仍是缺口。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
 
 后续实现记录已报告其中部分工作进展，因此不能简单把该快照的所有“待补齐”当作今天的代码事实：
 
@@ -404,6 +406,7 @@ HTML 第 17 节的“已有基础/待补齐”保留为原 v1.2 实现快照，v
 | --- | --- | --- |
 | Session 身份 | 公共 API、qwen/Harness、JSONL 与 Broker scope 共用一个 RFC UUID，不保存第二套映射 | 实验分支 `feature/managed-agents-p0-p8` 的 [`fc32ab0c95`](https://github.com/doudouOUC/qwen-code/commit/fc32ab0c9502a0b44020ef1a66c88e9b3a2a1484) 已在独立 Spring 服务中贯通同值，并从未发布的 V1 schema 删除 `harness_session_id`；只证明该身份切片，不代表完整产品部署验收 |
 | Harness→Broker | `JavaBrokerManagedRuntimeProvider`、`/internal/agent-runtime/v1/*`（v1.3 增补查询/control/ack） | 本次源码抽查为 `BrokerManagedRuntimeProvider`、`/internal/runtime-broker/v1/tool-sessions:acquire`、`/control`、`executions`、查询、`:cancel`、`:release`；作为待适配差异，不冒称路径兼容 |
+| Broker 持久化 | Binding、Runtime Session 和 Tool Execution 共享持久事实源，支持 CAS、租约接管与原执行查询 | [`c9c68760a2`](https://github.com/doudouOUC/qwen-code/commit/c9c68760a2fe7d016bcabca0723e80bcbae38953) 新增 DataSource-only JDBC Repository、四表 schema、H2/真实 MySQL 契约；Managed Agent Spring 仍使用内存接线，持久 `READY` 也不等于原 Runtime 进程存活 |
 | Java→Runtime | `/v1/prepare`、`/v1/executions` 等 HTTP/SSE | 现有 Broker 切片复用 Managed Runtime v1/v2 worker；目标接口需要显式适配及契约验收 |
 | Hosted Profile | loopback、内部鉴权、无本地 fallback | 本次源码可见对应 Profile 和版本/boot ID 检查；不据此认定 E/F 全部验收 |
 | 未知工具结果 | `recovery_blocked` | 先前 Java 文档记录 durable `UNKNOWN`；需要冻结内部枚举到目标状态的映射和原调用查询语义 |

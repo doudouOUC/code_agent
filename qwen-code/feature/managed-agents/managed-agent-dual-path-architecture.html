@@ -1554,6 +1554,7 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
                 <ul>
                   <li>RuntimeBrokerService</li>
                   <li>RuntimeBindingRepository</li>
+                  <li>RuntimeSessionRepository</li>
                   <li>ToolExecutionRepository</li>
                   <li>RuntimeLeaseManager</li>
                 </ul>
@@ -1573,6 +1574,14 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
               同进程。未来需要独立扩缩容或隔离 Kubernetes 权限时，
               只把实现替换为 RemoteRuntimeBrokerClient，不改变 Harness 和产品
               API。
+            </p>
+            <p>
+              <a href="managed-runtime-broker-jdbc.zh-CN.md">Runtime Broker JDBC 持久化方案</a>
+              已实现 DataSource-only 的 Binding、Runtime Session 和 Tool Execution
+              Repository，以及 binding allocation slot 在内的四表 schema，并通过 H2
+              和真实 MySQL 契约验证。当前只完成 Repository 边界；Spring
+              DataSource/Flyway 生产接线、双 Java 实例恢复和失效 Runtime lease
+              reconcile 仍属后续工作。
             </p>
           </div>
         </section>
@@ -3095,7 +3104,8 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
               <p>
                 在现有 Java Control Plane 内实现
                 RuntimeBrokerService、RuntimeBinding、Execution Ledger 和
-                Java→Runtime HTTP/SSE；不新增独立部署服务。
+                Java→Runtime HTTP/SSE；不新增独立部署服务。JDBC Repository
+                边界已完成，接入 Spring 与恢复调度仍需按本阶段验收。
               </p>
             </article>
             <article class="phase">
@@ -3217,6 +3227,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>独立 Spring 服务与阶段性 Public Session/Event API。</li>
                 <li>Hosted Harness Java Client、提交/取消/Transcript/SSE 接线。</li>
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
+                <li>Runtime Binding/Session/Execution 的 JDBC Repository、四表 schema 与 H2/真实 MySQL 契约。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
                 <li>稳定 Item/Part 身份、V2 Item/Snapshot/消费进度表与 SQL scanner 物化。</li>
@@ -3226,7 +3237,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             <article class="card accent-amber">
               <h3>待补齐</h3>
               <ul>
-                <li>Runtime Broker Repository 与 Execution Ledger 持久化。</li>
+                <li>将 Runtime Broker JDBC Repository 接入 Spring DataSource/Flyway，并完成 lease reconcile、双 Java 实例恢复与调度验证。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>按已冻结 OpenAPI 生成/校验 Java 与 TypeScript 类型，并补契约测试。</li>
@@ -3250,7 +3261,10 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             进一步加入 <code>AgentStateStore</code>、有界事件批处理、事务内游标/序号/终态更新、
             <code>afterCommit</code> 本机直推和 SQL 补发；当前后续切片又加入 V2
             Item/Snapshot 物化和 WebShell Snapshot 加尾部恢复，并通过 H2、真实 MySQL
-            26.7、前端类型检查与聚焦测试。这证明代码切片，不代表上表其余 A～H 能力或生产部署已经验收。
+            26.7、前端类型检查与聚焦测试。<code>c9c68760a2</code> 另完成
+            Runtime Broker JDBC Repository 边界、四表 schema 与 H2/真实 MySQL 契约。
+            这些只证明对应代码切片，不代表 Spring 接线、跨实例恢复、其余 A～H
+            能力或生产部署已经验收。
           </div>
         </section>
 

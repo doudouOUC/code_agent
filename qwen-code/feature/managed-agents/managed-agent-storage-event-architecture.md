@@ -22,7 +22,7 @@ v1.6 的机器可读接口契约见 [`managed-agent-public-api.openapi.yaml`](ma
 
 ## 2. 核实的代码基线
 
-源码集成基线为 `qwen-code` 分支 `feature/managed-agents-p0-p8`、提交 `fc32ab0c9502a0b44020ef1a66c88e9b3a2a1484`；本节核实的 P0/P1 实现头为 `2695220a3ad1ca2654633aed4a7cef46c7469d74`。下列源码路径均指这一分支快照。
+源码集成基线为 `qwen-code` 分支 `feature/managed-agents-p0-p8`、提交 `fc32ab0c9502a0b44020ef1a66c88e9b3a2a1484`；本节核实的 P0/P1 实现头为 `2695220a3ad1ca2654633aed4a7cef46c7469d74`。下列源码路径均指这一分支快照。Runtime Broker 持久化是后续独立切片，对应头为 `c9c68760a2fe7d016bcabca0723e80bcbae38953`。
 
 Java 服务源码根目录为 `packages/sdk-java/managed-agent-server/src/main/java/com/alibaba/qwen/code/managedagent/`。
 
@@ -35,7 +35,7 @@ Java 服务源码根目录为 `packages/sdk-java/managed-agent-server/src/main/j
 | `service/ManagedAgentService.java`                                         | Transcript 读取最新物化 Snapshot、保留的控制事件和 `coveredSequence` 后的尾部；Snapshot 尚未产生时兼容旧事件分页。            |
 | `harness/HarnessConnector.java`                                            | 已有连接器接口，可复用；当前包含提交、SSE、取消和启动代际信息。                                                                 |
 | `src/main/resources/db/migration/V1__managed_agent_core.sql` 与 `V2__managed_agent_projection.sql` | V1 包含 Session、Turn、Command、Event；V2 增加 Item、Item Part、Snapshot 和投影进度，批次日志/Outbox 尚未实现。    |
-| `packages/sdk-java/runtime-broker/`                                        | 已有三个 Repository 接口；Embedded Broker 默认构造仍使用内存实现。                                                              |
+| `packages/sdk-java/runtime-broker/`                                        | 三个 Repository 已有内存与 JDBC 实现，但 Embedded Broker / Spring 默认构造仍使用内存接线。                                         |
 | `packages/core/src/managed-runtime/managed-session-assembly.ts`            | 直接组装本地 Session authority、资源存储和写者租约，尚非可替换的远端持久化实现。                                                |
 
 最新代码已统一公开 Java Session、Harness、JSONL 与 Broker 使用的 Session UUID。`harnessSessionId` 仅为协议别名，不再设计第二套身份映射。租户隔离仍使用 `(tenantId, sessionId)`；`turnId` 与稳定的 `promptId` 各有用途。
@@ -126,7 +126,7 @@ interface SessionArtifactStore {
 
 `MySqlAgentStateStore`、`PostgresAgentStateStore` 可以共享行映射与业务类型，使用各自 SQL 和 Flyway 迁移。数据库异常在事务退出后转换成统一的冲突结果；不能在 PostgreSQL 已失败的事务里捕获唯一键异常后继续查询。统一锁顺序、事务隔离约定、数据库时间租约、字符串大小写语义、JSON 编码、分页和重试范围，不能只换 JDBC URL。[PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
 
-Broker 复用 `RuntimeBindingRepository`、`RuntimeSessionRepository`、`ToolExecutionRepository`，为其增加 MySQL/PostgreSQL 实现。不要另造一套 Broker 存储 API；涉及多个仓库的不变量仍需由其业务操作明确事务或 CAS 边界。
+Broker 复用 `RuntimeBindingRepository`、`RuntimeSessionRepository`、`ToolExecutionRepository`，不另造一套 Broker 存储 API。[Runtime Broker JDBC 方案](managed-runtime-broker-jdbc.zh-CN.md)已在 `c9c68760a2` 实现 DataSource-only MySQL/JDBC 边界、四表 schema 和共同契约测试；PostgreSQL 适配、Spring 接线及多 Repository 业务事务仍是后续工作。涉及多个仓库的不变量仍需由其业务操作明确事务或 CAS 边界。
 
 EventTransport 的通用保证保持较小：允许重复和跨重连乱序，应用按已提交序号检查、去重及补洞。适配器可以增强顺序和吞吐，不能静默降低确认或恢复语义。第一批只实现确实要部署的后端与共同契约测试，不预先实现全部 MQ。
 
@@ -344,7 +344,7 @@ qwen:
 | P0：契约与基线                 | **基础已实现。** 已有 `AgentStateStore`、有界入口批处理、幂等准入和提交后 Hub 直推；H2 与真实 MySQL 集成测试覆盖当前契约。性能基线和 PostgreSQL 对等能力仍待完成。                                                                             |
 | P1：批次与直推                 | **基于 SQL 的切片已实现。** 已有稳定 Item/Part 身份、V2 投影表、连续进度/Snapshot 同事务物化、带 Snapshot 水位的公共 Item 列表，以及 WebShell 的 Snapshot 加尾部恢复。长输出写放大、Snapshot 分页保护和生产故障/性能证据仍待完成。                         |
 | P2：传输与保留                 | 增加实际选中的 MQ 适配器、Outbox Relay、多实例通知及续传重置；物化核对通过后，才启用窗口清理。已有 RocketMQ 平台时在此接入。                                                                                                               |
-| P3：恢复持久化                 | 持久化 Broker 三个 Repository；补 Harness authority 和资源 manifest、Workspace 恢复与回收屏障。跨 JVM/Harness/Runtime 故障测试通过后，才开放自动接管能力。                                                                                 |
+| P3：恢复持久化                 | **Broker Repository 边界已实现。** 继续接入 Spring DataSource/Flyway，补 Harness authority 和资源 manifest、Runtime lease reconcile、Workspace 恢复与回收屏障。跨 JVM/Harness/Runtime 故障测试通过后，才开放自动接管能力。 |
 | P4：按测量决定是否改变接受路径 | 若 SQL 接受吞吐或 SQL 故障隔离不达标，先让 Harness/入口具备独立持久化源日志、单写者 fencing、稳定事件身份与重放确认，再设计 MQ 接受后直推、SQL 异步物化。此时必须重定控制事件与文本的统一顺序及公开游标，不能只替换 `acceptBatch` 的实现。 |
 
 P4 是明确的后续设计门槛，不是当前接口已经实现的能力。当前不引入多套运行模式、通用查询 DSL、自动 MQ 热切换或新的 Java Agent 循环。
