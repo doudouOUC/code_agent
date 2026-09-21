@@ -1,5 +1,7 @@
 # Session / Harness / Runtime 私有协议
 
+> **Upstream contract foundation（2026-09-22）：** #12409 已在 `main` 合入独立 `hosted-harness-contract.ts`：固定 protocol v1、每进程非持久 boot UUID、canonical `sha256:` capability digest 与 Express 426/400/409 fence。当前没有 Hosted Harness profile、`/capabilities` 广告、鉴权后 route 挂载或 Java client 接线；因此这只是 generation/version contract foundation，不表示下文完整私有协议已经部署。
+
 > **v1.10 Workspace 接线：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节冻结 `managed-context/1` 外层 `ContextBinding`，映射 ActivationGrant、InvocationBinding、config_install、两端安装回执及 journal/checkpoint/RestoreBundle。复用既有 `config.bound/domain.committed`，不修改严格 Tool v2 内层或增加另一份配置权威；未协商或 revision/digest/generation 不匹配时不开 gate。
 
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** Hosted 普通工具在[接线设计](managed-agent-ordinary-tools-integration.md)中冻结 Session 命令只读查询、activation/tool/history/receipt 封闭操作及资源分片映射。Hosted 作用域由可信入口注入的 tenantId 与资源身份共同约束；status/cancel 不创建 execution，原回执查询不授予新执行资格。

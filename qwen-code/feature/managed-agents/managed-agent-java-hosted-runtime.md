@@ -412,7 +412,7 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 
 ## 17. 实现快照与待对齐项
 
-HTML 第 17 节按 v1.13 目标设计区分两个实现分支：`feature/managed-agents-p0-p8` 的 [`e666150153`](https://github.com/doudouOUC/qwen-code/commit/e666150153748680e105f8c6068d79f898fa5c93) 已加入 Spring JDBC/Flyway V3、加密 provision seed、reconcile/attest gate、同宿主进程接管和 Kubernetes 参考 adapter，并修复 `attest` 外层路由 404 与 E2E 测试密钥注入；独立 `feature/managed-agent-p2-delivery` 的 `72e215c1e5` 已加入 V4 SQL Batch/Delivery，二者尚待集成。Runtime 恢复的[固定版本设计与验证记录](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md)报告真实 MySQL 双 JVM 与 fake Kubernetes 验证，本次补充的 [attest 契约](managed-runtime-attestation.zh-CN.md)冻结后续 route 单源、跨语言 conformance 与部署身份门槛；真实集群、生产分布式通知、完整 Harness/资源恢复及 O1～O4 仍未交付。不能用这些切片宣布 A～H 已完成。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
+HTML 第 17 节按 v1.13 目标设计区分两个实现分支：`feature/managed-agents-p0-p8` 的 [`e666150153`](https://github.com/doudouOUC/qwen-code/commit/e666150153748680e105f8c6068d79f898fa5c93) 已加入 Spring JDBC/Flyway V3、加密 provision seed、reconcile/attest gate、同宿主进程接管和 Kubernetes 参考 adapter，并修复 `attest` 外层路由 404 与 E2E 测试密钥注入；独立 `feature/managed-agent-p2-delivery` 的 `72e215c1e5` 已加入 V4 SQL Batch/Delivery，二者尚待集成。Runtime 恢复的[固定版本设计与验证记录](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md)报告真实 MySQL 双 JVM 与 fake Kubernetes 验证，本次补充的 [attest 契约](managed-runtime-attestation.zh-CN.md)冻结后续 route 单源、跨语言 conformance 与部署身份门槛；真实集群、生产分布式通知、完整 Harness/资源恢复及 O1～O4 仍未交付。upstream `main` 现另有 #12390 的 JDBC binding/session 子集与 #12409 的 Hosted Harness contract/middleware foundation；#12391 Tool Execution 状态仍为 open。它们没有包含上述完整 branch wiring。不能用这些切片宣布 A～H 已完成。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
 
 后续实现记录已报告其中部分工作进展，因此不能简单把该快照的所有“待补齐”当作今天的代码事实：
 
@@ -423,7 +423,7 @@ HTML 第 17 节按 v1.13 目标设计区分两个实现分支：`feature/managed
 | Broker 持久化与恢复 | Binding、Runtime Session 和 Tool Execution 共享持久事实源，支持 CAS、租约接管与原执行查询 | `c9c68760a2` 完成 Repository 基础；`e666150153` 已接 Spring JDBC/Flyway V3、AES-GCM seed 和 reconcile/attest gate，并修复真实 outer gate 404。Broker 启用时缺数据库或密钥配置会失败，不回退内存；持久 `READY` 仍须 reconcile + attest + CAS 后才能打开本 JVM gate；route 单源和跨 TS/Java conformance 尚待完成 |
 | SQL Batch/Delivery | 批次认领、generation fencing、连续物化及提交后展示 | 独立 P2 分支 `72e215c1e5` 已实现 V4 切片；未并入上述 P3 预览，需按 V3/V4 顺序集成，不据此声称 MQ 或大输出交付已完成 |
 | Java→Runtime | `/v1/prepare`、`/v1/executions` 等 HTTP/SSE | 现有 Broker 切片复用 Managed Runtime v1/v2 worker；目标接口需要显式适配及契约验收 |
-| Hosted Profile | loopback、内部鉴权、无本地 fallback | 本次源码可见对应 Profile 和版本/boot ID 检查；不据此认定 E/F 全部验收 |
+| Hosted Profile | loopback、内部鉴权、无本地 fallback | upstream #12409 只合入版本/boot ID contract 与未挂载 middleware；完整 Profile 仍只在参考分支可见，不据此认定 E/F 已接线或验收 |
 | 未知工具结果 | `recovery_blocked` | 先前 Java 文档记录 durable `UNKNOWN`；需要冻结内部枚举到目标状态的映射和原调用查询语义 |
 | Java authority / 前端 | qwen 会话契约与阶段 D 公共投影；G 外置 Authority | 先前首阶段 Java 全权威、指定 `JavaAgentProvider`、M0～M8 路线已归档；实际代码差异须按 A～H 逐项核验 |
 | 已有 E2E 记录 | 15 秒冷启动、首模型输出、无重复副作用 | 原文记录模型首事件约 495 ms、Runtime ready 约 15.916 s、physical execute=1、响应丢失恢复；保留为历史证据，本次未复跑，模型首事件不自动等于首 token |
