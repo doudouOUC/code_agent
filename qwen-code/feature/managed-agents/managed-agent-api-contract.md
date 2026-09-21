@@ -1,6 +1,6 @@
 # Managed Agent Public API 与 WebShell 契约
 
-状态：v1.10 目标契约；日期：2026-09-21。保留事件与 Workspace/cwd 契约，新增 planned 的持久 operation、Action 交互、Session 生命周期及可信 actor 授权。机器可读契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)。该文件是 Java DTO、WebShell TypeScript 类型和契约测试的单一来源；当前源码未生成这些类型，OpenAPI 中用 `x-qwen-implementation-status` 区分“已有路由但契约未完全对齐”的 `partial` 与尚未实现的 `planned`，全部契约通过后才改为 `implemented`。
+状态：v1.12 目标契约；日期：2026-09-21。在 v1.10 的持久 operation、Action、生命周期与 actor 授权之上细化 planned W0 创建前能力、默认 Workspace 与创建权限提示；v1.11 完整工具结果新增接口仍是候选，尚未全部纳入。机器可读契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)。该文件是 Java DTO、WebShell TypeScript 类型和契约测试的单一来源；当前源码未生成这些类型，OpenAPI 中用 `x-qwen-implementation-status` 区分“已有路由但契约未完全对齐”的 `partial` 与尚未实现的 `planned`，全部契约通过后才改为 `implemented`。
 
 ## 1. 路由与兼容范围
 
@@ -73,13 +73,14 @@ OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。�
 - 租户 Header 只能由可信入口注入；跨租户查询、SSE、取消和 Artifact 下载均不可见。
 - `planned` 路由在实现前不出现在生产发现文档或 SDK 中；实现后同步改为 `implemented` 并补契约测试。
 
-## 9. Workspace 与 Session cwd（v1.9，planned）
+## 9. Workspace 与 Session cwd（v1.12 细化，planned）
 
 完整语义见 [Workspace/cwd 设计](managed-agent-workspace-context.md)（[English](managed-agent-workspace-context.en.md)）。以下路由和新增字段已加入 OpenAPI，但尚未加入 Java/TypeScript 实现。生产发现、SDK 生成和 WebShell 功能入口必须按实现状态过滤到字段级，不能只过滤整条路由；服务端不能静默忽略客户端指定的 Workspace。
 
 | 契约 | 目标行为 |
 | --- | --- |
-| `GET /v1/agents/workspaces`、`GET /v1/agents/workspaces/{workspaceId}` | 只返回已授权的预注册 Workspace，按稳定 ID 分页；不暴露挂载路径、storageId 或凭据 |
+| `GET /v1/agents/workspaces`、`GET /v1/agents/workspaces/{workspaceId}` | 返回可读取的预注册 Workspace 及当前 actor 的 `can_create_session` 提示，按稳定 ID 分页；不暴露挂载路径、storageId 或凭据 |
+| Workspace 列表的 `capabilities/default_workspace` | 创建前发现 `workspace_context` 能力；已配置且 active、可创建的默认项独立于当前页返回，否则为 null；不启动 Runtime |
 | 创建 Session 的 `workspace` | 公共字段 `workspace_id/cwd_relative`；BFF 为 `workspaceId/cwdRelative`。缺省只允许解析显式租户默认值，首次准入后固定；重试先查原结果 |
 | Session 的 `workspace` | 返回逻辑身份、相对 cwd、context revision 和状态；旧 unbound 记录省略该对象并阻塞执行，不用当前默认配置补身份 |
 | `POST /v1/agents/sessions/{sessionId}/cwd` | 同 Workspace 的异步切换，必需 `cwd_relative/expected_context_revision` 与幂等键；202 表示命令已受理 |
@@ -88,12 +89,16 @@ OpenAPI 的 `partial` 表示路由存在，不能解释为字段已经兼容。�
 
 `workspace_context/cwd_change`（BFF `workspaceContext/cwdChange`）缺省 false；未声明能力时 UI 不显示相应写操作。`workspace.state=ready` 只表示当前上下文已提交，不表示 Runtime ready 或 activation gate 已打开。`changing` 期间拒绝新的 prompt 和工具准入。W2 初版在活动/排队 Turn、未决审批/执行或后台资源 hold 存在时拒绝切换。
 
+W0 新会话表单要求明确选择工作区，工作目录缺省 `.`。可使用服务端默认项预选，但不自动取列表第一项。BFF 将 `can_create_session/default_workspace/capabilities.workspace_context` 映射为 `canCreateSession/defaultWorkspace/capabilities.workspaceContext`；分页 cursor 绑定 tenant/actor/过滤条件并逐页复核授权。创建时再次检查权限、状态、Agent/config 兼容，列表结果不是执行授权。
+
+对象省略才允许解析默认 Workspace，null/空对象非法。请求摘要基于规范化原载荷及省略标记，原 creation receipt 优先于默认解析；服务端解析出的 storage/generation/config/revision 随 Session 与 create operation 原子固定。UI 把选择与原幂等键冻结到 pending-create，刷新或超时不改写载荷。旧服务不得忽略 Workspace 参数；本地绝对 cwd 与 Hosted selection 使用不同 DTO。完整交互、安装接线与 W0a～W0e 验收见专项第 3、8 节。
+
 cwd operation 的状态为 `pending/installing/completed/failed/recovery_blocked`。Java 收齐 Runtime 与 Harness 的持久安装回执后，在同一事务提交 Session cwd/revision、operation completed 与公开 `session.context.changed` 事件。事件使用既有 PublicEvent 封装，`data` 为 `{operation_id, workspace_id, cwd_relative, context_revision}`，不带绝对路径；WebShell adapter 映射为 camelCase。客户端漏事件后以 Session 和原 operation 查询为准。安装失败只在证明未安装或完整回滚后恢复旧状态，结果未知保持 blocked。
 
-新增错误：`400 workspace_required/invalid_cwd/unsupported_feature`；`404 workspace_not_found/operation_not_found`（含跨租户/无访问权）；`409 workspace_unavailable/workspace_generation_conflict/context_revision_conflict/session_context_busy/recovery_blocked`。准入之后发现路径无效等错误保存在 operation 的 `failure_code`；HTTP 202 不能解释为验证和安装都已完成。幂等重试先按原摘要返回同一 operation 和最新持久状态，再检查新的 CAS/忙碌条件。
+新增错误：`400 workspace_required/invalid_cwd/unsupported_feature`；`404 workspace_not_found/operation_not_found`（含跨租户/无读取权）；`403 workspace_forbidden`（可读取但不可创建）；`409 workspace_unavailable/workspace_generation_conflict/context_revision_conflict/session_context_busy/recovery_blocked`。准入之后发现路径无效等错误记录在相关安装 operation/Turn，Session 上下文保持 blocked；已完成的创建回执仍证明原受理事实，不能反写为未创建。HTTP 202 不能解释为验证和安装都已完成。幂等重试复核原资源当前访问权，再按原摘要返回同一 operation 和最新持久状态，之后检查新的 CAS/忙碌条件。
 
 
-## 7. v1.10 准入、Action 与生命周期
+## 10. v1.10 准入、Action 与生命周期
 
 完整约束与角色矩阵见 [契约收敛](managed-agent-contract-closure.md)。阶段 D 目标 `java_durable` 入口返回 operation/admission stage/delivery state，202 仅表示保存并承担投递责任；兼容产品入口仍等 qwen receipt。新增字段及 capability 默认关闭，不能仅靠新 OpenAPI 宣称代码支持。
 

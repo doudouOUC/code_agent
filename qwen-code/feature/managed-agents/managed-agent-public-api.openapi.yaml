@@ -1,13 +1,15 @@
 openapi: 3.1.0
 info:
   title: Qwen Managed Agent Public and WebShell API
-  version: 1.10.0
+  version: 1.12.0
   description: >-
     Canonical contract for the public Managed Agent resources and the WebShell
     adapter. partial means that the route exists but generated types and full
     contract tests are pending; planned means that the route or field is not implemented.
     Workspace context and cwd operations are v1.9 target contracts, not current
     server capabilities. v1.10 adds planned command admission, Actions, lifecycle and actor authorization.
+    v1.12 refines planned W0 creation discovery, actor-specific create hints and explicit default selection.
+    Full tool-result descriptors from the v1.11 design are not yet included.
     Filter planned fields as well as routes from production SDKs.
 servers:
   - url: /
@@ -89,6 +91,8 @@ paths:
       tags: [Public Sessions]
       operationId: createSession
       x-qwen-implementation-status: partial
+      description: Planned W0 workspace selection is persisted with the original creation receipt. Check actor-scoped
+        replay before resolving defaults. A durable binding is not proof of Runtime readiness; never ignore selection.
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -105,6 +109,8 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/PublicSession'}
         '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
     get:
       tags: [Public Sessions]
@@ -379,6 +385,8 @@ paths:
       tags: [WebShell]
       operationId: webShellCreateSession
       x-qwen-implementation-status: partial
+      description: W0 maps workspaceId/cwdRelative to the public selection without using environmentId or absolute cwd.
+        Freeze selection with the original idempotency key; admission does not prove physical directory readiness.
       requestBody:
         required: true
         content:
@@ -395,6 +403,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebShellAdmission'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
   /api/agent/web-shell/v1/turns/submit:
     post:
@@ -446,8 +457,10 @@ paths:
       - Public Resources
       operationId: listWorkspaces
       x-qwen-implementation-status: planned
-      description: Only authorized preregistered workspaces, ordered by stable workspace id. Opaque cursors are
-        bound to tenant and filters; no physical paths are exposed.
+      description: Only readable preregistered workspaces, ordered by stable workspace id. Opaque cursors are
+        bound to tenant, actor and filters; ACLs are rechecked on each page. Return actor-specific creation hints,
+        pre-Session capability discovery and the authorized explicit default even when it is outside this page.
+        No physical paths are exposed and no Runtime is started.
       parameters:
       - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/ListLimit'
@@ -547,6 +560,8 @@ paths:
       - WebShell
       operationId: webShellQueryWorkspaces
       x-qwen-implementation-status: planned
+      description: Same authorization, paging, explicit default and pre-Session capability discovery as listWorkspaces,
+        with camelCase fields. Listing errors must not cause silent fallback to a default directory.
       requestBody:
         required: true
         content:
@@ -950,8 +965,10 @@ components:
         workspace:
           $ref: '#/components/schemas/WorkspaceSelection'
           x-qwen-implementation-status: planned
-          description: W0. If omitted, resolve and persist an explicit tenant default at first admission; no default
-            means workspace_required. Replay must retain the original binding even if the default changes.
+          description: W0. Only omission allows default resolution; null or an empty object is invalid. Resolve and
+            persist an explicit authorized tenant default on first admission; no default means workspace_required.
+            The caller request digest retains an omission marker; replay resolves the original receipt before defaults.
+            A changed default must never rebind a retry. Unavailable W0 support rejects rather than ignores this field.
     SessionEventRequest:
       oneOf:
         - $ref: '#/components/schemas/InputMessageEventRequest'
@@ -1440,6 +1457,8 @@ components:
       description: Logical directory relative to the authorized workspace root; dot denotes root. Use slash separators.
         Reject absolute paths, drive prefixes, backslashes, NUL and parent segments. Runtime must verify directory
         existence, realpath containment and symlink safety before activation; schema validation alone is insufficient.
+        Preserve spaces and case, normalize repeated separators and dot segments, and never percent-decode JSON values.
+      examples: ['.', services/api]
       x-qwen-implementation-status: planned
     WorkspaceSelection:
       type: object
@@ -1489,6 +1508,7 @@ components:
       - object
       - display_name
       - state
+      - can_create_session
       properties:
         id:
           type: string
@@ -1499,6 +1519,10 @@ components:
         display_name:
           type: string
           maxLength: 512
+        can_create_session:
+          type: boolean
+          description: Current actor permission hint only; creation rechecks ACL, state and Agent/config compatibility.
+          x-qwen-implementation-status: planned
         state:
           type: string
           enum:
@@ -1513,6 +1537,8 @@ components:
       - object
       - data
       - has_more
+      - capabilities
+      - default_workspace
       properties:
         object:
           const: list
@@ -1526,6 +1552,28 @@ components:
           type:
           - string
           - 'null'
+        capabilities:
+          type: object
+          additionalProperties: false
+          required: [workspace_context]
+          properties:
+            workspace_context:
+              type: boolean
+              default: false
+              description: True only after W0 creation, binding and private installation contracts are supported end to end.
+          x-qwen-implementation-status: planned
+        default_workspace:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/PublicWorkspace'
+            - type: object
+              properties:
+                state: {const: active}
+                can_create_session: {const: true}
+          - type: 'null'
+          description: Explicit tenant default only when active and creatable by this actor; otherwise null. Included
+            independently of the current page. A non-null default has can_create_session=true; creation revalidates it.
+          x-qwen-implementation-status: planned
       x-qwen-implementation-status: planned
     ChangeCwdRequest:
       type: object
@@ -1657,6 +1705,7 @@ components:
       - workspaceId
       - displayName
       - state
+      - canCreateSession
       properties:
         workspaceId:
           type: string
@@ -1665,6 +1714,10 @@ components:
         displayName:
           type: string
           maxLength: 512
+        canCreateSession:
+          type: boolean
+          description: Current actor permission hint only; creation rechecks ACL, state and Agent/config compatibility.
+          x-qwen-implementation-status: planned
         state:
           type: string
           enum:
@@ -1678,6 +1731,8 @@ components:
       required:
       - data
       - hasMore
+      - capabilities
+      - defaultWorkspace
       properties:
         data:
           type: array
@@ -1689,6 +1744,28 @@ components:
           type:
           - string
           - 'null'
+        capabilities:
+          type: object
+          additionalProperties: false
+          required: [workspaceContext]
+          properties:
+            workspaceContext:
+              type: boolean
+              default: false
+              description: Same end-to-end W0 readiness as public workspace_context; missing means unsupported.
+          x-qwen-implementation-status: planned
+        defaultWorkspace:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/WebShellWorkspace'
+            - type: object
+              properties:
+                state: {const: active}
+                canCreateSession: {const: true}
+          - type: 'null'
+          description: Same authorized explicit default as default_workspace, including when outside this page;
+            null if absent or not creatable. A non-null default is active and has canCreateSession=true.
+          x-qwen-implementation-status: planned
       x-qwen-implementation-status: planned
     WebShellChangeCwdRequest:
       type: object

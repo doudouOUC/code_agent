@@ -1,10 +1,12 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
+> **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)定义选择器、相对 cwd、创建前能力/默认工作区查询、Session 与原创建回执同事务绑定、Broker 按 Session 解析及 Worker 身份适配。W0a～W0e 为待实现交付，不改变既有 ACK Profile，也不提前开放 W2 目录切换。
+
 > **v1.11 完整工具结果：** [中文专项](managed-agent-tool-result-artifacts.zh-CN.md) / [English](managed-agent-tool-result-artifacts.md)补齐裁剪前捕获、不可变分段、完整性状态、Session receipt ACK、Java 公共投影、range/下载与 WebShell 展示。该专项为提案；现有本地输出文件与 Session 资源已存在，远端持久交付仍待 O1～O4 验收。
 
 > **v1.10 实施接缝：** [v1.10 契约收敛](managed-agent-contract-closure.md)统一准入 Profile、批次任务、交互 API、Workspace 私有安装证据、迁移/回退、产品权限与容量门槛。它细化已有 A～H，不改变 Java SQL 提交后 SSE、MQ 通知/物化与 qwen 私有执行 authority 的职责。
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.11](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计；v1.10 收敛准入/分发/交互、私有上下文接线、升级及容量门槛；v1.11 细化完整工具结果与大输出交付。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.12](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计；v1.10 收敛准入/分发/交互、私有上下文接线、升级及容量门槛；v1.11 细化完整工具结果与大输出交付；v1.12 细化创建时选择 Workspace。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 

@@ -1,8 +1,10 @@
 # Qwen Code Managed Agents 双链路方案
 
+> **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)细化工作区选择器、可选子目录、创建前能力/默认查询、原键重试、持久绑定及 Broker/Worker 接线。OpenAPI v1.12 同步 planned 契约；W0a～W0e 尚待实现，Session 目录切换仍属 W2。
+
 > **v1.10 审查修订（2026-09-21）：** [中文](managed-agent-contract-closure.md) / [English](managed-agent-contract-closure.en.md) 明确两种受理 Profile、逐批 delivery 认领、Action API、ContextBinding、真实 V1/V2 升级、actor ACL、close/archive/delete 与容量门槛。同步 HTML/OpenAPI/[storage delta](managed-agent-storage-schema.mysql.sql)/[command delta](managed-agent-command-schema.mysql.sql)；目标契约不表示已全部实现，后续切片状态见下文。
 
-> **当前基准：[HTML v1.11](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-21；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约、扩展运行模型、SQL 物化、Workspace/cwd、v1.10 契约收敛及完整工具结果设计。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.12](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-21；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约、扩展运行模型、SQL 物化、Workspace/cwd、v1.10 契约收敛、完整工具结果及创建时工作区选择设计。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
 > **存储与事件实现补充（更新于 2026-09-21）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交、提交后本机 SSE 直推、V2 Item/Snapshot 物化及 WebShell Snapshot 加尾部恢复；独立 `feature/managed-agent-p2-delivery` 分支的 `72e215c1e5` 又实现 V4 SQL Batch/Delivery，尚待与 P3 的 V3 集成。Outbox Relay、RocketMQ/Redis Transport、PostgreSQL 适配器及完整 Harness/资源恢复仍待实现。这一补充细化 D/F/G，不改变既有组件职责与 A～H 顺序。
 >
@@ -18,13 +20,13 @@
 
 ## 当前方案入口
 
-v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。OpenAPI/目标 DDL 仍保持 v1.10，O1～O4 实现前须将新增契约纳入类型和契约测试。
+v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。v1.12 细化[创建时选择 Workspace](managed-agent-workspace-context.md#3-创建与请求路由w0)，OpenAPI 升至 v1.12；既有目标 DDL 不变，完整工具结果新增接口仍需在 O1～O4 实现前纳入类型和契约测试。
 
 先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型；v1.8 同步 SQL 物化实现快照与 Runtime Broker JDBC Repository 边界；v1.9 补齐 Workspace 与 Session cwd 的 W0/W1/W2 设计；v1.10 收敛七项审查接缝。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.11 | 决定组件职责、部署、目标协议、状态、公共 API、完整工具结果、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.12 | 决定组件职责、部署、目标协议、状态、公共 API、Workspace 选择、完整工具结果、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |

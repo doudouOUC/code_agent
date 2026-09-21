@@ -961,7 +961,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.11 · 2026-09-21<br />
+          方案版本 v1.12 · 2026-09-21<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环；公开事件先可靠提交，再向客户端推送。
         </div>
@@ -1014,9 +1014,9 @@
             </div>
           </div>
           <p class="lead">
-            v1.11 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
+            v1.12 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
             的普通工具接线、v1.5 的统一 Session 身份、v1.6 的事件恢复边界和
-            v1.7 的扩展运行时、v1.8 的 SQL 物化切片、v1.9 Workspace/cwd 和 v1.10 契约收敛，新增完整工具结果的持久交付与展示设计。Java 在创建前生成全局唯一 RFC UUID，
+            v1.7 的扩展运行时、v1.8 的 SQL 物化切片、v1.9 Workspace/cwd、v1.10 契约收敛与 v1.11 完整工具结果设计，细化创建会话时选择工作区的 W0 交付。Java 在创建前生成全局唯一 RFC UUID，
             公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
             使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
             首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
@@ -1987,7 +1987,7 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
         <section id="workspace-context">
           <div class="section-head">
             <div>
-              <div class="section-index">08B / WORKSPACE CONTEXT · PLANNED</div>
+              <div class="section-index">08B / WORKSPACE CONTEXT · v1.12 · PLANNED</div>
               <h2>Workspace 归属与 Session 工作目录</h2>
             </div>
           </div>
@@ -2001,11 +2001,41 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
             EmbeddedRuntimeBroker 启动时读取一组全局 workspace 配置。
             以下 W0/W1/W2、OpenAPI 新字段与增量 DDL 均为目标设计，未实现前不宣告能力。
           </div>
+          <div class="grid-2" style="margin-top: 18px">
+            <article class="card accent-blue">
+              <h3>新会话：交互示意</h3>
+              <pre>Agent       Code Agent
+工作区       项目 A ▾
+工作目录     services/api   （默认 .）
+任务         检查 API 模块
+
+[开始会话]
+同一工作区的会话共享文件</pre>
+              <p>选择有权限的已注册工作区，可选其中的子目录。切换工作区时子目录回到根目录，重新确认后发送。</p>
+            </article>
+            <article class="card accent-green">
+              <h3>默认值与创建结果</h3>
+              <p>优先保留本次选择，没有选择时使用服务端显式默认项；不自动选列表第一项或其他会话的最近目录。没有默认值则要求选择，没有可创建工作区则保留草稿并显示空态。</p>
+              <p>发送后固定本次选择，超时或刷新继续确认同一次创建。成功后标题显示「项目 A / services/api」，并单独显示工具环境准备状态；切换侧栏不改变已有会话的目录。</p>
+            </article>
+          </div>
           <figure class="tool-flow-diagram" aria-labelledby="workspace-flow-caption">
             <div class="tool-flow-track">
               <div class="tool-flow-stage">
                 <div>
-                  <span class="tool-flow-index">01 / AUTHORIZE</span>
+                  <span class="tool-flow-index">01 / SELECT</span>
+                  <h4>新会话固定选择</h4>
+                  <span class="tool-flow-owner">WebShell · 工作区与相对目录</span>
+                </div>
+                <div class="tool-flow-steps">
+                  <span class="tool-flow-step">能力 / 授权列表 / 默认项</span>
+                  <span class="tool-flow-step">workspaceId + cwdRelative</span>
+                  <span class="tool-flow-step commit">冻结请求与幂等键</span>
+                </div>
+              </div>
+              <div class="tool-flow-stage">
+                <div>
+                  <span class="tool-flow-index">02 / AUTHORIZE</span>
                   <h4>Workspace Registry</h4>
                   <span class="tool-flow-owner">Java · 可信租户与授权范围</span>
                 </div>
@@ -2017,7 +2047,7 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
               </div>
               <div class="tool-flow-stage">
                 <div>
-                  <span class="tool-flow-index">02 / COMMIT</span>
+                  <span class="tool-flow-index">03 / COMMIT</span>
                   <h4>Session 持久上下文</h4>
                   <span class="tool-flow-owner">Java SQL · 与创建命令同事务</span>
                 </div>
@@ -2029,7 +2059,7 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
               </div>
               <div class="tool-flow-stage">
                 <div>
-                  <span class="tool-flow-index">03 / INSTALL</span>
+                  <span class="tool-flow-index">04 / INSTALL</span>
                   <h4>Runtime 实际目录</h4>
                   <span class="tool-flow-owner">Broker / Harness / Runtime</span>
                 </div>
@@ -2041,10 +2071,16 @@ GET  /internal/agent-runtime/v1/resources/{resourceId}</pre
               </div>
             </div>
             <figcaption id="workspace-flow-caption">
-              模型可以先行；工具与 Workspace 命令必须等目录、权限、资源闭包及 activation 校验通过。
+              选择 → 授权 → Session 与创建回执同事务绑定 → 原身份安装。模型使用已发布配置先行；工具与 Workspace 命令必须等目录、权限、资源闭包及 activation 校验通过。
               私有日志与挂载点都不能代替稳定 Workspace 身份。
             </figcaption>
           </figure>
+          <div class="callout" style="margin-top: 18px">
+            <strong>创建接线：</strong>Workspace 列表返回创建前 capability、当前用户的创建权限提示与独立于分页的默认项。
+            请求仅传 workspaceId / cwdRelative；Java 固定 storage/generation/config/revision，Broker 从 Session 绑定解析挂载和执行目录。
+            当前 Worker 的路径哈希身份需通过版本化 boot / managed-context 契约适配，不能直接换成公共 Workspace ID。
+            context ready 只证明逻辑绑定；qwen_confirmed / java_durable 仍遵守原 ACK 边界。
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>字段</th><th>职责与恢复边界</th><th>对前端</th></tr></thead>
@@ -2093,10 +2129,13 @@ cwdRelative = services/api
           <p>W0 是多 Workspace 接入与 H 扩展的前置条件，可与 MQ/Outbox 独立推进。
             W1 随持久恢复验收，W2 不阻塞固定 cwd 的最小闭环。
             存量无绑定 Session 先保持只读；有原 Workspace 证据才回填，不能使用升级时的默认目录。</p>
+          <p><strong>W0 实施：</strong>W0a 契约/Registry → W0b 持久创建 → W0c 实际执行目录 → W0d 选择器 → W0e 重启/回收验收。
+            覆盖两个工作区、不同子目录、同工作区写入串行、原请求重试、默认值变化、15 秒 Runtime 延迟和目录失效；全链路通过后才开放能力。
+            首版不提供任意服务器目录注册、clone、worktree 创建或已有会话目录编辑。</p>
           <p>
             详细契约：<a href="managed-agent-workspace-context.md">中文设计</a> ·
             <a href="managed-agent-workspace-context.en.md">English</a> ·
-            <a href="managed-agent-public-api.openapi.yaml">OpenAPI v1.10</a> ·
+            <a href="managed-agent-public-api.openapi.yaml">OpenAPI v1.12</a> ·
             <a href="managed-agent-workspace-schema.mysql.sql">基于实际 V1/V2 的增量目标 DDL</a>。
             Workspace 查询、Session workspace 字段、cwd operation 和能力位均标为 planned。
           </p>
@@ -2449,7 +2488,7 @@ cwdRelative = services/api
           </div>
           <p>WebShell 复用工具卡，预览有界，展开后使用虚拟化与固定 revision 的范围分页。执行失败也能下载完整错误日志；执行成功但结果未保存时显示独立状态。公开 ID 不等于下载权限，原始结果与脱敏预览分别授权。</p>
           <p>实施顺序：<strong>O1 本地捕获/引用契约 → O2 Hosted 存储与回执恢复 → O3 Java API/工具卡 → O4 引用清理与已开放扩展</strong>。验收包括 100 MiB 输出、上传/提交/ACK 故障、进程替换、取消/配额、跨租户读取与 pin/GC 竞争，无需先引入 RocketMQ。</p>
-          <p>完整调研、接口、容量候选值及验收：<a href="managed-agent-tool-result-artifacts.zh-CN.md">中文专项</a> · <a href="managed-agent-tool-result-artifacts.md">English</a>。其中 API 与表结构为提案，现有 OpenAPI v1.10 尚未包含本次新增结果描述契约。</p>
+          <p>完整调研、接口、容量候选值及验收：<a href="managed-agent-tool-result-artifacts.zh-CN.md">中文专项</a> · <a href="managed-agent-tool-result-artifacts.md">English</a>。其中 API 与表结构为提案，现有 OpenAPI v1.12 尚未包含该专项新增的结果描述契约。</p>
         </section>
 
         <section id="capacity">
@@ -3465,7 +3504,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
           <div class="section-head">
             <div>
               <div class="section-index">17 / CURRENT GAP</div>
-              <h2>现有基础与主要缺口（v1.11 设计对照）</h2>
+              <h2>现有基础与主要缺口（v1.12 设计对照）</h2>
             </div>
           </div>
           <div class="grid-2">
@@ -3536,7 +3575,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.11 · 2026-09-21 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.12 · 2026-09-21 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>
