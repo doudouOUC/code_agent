@@ -961,7 +961,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.12 · 2026-09-21<br />
+          方案版本 v1.13 · 2026-09-21<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环；公开事件先可靠提交，再向客户端推送。
         </div>
@@ -1014,9 +1014,9 @@
             </div>
           </div>
           <p class="lead">
-            v1.12 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
+            v1.13 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
             的普通工具接线、v1.5 的统一 Session 身份、v1.6 的事件恢复边界和
-            v1.7 的扩展运行时、v1.8 的 SQL 物化切片、v1.9 Workspace/cwd、v1.10 契约收敛与 v1.11 完整工具结果设计，细化创建会话时选择工作区的 W0 交付。Java 在创建前生成全局唯一 RFC UUID，
+            v1.7 的扩展运行时、v1.8 的 SQL 物化切片、v1.9 Workspace/cwd、v1.10 契约收敛、v1.11 完整工具结果与 v1.12 Workspace 选择设计，并细化 Runtime 身份核验和就绪门禁。Java 在创建前生成全局唯一 RFC UUID，
             公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
             使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
             首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
@@ -2383,6 +2383,51 @@ cwdRelative = services/api
             ID、at-most-once dispatch、可查询回执，以及在结果不确定时保守进入
             recovery_blocked。
           </div>
+          <h3 style="margin-top: 28px">Runtime 恢复后的身份核验</h3>
+          <p>
+            数据库中的 <code>READY</code> 是历史观察，不是当前 JVM 可以直接使用
+            endpoint 的证明。Java 重启、owner 变更，或 endpoint、lease、Workspace
+            generation、capability digest 改变后，必须重新通过以下闭环：
+          </p>
+          <div class="tool-flow-steps" aria-label="Runtime attest readiness flow">
+            <span class="tool-flow-step">1. Claim · operation generation</span>
+            <span class="tool-flow-arrow">→</span>
+            <span class="tool-flow-step wait">2. Reconcile · 调度器资源 identity</span>
+            <span class="tool-flow-arrow">→</span>
+            <span class="tool-flow-step execute">3. Attest · Runtime boot identity</span>
+            <span class="tool-flow-arrow">→</span>
+            <span class="tool-flow-step commit">4. CAS · 提交当前 binding</span>
+            <span class="tool-flow-arrow">→</span>
+            <span class="tool-flow-step commit">5. Gate · 本 JVM 才可执行</span>
+          </div>
+          <div class="grid-2" style="margin-top: 16px">
+            <article class="card accent-green">
+              <h3>核验身份</h3>
+              <ul>
+                <li>resource handle / Pod 或进程 identity</li>
+                <li>runtime instance / incarnation</li>
+                <li>provision request、lease ID 与 epoch</li>
+                <li>tenant、Workspace generation/cwd、capability 与 isolation</li>
+              </ul>
+            </article>
+            <article class="card accent-amber">
+              <h3>失败关闭</h3>
+              <ul>
+                <li><code>/health</code> 成功不能替代 <code>attest</code></li>
+                <li>404/405、协议或 identity 冲突进入 <code>recovery_blocked</code></li>
+                <li>网络/5xx 只在 operation deadline 内有界重试</li>
+                <li>迟到成功或 CAS 失效直接丢弃，不打开 gate</li>
+              </ul>
+            </article>
+          </div>
+          <p>
+            私有 <code>POST /internal/managed-runtime/v2/attest</code> 使用每代凭据和严格封闭的有界 JSON。
+            route 注册与 owned-worker 外层 allowlist 必须来自单一 manifest；TS 与 Java 消费同一组 schema/fixture 并由 required CI 验证。
+            plain HTTP bearer 只适用于已证明的 loopback/受保护网络，跨主机或共享代理需要 TLS/mTLS 或等价 workload identity。
+            完整协议、失败矩阵和 A0～A4 实施切片见
+            <a href="managed-runtime-attestation.zh-CN.md">中文专项</a> ·
+            <a href="managed-runtime-attestation.md">English</a>。
+          </p>
         </section>
 
         <section id="security">
@@ -3504,7 +3549,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
           <div class="section-head">
             <div>
               <div class="section-index">17 / CURRENT GAP</div>
-              <h2>现有基础与主要缺口（v1.12 设计对照）</h2>
+              <h2>现有基础与主要缺口（v1.13 设计对照）</h2>
             </div>
           </div>
           <div class="grid-2">
@@ -3523,7 +3568,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Hosted Harness Java Client、提交/取消/Transcript/SSE 接线。</li>
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
                 <li>Runtime Binding/Session/Execution 的 JDBC Repository、四表 schema 与 H2/真实 MySQL 契约。</li>
-                <li>P3 预览分支 <code>34ea187c628c</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter。</li>
+                <li>P3 预览分支当前 <code>e666150153</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter，并修复 <code>v2/attest</code> 外层路由 404 和 E2E 测试密钥注入。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
                 <li>稳定 Item/Part 身份、V2 Item/Snapshot/消费进度表与 SQL scanner 物化。</li>
@@ -3535,6 +3580,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
               <h3>待补齐</h3>
               <ul>
                 <li>在真实集群验证已接线的 Broker 恢复：网络/RBAC、service-account 轮换、Pod 生命周期、条件清理与部署容量。</li>
+                <li>将 owned Runtime route 注册与外层 allowlist 收敛为单一 manifest，并建立 TS/Java 共用 schema/fixtures、错误分类和 required conformance CI。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>
@@ -3572,10 +3618,16 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             P2 SQL Batch/Delivery 与 P3 恢复目前分属不同源码分支，尚未形成联合验收结果。
             v1.11 完整工具结果设计继续保留，O1～O4 不因 Broker 恢复已实现而自动完成。
           </div>
+          <div class="callout" style="margin-top: 18px">
+            <strong>2026-09-21 attest 更新：</strong><code>feature/managed-agents-p0-p8@e666150153</code>
+            已修复当前预览分支的 outer-route 404，并让 E2E 自行注入临时 Broker 凭据加密密钥。
+            这只是 A0 即时修复；A1 route 单源、A2 跨 TS/Java 契约、A3 gate/状态/观测与 A4 真实部署身份仍需分别验收。
+            公共 OpenAPI 保持 v1.12，因为 <code>attest</code> 是 Java Broker 到 Tool Runtime 的私有协议。
+          </div>
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.12 · 2026-09-21 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.13 · 2026-09-21 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>

@@ -1,12 +1,14 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
+> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate 的顺序，以及 route 单源、失败分类和跨 TS/Java conformance。预览分支 `e666150153` 已修复已知 outer-route 404 和 E2E 密钥注入，A1～A4 仍待实施与验收。
+
 > **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)定义选择器、相对 cwd、创建前能力/默认工作区查询、Session 与原创建回执同事务绑定、Broker 按 Session 解析及 Worker 身份适配。W0a～W0e 为待实现交付，不改变既有 ACK Profile，也不提前开放 W2 目录切换。
 
 > **v1.11 完整工具结果：** [中文专项](managed-agent-tool-result-artifacts.zh-CN.md) / [English](managed-agent-tool-result-artifacts.md)补齐裁剪前捕获、不可变分段、完整性状态、Session receipt ACK、Java 公共投影、range/下载与 WebShell 展示。该专项为提案；现有本地输出文件与 Session 资源已存在，远端持久交付仍待 O1～O4 验收。
 
 > **v1.10 实施接缝：** [v1.10 契约收敛](managed-agent-contract-closure.md)统一准入 Profile、批次任务、交互 API、Workspace 私有安装证据、迁移/回退、产品权限与容量门槛。它细化已有 A～H，不改变 Java SQL 提交后 SSE、MQ 通知/物化与 qwen 私有执行 authority 的职责。
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.12](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计；v1.10 收敛准入/分发/交互、私有上下文接线、升级及容量门槛；v1.11 细化完整工具结果与大输出交付；v1.12 细化创建时选择 Workspace。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.13](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计；v1.10 收敛准入/分发/交互、私有上下文接线、升级及容量门槛；v1.11 细化完整工具结果与大输出交付；v1.12 细化创建时选择 Workspace；v1.13 细化 Runtime 身份核验与就绪门禁。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -27,6 +29,8 @@ v1.5 固定一套 Session 身份：Java 在创建前生成全局唯一 RFC UUID 
 v1.8 将 Runtime Broker 持久化拆成明确的 Repository 边界：[中文 JDBC 方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 定义 Binding allocation slot、Runtime binding、Runtime Session 和 Tool execution 四表 schema，使用数据库时钟、行锁、version 与 generation fencing 协调多 JVM。对应代码切片已通过 H2 和真实 MySQL 契约验证，但尚未接入 Spring DataSource/Flyway，也不证明 Java 重启后可自动接管原 Runtime 进程。
 
 Workspace 与 Session cwd 的 v1.9 补充见[中文专项](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)及 [HTML Workspace 章节](managed-agent-dual-path-architecture.html#workspace-context)：当前全局静态配置仍待替换为持久 Session 绑定，W0 创建/归属、W1 恢复、W2 受控切换均尚未实现。
+
+Runtime 身份核验的 v1.13 补充见[中文专项](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)及 [HTML 恢复章节](managed-agent-dual-path-architecture.html#recovery)：持久 `READY` 只是历史事实，Java 重启或 endpoint/lease/Workspace identity 改变后必须依次完成 provisioner resource reconcile、Runtime boot identity `attest`、Broker 全字段比较和数据库 CAS，最后才打开当前 JVM 的 ready gate。`/health` 不能替代该证明，失败后不能换 Runtime 重放已派发副作用。
 
 ## 1. 架构总览
 
@@ -408,7 +412,7 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 
 ## 17. 实现快照与待对齐项
 
-HTML 第 17 节按 v1.11 目标设计区分两个实现分支：`feature/managed-agents-p0-p8` 的 [`34ea187c628c`](https://github.com/doudouOUC/qwen-code/commit/34ea187c628ce869cc2a2f6e7f3b967af12e276c) 已加入 Spring JDBC/Flyway V3、加密 provision seed、reconcile/attest gate、同宿主进程接管和 Kubernetes 参考 adapter；独立 `feature/managed-agent-p2-delivery` 的 `72e215c1e5` 已加入 V4 SQL Batch/Delivery，二者尚待集成。Runtime 恢复的[固定版本设计与验证记录](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md)报告真实 MySQL 双 JVM 与 fake Kubernetes 验证，本次只核对记录和接线，未重跑测试；真实集群、生产分布式通知、完整 Harness/资源恢复及 O1～O4 仍未交付。不能用这些切片宣布 A～H 已完成。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
+HTML 第 17 节按 v1.13 目标设计区分两个实现分支：`feature/managed-agents-p0-p8` 的 [`e666150153`](https://github.com/doudouOUC/qwen-code/commit/e666150153748680e105f8c6068d79f898fa5c93) 已加入 Spring JDBC/Flyway V3、加密 provision seed、reconcile/attest gate、同宿主进程接管和 Kubernetes 参考 adapter，并修复 `attest` 外层路由 404 与 E2E 测试密钥注入；独立 `feature/managed-agent-p2-delivery` 的 `72e215c1e5` 已加入 V4 SQL Batch/Delivery，二者尚待集成。Runtime 恢复的[固定版本设计与验证记录](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md)报告真实 MySQL 双 JVM 与 fake Kubernetes 验证，本次补充的 [attest 契约](managed-runtime-attestation.zh-CN.md)冻结后续 route 单源、跨语言 conformance 与部署身份门槛；真实集群、生产分布式通知、完整 Harness/资源恢复及 O1～O4 仍未交付。不能用这些切片宣布 A～H 已完成。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
 
 后续实现记录已报告其中部分工作进展，因此不能简单把该快照的所有“待补齐”当作今天的代码事实：
 
@@ -416,7 +420,7 @@ HTML 第 17 节按 v1.11 目标设计区分两个实现分支：`feature/managed
 | --- | --- | --- |
 | Session 身份 | 公共 API、qwen/Harness、JSONL 与 Broker scope 共用一个 RFC UUID，不保存第二套映射 | 实验分支 `feature/managed-agents-p0-p8` 的 [`fc32ab0c95`](https://github.com/doudouOUC/qwen-code/commit/fc32ab0c9502a0b44020ef1a66c88e9b3a2a1484) 已在独立 Spring 服务中贯通同值，并从未发布的 V1 schema 删除 `harness_session_id`；只证明该身份切片，不代表完整产品部署验收 |
 | Harness→Broker | `JavaBrokerManagedRuntimeProvider`、`/internal/agent-runtime/v1/*`（v1.3 增补查询/control/ack） | 本次源码抽查为 `BrokerManagedRuntimeProvider`、`/internal/runtime-broker/v1/tool-sessions:acquire`、`/control`、`executions`、查询、`:cancel`、`:release`；作为待适配差异，不冒称路径兼容 |
-| Broker 持久化与恢复 | Binding、Runtime Session 和 Tool Execution 共享持久事实源，支持 CAS、租约接管与原执行查询 | `c9c68760a2` 完成 Repository 基础；`34ea187c628c` 已接 Spring JDBC/Flyway V3、AES-GCM seed 和 reconcile/attest gate。Broker 启用时缺数据库或密钥配置会失败，不回退内存；持久 `READY` 仍须核验物理身份后才能使用 |
+| Broker 持久化与恢复 | Binding、Runtime Session 和 Tool Execution 共享持久事实源，支持 CAS、租约接管与原执行查询 | `c9c68760a2` 完成 Repository 基础；`e666150153` 已接 Spring JDBC/Flyway V3、AES-GCM seed 和 reconcile/attest gate，并修复真实 outer gate 404。Broker 启用时缺数据库或密钥配置会失败，不回退内存；持久 `READY` 仍须 reconcile + attest + CAS 后才能打开本 JVM gate；route 单源和跨 TS/Java conformance 尚待完成 |
 | SQL Batch/Delivery | 批次认领、generation fencing、连续物化及提交后展示 | 独立 P2 分支 `72e215c1e5` 已实现 V4 切片；未并入上述 P3 预览，需按 V3/V4 顺序集成，不据此声称 MQ 或大输出交付已完成 |
 | Java→Runtime | `/v1/prepare`、`/v1/executions` 等 HTTP/SSE | 现有 Broker 切片复用 Managed Runtime v1/v2 worker；目标接口需要显式适配及契约验收 |
 | Hosted Profile | loopback、内部鉴权、无本地 fallback | 本次源码可见对应 Profile 和版本/boot ID 检查；不据此认定 E/F 全部验收 |

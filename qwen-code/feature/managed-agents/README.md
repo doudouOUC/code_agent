@@ -1,10 +1,12 @@
 # Qwen Code Managed Agents 双链路方案
 
+> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复真实 outer gate 的 404 和 E2E 密钥注入；单一 route manifest、TS/Java 共用 fixtures/schema、required CI 与真实部署身份仍待 A1～A4 落地。该私有协议不新增公共 OpenAPI 路由。
+
 > **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)细化工作区选择器、可选子目录、创建前能力/默认查询、原键重试、持久绑定及 Broker/Worker 接线。OpenAPI v1.12 同步 planned 契约；W0a～W0e 尚待实现，Session 目录切换仍属 W2。
 
 > **v1.10 审查修订（2026-09-21）：** [中文](managed-agent-contract-closure.md) / [English](managed-agent-contract-closure.en.md) 明确两种受理 Profile、逐批 delivery 认领、Action API、ContextBinding、真实 V1/V2 升级、actor ACL、close/archive/delete 与容量门槛。同步 HTML/OpenAPI/[storage delta](managed-agent-storage-schema.mysql.sql)/[command delta](managed-agent-command-schema.mysql.sql)；目标契约不表示已全部实现，后续切片状态见下文。
 
-> **当前基准：[HTML v1.12](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-21；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约、扩展运行模型、SQL 物化、Workspace/cwd、v1.10 契约收敛、完整工具结果及创建时工作区选择设计。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
+> **当前基准：[HTML v1.13](managed-agent-dual-path-architecture.html)。** 同步日期：2026-09-21；在用户提供的 v1.2 上补充首版运行条件、普通工具接线、统一 Session 身份、事件与恢复契约、扩展运行模型、SQL 物化、Workspace/cwd、v1.10 契约收敛、完整工具结果、创建时工作区选择及 Runtime 身份核验。现行架构保留 `qwen serve` 统一会话协议与同 daemon 的 Legacy/Managed 双引擎；Java 是产品控制面并内嵌 Runtime Broker，托管部署使用 Java Pod + qwen serve Sidecar，工具环境按需启动。实施顺序为 HTML 的 A～H。
 >
 > **存储与事件实现补充（更新于 2026-09-21）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交、提交后本机 SSE 直推、V2 Item/Snapshot 物化及 WebShell Snapshot 加尾部恢复；独立 `feature/managed-agent-p2-delivery` 分支的 `72e215c1e5` 又实现 V4 SQL Batch/Delivery，尚待与 P3 的 V3 集成。Outbox Relay、RocketMQ/Redis Transport、PostgreSQL 适配器及完整 Harness/资源恢复仍待实现。这一补充细化 D/F/G，不改变既有组件职责与 A～H 顺序。
 >
@@ -16,17 +18,17 @@
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
-> **W38 upstream PR 快照（2026-09-21）：** #12301 当前以 open 独立 Java 21 模块提交 Runtime Binding/Session identity、CAS、operation lease 与内存 Repository，仅是状态 foundation；#12302 当前以 open Core diff 提交 Managed Session v1 header/event/commit marker、严格 parser/validation 与 transcript subtype reservation，尚无 production writer。#12358 已扩为 514 文件、154 commit 的 open draft architecture preview，除 Spring 服务、Hosted Harness、Runtime Broker、durable event/materialization 和 dual-path WebShell 外，又加入 JDBC/Flyway 与 AES-GCM seed、reconcile+private attest gate、同宿主进程接管和 Kubernetes adapter；真实 MySQL 双 JVM与 fake-Kubernetes proof 仍不等于真实集群、生产 MQ/Redis 或跨平台验收，且该 draft 必须拆成独立 review unit。三者都未进入 upstream `main`，不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
+> **W38 upstream PR 快照（2026-09-21）：** #12301 与 #12302 已合入上游，分别提供 Java Runtime 状态基础和 Managed Session v1 Transcript 基础；#12390 已合入独立 Runtime recovery 文档，#12391 仍为 open Workspace proposal。#12358 仍是 open draft architecture preview，当前 head `e666150153` 已修复私有 `v2/attest` 的 outer-route 404、增加穿过真实 gate 的回归测试，并为 E2E 注入临时 Broker 凭据加密密钥。该分支已有 reconcile/attest gate、同宿主进程接管与 Kubernetes adapter，但 route 仍是双清单，且跨 TS/Java conformance、真实集群、生产 MQ/Redis 和跨平台验收尚未完成；不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
 
 ## 当前方案入口
 
-v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。v1.12 细化[创建时选择 Workspace](managed-agent-workspace-context.md#3-创建与请求路由w0)，OpenAPI 升至 v1.12；既有目标 DDL 不变，完整工具结果新增接口仍需在 O1～O4 实现前纳入类型和契约测试。
+v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。v1.12 细化[创建时选择 Workspace](managed-agent-workspace-context.md#3-创建与请求路由w0)，OpenAPI 升至 v1.12。v1.13 细化[Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md)，不改变公共 OpenAPI；既有目标 DDL 不变，完整工具结果新增接口仍需在 O1～O4 实现前纳入类型和契约测试。
 
 先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型；v1.8 同步 SQL 物化实现快照与 Runtime Broker JDBC Repository 边界；v1.9 补齐 Workspace 与 Session cwd 的 W0/W1/W2 设计；v1.10 收敛七项审查接缝。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.12 | 决定组件职责、部署、目标协议、状态、公共 API、Workspace 选择、完整工具结果、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.13 | 决定组件职责、部署、目标协议、状态、公共 API、Workspace 选择、Runtime 身份核验、完整工具结果、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
@@ -117,6 +119,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [Session 存储](managed-agent-session-storage.md) | 本地权威日志、writer、公共投影与共享存储的边界 |
 | [Java 存储、事件与恢复](managed-agent-storage-event-architecture.md) | `AgentStateStore`、事件批次、提交后 SSE、SQL/MQ/物化边界、MySQL/PostgreSQL 与恢复阶段 |
 | [Runtime Broker JDBC 持久化](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) | Binding/Session/Execution Repository、四表 schema、CAS/租约 fencing、H2/真实 MySQL 验证与 Spring 接线边界 |
+| [Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md) | reconcile + attest + CAS + 本地 gate、route 单源、失败分类、跨 TS/Java 契约门禁与部署身份 |
 | [Public API 与 WebShell 契约](managed-agent-api-contract.md) / [OpenAPI](managed-agent-public-api.openapi.yaml) | 统一公共/WebShell 路由、DTO、错误、幂等、分页、SSE 与租户范围 |
 | [MySQL v1.10 目标增量结构](managed-agent-storage-schema.mysql.sql) | 真实 V1/V2 后新增 Batch/Delivery/Receipt/immutable Snapshot/Owner，保留已有 Item/Part 与每 Session 进度 |
 | [Session 兼容](managed-agent-session-compatibility.md) / [方法映射](managed-agent-session-method-map.md) | 复用 daemon 契约及原调用者审计 |
