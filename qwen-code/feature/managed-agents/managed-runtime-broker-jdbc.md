@@ -4,6 +4,8 @@
 
 Status: Implemented and verified at the repository boundary
 
+> Snapshot scope: the body preserves the Repository slice at `c9c68760a2`; “Current state” and “Non-goals” refer to that commit. The subsequent reference implementation at [`34ea187c628c`](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.md), dated 2026-09-21, wires Spring JDBC/Flyway, encrypted seeds, reconcile/attest, and recoverable provisioners. It records real-MySQL two-JVM and fake-Kubernetes verification; those tests were not rerun for this documentation update, and real-cluster verification remains outstanding. It does not include SQL Batch/Delivery from the separate P2 branch or complete the v1.11 durable tool-result delivery design.
+
 ## Problem
 
 The Runtime Broker state foundation defines optimistic repository contracts for

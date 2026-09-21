@@ -3484,6 +3484,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Hosted Harness Java Client、提交/取消/Transcript/SSE 接线。</li>
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
                 <li>Runtime Binding/Session/Execution 的 JDBC Repository、四表 schema 与 H2/真实 MySQL 契约。</li>
+                <li>P3 预览分支 <code>34ea187c628c</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
                 <li>稳定 Item/Part 身份、V2 Item/Snapshot/消费进度表与 SQL scanner 物化。</li>
@@ -3494,7 +3495,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             <article class="card accent-amber">
               <h3>待补齐</h3>
               <ul>
-                <li>将 Runtime Broker JDBC Repository 接入 Spring DataSource/Flyway，并完成 lease reconcile、双 Java 实例恢复与调度验证。</li>
+                <li>在真实集群验证已接线的 Broker 恢复：网络/RBAC、service-account 轮换、Pod 生命周期、条件清理与部署容量。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>
@@ -3505,7 +3506,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>AgentBundle/Manifest 版本一致性。</li>
                 <li>按 O1～O4 接通完整工具结果捕获、持久资源、receipt ACK、Java 投影与 WebShell range/下载；RuntimeTemplate 仍待补齐。</li>
                 <li>Harness 私有 journal、资源闭包、共享 Session Authority 和可替换 Harness。</li>
-                <li>真实 MySQL 基础迁移/聚合已验证；双 JVM、真实 Harness/Runtime 的故障与容量验证仍待完成。</li>
+                <li>P3 已记录真实 MySQL 双 JVM及 fake Kubernetes 验证；完整 Hosted Harness/Runtime 的故障、跨主机与容量验证仍待完成。</li>
                 <li>Legacy → Managed continuation。</li>
                 <li>MCP、Hooks、后台 Shell、Monitor、child/workflow/team、Channels 与 Automation 按 H0～H6 完整迁移。</li>
                 <li>删除旧 <code>/managed/sessions*</code> 实验控制面。</li>
@@ -3521,8 +3522,16 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
             Item/Snapshot 物化和 WebShell Snapshot 加尾部恢复，并通过 H2、真实 MySQL
             26.7、前端类型检查与聚焦测试。<code>c9c68760a2</code> 另完成
             Runtime Broker JDBC Repository 边界、四表 schema 与 H2/真实 MySQL 契约。
-            这些只证明对应代码切片，不代表 Spring 接线、跨实例恢复、其余 A～H
-            能力或生产部署已经验收。
+            以上为早期切片记录；Spring 接线和 Runtime 恢复的后续状态见下方固定版本快照，
+            不能外推其余 A～H 能力或生产部署已验收。
+          </div>
+          <div class="callout" style="margin-top: 18px">
+            <strong>2026-09-21 合并快照：</strong>已纳入远端方案中的
+            <a href="https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md">P3 恢复设计与验证记录（34ea187c628c）</a>。
+            该记录包含真实 MySQL 双 JVM、创建者退出后的同宿主接管和 fake Kubernetes 验证；
+            本次只核对文档与接线，未复跑测试，真实集群仍待验收。
+            P2 SQL Batch/Delivery 与 P3 恢复目前分属不同源码分支，尚未形成联合验收结果。
+            v1.11 完整工具结果设计继续保留，O1～O4 不因 Broker 恢复已实现而自动完成。
           </div>
         </section>
 

@@ -406,7 +406,7 @@ P0～P9a、D1～D5、R1～R5/F1～F8 保留为历史实验与专项切片编号�
 
 ## 17. 实现快照与待对齐项
 
-HTML 第 17 节已更新为 v1.8 代码快照，仍只能表达已有代码切片与待验收边界，不能用来宣布 A～H 已完成。较原 v1.2～v1.7，当前快照已经补入 Java 存储/事件物化和 Runtime Broker JDBC Repository；Spring 生产接线、跨实例通知、Runtime 进程恢复、双 JVM 故障验证及完整 Hosted Profile 仍是缺口。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
+HTML 第 17 节按 v1.11 目标设计区分两个实现分支：`feature/managed-agents-p0-p8` 的 [`34ea187c628c`](https://github.com/doudouOUC/qwen-code/commit/34ea187c628ce869cc2a2f6e7f3b967af12e276c) 已加入 Spring JDBC/Flyway V3、加密 provision seed、reconcile/attest gate、同宿主进程接管和 Kubernetes 参考 adapter；独立 `feature/managed-agent-p2-delivery` 的 `72e215c1e5` 已加入 V4 SQL Batch/Delivery，二者尚待集成。Runtime 恢复的[固定版本设计与验证记录](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md)报告真实 MySQL 双 JVM 与 fake Kubernetes 验证，本次只核对记录和接线，未重跑测试；真实集群、生产分布式通知、完整 Harness/资源恢复及 O1～O4 仍未交付。不能用这些切片宣布 A～H 已完成。2026-09-19 的定向调研另见[普通工具源码依据](managed-agent-ordinary-tools-integration.md#1-调研依据与可复用基础)。
 
 后续实现记录已报告其中部分工作进展，因此不能简单把该快照的所有“待补齐”当作今天的代码事实：
 
@@ -414,13 +414,14 @@ HTML 第 17 节已更新为 v1.8 代码快照，仍只能表达已有代码切�
 | --- | --- | --- |
 | Session 身份 | 公共 API、qwen/Harness、JSONL 与 Broker scope 共用一个 RFC UUID，不保存第二套映射 | 实验分支 `feature/managed-agents-p0-p8` 的 [`fc32ab0c95`](https://github.com/doudouOUC/qwen-code/commit/fc32ab0c9502a0b44020ef1a66c88e9b3a2a1484) 已在独立 Spring 服务中贯通同值，并从未发布的 V1 schema 删除 `harness_session_id`；只证明该身份切片，不代表完整产品部署验收 |
 | Harness→Broker | `JavaBrokerManagedRuntimeProvider`、`/internal/agent-runtime/v1/*`（v1.3 增补查询/control/ack） | 本次源码抽查为 `BrokerManagedRuntimeProvider`、`/internal/runtime-broker/v1/tool-sessions:acquire`、`/control`、`executions`、查询、`:cancel`、`:release`；作为待适配差异，不冒称路径兼容 |
-| Broker 持久化 | Binding、Runtime Session 和 Tool Execution 共享持久事实源，支持 CAS、租约接管与原执行查询 | [`c9c68760a2`](https://github.com/doudouOUC/qwen-code/commit/c9c68760a2fe7d016bcabca0723e80bcbae38953) 新增 DataSource-only JDBC Repository、四表 schema、H2/真实 MySQL 契约；Managed Agent Spring 仍使用内存接线，持久 `READY` 也不等于原 Runtime 进程存活 |
+| Broker 持久化与恢复 | Binding、Runtime Session 和 Tool Execution 共享持久事实源，支持 CAS、租约接管与原执行查询 | `c9c68760a2` 完成 Repository 基础；`34ea187c628c` 已接 Spring JDBC/Flyway V3、AES-GCM seed 和 reconcile/attest gate。Broker 启用时缺数据库或密钥配置会失败，不回退内存；持久 `READY` 仍须核验物理身份后才能使用 |
+| SQL Batch/Delivery | 批次认领、generation fencing、连续物化及提交后展示 | 独立 P2 分支 `72e215c1e5` 已实现 V4 切片；未并入上述 P3 预览，需按 V3/V4 顺序集成，不据此声称 MQ 或大输出交付已完成 |
 | Java→Runtime | `/v1/prepare`、`/v1/executions` 等 HTTP/SSE | 现有 Broker 切片复用 Managed Runtime v1/v2 worker；目标接口需要显式适配及契约验收 |
 | Hosted Profile | loopback、内部鉴权、无本地 fallback | 本次源码可见对应 Profile 和版本/boot ID 检查；不据此认定 E/F 全部验收 |
 | 未知工具结果 | `recovery_blocked` | 先前 Java 文档记录 durable `UNKNOWN`；需要冻结内部枚举到目标状态的映射和原调用查询语义 |
 | Java authority / 前端 | qwen 会话契约与阶段 D 公共投影；G 外置 Authority | 先前首阶段 Java 全权威、指定 `JavaAgentProvider`、M0～M8 路线已归档；实际代码差异须按 A～H 逐项核验 |
 | 已有 E2E 记录 | 15 秒冷启动、首模型输出、无重复副作用 | 原文记录模型首事件约 495 ms、Runtime ready 约 15.916 s、physical execute=1、响应丢失恢复；保留为历史证据，本次未复跑，模型首事件不自动等于首 token |
-| 产品与分布式验收 | F/G 及各阶段门槛 | 原记录仍列真实产品/ACS E2E、双 JVM+MySQL、故障注入、容量安全灰度等缺口；不能用本地 fixture 替代 |
+| 产品与分布式验收 | F/G 及各阶段门槛 | P3 记录已覆盖真实 MySQL 双 JVM、同宿主接管和 fake Kubernetes；真实产品/ACS、真实集群、完整 Harness/Runtime 故障与容量灰度仍需验证，不能用参考实现测试替代 |
 
 记录来源：同名 qwen-code 工作树中的 `packages/cli/src/serve/broker-managed-runtime-provider.ts`、`hosted-harness-contract.ts`、`hosted-harness-profile.ts`、`docs/design/2026-09-17-managed-agent-java-runtime-broker-mvp.zh-CN.md`，以及[调整前产品记录](managed-agent-java-hosted-runtime-history.md)。这些路径用于定位抽查，不将工作树状态当成上游 main 已发布能力。
 

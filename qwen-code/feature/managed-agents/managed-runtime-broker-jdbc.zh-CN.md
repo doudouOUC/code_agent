@@ -4,6 +4,8 @@
 
 状态：Repository 边界已实现并验证
 
+> 快照范围：正文保留 `c9c68760a2` 的 Repository 切片，“当前状态”和“非目标”均针对该提交。2026-09-21 的后续参考实现 [`34ea187c628c`](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md) 已接 Spring JDBC/Flyway、加密 seed、reconcile/attest 与可恢复 provisioner，并记录真实 MySQL 双 JVM及 fake Kubernetes 验证；本次未复跑这些测试，真实集群仍待验证。它不包含独立 P2 分支的 SQL Batch/Delivery，也不完成 v1.11 的工具结果持久交付。
+
 ## 问题
 
 Runtime Broker 状态基础已经为 Runtime 绑定和逻辑 Runtime Session 定义了

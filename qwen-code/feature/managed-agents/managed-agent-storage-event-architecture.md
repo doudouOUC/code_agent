@@ -4,6 +4,8 @@
 
 > **v1.10 修订（2026-09-21）：** [v1.10 契约收敛](managed-agent-contract-closure.md)替换全局 offset 扫描，区分入口受理边界，补齐真实 V1/V2 的增量迁移及容量/清理门槛。后续源码提交 `72e215c1e5`（`feature/managed-agent-p2-delivery`）已实现 V4 SQL Batch/Delivery、generation fencing 和连续物化；MQ、保留清理和完整命令交付仍为目标设计，V4 与原 V3 需按顺序集成。
 
+> **P3 恢复合并记录（2026-09-21）：** 另一源码分支 `feature/managed-agents-p0-p8` 的 [`34ea187c628c`](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md) 已接 Spring JDBC/Flyway V3、加密 seed、reconcile/attest gate、同宿主接管和 Kubernetes 参考 adapter；记录包含真实 MySQL 双 JVM及 fake Kubernetes 验证，本次未复跑。该更新替代下文历史快照中的“Spring 接线与 Runtime reconcile 尚未实现”，不代表真实集群、Harness authority/资源恢复或 P2/P3 联合验收已完成。
+
 > **源码实现（2026-09-20）：** `qwen-code` 分支 [`feature/managed-agents-p0-p8`](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的提交 [`2695220a3a`](https://github.com/doudouOUC/qwen-code/commit/2695220a3ad1ca2654633aed4a7cef46c7469d74) 已实现本文所列 P0 和基于 SQL 的 P1 物化切片。源码仓库同时保留[中文设计](https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.zh-CN.md)和[英文设计](https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.md)。
 
 状态：总体架构仍为提议；P0/P1 之后，独立分支 `feature/managed-agent-p2-delivery` 已实现首个 P2 SQL 投递切片。更新日期：2026-09-21。下文保留 2026-09-20 的集成快照，P2 新状态以上述提交及源码双语文档为准，不表示完整架构已经通过生产验收。
@@ -350,7 +352,7 @@ qwen:
 | P0：契约与基线                 | **基础已实现。** 已有 `AgentStateStore`、有界入口批处理、幂等准入和提交后 Hub 直推；H2 与真实 MySQL 集成测试覆盖当前契约。性能基线和 PostgreSQL 对等能力仍待完成。                                                                             |
 | P1：批次与直推                 | **基于 SQL 的切片已实现。** 已有稳定 Item/Part 身份、V2 投影表、连续进度/Snapshot 同事务物化、带 Snapshot 水位的公共 Item 列表，以及 WebShell 的 Snapshot 加尾部恢复。长输出写放大、Snapshot 分页保护和生产故障/性能证据仍待完成。                         |
 | P2：传输与保留                 | 增加实际选中的 MQ 适配器、Outbox Relay、多实例通知及续传重置；物化核对通过后，才启用窗口清理。已有 RocketMQ 平台时在此接入。                                                                                                               |
-| P3：恢复持久化                 | **Broker Repository 边界已实现。** 继续接入 Spring DataSource/Flyway，补 Harness authority 和资源 manifest、Runtime lease reconcile、Workspace 恢复与回收屏障。跨 JVM/Harness/Runtime 故障测试通过后，才开放自动接管能力。 |
+| P3：恢复持久化                 | **参考分支 `34ea187c628c` 已接 Spring JDBC/Flyway 与 Runtime reconcile/attest。** 真实 MySQL 双 JVM及 fake Kubernetes 已有验证记录；继续集成 P2、补真实集群验收、Harness authority/资源 manifest、Workspace 恢复与回收屏障，不能据此开放完整 Harness 自动接管。 |
 | P4：按测量决定是否改变接受路径 | 若 SQL 接受吞吐或 SQL 故障隔离不达标，先让 Harness/入口具备独立持久化源日志、单写者 fencing、稳定事件身份与重放确认，再设计 MQ 接受后直推、SQL 异步物化。此时必须重定控制事件与文本的统一顺序及公开游标，不能只替换 `acceptBatch` 的实现。 |
 
 P4 是明确的后续设计门槛，不是当前接口已经实现的能力。当前不引入多套运行模式、通用查询 DSL、自动 MQ 热切换或新的 Java Agent 循环。
