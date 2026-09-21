@@ -2,11 +2,11 @@
 
 > 本文件已整理 2026-09-14 至 2026-09-20（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: ACP child 容量/恢复/堆执行、MCP App 诊断、Linux bwrap 工具级拆分与 Landlock、Managed Agent 状态/架构预览、系统提示词精简、HTTP standalone UUID
+**主题**: ACP child 容量/恢复/堆执行、MCP App 诊断、Linux bwrap 工具级拆分与 Landlock、Managed Agent 状态/Runtime 恢复预览、系统提示词精简、HTTP standalone UUID
 
-**PR 统计**: 20 PRs - 10 merged / 9 open / 1 closed
-**当前已合并 PR 代码量**: +12,175 / -755，161 个文件变更
-**全量代码量**: +155,523 / -18,124，1,134 个文件变更
+**PR 统计**: 20 PRs - 11 merged / 8 open / 1 closed
+**当前已合并 PR 代码量**: +16,787 / -960，207 个文件变更
+**全量代码量**: +163,385 / -18,127，1,153 个文件变更
 **类型分布**: feat ×12, fix ×5, other ×1, test ×1, docs ×1
 **范围 (scope)**: serve/daemon ×6, web-shell ×4, sdk-typescript ×4, ci ×4, core ×9, linux-sandbox ×6, cli ×3, java ×2, managed-agent ×3, docs ×1
 
@@ -28,13 +28,13 @@
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | 🟡 open draft | @doudouOUC | feat(core): Move bwrap confinement to tool execution | +8800/-3141 | 132 | 09-17 04:11 | — |
 | [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | ✅ merged | @doudouOUC | feat(core): Add the bwrap execution foundation | +3732/-48 | 25 | 09-17 05:31 | 09-19 13:54 |
 | [#12265](https://github.com/QwenLM/qwen-code/pull/12265) | ✅ merged | @doudouOUC | docs(serve): Document ACP child heap calibration | +648/-0 | 3 | 09-19 15:38 | 09-20 03:22 |
-| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | 🟡 open draft | @doudouOUC | feat(cli): Move bwrap sandboxing to tool execution | +2136/-3054 | 82 | 09-19 15:48 | — |
-| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | 🟡 open | @doudouOUC | feat(core): Route runtime tools through bwrap | +4612/-205 | 46 | 09-19 16:16 | — |
+| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | 🟡 open draft | @doudouOUC | feat(cli): Move bwrap sandboxing to tool execution | +2180/-3057 | 82 | 09-19 15:48 | — |
+| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | ✅ merged | @doudouOUC | feat(core): Route runtime tools through bwrap | +4612/-205 | 46 | 09-19 16:16 | 09-20 23:41 |
 | [#12278](https://github.com/QwenLM/qwen-code/pull/12278) | 🟡 open draft | @doudouOUC | feat(core): Add Landlock execution fallback | +8214/-3594 | 146 | 09-19 18:18 | — |
 | [#12301](https://github.com/QwenLM/qwen-code/pull/12301) | 🟡 open | @doudouOUC | feat(java): Add managed runtime state foundation | +1632/-2 | 20 | 09-20 04:07 | — |
 | [#12302](https://github.com/QwenLM/qwen-code/pull/12302) | 🟡 open | @doudouOUC | feat(core): Add managed session record foundation | +2463/-2 | 8 | 09-20 04:07 | — |
 | [#12353](https://github.com/QwenLM/qwen-code/pull/12353) | 🟡 open draft | @doudouOUC | feat(serve): Add opt-in fixed ACP child heap enforcement | +993/-427 | 27 | 09-20 13:34 | — |
-| [#12358](https://github.com/QwenLM/qwen-code/pull/12358) | 🟡 open draft | @doudouOUC | feat(managed-agent): Add standalone managed agent stack | +113215/-5652 | 495 | 09-20 14:31 | — |
+| [#12358](https://github.com/QwenLM/qwen-code/pull/12358) | 🟡 open draft | @doudouOUC | feat(managed-agent): Add standalone managed agent stack | +121033/-5652 | 514 | 09-20 14:31 | — |
 | [#12360](https://github.com/QwenLM/qwen-code/pull/12360) | 🟡 open | @doudouOUC | fix(core): Simplify system prompts and remove conflicting examples | +468/-1285 | 5 | 09-20 15:06 | — |
 
 ---
@@ -55,13 +55,13 @@
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | whole-CLI bwrap 同时约束模型网络与可信应用状态，而仅包 Shell 又会漏掉文件工具；需要把命令/文件副作用移到工具级 kernel boundary。 | 当前 132 文件 draft 提供完整迁移参考：operator-only `tools.executionSandbox`、Shell/文件 worker、unsupported integration fail-closed、旧 selector 迁移错误和跨架构验收；当前 head 两个 Bwrap acceptance lane 失败，且方案正拆为独立 PR。 | 已更新 Linux 内核沙箱专题，标记为总体 draft/reference。完整观察见 [implementations/pr-12064.md](implementations/pr-12064.md)。 |
 | [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | 工具级 bwrap 需要结构化 executable/argv/env/stdin、可信完成证据、进程监管和受限文件 worker，且不能在 setup 不确定时重放 payload。 | 最终第一拆分交付内部 foundation：`executeLaunch` 与 bwrap relay/receipt、最多 1 秒 post-exit drain、三态执行证据保留、16 KiB header 加精确长度的 binary file worker、两份 worker 打包和 36 项 Linux verifier；不开放 runtime policy、公开设置或工具路由。 | 已更新 Linux 内核沙箱专题，明确 merged foundation 与公开启用边界。完整实现见 [implementations/pr-12067.md](implementations/pr-12067.md)。 |
 | [#12265](https://github.com/QwenLM/qwen-code/pull/12265) | count admission、空闲回收与用户 stop 已落地，但 modeled per-child heap ceiling 仍缺少可审计的实机校准证据，不能仅凭 RSS 或策略下限启用。 | 最终 docs-only diff 发布中英设计与 compact summary；Node 24 接受集汇总 8 次运行、184 个真实模型回合和 360 次精确工具调用，包含长会话、MCP、四 child 并发的 3632/544 MiB 对照，同时保留协议/hash、排除尝试和覆盖缺口。生产 enforcement 仍关闭。 | 已更新daemon资源预算、Linux 4c8g容量实测、daemon总览与feature索引。完整实现见 [implementations/pr-12265.md](implementations/pr-12265.md)。 |
-| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | whole-CLI bwrap 把可信模型/认证/会话面一起放入沙箱，而工具级执行若只接部分入口又会从未迁移路径回落宿主。 | 当前 stacked draft 为普通 headless、Ink/OpenTUI 暴露 operator-only policy，让已接入工具与直接 shell 入口共用 runtime boundary，删除 whole-CLI bwrap，对旧 selector 给迁移错误，并对未移植宿主副作用 fail closed；当前 base 是 open #12269，精确 head Linux 验收仍后置。 | 已更新 Linux 内核沙箱专题与feature索引；不能视为 `main` 能力。完整观察见 [implementations/pr-12267.md](implementations/pr-12267.md)。 |
-| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | 已合入 foundation 尚未接到生产工具，需要可信宿主一次准入且不可被 workspace 放宽的内部策略，覆盖 Shell/Monitor 与文件变更并阻断未迁移入口。 | 当前 open diff 冻结 canonical workspace/install/state policy，Shell/Monitor 走 bwrap adapter，Write/Edit 走带 stale-version 核验的 file worker；派生 Config 保持同一 ceiling，未支持 agent/worktree/MCP/LSP 等在副作用前拒绝，且不公开配置。 | 已更新 Linux 内核沙箱专题与feature索引。完整观察见 [implementations/pr-12269.md](implementations/pr-12269.md)。 |
+| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | whole-CLI bwrap 把可信模型/认证/会话面一起放入沙箱，而工具级执行若只接部分入口又会从未迁移路径回落宿主。 | 当前 draft 已在 merged #12269 上重基线，为普通 headless、Ink/OpenTUI 暴露 operator-only policy，让已接入工具与直接 shell 入口共用 runtime boundary，删除 whole-CLI bwrap，对旧 selector 给迁移错误，并对未移植宿主副作用 fail closed；后续加固 operator 设置读取/合并并让 settings-cache failure fixture 使用 malformed sandbox policy，但精确 head Linux 验收仍后置。 | 已更新 Linux 内核沙箱专题与feature索引；不能视为 `main` 公开能力。完整观察见 [implementations/pr-12267.md](implementations/pr-12267.md)。 |
+| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | 已合入 foundation 尚未接到生产工具，需要可信宿主一次准入且不可被 workspace 放宽的内部策略，覆盖 Shell/Monitor 与文件变更并阻断未迁移入口。 | 最终冻结 canonical workspace/install/state policy，Shell/Monitor 走 bwrap adapter，Write/Edit 走带 stale-version 核验的 file worker；派生 Config 保持同一 ceiling，未支持 agent/worktree/MCP/LSP 等在副作用前拒绝，且不公开配置。 | 已更新 Linux 内核沙箱专题与feature索引，标记为 merged internal integration。完整实现见 [implementations/pr-12269.md](implementations/pr-12269.md)。 |
 | [#12278](https://github.com/QwenLM/qwen-code/pull/12278) | bwrap 在缺二进制、user namespace 或 mount 能力的 Linux 上不可用，但 host fallback 会破坏工具级 fail-closed 边界。 | 当前 stacked draft 增加 Landlock x64/arm64 helper；显式或 `auto` 只在 open command network 下选择，启动时固定 effective backend/ABI，workspace-write 才授予工作区写，receipt 不确定时不回放 payload，并明确报告 `partial`。 | 已更新 Linux 内核沙箱专题与feature索引。完整观察见 [implementations/pr-12278.md](implementations/pr-12278.md)。 |
 | [#12301](https://github.com/QwenLM/qwen-code/pull/12301) | Managed Runtime Broker 缺少可先独立评审的多租户 identity、乐观版本和 operation lease 状态边界。 | 当前 open Java 21 模块定义 binding/session record 与 repository contract，内存实现原子 `findOrCreate`、CAS、可过期 claim/renew、scope isolation 和 generation fencing；不含 Spring、HTTP、持久化或真实 provision。 | 已在 Managed Agents 专题登记 state foundation。完整观察见 [implementations/pr-12301.md](implementations/pr-12301.md)。 |
 | [#12302](https://github.com/QwenLM/qwen-code/pull/12302) | Managed Session 的 writer/recovery/projection 需要先共享一份封闭、可校验的记录格式，私有日志也不能混入普通对话。 | 当前 open diff 定义 v1 header/event/commit marker、closed kind/domain/state、strict raw/typed parser、actor/transition/transaction/digest 校验，并把三种 subtype 注册为非对话 transcript record；不含 writer、Harness 或迁移。 | 已在 Managed Agents 专题登记 record foundation。完整观察见 [implementations/pr-12302.md](implementations/pr-12302.md)。 |
 | [#12353](https://github.com/QwenLM/qwen-code/pull/12353) | `admit` 只限制 child 数量，真实 V8 old-space 仍沿用 host-derived 参数，modeled fixed partition 无法执行。 | 当前 draft 新增 opt-in `enforce`：所有 managed ACP child 共用 boot-resolved fixed ceiling 与 count admission，替换 inherited fixed heap flag、拒绝 percentage 冲突，仅在真实接线时报告 enforced；默认 `observe` 及 `admit` heap 行为不变。 | 已更新daemon资源预算、容量实测、总览与feature索引。完整观察见 [implementations/pr-12353.md](implementations/pr-12353.md)。 |
-| [#12358](https://github.com/QwenLM/qwen-code/pull/12358) | Java 控制面、常驻 Harness、按需 Tool Runtime、持久事件和 dual-path WebShell 尚缺一条可运行的整体预览链路。 | 当前 495 文件/148 commit draft 汇总 Spring 服务、Hosted Harness、Runtime Broker、Managed record/authority、事件批处理/提交后 SSE、SDK 与 WebShell；本地单实例有 smoke evidence，但必须拆成独立 PR，且不证明多节点、生产 MQ/Redis 或跨平台。 | 保留并增量更新 Managed Agents 既有专题，不按大 draft 重写。完整观察见 [implementations/pr-12358.md](implementations/pr-12358.md)。 |
+| [#12358](https://github.com/QwenLM/qwen-code/pull/12358) | Java 控制面、常驻 Harness、按需 Tool Runtime、持久事件和 dual-path WebShell 尚缺一条可运行的整体预览链路，Runtime endpoint 也必须在 Java 重启后按物理身份恢复而非盲信旧 URL。 | 当前 514 文件/154 commit draft 汇总 Spring 服务、Hosted Harness、Runtime Broker、Managed record/authority、事件批处理/提交后 SSE、SDK 与 WebShell，并增加加密持久 seed/resource handle、reconcile+attest gate、同宿主进程接管和 Kubernetes adapter；本地/MySQL/fake-Kubernetes 证据仍不等于真实集群或完整生产验收。 | 保留并增量更新 Managed Agents 既有专题，不按大 draft 重写。完整观察见 [implementations/pr-12358.md](implementations/pr-12358.md)。 |
 | [#12360](https://github.com/QwenLM/qwen-code/pull/12360) | 主会话 prompt 重复规则，并在 headless no-reply 模式中保留主动追问示例，增加上下文且产生行为冲突。 | 当前 open diff 合并重复 guidance，把五种 format 的示例从七个减为三个并删除 headless 冲突问句，保留 capability filtering、interactive/ACP clarification、CodeModeOnly 约定和安全边界；固定输入体积下降不等于真实模型质量已验证。 | 暂不新建长期专题，在feature索引登记当前 open 方案。完整观察见 [implementations/pr-12360.md](implementations/pr-12360.md)。 |
 
 ## PR 对应 feature 覆盖
@@ -76,8 +76,8 @@
 | [daemon资源预算](../../feature/daemon-serve-mode/13-resource-budgeting.md) | #11911/#11940/#12008/#12265(merged), #12353(open) | 登记数量准入、恢复链、已合入 heap 校准证据与 opt-in `enforce` draft。 |
 | [Linux 4c8g容量实测](../../feature/daemon-serve-mode/14-capacity-validation-linux-4c8g.md) | #11911/#11940/#12008/#12265(merged), #12353(open) | 对齐 count recovery 与 Node 24 evidence，标记 fixed-heap enforcement 尚未合入/跨平台校准。 |
 | [daemon总览](../../feature/daemon-serve-mode/README.md) | #11812/#11911/#11940/#12008/#12265(merged), #12353(open) | 同步容量三阶段、校准证据与 `enforce` draft 边界。 |
-| [Linux 内核沙箱](../../feature/linux-kernel-sandbox.md) | #12067(merged), #11981(closed), #12064/#12267/#12269/#12278(open) | 登记 foundation、关闭的旧 CI、总体参考、runtime integration、公开 cutover 与 Landlock stacked draft。 |
-| [Managed Agents](../../feature/managed-agents/README.md) | #12301/#12302/#12358(open) | 增量登记 Java state、Core record foundation 与超大 standalone preview，不覆盖既有更完整目标设计。 |
+| [Linux 内核沙箱](../../feature/linux-kernel-sandbox.md) | #12067/#12269(merged), #11981(closed), #12064/#12267/#12278(open) | 登记 foundation、merged runtime integration、关闭的旧 CI、总体参考、公开 cutover 与 Landlock stacked draft。 |
+| [Managed Agents](../../feature/managed-agents/README.md) | #12301/#12302/#12358(open) | 增量登记 Java state、Core record foundation，以及加入 durable Runtime recovery 的超大 standalone preview，不覆盖既有更完整目标设计。 |
 | [feature 索引](../../feature/README.md) | 本周全部 20 个 PR | 同步 W38 最终周范围、状态、长期专题入口及无专题的诊断/提示词边界。 |
 
 _按个人 PR 口径更新于 2026-09-21_

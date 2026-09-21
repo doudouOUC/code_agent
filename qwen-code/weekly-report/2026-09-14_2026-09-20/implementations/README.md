@@ -15,7 +15,7 @@
 | [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | ✅ merged | feat(core): Add the bwrap execution foundation | [pr-12067.md](pr-12067.md) |
 | [#12265](https://github.com/QwenLM/qwen-code/pull/12265) | ✅ merged | docs(serve): Document ACP child heap calibration | [pr-12265.md](pr-12265.md) |
 | [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | 🟡 open draft | feat(cli): Move bwrap sandboxing to tool execution | [pr-12267.md](pr-12267.md) |
-| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | 🟡 open | feat(core): Route runtime tools through bwrap | [pr-12269.md](pr-12269.md) |
+| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | ✅ merged | feat(core): Route runtime tools through bwrap | [pr-12269.md](pr-12269.md) |
 | [#12278](https://github.com/QwenLM/qwen-code/pull/12278) | 🟡 open draft | feat(core): Add Landlock execution fallback | [pr-12278.md](pr-12278.md) |
 | [#12301](https://github.com/QwenLM/qwen-code/pull/12301) | 🟡 open | feat(java): Add managed runtime state foundation | [pr-12301.md](pr-12301.md) |
 | [#12302](https://github.com/QwenLM/qwen-code/pull/12302) | 🟡 open | feat(core): Add managed session record foundation | [pr-12302.md](pr-12302.md) |

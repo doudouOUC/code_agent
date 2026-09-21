@@ -8,13 +8,13 @@
 >
 > **Workspace/cwd 设计补充（2026-09-21）：** [中文方案](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md) 区分稳定 Workspace、Session 相对 cwd 与 Runtime 挂载路径，补齐创建绑定、冷恢复、受控目录切换、后台任务归属及旧数据迁移。[OpenAPI](managed-agent-public-api.openapi.yaml) 与 [增量目标 DDL](managed-agent-workspace-schema.mysql.sql) 同步；W0/W1/W2 均为待实现设计，当前 Java 仍使用全局静态工作区配置。
 >
-> **Runtime Broker JDBC 补充（2026-09-20）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的 JDBC/MySQL 持久化、四表 schema、数据库时钟租约与 fencing 契约。对应代码已在 [`c9c68760a2`](https://github.com/doudouOUC/qwen-code/commit/c9c68760a2fe7d016bcabca0723e80bcbae38953) 完成 Repository 边界及 H2/真实 MySQL 验证；Spring DataSource/Flyway 接线、双 Java 实例恢复及 Runtime lease reconcile 仍未完成。
+> **Runtime Broker JDBC 补充（2026-09-20）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的 JDBC/MySQL 持久化、四表 schema、数据库时钟租约与 fencing 契约。对应代码在 [`c9c68760a2`](https://github.com/doudouOUC/qwen-code/commit/c9c68760a2fe7d016bcabca0723e80bcbae38953) 先完成 Repository 边界及 H2/真实 MySQL 验证；该提交尚无 Spring DataSource/Flyway 接线、双 Java 实例恢复及 Runtime lease reconcile，当前 #12358 open preview 的后续增量见下方 W38 快照。
 >
 > **阶段 H 设计补充（2026-09-20）：** [扩展运行时设计](managed-agent-extension-runtime.md)统一 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的执行 owner、持久资源、任务投影、Runtime hold 和恢复语义。该文档补齐设计，不表示 Hosted Managed 已启用这些能力。
 >
 > 本次是文档对齐，不表示新阶段已实现或通过验收。此前 `JavaAgentProvider / M0～M8 / 首阶段 Java 统一 Session authority` 路线已[归档](managed-agent-java-hosted-runtime-history.md)，不再覆盖 HTML。源码中的接口差异、已有验证记录和未完成项见[实现对照](managed-agent-java-hosted-runtime.md#17-实现快照与待对齐项)。
 
-> **W38 upstream PR 快照（2026-09-21）：** #12301 当前以 open 独立 Java 21 模块提交 Runtime Binding/Session identity、CAS、operation lease 与内存 Repository，仅是状态 foundation；#12302 当前以 open Core diff 提交 Managed Session v1 header/event/commit marker、严格 parser/validation 与 transcript subtype reservation，尚无 production writer。#12358 是 495 文件、148 commit 的 open draft architecture preview，串联 Spring 服务、Hosted Harness、Runtime Broker、durable event/materialization 和 dual-path WebShell；本地单实例 smoke 不证明多节点/MQ/Redis/跨平台，且该 draft 必须拆成独立 review unit。三者都未进入 upstream `main`，不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
+> **W38 upstream PR 快照（2026-09-21）：** #12301 当前以 open 独立 Java 21 模块提交 Runtime Binding/Session identity、CAS、operation lease 与内存 Repository，仅是状态 foundation；#12302 当前以 open Core diff 提交 Managed Session v1 header/event/commit marker、严格 parser/validation 与 transcript subtype reservation，尚无 production writer。#12358 已扩为 514 文件、154 commit 的 open draft architecture preview，除 Spring 服务、Hosted Harness、Runtime Broker、durable event/materialization 和 dual-path WebShell 外，又加入 JDBC/Flyway 与 AES-GCM seed、reconcile+private attest gate、同宿主进程接管和 Kubernetes adapter；真实 MySQL 双 JVM与 fake-Kubernetes proof 仍不等于真实集群、生产 MQ/Redis 或跨平台验收，且该 draft 必须拆成独立 review unit。三者都未进入 upstream `main`，不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
 
 ## 当前方案入口
 

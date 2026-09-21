@@ -1,7 +1,7 @@
 # Linux bwrap 内核沙箱技术方案
 
 > 适用代码库：`QwenLM/qwen-code`。
-> 当前口径：#11614 已合入 whole-CLI bwrap backend，#12067 已合入工具执行 foundation；#11981 已关闭未合入，#12064 是总体参考 draft，#12269/#12267 是 runtime integration/公开 cutover stacked PR，#12278 再叠加 Landlock fallback。`main` 尚未提供公开工具级 sandbox policy 或 Landlock backend。
+> 当前口径：#11614 已合入 whole-CLI bwrap backend，#12067 已合入工具执行 foundation，#12269 已合入内部 runtime integration；#11981 已关闭未合入，#12064 是总体参考 draft，#12267 是已在 `main` 重基线的公开 cutover draft，#12278 仍叠加在其首个 cutover commit 上提供 Landlock fallback。`main` 尚未提供公开工具级 sandbox policy 或 Landlock backend。
 
 ## 1. 已合入基线：whole-CLI bwrap（#11614）
 
@@ -40,23 +40,23 @@ draft 覆盖 ordinary headless、Ink/OpenTUI `!`、prompt interpolation、Monito
 
 旧 whole-CLI backend 在该拆分中仍存在。只有后续 policy/tool wiring 和完整 public cutover 合入后，工具级边界才会成为可用产品能力。
 
-## 5. 第二拆分：runtime integration（#12269 当前 open）
+## 5. 第二拆分：runtime integration（#12269 merged）
 
-#12269 在 foundation 上增加可信宿主注入的内部 runtime policy。准入时 canonicalize workspace、installation、state 与 masks，拒绝 protected-root 重叠、cwd 越界、旧 sandbox marker 和未支持 SDK/ACP、MCP/LSP、extension/executor；准入结果被冻结，派生 Config 不能扩大 workspace ceiling。
+#12269 最终在 foundation 上增加可信宿主注入的内部 runtime policy。准入时 canonicalize workspace、installation、state 与 masks，拒绝 protected-root 重叠、cwd 越界、旧 sandbox marker 和未支持 SDK/ACP、MCP/LSP、extension/executor；准入结果被冻结，派生 Config 不能扩大 workspace ceiling。
 
-Shell/Monitor 通过共享 bwrap executor，Write/Edit 在读取时捕获 file version并由 sandbox file worker 发布，stale target、symlink/special file 与不可信 receipt 均拒绝。受限 registry 只保留已接线工具，speculation、worktree、外部 agent、checkpoint 等 host effect 在副作用前 fail closed。该阶段没有公开 setting/env/CLI，且 exact-head Linux workflow 仍是后续门槛。
+Shell/Monitor 通过共享 bwrap executor，Write/Edit 在读取时捕获 file version并由 sandbox file worker 发布，stale target、symlink/special file 与不可信 receipt 均拒绝。受限 registry 只保留已接线工具，speculation、worktree、外部 agent、checkpoint 等 host effect 在副作用前 fail closed。该阶段已进入 `main`，但没有公开 setting/env/CLI，且精确 head 没有独立 x64/arm64 acceptance workflow。
 
-## 6. 第三拆分：公开 CLI cutover（#12267 当前 open stacked draft）
+## 6. 第三拆分：公开 CLI cutover（#12267 当前 open draft）
 
-#12267 当前以 #12269 head 为 base，把内部 policy 暴露给普通 headless 与 Ink/OpenTUI。operator-only `tools.executionSandbox` 要求明确 filesystem/network policy，SystemDefaults、User、System 和可信 programmatic runtime 才能提供；Workspace/project env、bare/safe mode 和 model 参数不能放宽。设置对象严格拒绝未知字段，Linux/bwrap 前置条件和探针失败均 fail closed。
+#12267 已在包含 #12269 merge commit 的 `main` 上重基线，把内部 policy 暴露给普通 headless 与 Ink/OpenTUI。operator-only `tools.executionSandbox` 要求明确 filesystem/network policy，SystemDefaults、User、System 和可信 programmatic runtime 才能提供；Workspace/project env、bare/safe mode 和 model 参数不能放宽。设置对象严格拒绝未知字段，Linux/bwrap 前置条件和探针失败均 fail closed。
 
 当前 diff 路由 Shell、Read、Write、Edit、Monitor、prompt interpolation 与终端 `!`，并在 footer/system info/status 显示 requested/effective backend。旧 `--sandbox bwrap`、`tools.sandbox:"bwrap"`、`QWEN_SANDBOX=bwrap` 和继承 `SANDBOX=bwrap` 返回迁移错误；whole-CLI bwrap restart 被删除，Docker/Podman/Seatbelt 保留。
 
-ACP/serve、web terminal、MCP/LSP、extensions/hooks/discovery、自动 worktree/Arena、custom executors、技能准备与其它未迁移 host effects 会在 listener、payload 或副作用前拒绝或禁用。exact-head Linux x64/aarch64 enforcement 被明确留给后续 acceptance workflow；macOS build/test 不能证明 kernel confinement。因为 base #12269 和验收都未闭合，该 draft 不能视为 `main` 的公开工具级 bwrap。
+ACP/serve、web terminal、MCP/LSP、extensions/hooks/discovery、自动 worktree/Arena、custom executors、技能准备与其它未迁移 host effects 会在 listener、payload 或副作用前拒绝或禁用。后续 review fix 加固 bare-mode operator 文件读取与 legacy sandbox 字段保留，防止无关损坏文件误触发策略失败或 workspace 合并抹掉冲突证据；最新提交又把 settings-cache failure/recovery fixture 对齐到 malformed sandbox policy。exact-head Linux x64/aarch64 enforcement 被明确留给后续 acceptance workflow；最新 head 的 GitHub CI 仍在运行，macOS build/test 也不能证明 kernel confinement，因此该 draft 不能视为 `main` 的公开工具级 bwrap。
 
 ## 7. 第四层 draft：Landlock fallback（#12278 当前 open stacked draft）
 
-#12278 在 #12267 上加入 `landlock` backend。随包静态 helper 支持 Linux x64/arm64并要求 ABI >= 3；显式选择时启动前探测，`auto` 只在 bwrap 不可用且 command network 为 `open` 时回退。effective backend 在启动时固定，用户 payload 不会换后端重放。
+#12278 在 #12267 的首个 cutover commit 上加入 `landlock` backend，当前 base 尚未包含 #12267 后续 review fix 与 test fixture 对齐。随包静态 helper 支持 Linux x64/arm64并要求 ABI >= 3；显式选择时启动前探测，`auto` 只在 bwrap 不可用且 command network 为 `open` 时回退。effective backend 在启动时固定，用户 payload 不会换后端重放。
 
 Landlock 对宿主提供广泛只读、私有 scratch 写入，并只在 `workspace-write` 下允许 workspace 写。它没有 PID/network namespace，故固定报告 `partial`，`network: closed` 在 payload 前失败。relay/status FD 保留 prepared ABI 与 exec receipt，专用 workflow 用固定 Zig artifact 重建两架构 helper并验证 denial、inheritance 与 receipt。该 stacked draft 尚未进入 `main`。
 
@@ -64,7 +64,7 @@ Landlock 对宿主提供广泛只读、私有 scratch 写入，并只在 `worksp
 
 - bwrap 路径提供 write 与 command-network confinement，不承诺 secret confidentiality 或完整 host isolation；广泛 host read 与 pathname Unix socket 仍可用。
 - #11614 默认不自动启用；Landlock、seccomp、一次性提权、Windows/macOS 新 backend 均不在当前 `main` 能力内。
-- #11981 是 closed-unmerged CI 方案；#12064 是总体 draft；#12067 是已合入但未接线的内部 foundation；#12269/#12267 是未合入 integration/cutover；#12278 是 partial Landlock stacked draft。
+- #11981 是 closed-unmerged CI 方案；#12064 是总体 draft；#12067/#12269 是已合入的 foundation/internal integration；#12267 公开 cutover仍未合入，#12278 是基于其 pre-review-fix commit 的 partial Landlock stacked draft。
 - tool-level 迁移涉及安全边界、PTY/pipe 生命周期、文件并发和配置来源，必须逐拆分核对，不应从大 draft 的通过声明推断每个 extraction 已验证。
 
 ## PR 归因
@@ -75,8 +75,8 @@ Landlock 对宿主提供广泛只读、私有 scratch 写入，并只在 `worksp
 | [#11981](https://github.com/QwenLM/qwen-code/pull/11981) | closed | 为 whole-CLI backend 增加真实 Linux workflow 与 14 项 integration coverage；未合入且最终 GitHub checks 失败。 |
 | [#12064](https://github.com/QwenLM/qwen-code/pull/12064) | open draft | 工具级 bwrap 完整迁移参考、公开 policy/cutover 与跨架构 acceptance。 |
 | [#12067](https://github.com/QwenLM/qwen-code/pull/12067) | merged | 从总体 draft 抽取 structured execution、trusted receipt、file worker、packaging foundation 与 36 项 portable Linux verifier。 |
-| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | open | 内部 trusted-host policy、Shell/Monitor 与 file-worker production wiring、派生 runtime policy ceiling 和 unsupported surface fail-closed。 |
-| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | open draft | 为普通 CLI/TUI 暴露 operator-only policy、删除 whole-CLI bwrap，并对未迁移 surface fail closed；base 为 #12269，仍缺后续 Linux acceptance。 |
-| [#12278](https://github.com/QwenLM/qwen-code/pull/12278) | open draft | 增加 Linux x64/arm64 Landlock partial fallback、ABI/helper probe、open-network-only `auto` 选择与原生 helper workflow。 |
+| [#12269](https://github.com/QwenLM/qwen-code/pull/12269) | merged | 内部 trusted-host policy、Shell/Monitor 与 file-worker production wiring、派生 runtime policy ceiling 和 unsupported surface fail-closed；不开放用户设置。 |
+| [#12267](https://github.com/QwenLM/qwen-code/pull/12267) | open draft | 在包含 #12269 的 `main` 上为普通 CLI/TUI 暴露 operator-only policy、删除 whole-CLI bwrap，并对未迁移 surface fail closed；仍缺 exact-head Linux acceptance。 |
+| [#12278](https://github.com/QwenLM/qwen-code/pull/12278) | open draft | 基于 #12267 首个 cutover commit 增加 Linux x64/arm64 Landlock partial fallback、ABI/helper probe、open-network-only `auto` 选择与原生 helper workflow。 |
 
 _按个人 PR 口径更新于 2026-09-21_

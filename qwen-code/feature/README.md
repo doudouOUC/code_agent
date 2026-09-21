@@ -9,7 +9,7 @@
 
 | 主题 | 文档 | 状态 | 一句话 |
 |---|---|---|---|
-| Managed Agents | [managed-agents/](managed-agents/README.md) | #12301/#12302 open foundations；#12358 open 495-file architecture preview；均未进入 upstream `main` | 目标方案由 Java 产品控制面、常驻 Harness 与按需 Tool Runtime 组成；当前独立 state/record foundations 可评审，超大 standalone preview 必须拆分，不能视为完整交付。 |
+| Managed Agents | [managed-agents/](managed-agents/README.md) | #12301/#12302 open foundations；#12358 open 514-file architecture/recovery preview；均未进入 upstream `main` | 目标方案由 Java 产品控制面、常驻 Harness 与按需 Tool Runtime 组成；当前独立 state/record foundations 可评审，超大 standalone preview 已加入 durable Runtime recovery 但仍必须拆分，不能视为完整交付。 |
 
 > 本节不计入下方按 @doudouOUC 个人 PR 汇总的 24 篇方案，也不代表 upstream 已落地能力。
 
@@ -37,7 +37,7 @@
 | Diff 渲染与变更统计 | [diff-rendering.md](diff-rendering.md) | #6141 | edit/write/shell 等工具的 whitespace-only diff 不再显示为 “No changes detected”，diff stat 也按 smart fallback 统计。 |
 | 文件读取 / 大文本范围 / PDF 预算 | [file-reading.md](file-reading.md) | #6404 / #6409 / #6585 / #6846 / #7947 / #7967 / #8002 / #8383 | 大文本范围读取与 PDF 读取预算：Core 超过旧 10MB 文本 guard 时返回有界行范围，大型 PDF 不带 `pages` 时返回 guidance/reference；文本提取失败或单页超预算时可用 bounded PDF vision bridge fallback；#7947 让 Serve workspace `/file` 也能对超过 256 KiB 的 UTF-8 文本返回 bounded line window；#7967 已合入 handle-bound range reader 分层清理；#8002 增加 byte-cursor paging；#8383 已合入 CRLF cursor paging 的 lineEnding 文件级 metadata 修复。 |
 | Shell 工具执行语义 | [shell-tool.md](shell-tool.md) | #6864 / #6876 / #7053 / #7172 / #11727 | 前台shell timeout、静默心跳与安全三态保持一致；#11727已新增producer预算标记，避免默认配置下generic gate抢先丢掉Shell尾部终态。 |
-| Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614/#12067(merged) / #11981(closed) / #12064/#12267/#12269/#12278(open) | #11614 已合入 whole-CLI bwrap，#12067已合入内部 execution foundation；#11981真实Linux CI已关闭未合入，#12064是总体参考，#12269是runtime integration，#12267是公开cutover，#12278是open-network-only的Landlock partial fallback；四者均未进入`main`。 |
+| Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614/#12067/#12269(merged) / #11981(closed) / #12064/#12267/#12278(open) | #11614 已合入 whole-CLI bwrap，#12067/#12269已合入 execution foundation 与内部 runtime integration；#11981真实Linux CI已关闭未合入，#12064是总体参考，#12267是公开cutover，#12278是open-network-only的Landlock partial fallback，后三者未进入`main`。 |
 | Scheduled Tasks | [scheduled-tasks.md](scheduled-tasks.md) | #9838 / #10144 / #10828 / #10924 / #11207 | 已合入current-session reuse、empty-session persistence与relaxed ownership task设计；#10924提供mandatory lease/controller-binding fence，#11207已完成新版daemon global-owner runtime cutover，不改变at-least-once dispatch窗口。 |
 | 诊断 / creator skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 #6117 #6233(closed) | `/doctor` 代码命令、`/stuck` 诊断技能、`/batch` prompt 技能、ACP/non-interactive `/skills` 列表输出；disabled skill wire/filtering 仅为 #6233 closed 方案记录。 |
 | Hooks / submitted prompt provenance | [hooks.md](hooks.md) | #7762 / #7877 / #10100 / #10288 / #10512(closed) / #11455 | `UserPromptSubmit.submitted_prompt` 保留扩展前 provenance；#10100 已合入 command hook process-group ownership、TERM→KILL 与 bounded stream drain；#10288 已合入 staged-input + detached supervisor 的 fire-and-forget 生命周期，#10512 closed hardening 未进入 `main`；#11455已合入WebShell/显式ACP逐请求声明与daemon trust边界，缺失时不从request text推断。 |
@@ -52,7 +52,7 @@
 >
 > W37 最终 follow-up：#11207已合入relaxed Conversations runtime cutover，#11208/#11322/#11323已交付连续历史/compact rail与交互收口，#11246/#11311/#11337/#11397已合入Mem0 Auto Recall/写入/删除与DELETE兼容，#11308/#11309已合入Channel worktree恢复/回收，#11339已合入五秒live-state轮询，#11398/#11447已交付浏览器通知基础、内容与点击导航，#11428/#11515已完成容量owner解耦与默认256注册，#11653已修复ACP child heap无限cgroup哨兵，#11727已交付Shell producer预算单一决策；#11614已合入whole-CLI Linux bwrap backend。
 >
-> W38 最终 follow-up：#11812已合入普通HTTP非回环standalone UUID fallback；#11911/#11940/#12008已完成ACP child数量准入、零session自动回收和loaded runtime用户确认stop，#12265已合入fixed-heap校准证据，#12353仍只是opt-in enforcement draft。#11960已合入MCP App资源失败可见fallback。Linux sandbox方面，#12067已合入foundation；#11981已关闭未合入，#12064是总体draft，#12269/#12267/#12278依次是runtime integration、公开cutover与Landlock stacked draft。Managed Agents方面，#12301/#12302提交独立state/record foundations，#12358是必须拆分的超大preview。#12360精简系统提示词并移除headless冲突示例，但真实模型A/B未验证。#11781/#11819/#11938只修构建或CI。
+> W38 最终 follow-up：#11812已合入普通HTTP非回环standalone UUID fallback；#11911/#11940/#12008已完成ACP child数量准入、零session自动回收和loaded runtime用户确认stop，#12265已合入fixed-heap校准证据，#12353仍只是opt-in enforcement draft。#11960已合入MCP App资源失败可见fallback。Linux sandbox方面，#12067/#12269已合入foundation与内部runtime integration；#11981已关闭未合入，#12064是总体draft，#12267是已在`main`重基线的公开cutover，#12278仍叠加在其pre-review-fix commit。Managed Agents方面，#12301/#12302提交独立state/record foundations，#12358加入durable Runtime recovery但仍是必须拆分的超大preview。#12360精简系统提示词并移除headless冲突示例，但真实模型A/B未验证。#11781/#11819/#11938只修构建或CI。
 
 ## 使用口径
 
