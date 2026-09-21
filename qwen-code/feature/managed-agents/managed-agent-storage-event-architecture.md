@@ -1,10 +1,12 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-> **v1.10 修订（2026-09-21）：** [v1.10 契约收敛](managed-agent-contract-closure.md)替换全局 offset 扫描，区分入口受理边界，补齐真实 V1/V2 的增量迁移及容量/清理门槛。全部新增批次/MQ/命令交付能力仍为目标设计。
+> **v1.11 工具结果专项：** [完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)细化 bytes 捕获、receipt ACK、公开预览、有界读取和资源保留，尚待实现。当前 SQL Batch 只保存公开投影，不等于原生完整工具输出。
+
+> **v1.10 修订（2026-09-21）：** [v1.10 契约收敛](managed-agent-contract-closure.md)替换全局 offset 扫描，区分入口受理边界，补齐真实 V1/V2 的增量迁移及容量/清理门槛。后续源码提交 `72e215c1e5`（`feature/managed-agent-p2-delivery`）已实现 V4 SQL Batch/Delivery、generation fencing 和连续物化；MQ、保留清理和完整命令交付仍为目标设计，V4 与原 V3 需按顺序集成。
 
 > **源码实现（2026-09-20）：** `qwen-code` 分支 [`feature/managed-agents-p0-p8`](https://github.com/doudouOUC/qwen-code/tree/feature/managed-agents-p0-p8) 的提交 [`2695220a3a`](https://github.com/doudouOUC/qwen-code/commit/2695220a3ad1ca2654633aed4a7cef46c7469d74) 已实现本文所列 P0 和基于 SQL 的 P1 物化切片。源码仓库同时保留[中文设计](https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.zh-CN.md)和[英文设计](https://github.com/doudouOUC/qwen-code/blob/feature/managed-agents-p0-p8/docs/design/2026-09-20-managed-agent-storage-event-architecture.md)。
 
-状态：总体架构仍为提议；对应的 `qwen-code` 源码分支已实现 P0 和基于 SQL 的 P1 物化切片。日期：2026-09-20。本文按下面的集成代码快照设计，不表示完整架构已经通过生产验收。
+状态：总体架构仍为提议；P0/P1 之后，独立分支 `feature/managed-agent-p2-delivery` 已实现首个 P2 SQL 投递切片。更新日期：2026-09-21。下文保留 2026-09-20 的集成快照，P2 新状态以上述提交及源码双语文档为准，不表示完整架构已经通过生产验收。
 
 v1.10 的机器可读接口契约见 [`managed-agent-public-api.openapi.yaml`](managed-agent-public-api.openapi.yaml)，接口语义见[Public API 与 WebShell 契约](managed-agent-api-contract.md)，MySQL 8.0 的目标增量结构见 [`managed-agent-storage-schema.mysql.sql`](managed-agent-storage-schema.mysql.sql)。这三项定义目标结构；当前 Java 已执行实际 V2 Item/Part/latest Snapshot/per-Session progress，但尚未从 OpenAPI 生成 DTO、通过完整契约测试或迁移目标 DDL 的其余部分。
 

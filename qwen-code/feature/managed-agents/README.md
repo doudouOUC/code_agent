@@ -18,11 +18,13 @@
 
 ## 当前方案入口
 
+v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。OpenAPI/目标 DDL 仍保持 v1.10，O1～O4 实现前须将新增契约纳入类型和契约测试。
+
 先读 [HTML 双链路技术方案](managed-agent-dual-path-architecture.html)，再读对应的 [Markdown 技术方案](managed-agent-java-hosted-runtime.md)。[首版运行契约](managed-agent-first-runtime.md)固定最小范围，v1.4 新增[普通工具接线设计](managed-agent-ordinary-tools-integration.md)，补齐 Bundle/Session、调用阶段、资源交付及回收续轮；v1.5 固定公共 API、qwen Session Authority、JSONL 和 Runtime Broker 共用同一个 RFC UUID `sessionId`；v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界；v1.7 统一阶段 H 的扩展运行模型；v1.8 同步 SQL 物化实现快照与 Runtime Broker JDBC Repository 边界；v1.9 补齐 Workspace 与 Session cwd 的 W0/W1/W2 设计；v1.10 收敛七项审查接缝。原 v1.2 可从 Git 提交 `479432d`、v1.3 可从 `7e96cb2` 追溯。
 
 | 文档层级 | 用途 | 冲突处理 |
 | --- | --- | --- |
-| HTML v1.10 | 决定组件职责、部署、目标协议、状态、公共 API、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
+| HTML v1.11 | 决定组件职责、部署、目标协议、状态、公共 API、完整工具结果、扩展运行时、持久化实现边界和 A～H 阶段 | 作为当前架构基准 |
 | Markdown 双链路方案 | 将 HTML 转为可检索的契约、时序、实施门槛及实现差异 | 与 HTML 同步，不用源码现状反向改写目标 |
 | Session/Harness/Runtime 专项 | 细化 owner、存储、权限、工具、checkpoint、取消、恢复及兼容 | 按 A～H 映射；不能提前宣布 G 的完整外置/接管已完成 |
 | P/D/R/F 历史阶段与验收记录 | 追溯实验、局部能力、失败和测试环境 | 保留原日期与范围，不作为另一套当前实施顺序 |
@@ -125,6 +127,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [配置与扩展](managed-agent-config-extensions.md) | AgentBundle、MCP/Skills/Hooks 版本和执行归属 |
 | [扩展运行时](managed-agent-extension-runtime.md) | MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的共同状态机、任务投影、恢复和 H0～H6 顺序 |
 | [全部工具与文件历史](managed-agent-tools-history.md) | 工具族、Artifact、备份、撤销、迁移 |
+| [完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md) / [English](managed-agent-tool-result-artifacts.md) | v1.11 调研与拟议契约：裁剪前捕获、不可变分段、receipt ACK、三种结果表示、range/下载、WebShell 与引用保留；O1～O4 尚待实现 |
 | [子作用域](managed-agent-child-scopes.md) / [自动任务](managed-agent-automation.md) | 扩展范围的持久准入、调度、交付与父子关系 |
 | [搜索](managed-agent-search-tools.md) / [Grep](managed-agent-grep-tools.md) / [Notebook](managed-agent-notebook-tools.md) / [媒体](managed-agent-media.md) | 局部工具能力与有限验收，不能外推全部阶段完成 |
 

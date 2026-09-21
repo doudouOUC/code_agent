@@ -1,8 +1,10 @@
 # Managed Agent 双链路方案：Java、qwen serve 与 Tool Runtime
 
+> **v1.11 完整工具结果：** [中文专项](managed-agent-tool-result-artifacts.zh-CN.md) / [English](managed-agent-tool-result-artifacts.md)补齐裁剪前捕获、不可变分段、完整性状态、Session receipt ACK、Java 公共投影、range/下载与 WebShell 展示。该专项为提案；现有本地输出文件与 Session 资源已存在，远端持久交付仍待 O1～O4 验收。
+
 > **v1.10 实施接缝：** [v1.10 契约收敛](managed-agent-contract-closure.md)统一准入 Profile、批次任务、交互 API、Workspace 私有安装证据、迁移/回退、产品权限与容量门槛。它细化已有 A～H，不改变 Java SQL 提交后 SSE、MQ 通知/物化与 qwen 私有执行 authority 的职责。
 
-> 当前基准：[Managed Agent 双链路技术方案 HTML v1.10](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计；v1.10 收敛准入/分发/交互、私有上下文接线、升级及容量门槛。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
+> 当前基准：[Managed Agent 双链路技术方案 HTML v1.11](managed-agent-dual-path-architecture.html)。同步日期：2026-09-21；v1.3 补充首版运行条件，v1.4 补齐普通工具的跨组件接线，v1.5 固定统一 Session 身份，v1.6 冻结事件接受、SSE、存储、API Schema、多实例通知与恢复边界，v1.7 收敛 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的统一扩展运行模型，v1.8 同步当前 SQL 物化切片和 Runtime Broker JDBC Repository 边界，v1.9 补齐 Workspace 与 Session cwd 的目标设计；v1.10 收敛准入/分发/交互、私有上下文接线、升级及容量门槛；v1.11 细化完整工具结果与大输出交付。本文将 HTML 的职责、部署、协议、状态和 A～H 阶段整理为可检索的 Markdown；发生冲突时以 HTML 为准。这里的目标契约不等于当前代码已全部实现或验收。
 >
 > 此前以 `JavaAgentProvider`、Java 首阶段统一 Session authority 和 M0～M8 为主线的版本已移入[历史归档](managed-agent-java-hosted-runtime-history.md)。现有代码和测试记录继续保留，但不能据此改写 HTML 的目标顺序。具体实现差异见第 17 节。
 
@@ -283,7 +285,9 @@ Hosted 租户范围在 v1.6 固定为可信入口注入，并且必须贯穿 Ses
 - Hosted Managed 禁止本地 Tool fallback；tenantId 来自服务端鉴权上下文。
 - 不同租户不得复用 RuntimeBinding 或 Workspace。
 
-大输出使用有界 preview、artifactRef、sha256、size、truncated。SSE 不长期中转完整大结果，Java 不长期持有大输出；Artifact 未持久接收前不删除 Runtime 唯一副本。公共 Artifact ID、授权和内部对象存储位置由 Java 映射。
+大输出使用有界 preview、不透明 artifactId、revision、sha256、sizeBytes、captureStatus 和 previewTruncated。公开字段不暴露 oss://、Runtime 路径或持久签名 URL。SSE 不中转完整大结果，Java 仅以有界流代理授权下载；Artifact 未被持久接收、引用闭包尚未提交前不删除 Runtime 唯一副本。公共 Artifact ID、授权和内部对象存储位置由 Java 映射。
+
+完整契约见[工具结果专项](managed-agent-tool-result-artifacts.zh-CN.md)：原始捕获、模型实际消费与公开预览分别保存；先上传校验并提交 Session receipt，再确认 delivered。执行成功和输出完整性是不同状态，存储故障不能重跑副作用。Java 公共投影从已提交源重放，与 Item/Event 同事务保存元数据后推 SSE。WebShell 通过固定 revision 的 range/下载获取完整内容；Snapshot 保存相同引用。资源仍被历史/checkpoint/fork/公共事件引用时不可随 24h 事件窗口删除。O1 本地契约、O2 Hosted 持久交付、O3 UI/API、O4 清理及已开放扩展均须独立验收，MQ 不构成前置条件。
 
 ## 13. 容量与观测
 

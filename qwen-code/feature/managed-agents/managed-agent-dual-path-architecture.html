@@ -951,6 +951,7 @@
           <a href="#migration">Legacy 迁移</a>
           <a href="#recovery">故障恢复</a>
           <a href="#security">安全隔离</a>
+          <a href="#tool-results">完整工具结果</a>
           <a href="#capacity">容量与观测</a>
           <a href="#agent-api">Agent API</a>
           <a href="#event-storage">事件与存储</a>
@@ -960,7 +961,7 @@
           <a href="#acceptance">验收标准</a>
         </nav>
         <div class="sidebar-note">
-          方案版本 v1.10 · 2026-09-21<br />
+          方案版本 v1.11 · 2026-09-21<br />
           核心决策：一个 Session 一个固定执行引擎；Managed Harness
           从第一轮起负责完整模型循环；公开事件先可靠提交，再向客户端推送。
         </div>
@@ -1013,9 +1014,9 @@
             </div>
           </div>
           <p class="lead">
-            v1.10 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
+            v1.11 保留 v1.2 的总体架构、v1.3 的首版取舍、v1.4
             的普通工具接线、v1.5 的统一 Session 身份、v1.6 的事件恢复边界和
-            v1.7 的扩展运行时、v1.8 的 SQL 物化切片，保留 v1.9 Workspace/cwd 契约，新增准入、分发、交互、迁移及容量门槛。Java 在创建前生成全局唯一 RFC UUID，
+            v1.7 的扩展运行时、v1.8 的 SQL 物化切片、v1.9 Workspace/cwd 和 v1.10 契约收敛，新增完整工具结果的持久交付与展示设计。Java 在创建前生成全局唯一 RFC UUID，
             公共 API、qwen Session Authority、Managed Harness、JSONL 和 Runtime Broker scope
             使用完全相同的 <code>sessionId</code>。不得再生成或持久化第二套 Harness Session ID。
             首版仍采用单 Java + qwen Sidecar、预发布静态 AgentBundle、Session 独占 Runtime，
@@ -2367,20 +2368,88 @@ cwdRelative = services/api
             <li>tenantId 已进入 Session/Turn/Event/Broker scope；授权、配额与防伪造仍须由产品接入层完成。</li>
             <li>不同租户禁止复用 RuntimeBinding 和 Workspace。</li>
           </ul>
-          <h3 style="margin-top: 28px">大输出与 Artifact</h3>
+          <h3 style="margin-top: 28px">公开结果描述（拟议）</h3>
           <pre>
 {
   "preview": "bounded preview",
-  "artifactRef": "oss://bucket/path/result.log",
+  "artifactId": "art_opaque_id",
+  "revision": 1,
   "sha256": "...",
-  "size": 18392013,
-  "truncated": true
+  "sizeBytes": 18392013,
+  "captureStatus": "complete",
+  "previewTruncated": true
 }</pre
           >
           <p class="lead">
-            SSE 只传有界预览和引用。Java不长期持有大输出，Runtime 在确认
-            Artifact 已持久接收前不能删除唯一副本。
+            SSE 只传有界预览和不透明引用，不暴露对象 key、Runtime 路径或长期签名 URL。
+            Runtime 在结果 bytes 与引用闭包被持久接收、取得 Session 回执前不能删除唯一副本。
           </p>
+        </section>
+
+        <section id="tool-results">
+          <div class="section-head">
+            <div>
+              <div class="section-index">12A / TOOL RESULTS · v1.11</div>
+              <h2>完整工具结果：保存、交付与按需展示</h2>
+            </div>
+          </div>
+          <p class="lead">
+            现有 Shell/调度器会将部分大输出落到本地文件，Managed Session 也已有带摘要校验的本地资源存储。
+            缺少的是远端持久交付与公开读取链路。下面是目标设计，未因 SQL Batch/Delivery 已落地而自动实现。
+          </p>
+          <div class="grid-3">
+            <article class="card accent-purple">
+              <h3>原始捕获结果</h3>
+              <p>Runtime 在裁剪前捕获输出；不可变分段、结构化结果和附件快照进入 OSS/持久存储，记录长度、摘要与完整性。</p>
+            </article>
+            <article class="card accent-green">
+              <h3>模型实际消费内容</h3>
+              <p>Harness 保存 Hook 与预算处理后实际进入模型的消息及引用。恢复使用这份历史，后续按需有界读取完整资源。</p>
+            </article>
+            <article class="card accent-blue">
+              <h3>用户展示内容</h3>
+              <p>Java SQL 保存获准预览、状态和 Artifact ID。WebShell 先显示工具卡，展开或下载时才经过鉴权读取内容。</p>
+            </article>
+          </div>
+          <figure class="tool-flow-diagram" aria-label="工具结果从 Runtime 捕获到持久确认、公开投影和按需读取的四阶段流程">
+            <div class="tool-flow-track">
+              <div class="tool-flow-stage">
+                <div><span class="tool-flow-index">01 / CAPTURE</span><h4>完整 bytes 先落稳</h4><span class="tool-flow-owner">Runtime · Resource Store</span></div>
+                <div class="tool-flow-steps"><span class="tool-flow-step execute">裁剪前捕获</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step">有界 spool / 分段上传</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step commit">校验 + 封存清单</span></div>
+              </div>
+              <div class="tool-flow-stage">
+                <div><span class="tool-flow-index">02 / ACCEPT</span><h4>原调用结果提交</h4><span class="tool-flow-owner">Session Authority · Harness</span></div>
+                <div class="tool-flow-steps"><span class="tool-flow-step commit">Pin 资源闭包</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step commit">tool receipt</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step commit">CommitReceipt ACK</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step">模型继续</span></div>
+              </div>
+              <div class="tool-flow-stage">
+                <div><span class="tool-flow-index">03 / PROJECT</span><h4>小事件驱动展示</h4><span class="tool-flow-owner">Java · WebShell</span></div>
+                <div class="tool-flow-steps"><span class="tool-flow-step">可重放源投影</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step commit">元数据 + Item/Event 同事务</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step">提交后 SSE 工具卡</span></div>
+              </div>
+              <div class="tool-flow-stage">
+                <div><span class="tool-flow-index">04 / READ</span><h4>需要时取完整内容</h4><span class="tool-flow-owner">WebShell → Java → Store</span></div>
+                <div class="tool-flow-steps"><span class="tool-flow-step">Artifact ID / revision</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step wait">租户与资源鉴权</span><span class="tool-flow-arrow">→</span><span class="tool-flow-step">Range / 流式下载</span></div>
+              </div>
+            </div>
+            <figcaption>文字链路：捕获 → 上传校验 → Session 引用与结果回执提交 → ACK；公开投影另行重放至 Java → SQL 提交后 SSE → 按需读取。ACK 丢失只查原执行，存储失败不重跑副作用。</figcaption>
+          </figure>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>必须分开的状态</th><th>含义</th><th>用户看到什么</th></tr></thead>
+              <tbody>
+                <tr><td>executionStatus</td><td>原工具成功、失败、取消或未知；上传失败不能改写物理结论。</td><td>执行结果与退出信息。</td></tr>
+                <tr><td>captureStatus</td><td>pending / complete / partial / unavailable，声明捕获范围与已知缺口。</td><td>完整、部分可用或输出不可用。</td></tr>
+                <tr><td>deliveryStatus</td><td>pending / committed / blocked；Session receipt 确认可靠接受。</td><td>输出保存中或恢复阻塞。</td></tr>
+                <tr><td>previewTruncated</td><td>只代表 UI 裁剪；8 KiB 预览仍可对应完整的 100 MiB 对象。</td><td>查看完整输出 / 下载。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout" style="margin-top: 18px">
+            <strong>完整性与保留：</strong>已有调度器 offload 路径可能因 50 MiB 文件上限、500 MiB Session 预算或写入故障而只留下预览，不能据此声称完整保存。
+            新路径需流式捕获并校验；仍被结果回执、模型历史、checkpoint、fork、公共事件或读取租约引用的 bytes 不随 24h 事件窗口删除。
+          </div>
+          <p>WebShell 复用工具卡，预览有界，展开后使用虚拟化与固定 revision 的范围分页。执行失败也能下载完整错误日志；执行成功但结果未保存时显示独立状态。公开 ID 不等于下载权限，原始结果与脱敏预览分别授权。</p>
+          <p>实施顺序：<strong>O1 本地捕获/引用契约 → O2 Hosted 存储与回执恢复 → O3 Java API/工具卡 → O4 引用清理与已开放扩展</strong>。验收包括 100 MiB 输出、上传/提交/ACK 故障、进程替换、取消/配额、跨租户读取与 pin/GC 竞争，无需先引入 RocketMQ。</p>
+          <p>完整调研、接口、容量候选值及验收：<a href="managed-agent-tool-result-artifacts.zh-CN.md">中文专项</a> · <a href="managed-agent-tool-result-artifacts.md">English</a>。其中 API 与表结构为提案，现有 OpenAPI v1.10 尚未包含本次新增结果描述契约。</p>
         </section>
 
         <section id="capacity">
@@ -3396,7 +3465,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
           <div class="section-head">
             <div>
               <div class="section-index">17 / CURRENT GAP</div>
-              <h2>现有基础与主要缺口（v1.10 设计对照）</h2>
+              <h2>现有基础与主要缺口（v1.11 设计对照）</h2>
             </div>
           </div>
           <div class="grid-2">
@@ -3418,6 +3487,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
                 <li>稳定 Item/Part 身份、V2 Item/Snapshot/消费进度表与 SQL scanner 物化。</li>
+                <li>独立分支 <code>feature/managed-agent-p2-delivery</code> 的 <code>72e215c1e5</code> 已实现 V4 SQL Batch/Delivery、generation fencing 和按 Session 连续物化，待与原 V3 顺序集成。</li>
                 <li>WebShell Snapshot 加控制事件与尾部恢复；公共 Item 列表返回 Snapshot 水位。</li>
               </ul>
             </article>
@@ -3430,10 +3500,10 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>
                 <li>按已冻结 OpenAPI 生成/校验 Java 与 TypeScript 类型，并补契约测试。</li>
                 <li>完整事件 schema/projection version、Snapshot reset 与固定版本历史分页。</li>
-                <li>继续落地已冻结 MySQL DDL 中的 SQL 批次日志/Outbox、EventTransport、跨实例唤醒和保留清理。</li>
+                <li>集成已实现的 SQL Batch/Delivery；继续落地 EventTransport、Outbox Relay、跨实例唤醒和保留清理。</li>
                 <li>生产身份到 tenant 的映射、资源授权、内部服务认证和跨租户隔离验收。</li>
                 <li>AgentBundle/Manifest 版本一致性。</li>
-                <li>Artifact Store 和 RuntimeTemplate。</li>
+                <li>按 O1～O4 接通完整工具结果捕获、持久资源、receipt ACK、Java 投影与 WebShell range/下载；RuntimeTemplate 仍待补齐。</li>
                 <li>Harness 私有 journal、资源闭包、共享 Session Authority 和可替换 Harness。</li>
                 <li>真实 MySQL 基础迁移/聚合已验证；双 JVM、真实 Harness/Runtime 的故障与容量验证仍待完成。</li>
                 <li>Legacy → Managed continuation。</li>
@@ -3457,7 +3527,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
         </section>
 
         <footer class="footer">
-          Managed Agent 双链路技术方案 · v1.10 · 2026-09-21 · 单文件展示<br />
+          Managed Agent 双链路技术方案 · v1.11 · 2026-09-21 · 单文件展示<br />
           核心原则：一个 Session 一个固定执行引擎；一个模型循环
           owner；工具副作用结果不确定时不自动重放。
         </footer>
