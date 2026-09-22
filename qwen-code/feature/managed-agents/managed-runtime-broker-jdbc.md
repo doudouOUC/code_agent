@@ -2,7 +2,7 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-Status: Implemented and verified at the repository boundary; upstream #12445 remains under review at `66d1aedb0e`
+Status: Implemented and verified at the repository boundary; upstream #12445 remains under review at `15d395bc40`
 
 > Upstream delivery status (2026-09-22): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. The PR is still open and does not add service wiring, physical dispatch, or automatic Runtime reconciliation.
 
@@ -28,7 +28,7 @@ The managed runtime broker foundation defines Runtime Binding, Runtime Session, 
 
 ## Dependency boundary
 
-The JDBC repositories use `javax.sql.DataSource` for database access and fastjson2 (2.0.60) as the JSON codec for the `reference_json`/`result_json` columns. They do not choose a connection pool, require Spring, manage database migrations through a framework, or bundle a production database driver. The test profile supplies H2 for the default repository contract and MySQL Connector/J for the optional MySQL integration test.
+The JDBC repositories use `javax.sql.DataSource` for database access and fastjson2 (2.0.60) as the JSON codec for the `reference_json`/`result_json` columns. Opaque Tool payloads disable fastjson2 reference detection so `$ref` and `@type` members remain data, and finite `BigDecimal` values are written without exponent notation so the reader cannot narrow or overflow them as doubles. They do not choose a connection pool, require Spring, manage database migrations through a framework, or bundle a production database driver. The test profile supplies H2 for the default repository contract and MySQL Connector/J for the optional MySQL integration test.
 
 ## Schema
 

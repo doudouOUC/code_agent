@@ -2,7 +2,7 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-状态：已在 Repository 边界实现并验证；upstream #12445 仍在评审，当前 head 为 `66d1aedb0e`
+状态：已在 Repository 边界实现并验证；upstream #12445 仍在评审，当前 head 为 `15d395bc40`
 
 > Upstream 交付状态（2026-09-22）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。该 PR 仍为 open，不包含 service 接线、真实物理 dispatch 或 Runtime 自动 reconcile。
 
@@ -28,7 +28,7 @@ Managed Runtime Broker 基础能力已经定义 Runtime Binding、Runtime Sessio
 
 ## 依赖边界
 
-JDBC Repository 使用 `javax.sql.DataSource` 访问数据库，并使用 fastjson2（2.0.60）作为 `reference_json`/`result_json` 列的 JSON 编解码。它们不选择连接池、不要求 Spring、不通过框架管理数据库迁移，也不捆绑生产数据库驱动。测试配置默认提供 H2 来运行 Repository 契约，并为可选的 MySQL 集成测试提供 MySQL Connector/J。
+JDBC Repository 使用 `javax.sql.DataSource` 访问数据库，并使用 fastjson2（2.0.60）作为 `reference_json`/`result_json` 列的 JSON 编解码。不透明 Tool 载荷会关闭 fastjson2 引用检测，使 `$ref` 与 `@type` 成员保持普通数据；有限 `BigDecimal` 不使用指数形式写出，避免读取时被收窄为 double 或溢出。它们不选择连接池、不要求 Spring、不通过框架管理数据库迁移，也不捆绑生产数据库驱动。测试配置默认提供 H2 来运行 Repository 契约，并为可选的 MySQL 集成测试提供 MySQL Connector/J。
 
 ## Schema
 
