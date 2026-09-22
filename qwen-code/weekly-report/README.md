@@ -4,9 +4,9 @@
 
 > 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
-**时间范围**: 2026-04-06 ~ 2026-09-21（持续更新）
-**总计**: 516 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37/W38/W39 见对应周目录（W39 当前个人增量 +3,762 / -13，35 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-09-22（持续更新）
+**总计**: 522 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37/W38/W39 见对应周目录（W39 当前个人增量 +11,038 / -125，88 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -38,11 +38,11 @@
 | 2026-08-31 ~ 2026-09-06 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-08-31_2026-09-06) · [Obsidian](2026-08-31_2026-09-06/README.md)) (W36 最终版) | 20 | 16/1/3 | +42,533/-1,627 | provider/SDK 错误详情、Channel worktree isolation/reset、Mem0 分发、standalone/WebShell、turn navigation 协议与客户端方案收敛、relaxed ownership/writer fences、close probe 抑制 |
 | 2026-09-07 ~ 2026-09-13 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-07_2026-09-13) · [Obsidian](2026-09-07_2026-09-13/README.md)) (W37 最终版) | 21 | 21/0/0 | +32,642/-1,392 | relaxed Conversations ownership runtime、WebShell 连续历史/turn rail/轮询/通知与点击导航、Mem0与Channel worktree、workspace容量扩展、Linux bwrap沙箱、ACP child heap哨兵修复、Shell输出预算单一决策 |
 | 2026-09-14 ~ 2026-09-20 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-14_2026-09-20) · [Obsidian](2026-09-14_2026-09-20/README.md)) (W38 最终版) | 20 | 11/8/1 | +163,385/-18,127 | ACP容量/恢复/堆执行、MCP App诊断、bwrap工具级拆分与Landlock、Managed Agent状态/Runtime恢复预览、系统提示词精简、HTTP UUID |
-| 2026-09-21 ~ 2026-09-27 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-21_2026-09-27) · [Obsidian](2026-09-21_2026-09-27/README.md)) (W39 周内累计) | 4 | 2/2/0 | +3,762/-13 | session debug日志保留、Runtime Broker JDBC/执行状态、Hosted Harness私有协议 |
+| 2026-09-21 ~ 2026-09-27 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-21_2026-09-27) · [Obsidian](2026-09-21_2026-09-27/README.md)) (W39 周内累计) | 10 | 7/2/1 | +11,038/-125 | session debug日志保留、Runtime Broker service/四表JDBC/fencing、Hosted Harness与attestation私有协议 |
 
 ## 类型分布
 
-feat ×252, fix ×186, refactor ×17, other ×14, docs ×15, chore ×7, perf ×17, test ×7, merge ×1
+feat ×256, fix ×188, refactor ×17, other ×14, docs ×15, chore ×7, perf ×17, test ×7, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

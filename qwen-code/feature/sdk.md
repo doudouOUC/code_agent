@@ -569,11 +569,14 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 最终增加只读stop options、exact confirmation和typed receipt/error；management方法固定走REST且不得自动重复POST。
 - lost response/partial outcome必须刷新matching receipt，只有`stopped && released`才允许caller自行决定是否继续；readback成功后也可能保留先前teardown warning。normalizer把已知close reason转换为可读文案，未知token降级为通用提示；该surface已进入发布SDK。
 
-### #12301 / #12390 / #12391 — Java Runtime Broker state（foundations merged）
+### #12301 / #12390 / #12391 / #12438 / #12445 — Java Runtime Broker state（foundations merged）
 
 - #12301 已合入独立 Java 21 `runtime-broker` 模块，定义 tenant/scope-aware Runtime Binding、Runtime Session、乐观版本、operation lease 与线程安全内存 Repository；它不含 Spring、HTTP 或真实 Runtime provision。
 - #12390 已合入 DataSource-only JDBC binding/session Repository 与三表 schema。scope slot 行锁、数据库时钟 lease、version/generation fencing 和 terminal Session 语义可跨 Repository 实例保持；Tool Execution、Spring/Flyway 接线及 Runtime reconcile 不在该 PR。
 - #12391 已合入 Tool Execution identity、dispatch claim、UNKNOWN no-replay 与 open cancellation path 的内存参考实现；没有 JDBC、真实 dispatch 或 public API，调用方不能把它视为已发布 SDK surface。
+- #12438 已合入无框架 `RuntimeBrokerService`，组合 resolver/provisioner/transport 与三类 Repository，编排 acquire/control/dispatch/cancel/release 和 claim renewal；持久 `READY` 缺少本进程 live lease 时失败关闭，不提供重启 reconcile。
+- #12445 已合入第四张 `qwen_tool_execution` 表和 DataSource-only JDBC Repository，持久化幂等身份、dispatch fencing、取消、`UNKNOWN` 与结果；#12458 是已关闭且由它取代的平行实现。
+- #12477/#12478 当前仍为 open，分别补 transport 前 owner/generation 最终复核和不受 JDBC session time zone 影响的数据库时钟；合入前不能视为发布能力。
 - 新模块只在 Java 21 matrix 编译/测试，现有 Java SDK 的 Java 11 release target 与 Java 11/17 兼容覆盖不变。
 
 ### #12353 — ACP child heap enforcement status（open draft）
@@ -581,4 +584,4 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - 当前 open draft 把 `ChildHeapMode` 扩为 `off|observe|admit|enforce`，并继续通过 daemon status SDK types 暴露 `limits.memory.enforced`；只有 count admission 与 managed child heap wiring 均生效时该字段才为 true。
 - 这是 additive status/type 观察，不提供远程切换 heap mode 的 SDK 方法；默认 `observe` 与旧 daemon 缺字段兼容边界不变。PR 未合入，调用方不能提前依赖 `enforce`。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-22_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-23_

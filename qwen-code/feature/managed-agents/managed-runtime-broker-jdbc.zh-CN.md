@@ -4,7 +4,7 @@
 
 状态：基础切片已由 upstream #12445 以 `d2e4cc74d5` 合入；接线门槛修复 #12477 与 #12478 正在评审
 
-> Upstream 交付状态（2026-09-22）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入。后续 #12477（`b29426173c`）阻止旧 Broker owner 在另一 generation 赢得 `EXECUTING` 转换后继续调用 transport；#12478（`ddb65ba448`）把数据库时钟读取为 epoch 秒加微秒，并在 H2 与真实 MySQL 上验证 UTC、+08:00、-04:00 三种 session offset。两个后续 PR 当前均为 open。这些 PR 都不包含 service 接线、真实 Runtime transport 或 Runtime 自动 reconcile。
+> Upstream 交付状态（2026-09-23）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入，#12458 作为相同范围的平行实现已关闭并由它取代。后续 #12477（当前 head `64a68f2279`，实现 commit `b29426173c`）阻止旧 Broker owner 在另一 generation 赢得 `EXECUTING` 转换后继续调用 transport；#12478（当前 head `ea6c0d9739`，实现 commit `ddb65ba448`）把数据库时钟读取为 epoch 秒加微秒，并在 H2 与真实 MySQL 上验证 UTC、+08:00、-04:00 三种 session offset。两个后续 PR 当前均为 open。这些 PR 都不包含 service 接线、真实 Runtime transport 或 Runtime 自动 reconcile。
 
 ## 问题
 
