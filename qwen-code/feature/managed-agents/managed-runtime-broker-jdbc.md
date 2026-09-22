@@ -4,7 +4,7 @@
 
 Status: Implemented and verified at the repository boundary; upstream #12445 remains under review at `15d395bc40`
 
-> Upstream delivery status (2026-09-22): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. The PR is still open and does not add service wiring, physical dispatch, or automatic Runtime reconciliation.
+> Upstream delivery status (2026-09-22): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. Round-3 verification marks the exact head merge-ready and one human collaborator has approved it; code CI is green. The PR remains open and GitHub still reports an earlier `CHANGES_REQUESTED` review plus a pending automatic review. It does not add service wiring, physical dispatch, or automatic Runtime reconciliation.
 
 ## Problem
 

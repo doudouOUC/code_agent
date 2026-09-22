@@ -4,7 +4,7 @@
 
 状态：已在 Repository 边界实现并验证；upstream #12445 仍在评审，当前 head 为 `15d395bc40`
 
-> Upstream 交付状态（2026-09-22）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。该 PR 仍为 open，不包含 service 接线、真实物理 dispatch 或 Runtime 自动 reconcile。
+> Upstream 交付状态（2026-09-22）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，且已有一名 human collaborator approve；代码 CI 已全绿。PR 仍为 open，GitHub 仍显示另一名评审者此前的 `CHANGES_REQUESTED` 和待完成的自动评审；它不包含 service 接线、真实物理 dispatch 或 Runtime 自动 reconcile。
 
 ## 问题
 

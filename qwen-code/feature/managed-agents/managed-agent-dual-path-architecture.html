@@ -1593,7 +1593,7 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
               <code>qwen_tool_execution</code> 表和 JDBC adapter。该 head 已通过 H2 共用合约
               与一次性 MySQL 26.7.0 的 <code>utf8mb4_0900_ai_ci</code> 契约，覆盖数据库时钟、
               行锁、generation/owner fencing、不透明 <code>$ref</code>/<code>@type</code> 与正指数 BigDecimal 往返，以及大小写敏感标识。#12445 尚未合入，
-              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile；接线前还需统一数据库租约与服务时钟，并在多 Broker dispatch 前补进入 <code>EXECUTING</code> 后的 owner/generation 复核。
+              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile；接线前还需统一数据库租约与服务时钟，并在多 Broker dispatch 前补进入 <code>EXECUTING</code> 后的 owner/generation 复核。第三轮验证已将该 head 标记为 merge-ready，一名 human collaborator 已 approve 且代码 CI 全绿；PR 仍受此前 <code>CHANGES_REQUESTED</code> 与待完成自动评审阻塞。
             </p>
           </div>
         </section>
