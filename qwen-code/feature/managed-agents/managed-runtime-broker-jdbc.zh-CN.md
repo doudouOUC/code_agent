@@ -2,9 +2,9 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-状态：源分支四表目标切片已验证；upstream `main` 已合入 binding/session JDBC 与 Tool Execution 内存状态子集
+状态：源分支四表目标切片已验证；upstream `main` 已合入 binding/session JDBC 与 Tool Execution 内存状态子集；Tool Execution JDBC 正在 #12445 评审
 
-> Upstream 状态（2026-09-22）：#12390 已把三表 JDBC binding/session 子集合入 `QwenLM/qwen-code` `main`，包括 `qwen_runtime_binding_slot`、`qwen_runtime_binding` 与 `qwen_runtime_session`，并提供 H2 合约测试和可选 MySQL profile；该 PR 不含 Tool Execution 持久化、Spring/Flyway 接线或 Runtime reconcile。#12391 已合入内存 Tool Execution 状态契约，但 JDBC adapter、真实 dispatch 与公共 API 仍属于后续工作。
+> Upstream 状态（2026-09-22）：#12390 已把三表 JDBC binding/session 子集合入 `QwenLM/qwen-code` `main`，包括 `qwen_runtime_binding_slot`、`qwen_runtime_binding` 与 `qwen_runtime_session`，并提供 H2 合约测试和可选 MySQL profile。#12391 已合入内存 Tool Execution 状态契约。#12445 现提交第四张 `qwen_tool_execution` 表与 DataSource-only JDBC adapter；H2/MySQL 共用合约覆盖数据库时钟租约、行锁、generation/owner fencing、原始 `EXECUTING` 过期转 `UNKNOWN`，以及过期 `DISPATCHING` 被 generation 2 接管。该 PR 仍为 open，不接 Spring/Flyway 或真实物理 dispatch，本次更新也没有运行一次性真实 MySQL 实例。
 >
 > 快照范围：正文保留 `c9c68760a2` 的更完整四表 Repository 切片，“当前状态”和“非目标”均针对该源分支提交。2026-09-21 的后续参考实现 [`34ea187c628c`](https://github.com/doudouOUC/qwen-code/blob/34ea187c628ce869cc2a2f6e7f3b967af12e276c/docs/design/2026-09-21-managed-runtime-endpoint-recovery.zh-CN.md) 已接 Spring JDBC/Flyway、加密 seed、reconcile/attest 与可恢复 provisioner，并记录真实 MySQL 双 JVM及 fake Kubernetes 验证；本次未复跑这些测试，真实集群仍待验证。它不包含独立 P2 分支的 SQL Batch/Delivery，也不完成 v1.11 的工具结果持久交付。
 
