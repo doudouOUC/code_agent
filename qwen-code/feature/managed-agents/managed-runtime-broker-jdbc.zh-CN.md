@@ -2,9 +2,9 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-状态：upstream #12445 已以 `d2e4cc74d5` 合入（评审 head `15d395bc40`）
+状态：基础切片已由 upstream #12445 以 `d2e4cc74d5` 合入；接线门槛修复 #12477 与 #12478 正在评审
 
-> Upstream 交付状态（2026-09-22）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入。它不包含 service 接线、真实物理 dispatch 或 Runtime 自动 reconcile。
+> Upstream 交付状态（2026-09-22）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入。后续 #12477（`b29426173c`）阻止旧 Broker owner 在另一 generation 赢得 `EXECUTING` 转换后继续调用 transport；#12478（`ddb65ba448`）把数据库时钟读取为 epoch 秒加微秒，并在 H2 与真实 MySQL 上验证 UTC、+08:00、-04:00 三种 session offset。两个后续 PR 当前均为 open。这些 PR 都不包含 service 接线、真实 Runtime transport 或 Runtime 自动 reconcile。
 
 ## 问题
 
@@ -43,11 +43,13 @@ Scope 身份使用确定性哈希表示，并始终与完整的租户级身份�
 
 ## 事务与并发语义
 
-创建 Binding 时会锁定 Scope slot，在事务内重新读取 Binding，并确保每个 Scope 只插入一个活动记录。Binding 更新同时使用已保存的 version 和 generation 作为 fencing 条件。操作租约使用数据库时钟，使竞争 JVM 不依赖彼此同步的本地时钟。
+创建 Binding 时会锁定 Scope slot，在事务内重新读取 Binding，并确保每个 Scope 只插入一个活动记录。Binding 更新同时使用已保存的 version 和 generation 作为 fencing 条件。操作租约使用数据库时钟，使竞争 JVM 不依赖彼此同步的本地时钟。#12478 在 SQL 查询中把该时钟转换为 Unix epoch 秒和微秒，使连接的 session time zone 无法相对服务时钟偏移租约 instant。
 
 创建 Session 时依赖数据库唯一约束，并在并发插入后重新读取胜出的记录。Session 的 CAS 更新会锁定当前行，校验预期 version 和 Binding generation，并拒绝把终态 Session 重新激活。SQL 失败会回滚事务并向调用方传播；不会静默回退到进程内状态。
 
 创建 Tool Execution 时使用唯一 SHA-256 key 保持数据库索引长度可控，同时保留并校验完整 idempotency key。变更操作会锁定 execution 行。CAS 更新和 `UNKNOWN` 对账校验调用方提供的不可变身份与 version；取消请求校验预期 version；dispatch claim 与续租校验各自适用的 owner、generation 和 lease fencing。租约判断使用数据库时钟。过期的 `DISPATCHING` claim 可以重新发放，因为物理执行尚未开始；过期的 `EXECUTING` 或 `CANCEL_REQUESTED` claim 会进入 `UNKNOWN`，在显式对账结果完成它之前不得再次 dispatch。
+
+Service 还必须在状态转换后对物理副作用执行 fencing。#12477 会在启动续租或调用 `transport.execute` 前，再次校验 `EXECUTING` 转换返回的记录仍具有已认领的 owner 和 generation；已丢失 claim 的旧 dispatcher 会直接退出，不调用 transport。
 
 ## Schema 生命周期
 
@@ -74,6 +76,8 @@ Repository 契约覆盖：
 - 终态 Session 不能重新激活；
 - 多 Repository 实例并发幂等创建 Tool Execution；
 - dispatch claim、续租、取消、过期 owner fencing 和 `UNKNOWN` 对账；
+- `EXECUTING` 转换与 transport 调用之间的确定性 owner 接管；
+- H2 与真实 MySQL 在 UTC、+08:00、-04:00 session time zone 下的数据库时钟转换；
 - 通过新 Repository 实例恢复最终结果；
 - Schema 可重复初始化。
 
@@ -90,10 +94,12 @@ Repository 契约覆盖：
 - 终态 Session 不能回到非终态。
 - 并发调用方对同一 idempotency key 只能观察到一个 Tool Execution。
 - 有效 dispatch 租约会拒绝其他 owner，过期的执行中 claim 会进入 `UNKNOWN` 而不会被重放。
+- dispatcher 在 transport 边界前丢失 owner/generation fencing 后不会调用 transport。
+- JDBC session time zone 不会改变数据库租约 instant 与服务时钟的对齐关系。
 - 取消意图和 Tool 最终结果在 Repository 重建后仍然存在。
 - Schema 初始化可安全重复执行。
 - H2 契约和可选的真实 MySQL 契约均无需进程内回退即可通过。
 
 ## 后续工作
 
-服务端装配前，Repository 租约时间戳与服务时钟必须使用不受 MySQL 会话 `time_zone` 影响的同一 instant 域，并同时覆盖 H2 与 MySQL。开放多 Broker dispatch 或 Runtime 接管前，服务必须在进入 `EXECUTING` 后、调用 `transport.execute` 前重新校验 dispatch owner 与 generation，并增加确定性的接管竞争回归。进程对账、权威 `UNKNOWN` 解决、Schema migration 部署和多进程端到端验证也仍属于后续工作。
+#12477 与 #12478 已实现服务端装配和多 Broker dispatch 前要求的两个正确性门槛，但在合入前仍是评审依赖。进程对账、权威 `UNKNOWN` 解决、Schema migration 部署、具体 service/transport 接线和多进程端到端验证仍属于后续工作。

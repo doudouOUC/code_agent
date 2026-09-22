@@ -2,9 +2,9 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-Status: Merged upstream by #12445 at `d2e4cc74d5` (review head `15d395bc40`)
+Status: Base merged upstream by #12445 at `d2e4cc74d5`; wiring-gate fixes are under review in #12477 and #12478
 
-> Upstream delivery status (2026-09-22): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. Round-3 verification marked the exact head merge-ready, two human collaborators approved it, and code CI was green. PR #12445 merged as `d2e4cc74d5`. It does not add service wiring, physical dispatch, or automatic Runtime reconciliation.
+> Upstream delivery status (2026-09-22): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. Round-3 verification marked the exact head merge-ready, two human collaborators approved it, and code CI was green. PR #12445 merged as `d2e4cc74d5`. Follow-up #12477 (`b29426173c`) prevents a stale Broker owner from calling the transport after another generation wins the transition to `EXECUTING`; #12478 (`ddb65ba448`) reads the database clock as epoch seconds plus microseconds and verifies UTC, +08:00, and -04:00 session offsets on H2 and real MySQL. Both follow-ups are open. None of these PRs adds service wiring, physical Runtime transport, or automatic Runtime reconciliation.
 
 ## Problem
 
@@ -43,11 +43,13 @@ Scope identity is represented by a deterministic hash and is always checked toge
 
 ## Transaction and concurrency semantics
 
-Binding creation locks the scope slot, re-reads the binding inside the transaction, and inserts exactly one active record for that scope. Binding updates use the stored version and generation as fences. Operation leases use the database clock so competing JVMs do not depend on synchronized local clocks.
+Binding creation locks the scope slot, re-reads the binding inside the transaction, and inserts exactly one active record for that scope. Binding updates use the stored version and generation as fences. Operation leases use the database clock so competing JVMs do not depend on synchronized local clocks. #12478 converts that clock to Unix epoch seconds and microseconds in the SQL query, so a connection's session time zone cannot shift lease instants relative to the service clock.
 
 Session creation relies on the database uniqueness constraint and re-reads the winning record after a concurrent insert. Session compare-and-set updates lock the current row, validate the expected version and binding generation, and reject any attempt to reactivate a terminal session. SQL failures roll back the transaction and propagate to the caller; there is no silent fallback to process-local state.
 
 Tool Execution creation uses a unique SHA-256 key for bounded database indexing while retaining and verifying the full idempotency key. Mutations lock the execution row. Compare-and-set and `UNKNOWN` reconciliation validate the supplied immutable identity and version; cancellation validates the expected version; dispatch claim and renewal validate the applicable owner, generation, and lease fences. Lease decisions use the database clock. An expired `DISPATCHING` claim can be reissued because physical execution has not started; an expired `EXECUTING` or `CANCEL_REQUESTED` claim becomes `UNKNOWN` and cannot be dispatched again until an explicit reconciliation result settles it.
+
+The service must also fence the physical side effect after its state transition. #12477 re-checks that the record returned from the `EXECUTING` transition still has the claimed owner and generation before starting renewal or calling `transport.execute`; losing the claim makes the stale dispatcher exit without invoking the transport.
 
 ## Schema lifecycle
 
@@ -74,6 +76,8 @@ The repository contract covers:
 - terminal sessions that cannot be reactivated;
 - concurrent idempotent Tool Execution creation across repository instances;
 - dispatch claim, renewal, cancellation, expired-owner fencing, and `UNKNOWN` reconciliation;
+- deterministic owner takeover between the `EXECUTING` transition and transport call;
+- database clock conversion under UTC, +08:00, and -04:00 session time zones on H2 and real MySQL;
 - settled result reconstruction through a new repository instance; and
 - repeatable schema initialization.
 
@@ -90,10 +94,12 @@ The default test suite runs the contract on H2 in MySQL compatibility mode. The 
 - Terminal sessions cannot return to a non-terminal state.
 - Concurrent callers observe one Tool Execution for an idempotency key.
 - A live dispatch lease rejects another owner, while an expired executing claim becomes `UNKNOWN` instead of being replayed.
+- A dispatcher that loses owner/generation fencing before the transport boundary does not invoke the transport.
+- Database lease instants remain aligned with the service clock regardless of the JDBC session time zone.
 - Cancellation intent and settled Tool results survive repository reconstruction.
 - Schema initialization is safe to repeat.
 - The H2 contract and the optional real-MySQL contract pass without process-local fallback.
 
 ## Follow-up work
 
-Before server wiring, repository lease timestamps and the service clock must use one instant domain independent of the MySQL session `time_zone`, with H2 and MySQL coverage. Before multi-broker dispatch or Runtime adoption, the service must re-check dispatch owner and generation after the transition to `EXECUTING` and before `transport.execute`, with a deterministic takeover regression. Process reconciliation, authoritative `UNKNOWN` resolution, schema migration deployment, and multi-process end-to-end validation also remain follow-up work.
+#12477 and #12478 implement the two correctness gates required before server wiring and multi-broker dispatch, but they remain review dependencies until merged. Process reconciliation, authoritative `UNKNOWN` resolution, schema migration deployment, concrete service/transport wiring, and multi-process end-to-end validation remain follow-up work.
