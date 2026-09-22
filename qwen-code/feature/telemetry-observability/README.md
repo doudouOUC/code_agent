@@ -48,7 +48,7 @@ epic **#3731** 的目标即「Harden OpenTelemetry」——把遥测从「事件
 - **GenAI / ARMS 字段对齐（#7536/#7635/#7650/#7667/#7921/#8150）**：新增 provider/operation/output type resolver 和 usage provenance，OpenAI/Anthropic/Gemini/Qwen 转换链保留 response model、finish reason、cache usage、provider tool-call id；#7635 继续捕获 provider-final request 参数字段，#7650 保证 OpenAI empty stream frame 不提前丢 usage，#7667 将 LLM input/output/system/tool content fields 转成标准 GenAI sensitive span attributes，#7921 增加 operator-supplied `gen_ai.user.id` 以支持 ARMS Session Analysis，#8150 在流式 span 上写标准 `gen_ai.response.time_to_first_chunk` 秒级属性并移除 span-level 私有 `ttft_ms` 双发。
 - **Tool-call outcome 口径（#8176/#8180）**：#8176 已合入统一 terminal normalization boundary，所有 tool-call event 在 UI telemetry、chat recording、QwenLogger、OTLP logs 与 metrics 前先归一化 `status`、兼容 `success` 和 error fields；#8180 已合入，继续把 terminal status 与 execution outcome 拆开，区分未进入 `invocation.execute()` 的 synthetic failure 和真正工具执行后的 success/failure/cancel。
 - **OpenAI API 本地日志保留（#8862/#8893）**：interactive 与 non-interactive best-effort housekeeping 现在按 `model.openAILogRetentionDays` 清理 `OpenAILogger` 写出的本地 request/response JSON 文件，默认 7 天，`0` 约等于 1 小时；只删除真实 writer 文件名，不触碰用户自有 `openai-*.json`，自定义目录要求 user/system 级单一策略。非交互进程退出时会 abort/drain 当前扫描，但不在写入路径同步删除。
-- **session debug 日志保留（#12374 open）**：当前 open diff 拟把 runtime `debug/` 下合法 session/pseudo-session `.txt` 纳入 interactive `general.cleanupPeriodDays` housekeeping，排除当前会话、`latest`、daemon 子目录与无关文件；尚未合入，也不覆盖 headless/ACP/serve 主动扫描。
+- **session debug 日志保留（#12374 merged）**：已把 runtime `debug/` 下合法 session/pseudo-session `.txt` 纳入 interactive `general.cleanupPeriodDays` housekeeping，排除当前会话、`latest`、daemon 子目录与无关文件；不覆盖 headless/ACP/serve 主动扫描。
 - **session continuation admission log（#8932）**：daemon 接受 continuation 后输出低敏 `continuation enqueued` 结构化日志，只含 `sessionId`、生成的 `promptId` 和可选 `clientId`，不记录 prompt 内容。
 - **tool-result boundary diagnostics（#9039 merged）**：仅在 file debug logging 启用时记录 tool-result 边界 size、process-local HMAC、mutation state 和 closed artifact summary，串起 ACP/Headless projection 与 writer frame；不写正文、prompt、raw id、tool name 或 artifact path。
 - **main agent invocation tracing（#9107 / #9121 merged）**：#9107 已合入，将 `qwen-code.interaction` 对齐 GenAI Agent `invoke_agent`，跨 tool approval/execution/continuation 保持打开，按 prompt owner 隔离，并在 sensitive opt-in 时只记录原始用户 prompt 与最终可见 assistant response；#9121 已合入继续修正 budget/swallowed abort、deferred TUI tool batch owner、structured-output owner 与 Goal/headless diagnostic message。
@@ -559,7 +559,7 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 | #8862 | OpenAI API 本地日志保留清理（merged） | `model.enableOpenAILogging` 产生的本地 JSON request/response 日志由 interactive housekeeping 按 `model.openAILogRetentionDays` 清理；默认 7 天，`0` 约等于 1 小时。 | Local logs |
 | #8893 | 非交互 OpenAI API 日志清理（merged） | headless CLI、stream-json 与 ACP lifecycle 启动同一 retention 队列，按 log dir 去重、FIFO 串行，退出时 best-effort abort/drain。 | Local logs |
 | #8932 | continuation admission 结构化日志（merged） | accepted continuation 写 `continuation enqueued`，只含 `sessionId`、`promptId` 和可选 `clientId`；failed/rejected 不误报 enqueued。 | Daemon logs |
-| #12374 | session debug log retention（open） | 当前 diff 按 resolved debug dir 独立节流，只扫描合法 session/pseudo-session 普通 `.txt` 并排除 active session；只由 interactive housekeeping 启动。 | Local logs |
+| #12374 | session debug log retention（merged） | 最终实现按 resolved debug dir 独立节流，只扫描合法 session/pseudo-session 普通 `.txt` 并排除 active session；只由 interactive housekeeping 启动。 | Local logs |
 
 #8862/#8893 不改变 OTel logs/traces export，也不改变 OpenAI-compatible 请求内容；它们只控制本地 flat-file 日志的磁盘和敏感数据保留期。清理器只匹配 `OpenAILogger` 当前 timestamp+id 文件名契约，用 UTC 文件名日期快速筛除大部分文件，cutoff 当天再用 mtime 判定。每个 log dir 有独立 marker，最多每天成功 sweep 一次；OpenAI marker 缺失或超过 7 天时，首次 housekeeping 使用 1 分钟 catch-up delay。
 
@@ -567,7 +567,7 @@ PR #6263 的观测面服务于 daemon/ACP child stdio 热路径：daemon 进程�
 
 #8893 在非交互 CLI、stream-json SDK 与 ACP lifecycle 上启动同一清理队列。队列按目录去重、串行扫描；退出时拒绝新任务、丢弃等待项、abort 当前 scan 并最多等待 250ms。这个边界是 best-effort retention，不是日志写入时同步清理。
 
-#12374 当前仍为 open。它复用 `general.cleanupPeriodDays` 而不是 OpenAI 专用 retention setting，并按 resolved runtime debug 目录生成 marker，避免不同 `QWEN_RUNTIME_DIR` 互相节流。清理器保留 debug 根目录，防止 logger 缓存目录存在性后因根目录被删除而丢失后续输出；headless、ACP 与 serve 主动调度仍属范围外。
+#12374 已合入。它复用 `general.cleanupPeriodDays` 而不是 OpenAI 专用 retention setting，并按 resolved runtime debug 目录生成 marker，避免不同 `QWEN_RUNTIME_DIR` 互相节流。清理器保留 debug 根目录，防止 logger 缓存目录存在性后因根目录被删除而丢失后续输出；headless、ACP 与 serve 主动调度仍属范围外。
 
 #8932 只补 daemon lifecycle log。accepted continuation 的日志可以和 prompt/cancel admission 对齐排查 controller identity；它不代表 continuation 最终完成，也不包含 prompt 内容。
 
