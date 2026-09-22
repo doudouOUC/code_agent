@@ -1588,10 +1588,12 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
             </p>
             <p>
               upstream 状态（2026-09-22）：#12390 已合入 Binding/Runtime Session
-              JDBC，#12391 已合入 Tool Execution 内存状态；open #12445 提交第四张
-              <code>qwen_tool_execution</code> 表和 JDBC adapter，并以 H2 共用合约验证
-              数据库时钟、行锁与 generation/owner fencing。#12445 尚未合入，不含
-              Spring/Flyway、真实物理 dispatch 或 Runtime reconcile，本轮也未运行一次性真实 MySQL。
+              JDBC，#12391 已合入 Tool Execution 内存状态，#12438 已合入 Broker service
+              core；open #12445 当前 head <code>66d1aedb0e</code> 提交第四张
+              <code>qwen_tool_execution</code> 表和 JDBC adapter。该 head 已通过 H2 共用合约
+              与一次性 MySQL 26.7.0 的 <code>utf8mb4_0900_ai_ci</code> 契约，覆盖数据库时钟、
+              行锁、generation/owner fencing、JSON 往返和大小写敏感标识。#12445 尚未合入，
+              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile。
             </p>
           </div>
         </section>
@@ -2436,7 +2438,7 @@ cwdRelative = services/api
             <a href="managed-runtime-attestation.md">English</a>。
           </p>
           <div class="callout info">
-            upstream #12447（open）已提交 <code>attest</code> method/path/limits/no-store 的单一 manifest、真实 raw HTTP TypeScript 拒绝矩阵和 Java 共用 fixture 消费。该切片尚未挂入 Hosted profile，也没有具体 Java HTTP transport、Broker reconcile/CAS ready gate、required 跨语言 CI 或进程 E2E，不能据此把 Runtime 标记为生产 ready。
+            upstream #12447 已合入 <code>attest</code> method/path/limits/no-store 的单一 manifest、真实 raw HTTP TypeScript 拒绝矩阵和 Java 共用 fixture 消费。该基础尚未挂入 Hosted profile，也没有具体 Java HTTP transport、Broker reconcile/CAS ready gate、required 跨语言 CI 或进程 E2E，不能据此把 Runtime 标记为生产 ready。
           </div>
         </section>
 
@@ -3452,9 +3454,9 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
               <p>
                 在现有 Java Control Plane 内实现
                 RuntimeBrokerService、RuntimeBinding、Execution Ledger 和
-                Java→Runtime HTTP/SSE；不新增独立部署服务。JDBC Repository
-                的 binding/session 子集已合入，Tool Execution JDBC 正在 #12445
-                独立评审；接入 Spring、真实 dispatch 与恢复调度仍需按本阶段验收。
+                Java→Runtime HTTP/SSE；不新增独立部署服务。Broker service core 与
+                JDBC Repository 的 binding/session 子集已合入，Tool Execution JDBC
+                正在 #12445 独立评审；接入 Spring、真实 dispatch 与恢复调度仍需按本阶段验收。
               </p>
             </article>
             <article class="phase">
@@ -3579,8 +3581,8 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Hosted Harness Java Client、提交/取消/Transcript/SSE 接线。</li>
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
                 <li>Runtime Binding/Session/Execution 的 JDBC Repository、四表 schema 与 H2/真实 MySQL 契约。</li>
-                <li>upstream open #12445 已提交 Tool Execution JDBC 第四表与 H2 共用合约；仍待合入、真实 MySQL 复验及 service/dispatch 接线。</li>
-                <li>upstream open #12447 已提交 <code>attest</code> route 单源、共享 schema/fixtures、真实 raw HTTP TypeScript 测试与 Java fixture consumer。</li>
+                <li>upstream open #12445 当前 head <code>66d1aedb0e</code> 已提交 Tool Execution JDBC 第四表，并通过 H2 与一次性真实 MySQL 共用合约；仍待合入及 service/dispatch 接线。</li>
+                <li>upstream #12447 已合入 <code>attest</code> route 单源、共享 schema/fixtures、真实 raw HTTP TypeScript 测试与 Java fixture consumer。</li>
                 <li>P3 预览分支当前 <code>e666150153</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter，并修复 <code>v2/attest</code> 外层路由 404 和 E2E 测试密钥注入。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
@@ -3593,7 +3595,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
               <h3>待补齐</h3>
               <ul>
                 <li>在真实集群验证已接线的 Broker 恢复：网络/RBAC、service-account 轮换、Pod 生命周期、条件清理与部署容量。</li>
-                <li>将 #12447 的 route/conformance 基础挂入真实 owned worker，并让具体 Java transport 消费共享 fixtures；再建立 required 跨语言 CI 与进程 E2E。</li>
+                <li>将已合入 #12447 的 route/conformance 基础挂入真实 owned worker，并让具体 Java transport 消费共享 fixtures；再建立 required 跨语言 CI 与进程 E2E。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>

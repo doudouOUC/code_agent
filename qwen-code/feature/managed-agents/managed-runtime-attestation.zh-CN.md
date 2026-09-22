@@ -2,7 +2,7 @@
 
 [English](managed-runtime-attestation.md) | [简体中文](managed-runtime-attestation.zh-CN.md)
 
-状态：v1.13 目标契约；更新于 2026-09-22。本文细化阶段 C/F 的 Runtime 恢复和 `attest` 门禁，并记录 #12358 分支 `e666150153` 的即时修复。upstream #12447 现提交可独立评审的 A1 route source 和 A2 的 schema/fixture 部分，但尚未挂入 Hosted profile，也没有完成 Java transport、Broker ready gate、required 跨语言 CI 或部署验收。
+状态：v1.13 目标契约；更新于 2026-09-22。本文细化阶段 C/F 的 Runtime 恢复和 `attest` 门禁，并记录 #12358 分支 `e666150153` 的即时修复。upstream #12447 已在 `c822995d3a` 合入可独立评审的 A1 route source 和 A2 的 schema/fixture 部分，但尚未挂入 Hosted profile，也没有完成 Java transport、Broker ready gate、required 跨语言 CI 或部署验收。
 
 ## 1. 问题与结论
 
@@ -22,7 +22,7 @@ Java Runtime Broker 持久化 endpoint 后，不能因为地址可连接或 `/he
 - Broker 再与持久 seed、lease 和 `RuntimeProvisionRequest.scope` 比较。只有仍持有同一个 operation generation 时，才以一次 CAS 更新 endpoint/handle、递增 `attestation_generation`、写 `last_reconciled_at` 并完成进程内 ready gate。
 - `34ea187c62` 的 route 已在 Express 注册，但 owned-worker 外层 HTTP 白名单遗漏 `attest`，因此真实请求在到达 Express 前返回 404。`e666150153` 已把该 method/path 加入白名单，并增加穿过真实外层 gate 的测试；同一提交也为 E2E 生成并注入临时 Broker 凭据加密密钥。
 
-预览分支的即时修复解决了已知 404 和 E2E 启动失败。upstream #12447 使用一个 typed manifest 取代重复的 `attest` method/path，通过真实 raw TypeScript HTTP gate 执行共享 fixtures，并让 Java Runtime Broker 测试读取同一 schema/fixtures。该 PR 仍为 open 且刻意未挂载；具体 Java transport、进程 E2E 和一个 required 跨语言 CI lane 仍是下一步 A2 工作。
+预览分支的即时修复解决了已知 404 和 E2E 启动失败。已合入的 upstream #12447 使用一个 typed manifest 取代重复的 `attest` method/path，通过真实 raw TypeScript HTTP gate 执行共享 fixtures，并让 Java Runtime Broker 测试读取同一 schema/fixtures。该基础仍刻意未挂载；具体 Java transport、进程 E2E 和一个 required 跨语言 CI lane 仍是下一步 A2 工作。
 
 ## 3. `attest` 精确证明什么
 
@@ -183,8 +183,8 @@ Stage A 增加具名交付物 `managed-runtime-attestation-conformance-v1`：
 | 切片 | 交付 | 出口 |
 | --- | --- | --- |
 | A0：即时修复 | 放行 v2/attest；E2E 注入临时加密 key；穿过 raw gate 的回归测试 | `e666150153` 已在预览分支完成，待 PR CI/评审与上游合入 |
-| A1：路由单源 | route manifest、精确 allowlist、16 KiB 限制、no-store | upstream #12447 已提交；注册/allowlist 分叉会使真实 raw HTTP 测试失败，但生产挂载仍待后续 |
-| A2：契约门禁 | 语言无关 fixtures/schema、TS/Java 消费、required CI | #12447 已提供共享文件、TypeScript 行为测试与 Java fixture consumer；具体 Java transport 和一个 required 跨语言 CI lane 仍未完成 |
+| A1：路由单源 | route manifest、精确 allowlist、16 KiB 限制、no-store | upstream #12447 已合入；注册/allowlist 分叉会使真实 raw HTTP 测试失败，但生产挂载仍待后续 |
+| A2：契约门禁 | 语言无关 fixtures/schema、TS/Java 消费、required CI | 已合入的 #12447 提供共享文件、TypeScript 行为测试与 Java fixture consumer；具体 Java transport 和一个 required 跨语言 CI lane 仍未完成 |
 | A3：状态与观测 | gate/CAS/迟到结果、错误映射、指标与安全日志 | 重启、claim 丢失、endpoint 变化和冲突均 fail closed |
 | A4：部署证明 | 真实 MySQL 双 JVM、真实 Kubernetes/目标平台、TLS/身份、密钥轮换 | 同资源唯一活跃 generation，无错接、无重复工具副作用 |
 

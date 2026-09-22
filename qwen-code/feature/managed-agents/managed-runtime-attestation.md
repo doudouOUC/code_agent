@@ -2,7 +2,7 @@
 
 [English](managed-runtime-attestation.md) | [简体中文](managed-runtime-attestation.zh-CN.md)
 
-Status: v1.13 target contract; updated 2026-09-22. This document refines the stage C/F Runtime recovery and `attest` gate and records the immediate fix on #12358 branch commit `e666150153`. Upstream #12447 now proposes the independently reviewable A1 route source and the schema/fixture portion of A2, but it is not mounted in a Hosted profile and does not complete the Java transport, Broker readiness gate, required cross-language CI, or deployment acceptance.
+Status: v1.13 target contract; updated 2026-09-22. This document refines the stage C/F Runtime recovery and `attest` gate and records the immediate fix on #12358 branch commit `e666150153`. Upstream #12447 has merged the independently reviewable A1 route source and the schema/fixture portion of A2 at `c822995d3a`, but it is not mounted in a Hosted profile and does not complete the Java transport, Broker readiness gate, required cross-language CI, or deployment acceptance.
 
 ## 1. Problem and Decision
 
@@ -22,7 +22,7 @@ At `feature/managed-agents-p0-p8@e666150153`:
 - Broker compares the response with the durable seed, lease, and `RuntimeProvisionRequest.scope`. Only while it still owns the same operation generation does one CAS update endpoint/handle, increment `attestation_generation`, write `last_reconciled_at`, and complete the in-process ready gate.
 - At `34ea187c62`, Express registered the route but the owned-worker outer HTTP allowlist omitted `attest`, so real requests returned 404 before Express. `e666150153` adds the method/path and a test through the real outer gate; the same commit generates and injects an ephemeral Broker credential-encryption key for E2E.
 
-The immediate preview fix resolves the known 404 and E2E startup failure. Upstream #12447 replaces the duplicated `attest` method/path with one typed manifest, runs shared fixtures through a real raw TypeScript HTTP gate, and makes the Java Runtime Broker tests consume the same schema/fixtures. The PR is still open and deliberately unmounted; a concrete Java transport, process E2E, and one required cross-language CI lane remain the next A2 work.
+The immediate preview fix resolves the known 404 and E2E startup failure. Merged upstream #12447 replaces the duplicated `attest` method/path with one typed manifest, runs shared fixtures through a real raw TypeScript HTTP gate, and makes the Java Runtime Broker tests consume the same schema/fixtures. The merged foundation remains deliberately unmounted; a concrete Java transport, process E2E, and one required cross-language CI lane remain the next A2 work.
 
 ## 3. Exact Meaning of Attestation
 
@@ -183,8 +183,8 @@ This gate proves interface behavior, not Kubernetes, network policy, key rotatio
 | Slice | Deliverable | Exit |
 | --- | --- | --- |
 | A0: immediate fix | Allow v2/attest, inject ephemeral E2E encryption key, regression through raw gate | Completed on preview branch `e666150153`; still requires PR CI/review and upstream merge |
-| A1: route source | Route manifest, exact allowlist, 16 KiB limit, no-store | Proposed in upstream #12447; registration/allowlist divergence fails real raw-HTTP tests, but production mounting remains follow-up work |
-| A2: contract gate | Language-neutral fixtures/schema, TS and Java consumers, required CI | #12447 provides the shared files, TypeScript behavior tests, and Java fixture consumer; a concrete Java transport and one required cross-language CI lane remain outstanding |
+| A1: route source | Route manifest, exact allowlist, 16 KiB limit, no-store | Merged in upstream #12447; registration/allowlist divergence fails real raw-HTTP tests, but production mounting remains follow-up work |
+| A2: contract gate | Language-neutral fixtures/schema, TS and Java consumers, required CI | Merged #12447 provides the shared files, TypeScript behavior tests, and Java fixture consumer; a concrete Java transport and one required cross-language CI lane remain outstanding |
 | A3: state and observation | Gate/CAS/late-result behavior, error mapping, metrics, safe logs | Restart, claim loss, endpoint changes, and conflicts fail closed |
 | A4: deployment proof | Real MySQL/two JVMs, real Kubernetes/target platform, TLS/identity, key rotation | One active generation per resource, no cross-binding connection, no repeated tool side effect |
 
