@@ -12,7 +12,7 @@
 >
 > **Workspace/cwd 设计补充（2026-09-21）：** [中文方案](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md) 区分稳定 Workspace、Session 相对 cwd 与 Runtime 挂载路径，补齐创建绑定、冷恢复、受控目录切换、后台任务归属及旧数据迁移。[OpenAPI](managed-agent-public-api.openapi.yaml) 与 [增量目标 DDL](managed-agent-workspace-schema.mysql.sql) 同步；W0/W1/W2 均为待实现设计，当前 Java 仍使用全局静态工作区配置。
 >
-> **Runtime Broker JDBC 补充（更新于 2026-09-22）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的四表目标切片。upstream #12390 已合入前三张表的 DataSource-only binding/session Repository，#12391 已合入 Tool Execution 内存状态契约，#12438 已合入无框架 Broker service core；#12445 当前 head `15d395bc40` 提交第四张 `qwen_tool_execution` 表及 JDBC adapter。该 head 已通过 JDK 21 下 63 个测试、H2 共用合约与一次性 MySQL 26.7.0 的 `utf8mb4_0900_ai_ci` 契约，覆盖数据库时钟、行锁、generation/owner fencing、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返，以及大小写敏感标识。#12445 尚未合入，不含 Spring/Flyway 接线、真实 Runtime dispatch 或 Runtime reconcile；正式接线前还需统一数据库租约与服务时钟，并在多 Broker dispatch 前补充进入 `EXECUTING` 后的 owner/generation 复核。第三轮验证已将该 head 标记为 merge-ready，一名 human collaborator 已 approve 且代码 CI 全绿；PR 仍受另一名评审者此前的 `CHANGES_REQUESTED` 与待完成自动评审阻塞。
+> **Runtime Broker JDBC 补充（更新于 2026-09-22）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的四表切片。upstream #12390 已合入前三张表的 DataSource-only binding/session Repository，#12391 已合入 Tool Execution 内存状态契约，#12438 已合入无框架 Broker service core；#12445 已以 `d2e4cc74d5` 合入第四张 `qwen_tool_execution` 表及 JDBC adapter（评审 head `15d395bc40`）。该实现通过 JDK 21 下 63 个测试、H2 共用合约与一次性 MySQL 26.7.0 的 `utf8mb4_0900_ai_ci` 契约，覆盖数据库时钟、行锁、generation/owner fencing、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返，以及大小写敏感标识。它不含 Spring/Flyway 接线、真实 Runtime dispatch 或 Runtime reconcile；正式接线前还需统一数据库租约与服务时钟，并在多 Broker dispatch 前补充进入 `EXECUTING` 后的 owner/generation 复核。
 
 > **Hosted Harness 私有协议基础（2026-09-22）：** #12409 已合入 `HostedHarnessContract` 与 Express middleware：protocol v1、进程级 boot UUID、canonical capability digest，以及稳定 426/400/409 generation fence。该 PR 没有创建 Hosted profile、挂载 route、广告 capability 或接入 Java client；bearer authentication 与部署 capability canonicalization 仍由后续集成完成。
 >
@@ -22,7 +22,7 @@
 
 > **W38 upstream PR 快照（更新于 2026-09-22）：** #12301 与 #12302 已合入上游，分别提供 Java Runtime 状态基础和 Managed Session v1 Transcript 基础。#12358 仍是 open draft architecture preview，当前 head `e666150153` 已修复私有 `v2/attest` 的 outer-route 404、增加穿过真实 gate 的回归测试，并为 E2E 注入临时 Broker 凭据加密密钥。该分支已有 reconcile/attest gate、同宿主进程接管与 Kubernetes adapter，但 route 仍是双清单，且跨 TS/Java conformance、真实集群、生产 MQ/Redis 和跨平台验收尚未完成；不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
 
-> **W39 upstream PR 快照（2026-09-22）：** #12390 已合入 JDBC Binding/Runtime Session 持久化，#12391 已合入 Tool Execution 内存状态契约，#12409 已合入 Hosted Harness 私有 contract foundation，#12438 已合入 Broker service core，#12447 已合入 attestation route/conformance foundation。#12445 的 Tool Execution JDBC 仍在独立评审；这些切片尚未形成具体 Runtime provider、Java HTTP transport、Hosted profile、reconcile/attest/CAS ready gate 或生产 Hosted Managed 链路。
+> **W39 upstream PR 快照（2026-09-22）：** #12390 已合入 JDBC Binding/Runtime Session 持久化，#12391 已合入 Tool Execution 内存状态契约，#12409 已合入 Hosted Harness 私有 contract foundation，#12438 已合入 Broker service core，#12445 已合入 Tool Execution JDBC，#12447 已合入 attestation route/conformance foundation；这些切片尚未形成具体 Runtime provider、Java HTTP transport、Hosted profile、reconcile/attest/CAS ready gate 或生产 Hosted Managed 链路。
 
 ## 当前方案入口
 

@@ -1589,11 +1589,11 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
             <p>
               upstream 状态（2026-09-22）：#12390 已合入 Binding/Runtime Session
               JDBC，#12391 已合入 Tool Execution 内存状态，#12438 已合入 Broker service
-              core；open #12445 当前 head <code>15d395bc40</code> 提交第四张
+              core；#12445 已以评审 head <code>15d395bc40</code> 提交并合入第四张
               <code>qwen_tool_execution</code> 表和 JDBC adapter。该 head 已通过 H2 共用合约
               与一次性 MySQL 26.7.0 的 <code>utf8mb4_0900_ai_ci</code> 契约，覆盖数据库时钟、
-              行锁、generation/owner fencing、不透明 <code>$ref</code>/<code>@type</code> 与正指数 BigDecimal 往返，以及大小写敏感标识。#12445 尚未合入，
-              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile；接线前还需统一数据库租约与服务时钟，并在多 Broker dispatch 前补进入 <code>EXECUTING</code> 后的 owner/generation 复核。第三轮验证已将该 head 标记为 merge-ready，一名 human collaborator 已 approve 且代码 CI 全绿；PR 仍受此前 <code>CHANGES_REQUESTED</code> 与待完成自动评审阻塞。
+              行锁、generation/owner fencing、不透明 <code>$ref</code>/<code>@type</code> 与正指数 BigDecimal 往返，以及大小写敏感标识。merge commit 为 <code>d2e4cc74d5</code>；
+              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile；接线前还需统一数据库租约与服务时钟，并在多 Broker dispatch 前补进入 <code>EXECUTING</code> 后的 owner/generation 复核。
             </p>
           </div>
         </section>
@@ -3456,7 +3456,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 RuntimeBrokerService、RuntimeBinding、Execution Ledger 和
                 Java→Runtime HTTP/SSE；不新增独立部署服务。Broker service core 与
                 JDBC Repository 的 binding/session 子集已合入，Tool Execution JDBC
-                正在 #12445 独立评审；接入 Spring、真实 dispatch 与恢复调度仍需按本阶段验收。
+                已由 #12445 合入；接入 Spring、真实 dispatch 与恢复调度仍需按本阶段验收。
               </p>
             </article>
             <article class="phase">
@@ -3581,7 +3581,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Hosted Harness Java Client、提交/取消/Transcript/SSE 接线。</li>
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
                 <li>Runtime Binding/Session/Execution 的 JDBC Repository、四表 schema 与 H2/真实 MySQL 契约。</li>
-                <li>upstream open #12445 当前 head <code>15d395bc40</code> 已提交 Tool Execution JDBC 第四表，并通过 H2 与一次性真实 MySQL 共用合约；仍待合入及 service/dispatch 接线。</li>
+                <li>upstream #12445 已以 <code>d2e4cc74d5</code> 合入 Tool Execution JDBC 第四表（评审 head <code>15d395bc40</code>），并通过 H2 与一次性真实 MySQL 共用合约；仍待 service/dispatch 接线。</li>
                 <li>upstream #12447 已合入 <code>attest</code> route 单源、共享 schema/fixtures、真实 raw HTTP TypeScript 测试与 Java fixture consumer。</li>
                 <li>P3 预览分支当前 <code>e666150153</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter，并修复 <code>v2/attest</code> 外层路由 404 和 E2E 测试密钥注入。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
