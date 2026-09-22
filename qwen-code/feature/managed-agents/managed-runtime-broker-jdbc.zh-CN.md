@@ -96,4 +96,4 @@ Repository 契约覆盖：
 
 ## 后续工作
 
-服务端装配、进程对账、权威 `UNKNOWN` 解决、Schema migration 部署和多进程端到端验证仍属于后续工作。
+服务端装配前，Repository 租约时间戳与服务时钟必须使用不受 MySQL 会话 `time_zone` 影响的同一 instant 域，并同时覆盖 H2 与 MySQL。开放多 Broker dispatch 或 Runtime 接管前，服务必须在进入 `EXECUTING` 后、调用 `transport.execute` 前重新校验 dispatch owner 与 generation，并增加确定性的接管竞争回归。进程对账、权威 `UNKNOWN` 解决、Schema migration 部署和多进程端到端验证也仍属于后续工作。

@@ -96,4 +96,4 @@ The default test suite runs the contract on H2 in MySQL compatibility mode. The 
 
 ## Follow-up work
 
-Server wiring, process reconciliation, authoritative `UNKNOWN` resolution, schema migration deployment, and multi-process end-to-end validation remain follow-up work.
+Before server wiring, repository lease timestamps and the service clock must use one instant domain independent of the MySQL session `time_zone`, with H2 and MySQL coverage. Before multi-broker dispatch or Runtime adoption, the service must re-check dispatch owner and generation after the transition to `EXECUTING` and before `transport.execute`, with a deterministic takeover regression. Process reconciliation, authoritative `UNKNOWN` resolution, schema migration deployment, and multi-process end-to-end validation also remain follow-up work.
