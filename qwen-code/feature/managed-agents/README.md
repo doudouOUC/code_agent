@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复预览分支真实 outer gate 的 404 和 E2E 密钥注入；upstream #12447 已合入 A1 的单一 route manifest 及 A2 的共享 fixtures/schema 基础；#12506 当前提交 attestation-only 独立 worker 外壳、loopback listener、stdin boot/stdout ready 协议和 TypeScript 子进程 E2E，尚在评审。Hosted profile、具体 Java client、Broker reconcile/CAS gate、required 跨语言 CI 与真实部署身份验收仍待后续。该私有协议不新增公共 OpenAPI 路由。
+> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复预览分支真实 outer gate 的 404 和 E2E 密钥注入；upstream #12447 已合入 A1 的单一 route manifest 及 A2 的共享 fixtures/schema 基础；#12506 当前提交 attestation-only 独立 worker 外壳、loopback listener、大小和时间均有界的 stdin boot/stdout ready 协议和 TypeScript 子进程 E2E，尚在评审。Hosted profile、具体 Java client、Broker reconcile/CAS gate、required 跨语言 CI 与真实部署身份验收仍待后续。该私有协议不新增公共 OpenAPI 路由。
 
 > **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)细化工作区选择器、可选子目录、创建前能力/默认查询、原键重试、持久绑定及 Broker/Worker 接线。OpenAPI v1.12 同步 planned 契约；W0a～W0e 尚待实现，Session 目录切换仍属 W2。
 

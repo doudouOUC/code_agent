@@ -2438,7 +2438,7 @@ cwdRelative = services/api
             <a href="managed-runtime-attestation.md">English</a>。
           </p>
           <div class="callout info">
-            upstream #12447 已合入 <code>attest</code> method/path/limits/no-store 的单一 manifest、真实 raw HTTP TypeScript 拒绝矩阵和 Java 共用 fixture 消费。#12506 当前以 <code>f8dd941cd9</code> 提交 attestation-only 独立 worker 外壳：隐藏启动路径从 32 KiB 上限的闭合 stdin boot 读取每代身份和凭据，只绑定 <code>127.0.0.1</code> 随机端口，只暴露 manifest route，并输出无 token ready record；TypeScript 子进程测试覆盖真实 HTTP attest 与优雅退出。该 PR 尚在评审，且 Hosted profile、具体 Java client、Broker reconcile/CAS ready gate、required 跨语言 CI 与跨语言进程 E2E 仍未完成，不能据此把 Runtime 标记为生产 ready。
+            upstream #12447 已合入 <code>attest</code> method/path/limits/no-store 的单一 manifest、真实 raw HTTP TypeScript 拒绝矩阵和 Java 共用 fixture 消费。#12506 当前以 <code>a92a8fed06</code> 提交 attestation-only 独立 worker 外壳：隐藏启动路径从 32 KiB 和 30 秒双重上限的闭合 stdin boot 读取每代身份和凭据，只绑定 <code>127.0.0.1</code> 随机端口，只暴露 manifest route，并输出无 token ready record；TypeScript 子进程测试覆盖真实 HTTP attest 与优雅退出。该 PR 尚在评审，且 Hosted profile、具体 Java client、Broker reconcile/CAS ready gate、required 跨语言 CI 与跨语言进程 E2E 仍未完成，不能据此把 Runtime 标记为生产 ready。
           </div>
         </section>
 

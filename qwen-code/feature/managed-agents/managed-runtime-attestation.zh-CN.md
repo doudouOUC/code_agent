@@ -2,7 +2,7 @@
 
 [English](managed-runtime-attestation.md) | [简体中文](managed-runtime-attestation.zh-CN.md)
 
-状态：v1.13 目标契约；更新于 2026-09-23。本文细化阶段 C/F 的 Runtime 恢复和 `attest` 门禁，并记录 #12358 分支 `e666150153` 的即时修复。upstream #12447 已在 `c822995d3a` 合入可独立评审的 A1 route source 和 A2 的 schema/fixture 部分；#12506 当前以 `f8dd941cd9` 提交仅提供身份证明的独立 worker 外壳。#12506 尚在评审，且 Hosted profile、Java client、Broker ready gate、required 跨语言 CI 与部署验收仍未完成。
+状态：v1.13 目标契约；更新于 2026-09-23。本文细化阶段 C/F 的 Runtime 恢复和 `attest` 门禁，并记录 #12358 分支 `e666150153` 的即时修复。upstream #12447 已在 `c822995d3a` 合入可独立评审的 A1 route source 和 A2 的 schema/fixture 部分；#12506 当前以 `a92a8fed06` 提交仅提供身份证明的独立 worker 外壳。#12506 尚在评审，且 Hosted profile、Java client、Broker ready gate、required 跨语言 CI 与部署验收仍未完成。
 
 ## 1. 问题与结论
 
@@ -22,7 +22,7 @@ Java Runtime Broker 持久化 endpoint 后，不能因为地址可连接或 `/he
 - Broker 再与持久 seed、lease 和 `RuntimeProvisionRequest.scope` 比较。只有仍持有同一个 operation generation 时，才以一次 CAS 更新 endpoint/handle、递增 `attestation_generation`、写 `last_reconciled_at` 并完成进程内 ready gate。
 - `34ea187c62` 的 route 已在 Express 注册，但 owned-worker 外层 HTTP 白名单遗漏 `attest`，因此真实请求在到达 Express 前返回 404。`e666150153` 已把该 method/path 加入白名单，并增加穿过真实外层 gate 的测试；同一提交也为 E2E 生成并注入临时 Broker 凭据加密密钥。
 
-预览分支的即时修复解决了已知 404 和 E2E 启动失败。已合入的 upstream #12447 使用一个 typed manifest 取代重复的 `attest` method/path，通过真实 raw TypeScript HTTP gate 执行共享 fixtures，并让 Java Runtime Broker 测试读取同一 schema/fixtures。评审中的 #12506 增加隐藏的 `qwen managed-runtime-worker` 启动路径：从 32 KiB 上限的闭合 stdin boot 文档取得每代身份与 bearer token，只绑定 `127.0.0.1` 随机端口，只暴露 manifest 中的 attest route，并在 stdout 发布不含 token 的 ready record；TypeScript 子进程测试覆盖 boot、真实 HTTP attest 与 `SIGTERM` 退出。具体 Java client、Broker reconcile/CAS gate、跨语言进程 E2E 和 required CI lane 仍是下一步 A2 工作。
+预览分支的即时修复解决了已知 404 和 E2E 启动失败。已合入的 upstream #12447 使用一个 typed manifest 取代重复的 `attest` method/path，通过真实 raw TypeScript HTTP gate 执行共享 fixtures，并让 Java Runtime Broker 测试读取同一 schema/fixtures。评审中的 #12506 增加隐藏的 `qwen managed-runtime-worker` 启动路径：从 32 KiB 和 30 秒双重上限的闭合 stdin boot 文档取得每代身份与 bearer token，只绑定 `127.0.0.1` 随机端口，只暴露 manifest 中的 attest route，并在 stdout 发布不含 token 的 ready record；TypeScript 子进程测试覆盖 boot、真实 HTTP attest 与 `SIGTERM` 退出。具体 Java client、Broker reconcile/CAS gate、跨语言进程 E2E 和 required CI lane 仍是下一步 A2 工作。
 
 ## 3. `attest` 精确证明什么
 
