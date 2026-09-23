@@ -2,9 +2,9 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-Status: Base merged upstream by #12445 at `d2e4cc74d5`; wiring-gate fixes are under review in #12477 and #12478
+Status: Base merged upstream by #12445; wiring-gate fixes #12477 and #12478 have also merged
 
-> Upstream delivery status (2026-09-23): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. Round-3 verification marked the exact head merge-ready, two human collaborators approved it, and code CI was green. PR #12445 merged as `d2e4cc74d5`; parallel PR #12458 was closed as superseded by it. Follow-up #12477 (current head `64a68f2279`, implementation commit `b29426173c`) prevents a stale Broker owner from calling the transport after another generation wins the transition to `EXECUTING`; #12478 (current head `ea6c0d9739`, implementation commit `ddb65ba448`) reads the database clock as epoch seconds plus microseconds and verifies UTC, +08:00, and -04:00 session offsets on H2 and real MySQL. Both follow-ups are open. None of these PRs adds service wiring, physical Runtime transport, or automatic Runtime reconciliation.
+> Upstream delivery status (2026-09-24): #12390 merged the JDBC Runtime Binding/Session repositories, #12391 merged the in-memory Tool Execution contract, and #12438 merged the framework-neutral Broker service core. #12445 adds the fourth `qwen_tool_execution` table and its DataSource-only repository. Its exact review head passed 63 JDK 21 tests, Checkstyle, the shared H2 contract, and the same contract on a disposable MySQL 26.7.0 database using `utf8mb4_0900_ai_ci`; identifiers that differ only by case remain independent. Round-3 verification marked the exact head merge-ready, two human collaborators approved it, and code CI was green. PR #12445 merged as `d2e4cc74d5`; parallel PR #12458 was closed as superseded by it. Follow-up #12477 merged the final owner/generation fence before transport dispatch; #12478 merged timezone-independent, second-truncated database clock reads and a MariaDB CI lane. These PRs do not add full service wiring, Tool Runtime transport, or durable Runtime reconciliation.
 
 ## Problem
 
@@ -102,4 +102,4 @@ The default test suite runs the contract on H2 in MySQL compatibility mode. The 
 
 ## Follow-up work
 
-#12477 and #12478 implement the two correctness gates required before server wiring and multi-broker dispatch, but they remain review dependencies until merged. Process reconciliation, authoritative `UNKNOWN` resolution, schema migration deployment, concrete service/transport wiring, and multi-process end-to-end validation remain follow-up work.
+#12477 and #12478 have merged the two correctness fixes required before server wiring and multi-broker dispatch. Process reconciliation, authoritative `UNKNOWN` resolution, schema migration deployment, concrete service/transport wiring, and multi-process end-to-end validation remain follow-up work.

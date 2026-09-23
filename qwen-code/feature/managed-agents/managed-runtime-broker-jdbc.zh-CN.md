@@ -2,9 +2,9 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-状态：基础切片已由 upstream #12445 以 `d2e4cc74d5` 合入；接线门槛修复 #12477 与 #12478 正在评审
+状态：基础切片已由 upstream #12445 合入；接线门槛修复 #12477 与 #12478 也已合入
 
-> Upstream 交付状态（2026-09-23）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入，#12458 作为相同范围的平行实现已关闭并由它取代。后续 #12477（当前 head `64a68f2279`，实现 commit `b29426173c`）阻止旧 Broker owner 在另一 generation 赢得 `EXECUTING` 转换后继续调用 transport；#12478（当前 head `ea6c0d9739`，实现 commit `ddb65ba448`）把数据库时钟读取为 epoch 秒加微秒，并在 H2 与真实 MySQL 上验证 UTC、+08:00、-04:00 三种 session offset。两个后续 PR 当前均为 open。这些 PR 都不包含 service 接线、真实 Runtime transport 或 Runtime 自动 reconcile。
+> Upstream 交付状态（2026-09-24）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入，#12458 作为相同范围的平行实现已关闭并由它取代。后续 #12477 已合入，阻止旧 Broker owner 在另一 generation 赢得 `EXECUTING` 转换后继续调用 transport；#12478 已合入，把数据库时钟读取为 epoch 秒加微秒、截断到存储安全的秒精度，并增加 MariaDB CI lane 验证三种 session offset。这些 PR 都不包含完整 service 接线、Tool Runtime transport 或持久 Runtime 自动 reconcile。
 
 ## 问题
 
@@ -49,7 +49,7 @@ Scope 身份使用确定性哈希表示，并始终与完整的租户级身份�
 
 创建 Tool Execution 时使用唯一 SHA-256 key 保持数据库索引长度可控，同时保留并校验完整 idempotency key。变更操作会锁定 execution 行。CAS 更新和 `UNKNOWN` 对账校验调用方提供的不可变身份与 version；取消请求校验预期 version；dispatch claim 与续租校验各自适用的 owner、generation 和 lease fencing。租约判断使用数据库时钟。过期的 `DISPATCHING` claim 可以重新发放，因为物理执行尚未开始；过期的 `EXECUTING` 或 `CANCEL_REQUESTED` claim 会进入 `UNKNOWN`，在显式对账结果完成它之前不得再次 dispatch。
 
-Service 还必须在状态转换后对物理副作用执行 fencing。#12477 会在启动续租或调用 `transport.execute` 前，再次校验 `EXECUTING` 转换返回的记录仍具有已认领的 owner 和 generation；已丢失 claim 的旧 dispatcher 会直接退出，不调用 transport。
+Service 还必须在状态转换后对物理副作用执行 fencing。#12477 已在启动续租或调用 `transport.execute` 前，再次校验 `EXECUTING` 转换返回的记录仍具有已认领的 owner 和 generation；已丢失 claim 的旧 dispatcher 会直接退出，不调用 transport。
 
 ## Schema 生命周期
 
@@ -102,4 +102,4 @@ Repository 契约覆盖：
 
 ## 后续工作
 
-#12477 与 #12478 已实现服务端装配和多 Broker dispatch 前要求的两个正确性门槛，但在合入前仍是评审依赖。进程对账、权威 `UNKNOWN` 解决、Schema migration 部署、具体 service/transport 接线和多进程端到端验证仍属于后续工作。
+#12477 与 #12478 已合入服务端装配和多 Broker dispatch 前要求的两个正确性修复。进程对账、权威 `UNKNOWN` 解决、Schema migration 部署、具体 service/transport 接线和多进程端到端验证仍属于后续工作。

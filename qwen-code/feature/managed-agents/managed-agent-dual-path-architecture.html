@@ -1593,7 +1593,7 @@ ACK 丢失：原 ID 查询；started 失联：原执行对账或 recovery_blocke
               <code>qwen_tool_execution</code> 表和 JDBC adapter。该 head 已通过 H2 共用合约
               与一次性 MySQL 26.7.0 的 <code>utf8mb4_0900_ai_ci</code> 契约，覆盖数据库时钟、
               行锁、generation/owner fencing、不透明 <code>$ref</code>/<code>@type</code> 与正指数 BigDecimal 往返，以及大小写敏感标识。merge commit 为 <code>d2e4cc74d5</code>；
-              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile。接线前的两个正确性门槛已分别提交 #12477（当前 head <code>64a68f2279</code>，实现 commit <code>b29426173c</code>，进入 <code>EXECUTING</code> 后、调用 transport 前复核 owner/generation）和 #12478（当前 head <code>ea6c0d9739</code>，实现 commit <code>ddb65ba448</code>，数据库时钟转换为不受 session <code>time_zone</code> 影响的 epoch instant，并在 H2/真实 MySQL 三种 offset 下验证）；两者当前均为 open。
+              不含 Spring/Flyway、真实物理 dispatch 或 Runtime reconcile。接线前的正确性修复 #12477（dispatch owner/generation 最终 fence）和 #12478（时区无关、秒级存储安全的数据库时钟与 MariaDB CI lane）均已合入。
             </p>
           </div>
         </section>
@@ -3456,7 +3456,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 RuntimeBrokerService、RuntimeBinding、Execution Ledger 和
                 Java→Runtime HTTP/SSE；不新增独立部署服务。Broker service core 与
                 JDBC Repository 的 binding/session 子集已合入，Tool Execution JDBC
-                已由 #12445 合入；#12477 与 #12478 已分别提交 dispatch 最终 fencing 和数据库时钟修复，当前仍在评审。接入 Spring、真实 dispatch 与恢复调度仍需按本阶段验收。
+                已由 #12445 合入；#12477 与 #12478 已分别合入 dispatch 最终 fencing 和数据库时钟修复。接入 Spring、真实 dispatch 与恢复调度仍需按本阶段验收。
               </p>
             </article>
             <article class="phase">
@@ -3582,8 +3582,9 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>Java 内嵌 Runtime Broker、HTTP 适配器与本地进程 Provisioner。</li>
                 <li>Runtime Binding/Session/Execution 的 JDBC Repository、四表 schema 与 H2/真实 MySQL 契约。</li>
                 <li>upstream #12445 已以 <code>d2e4cc74d5</code> 合入 Tool Execution JDBC 第四表（评审 head <code>15d395bc40</code>），并通过 H2 与一次性真实 MySQL 共用合约；仍待 service/dispatch 接线。</li>
-                <li>upstream #12477（当前 head <code>64a68f2279</code>，实现 commit <code>b29426173c</code>）已提交旧 dispatch owner 的 transport 边界 fencing；#12478（当前 head <code>ea6c0d9739</code>，实现 commit <code>ddb65ba448</code>）已提交 JDBC 数据库时钟 epoch 转换，并通过 H2 与真实 MySQL 的 UTC、+08:00、-04:00 session offset 验证。两者当前均为 open。</li>
+                <li>upstream #12477 已合入旧 dispatch owner 的 transport 边界 fencing；#12478 已合入 JDBC epoch 时钟与秒级存储精度修复，并增加 MariaDB CI lane。</li>
                 <li>upstream #12447 已合入 <code>attest</code> route 单源、共享 schema/fixtures、真实 raw HTTP TypeScript 测试与 Java fixture consumer。</li>
+                <li>upstream #12506 已合入独立 loopback attestation worker，#12522 已合入 Java HTTP attestation client；#12552 本地进程采用仍为 open diff，完整 Tool Runtime 未落地。</li>
                 <li>P3 预览分支当前 <code>e666150153</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter，并修复 <code>v2/attest</code> 外层路由 404 和 E2E 测试密钥注入。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
@@ -3596,7 +3597,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
               <h3>待补齐</h3>
               <ul>
                 <li>在真实集群验证已接线的 Broker 恢复：网络/RBAC、service-account 轮换、Pod 生命周期、条件清理与部署容量。</li>
-                <li>将已合入 #12447 的 route/conformance 基础挂入真实 owned worker，并让具体 Java transport 消费共享 fixtures；再建立 required 跨语言 CI 与进程 E2E。</li>
+                <li>在已合入 #12506 worker 与 #12522 Java client 基础上，完成 #12552 open 进程采用方案的审查，并建立 required 跨语言 CI、真实进程 E2E 与完整 Tool Runtime 路由。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>

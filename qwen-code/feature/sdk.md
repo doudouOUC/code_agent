@@ -576,7 +576,7 @@ Python SDK 上架 PyPI 由一组协作的脚本与 workflow 支撑，核心目�
 - #12391 已合入 Tool Execution identity、dispatch claim、UNKNOWN no-replay 与 open cancellation path 的内存参考实现；没有 JDBC、真实 dispatch 或 public API，调用方不能把它视为已发布 SDK surface。
 - #12438 已合入无框架 `RuntimeBrokerService`，组合 resolver/provisioner/transport 与三类 Repository，编排 acquire/control/dispatch/cancel/release 和 claim renewal；持久 `READY` 缺少本进程 live lease 时失败关闭，不提供重启 reconcile。
 - #12445 已合入第四张 `qwen_tool_execution` 表和 DataSource-only JDBC Repository，持久化幂等身份、dispatch fencing、取消、`UNKNOWN` 与结果；#12458 是已关闭且由它取代的平行实现。
-- #12477/#12478 当前仍为 open，分别补 transport 前 owner/generation 最终复核和不受 JDBC session time zone 影响的数据库时钟；合入前不能视为发布能力。
+- #12477/#12478 已合入，分别补 transport 前 owner/generation 最终复核和不受 JDBC session time zone 影响、秒级存储安全的数据库时钟；#12522 已合入 Java HTTP attestation client。#12552 本地进程采用仍是 open diff，不代表生产 Tool Runtime 已交付。
 - 新模块只在 Java 21 matrix 编译/测试，现有 Java SDK 的 Java 11 release target 与 Java 11/17 兼容覆盖不变。
 
 ### #12353 — ACP child heap enforcement status（open draft）

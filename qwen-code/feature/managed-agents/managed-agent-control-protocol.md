@@ -2,7 +2,7 @@
 
 > **Upstream contract foundation（2026-09-22）：** #12409 已在 `main` 合入独立 `hosted-harness-contract.ts`：固定 protocol v1、每进程非持久 boot UUID、canonical `sha256:` capability digest 与 Express 426/400/409 fence。当前没有 Hosted Harness profile、`/capabilities` 广告、鉴权后 route 挂载或 Java client 接线；因此这只是 generation/version contract foundation，不表示下文完整私有协议已经部署。
 
-> **Managed Runtime v2 attestation foundation（2026-09-23）：** #12447 已在 `main` 合入 `POST /internal/managed-runtime/v2/attest` 的单一 typed route manifest、16 KiB/no-store/先鉴权后解析边界，以及 TS/Java 共用 schema/fixtures。该 route 仍未挂入 Hosted profile，Java 侧也只有 fixture consumer，没有真实 HTTP transport 或 reconcile/CAS ready gate；不能把契约测试等同于生产链路已部署。
+> **Managed Runtime v2 attestation foundation（2026-09-23）：** #12447 已在 `main` 合入 `POST /internal/managed-runtime/v2/attest` 的单一 typed route manifest、16 KiB/no-store/先鉴权后解析边界，以及 TS/Java 共用 schema/fixtures。后续 #12506 已合入独立 attestation worker，#12522 已合入 Java HTTP client；#12552 进程采用仍为 open diff。完整 Hosted Tool Runtime 与持久 reconcile/CAS ready gate 尚未交付，不能把这些切片等同于生产链路已部署。
 
 > **v1.10 Workspace 接线：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节冻结 `managed-context/1` 外层 `ContextBinding`，映射 ActivationGrant、InvocationBinding、config_install、两端安装回执及 journal/checkpoint/RestoreBundle。复用既有 `config.bound/domain.committed`，不修改严格 Tool v2 内层或增加另一份配置权威；未协商或 revision/digest/generation 不匹配时不开 gate。
 
