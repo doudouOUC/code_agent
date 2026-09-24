@@ -2,7 +2,7 @@
 
 [English](managed-runtime-attestation.md) | [简体中文](managed-runtime-attestation.zh-CN.md)
 
-Status: v1.13 target contract; updated 2026-09-24. This document refines the stage C/F Runtime recovery and `attest` gate and records the immediate fix on #12358 branch commit `e666150153`. Upstream #12447 merged the A1 route and A2 schema/fixtures, #12506 merged a loopback attestation worker, and #12522 merged the Java HTTP client. #12552 process adoption and warm confirmation remain an open diff. Full Hosted Tool Runtime, durable READY reconcile/CAS, required cross-language CI, and deployment acceptance remain outstanding.
+Status: v1.13 target contract; updated 2026-09-25. This document refines the stage C/F Runtime recovery and `attest` gate and records the immediate fix on #12358 branch commit `e666150153`. Upstream #12447/#12506/#12522/#12552/#12627 merged the route, worker, Java client, local process adoption, and durable READY reconcile/CAS foundation. Full Hosted Tool Runtime, a production durable provisioner, required cross-language CI, and deployment acceptance remain outstanding.
 
 ## 1. Problem and Decision
 
@@ -22,7 +22,7 @@ At `feature/managed-agents-p0-p8@e666150153`:
 - Broker compares the response with the durable seed, lease, and `RuntimeProvisionRequest.scope`. Only while it still owns the same operation generation does one CAS update endpoint/handle, increment `attestation_generation`, write `last_reconciled_at`, and complete the in-process ready gate.
 - At `34ea187c62`, Express registered the route but the owned-worker outer HTTP allowlist omitted `attest`, so real requests returned 404 before Express. `e666150153` adds the method/path and a test through the real outer gate; the same commit generates and injects an ephemeral Broker credential-encryption key for E2E.
 
-The immediate preview fix resolves the known 404 and E2E startup failure. Merged upstream #12447 replaces the duplicated `attest` method/path with one typed manifest, runs shared fixtures through a real raw TypeScript HTTP gate, and makes the Java Runtime Broker tests consume the same schema/fixtures. The worker and Java attestation client have since merged in #12506 and #12522. #12552 is an open attempt at local process adoption; real-worker end-to-end adoption and a required cross-language CI lane remain outstanding.
+The immediate preview fix resolves the known 404 and E2E startup failure. Merged upstream #12447 replaces the duplicated `attest` method/path with one typed manifest, runs shared fixtures through a real raw TypeScript HTTP gate, and makes the Java Runtime Broker tests consume the same schema/fixtures. The worker, Java attestation client, local process adoption, and durable seed/handle observe→attest→CAS foundation have since merged in #12506/#12522/#12552/#12627. The local provisioner remains `legacy`; a real durable provisioner, full worker execution, and required cross-language CI remain outstanding.
 
 ## 3. Exact Meaning of Attestation
 

@@ -4,7 +4,7 @@
 
 状态：基础切片已由 upstream #12445 合入；接线门槛修复 #12477 与 #12478 也已合入
 
-> Upstream 交付状态（2026-09-24）：#12390 已合入 Runtime Binding/Session JDBC Repository，#12391 已合入 Tool Execution 内存契约，#12438 已合入无框架 Broker service core。#12445 新增第四张 `qwen_tool_execution` 表及 DataSource-only Repository；该 PR 的精确评审 head 已通过 JDK 21 下 63 个测试、Checkstyle、H2 共用契约，以及使用 `utf8mb4_0900_ai_ci` 的一次性 MySQL 26.7.0 同契约验证，仅大小写不同的标识仍保持独立。第三轮验证把该精确 head 标记为 merge-ready，两名 human collaborator 已 approve，代码 CI 全绿；PR #12445 已以 `d2e4cc74d5` 合入，#12458 作为相同范围的平行实现已关闭并由它取代。后续 #12477 已合入，阻止旧 Broker owner 在另一 generation 赢得 `EXECUTING` 转换后继续调用 transport；#12478 已合入，把数据库时钟读取为 epoch 秒加微秒、截断到存储安全的秒精度，并增加 MariaDB CI lane 验证三种 session offset。这些 PR 都不包含完整 service 接线、Tool Runtime transport 或持久 Runtime 自动 reconcile。
+> Upstream 交付状态（2026-09-25）：#12390/#12391/#12438/#12445 已合入 Binding/Session JDBC、Tool Execution 状态、Broker core 与第四表 JDBC；#12458 是关闭的平行实现。#12445 的精确评审 head 曾通过 JDK 21 下 63 个测试、Checkstyle、H2 共用合约及一次性 MySQL 26.7.0 `utf8mb4_0900_ai_ci` 验证，覆盖大小写敏感标识、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返。#12477/#12478 已合入 dispatch owner 最终 fence、时区无关且秒级存储安全的数据库时钟读取，并有 MariaDB CI lane；#12552 已合入本地进程采用。#12627 已为持久 binding 合入加密 seed、resource handle、attestation generation、LOST/RECOVERY_BLOCKED 与 observe→attest→CAS 恢复基础。主干 local-process provisioner 仍为 `legacy`，缺生产 durable provisioner、完整 Tool Runtime transport、Spring/Flyway 接线与多进程端到端验证。
 
 ## 问题
 

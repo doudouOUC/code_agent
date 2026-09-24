@@ -2,13 +2,13 @@
 
 > 本文件已整理 2026-09-21 至 2026-09-27（Asia/Shanghai）创建的 @doudouOUC 个人 PR。口径为 `QwenLM/qwen-code` 中 author 为 @doudouOUC 且 createdAt 落在对应北京时间日/周窗口内的 PR；只在窗口内更新、关闭或合入，但创建时间不在窗口内的 PR 不计入新增统计。open PR 只记录当前 diff 方案，不能视为 `main` 已落地能力。
 
-**主题**: session debug 日志保留、review 信任状态迁移、Managed Runtime Broker/JDBC/attestation、系统提示词去重
+**主题**: session debug 日志保留、review 信任状态迁移、Managed Runtime Broker/JDBC/attestation/恢复与工具协议、Hosted Harness Java client、系统提示词去重
 
-**PR 统计**: 16 PRs - 12 merged / 2 open / 2 closed
-**当前已合并 PR 代码量**: +12,048 / -342，108 个文件变更
-**全量代码量**: +17,726 / -4,373，136 个文件变更
-**类型分布**: feat ×10, fix ×6
-**范围 (scope)**: managed-agent ×12, java ×9, cli ×4, serve ×2, sdk-java ×2, review ×1, core ×1, vscode ×1
+**PR 统计**: 20 PRs - 18 merged / 0 open / 2 closed
+**当前已合并 PR 代码量**: +24,122 / -846，205 个文件变更
+**全量代码量**: +29,058 / -4,661，220 个文件变更
+**类型分布**: feat ×14, fix ×6
+**范围 (scope)**: managed-agent ×16, java ×12, cli ×5, serve ×2, sdk-java ×5, review ×1, core ×1, vscode ×1
 
 ---
 
@@ -30,8 +30,12 @@
 | [#12491](https://github.com/QwenLM/qwen-code/pull/12491) | ✅ merged | @doudouOUC | fix(review): Move trusted state outside workspaces | +547/-214 | 17 | 09-22 18:20 | 09-23 00:26 |
 | [#12506](https://github.com/QwenLM/qwen-code/pull/12506) | ✅ merged | @doudouOUC | feat(cli): Add managed runtime attestation worker | +487/-24 | 6 | 09-23 00:35 | 09-23 03:30 |
 | [#12522](https://github.com/QwenLM/qwen-code/pull/12522) | ✅ merged | @doudouOUC | feat(sdk-java): Add managed runtime attestation client | +1102/-20 | 10 | 09-23 06:03 | 09-23 11:40 |
-| [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | 🟡 open | @doudouOUC | fix(core): deduplicate system prompt guidance in a second pass | +200/-214 | 5 | 09-23 11:04 | — |
-| [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | 🟡 open | @doudouOUC | feat(sdk-java): Adopt a Managed Runtime only after attestation | +542/-2 | 8 | 09-23 11:59 | — |
+| [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | ✅ merged | @doudouOUC | fix(core): deduplicate system prompt guidance in a second pass | +307/-262 | 9 | 09-23 11:04 | 09-25 17:49 |
+| [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | ✅ merged | @doudouOUC | feat(sdk-java): Adopt a Managed Runtime only after attestation | +1220/-6 | 11 | 09-23 11:59 | 09-24 07:58 |
+| [#12627](https://github.com/QwenLM/qwen-code/pull/12627) | ✅ merged | @doudouOUC | feat(sdk-java): Reconcile and adopt restored Runtime bindings | +4066/-149 | 33 | 09-24 10:25 | 09-25 03:41 |
+| [#12630](https://github.com/QwenLM/qwen-code/pull/12630) | ✅ merged | @doudouOUC | feat(cli): Declare the v2 execute/status/cancel Managed Runtime contract | +1658/-29 | 12 | 09-24 11:22 | 09-25 03:14 |
+| [#12637](https://github.com/QwenLM/qwen-code/pull/12637) | ✅ merged | @doudouOUC | feat(sdk-java): Add the v2 tool operations to the runtime transport | +881/-54 | 7 | 09-24 11:53 | 09-25 09:31 |
+| [#12654](https://github.com/QwenLM/qwen-code/pull/12654) | ✅ merged | @doudouOUC | feat(sdk-java): Add the Hosted Harness private client | +3942/-4 | 25 | 09-24 15:40 | 09-24 16:47 |
 
 ---
 
@@ -53,21 +57,25 @@
 | [#12491](https://github.com/QwenLM/qwen-code/pull/12491) | review lease/base-tree 信任记录位于可写工作区，影响清理授权与 sandbox 边界。 | 最终迁至 `$QWEN_HOME/review-state/<hash>`，按规范化外层仓库分区；旧路径仅兼容镜像，不再作权威读取。 | 已新增 review 信任状态专题；完整实现见 [implementations/pr-12491.md](implementations/pr-12491.md)。 |
 | [#12506](https://github.com/QwenLM/qwen-code/pull/12506) | attestation 契约缺真实可启动的独立 worker。 | 最终隐藏 CLI 命令从 stdin 读取有界 boot JSON，仅在 loopback 提供 v2 attest，输出无 token ready 记录。 | 已更新 Managed Runtime 专题；完整实现见 [implementations/pr-12506.md](implementations/pr-12506.md)。 |
 | [#12522](https://github.com/QwenLM/qwen-code/pull/12522) | Java Broker 无法按 v2 契约真实核验 worker lease/seed/scope。 | 最终加入 bounded HTTP attestation client，严格比对身份并分类重试；尚未接 Broker READY/reconcile。 | 已更新 Managed Runtime/SDK 专题；完整实现见 [implementations/pr-12522.md](implementations/pr-12522.md)。 |
-| [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | 默认系统提示词仍重复说明工具、验证、报告和 Git 规则。 | 当前 open diff 压缩重复文字并更新快照/测试；结构验证不能替代真实模型 A/B。 | 已新增系统提示词专题，标注 open；完整观察见 [implementations/pr-12546.md](implementations/pr-12546.md)。 |
-| [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | Broker 尚不能启动并核验本地 worker 后才采用 lease。 | 当前 open diff 启动进程、读取 ready、attest 后置 READY，warm 时重新 confirm；worker 仍无 execute route。 | 已更新 Managed Runtime/SDK 专题，标注 open；完整观察见 [implementations/pr-12552.md](implementations/pr-12552.md)。 |
+| [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | 默认系统提示词仍重复说明工具、验证、报告和 Git 规则。 | 最终合入去重提示词、结构/模式断言及 token governance 测量修订；结构验证不能替代真实模型 A/B。 | 已更新系统提示词专题，标注已合入及验证边界；完整实现见 [implementations/pr-12546.md](implementations/pr-12546.md)。 |
+| [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | Broker 尚不能启动并核验本地 worker 后才采用 lease。 | 最终合入本地 provisioner 的 boot/ready/attest 采用与 warm confirm，补进程失活/竞争测试；worker 仍无 execute route，未实现持久 reconcile。 | 已更新 Managed Runtime/SDK 专题，标注已合入及边界；完整实现见 [implementations/pr-12552.md](implementations/pr-12552.md)。 |
+| [#12627](https://github.com/QwenLM/qwen-code/pull/12627) | 持久 READY binding 在新 Broker 进程没有 live lease，既不能盲信旧 endpoint，也缺少恢复仍存活资源的机制。 | 最终合入加密 seed/handle 持久化与 observe→attest→CAS 的本 JVM gate；身份冲突阻塞恢复，其他 attest 失败不误判身份，LOST 遗留会话有条件释放。 | 已更新 Managed Runtime/JDBC/SDK 专题，标注已合入与生产 provisioner 缺口；完整实现见 [implementations/pr-12627.md](implementations/pr-12627.md)。 |
+| [#12630](https://github.com/QwenLM/qwen-code/pull/12630) | v2 工具 execute/status/cancel 缺统一 wire contract，原调用与 UNKNOWN 语义易漂移。 | 最终合入 route manifest、schema/fixtures 和 TS/Java conformance；没有真实 handler，raw gate 仍只放行 attest。 | 已更新私有协议专题，标注已合入契约与执行缺口；完整实现见 [implementations/pr-12630.md](implementations/pr-12630.md)。 |
+| [#12637](https://github.com/QwenLM/qwen-code/pull/12637) | Java HTTP adapter 只有 attest，不能按稳定调用引用查询/取消工具结果。 | 最终在 #12630 契约基础上合入 execute/status/cancel HTTP 方法与严格结果校验；最终 diff 为 7 个文件，未接真实 worker handler。 | 已更新私有协议/SDK 专题，标注已合入客户端与执行缺口；完整实现见 [implementations/pr-12637.md](implementations/pr-12637.md)。 |
+| [#12654](https://github.com/QwenLM/qwen-code/pull/12654) | Java 产品控制面缺少 Hosted Harness 专用的会话、turn、SSE 与恢复客户端。 | 最终合入 Java 私有 client：协商 capability digest/boot ID 并为请求做代际 fence，提供会话生命周期、prompt 身份重试、事件流与恢复操作；Java 公共投影/生产接线仍未实现。 | 已更新 Managed Agents/SDK 专题，标注已合入及边界；完整实现见 [implementations/pr-12654.md](implementations/pr-12654.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [Managed Agents 双链路方案](../../feature/managed-agents/README.md) | #12390/#12391/#12409/#12438/#12445/#12447/#12477/#12478/#12506/#12522(merged), #12458(closed), #12552(open) | 同步 Broker/JDBC、worker 与 Java attestation client；进程采用仍为 open，未形成生产 Hosted Runtime。 |
-| [Runtime Broker JDBC 持久化](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #12390/#12391/#12438/#12445/#12477/#12478(merged), #12458(closed) | 登记 owner fence、时区/存储精度修复和 MariaDB CI lane 已合入。 |
-| [Managed Runtime 身份核验](../../feature/managed-agents/managed-runtime-attestation.zh-CN.md) | #12447/#12506/#12522(merged), #12552(open) | 登记 worker 与 Java client 已合入；进程采用/READY gate 仍是 open diff。 |
-| [Session / Harness / Runtime 私有协议](../../feature/managed-agents/managed-agent-control-protocol.md) | #12409/#12447/#12506/#12522(merged), #12552(open) | 区分 version/boot fence、worker/client attestation 与尚未合入的进程采用；完整 Tool Runtime 未挂载。 |
-| [SDK](../../feature/sdk.md) | #12390/#12391/#12438/#12445/#12477/#12478/#12522(merged), #12458(closed), #12552(open) | 更新 Java Runtime Broker 修复与 HTTP attestation client，并标记进程采用尚未合入。 |
+| [Managed Agents 双链路方案](../../feature/managed-agents/README.md) | #12390/#12391/#12409/#12438/#12445/#12447/#12477/#12478/#12506/#12522/#12552/#12627/#12630/#12637/#12654(merged), #12458(closed) | 持久恢复基础、工具契约/Java 客户端已合入；生产 provisioner/worker handler 仍缺，未形成生产 Hosted Runtime。 |
+| [Runtime Broker JDBC 持久化](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #12390/#12391/#12438/#12445/#12477/#12478/#12627(merged), #12458(closed) | 登记持久 seed/handle 与恢复 CAS 已合入，生产 durable provisioner 仍缺。 |
+| [Managed Runtime 身份核验](../../feature/managed-agents/managed-runtime-attestation.zh-CN.md) | #12447/#12506/#12522/#12552/#12627(merged) | 本地进程采用与持久 READY reconcile 基础已合入；生产 scheduler 接线仍缺。 |
+| [Session / Harness / Runtime 私有协议](../../feature/managed-agents/managed-agent-control-protocol.md) | #12409/#12447/#12506/#12522/#12552/#12630/#12637/#12654(merged) | 工具 wire contract 与 Java HTTP 方法已合入，真实 worker handler 和完整 Tool Runtime 未挂载。 |
+| [SDK](../../feature/sdk.md) | #12390/#12391/#12438/#12445/#12477/#12478/#12522/#12552/#12627/#12637/#12654(merged), #12458(closed) | 持久恢复基础、工具 HTTP 操作和 Hosted Harness client 已合入；生产工具链路仍缺。 |
 | [Review 信任状态](../../feature/review-trusted-state.md) | #12491(merged) | 记录权威状态移出工作区及旧路径兼容镜像。 |
-| [系统提示词指引](../../feature/system-prompt-guidance.md) | #12546(open) | 记录第二轮去重为 open diff 与真实模型 A/B 缺口。 |
+| [系统提示词指引](../../feature/system-prompt-guidance.md) | #12546(merged) | 记录第二轮去重已合入与真实模型 A/B 缺口。 |
 | [telemetry 可观测性](../../feature/telemetry-observability/README.md) | #12374(merged) | 登记 session debug log 的交互式 retention 方案及非交互入口边界。 |
-| [feature索引](../../feature/README.md) | #12374/#12390/#12391/#12409/#12438/#12445/#12447/#12458/#12477/#12478/#12491/#12506/#12522/#12546/#12552 | 同步 W39 当前状态和入口；#12482 未合入且无 feature。 |
+| [feature索引](../../feature/README.md) | #12374/#12390/#12391/#12409/#12438/#12445/#12447/#12458/#12477/#12478/#12491/#12506/#12522/#12546/#12552/#12627/#12630/#12637/#12654 | 同步 W39 当前状态和入口；#12482 未合入且无 feature。 |
 
-_按个人 PR 口径更新于 2026-09-24_
+_按个人 PR 口径更新于 2026-09-25_

@@ -2,7 +2,7 @@
 
 [English](managed-runtime-attestation.md) | [简体中文](managed-runtime-attestation.zh-CN.md)
 
-状态：v1.13 目标契约；更新于 2026-09-24。本文细化阶段 C/F 的 Runtime 恢复和 `attest` 门禁，并记录 #12358 分支 `e666150153` 的即时修复。upstream #12447 已合入 A1 route 和 A2 schema/fixture，#12506 已合入独立 loopback worker，#12522 已合入 Java HTTP attestation client；#12552 的进程采用与 warm confirm 仍为 open diff。尚未完成完整 Hosted Tool Runtime、持久 READY reconcile/CAS、required 跨语言 CI 或部署验收。
+状态：v1.13 目标契约；更新于 2026-09-25。本文细化阶段 C/F 的 Runtime 恢复和 `attest` 门禁，并记录 #12358 分支 `e666150153` 的即时修复。upstream #12447/#12506/#12522/#12552/#12627 已合入 route、worker、Java client、本地进程采用与持久 READY reconcile/CAS 基础。尚未完成完整 Hosted Tool Runtime、生产 durable provisioner、required 跨语言 CI 或部署验收。
 
 ## 1. 问题与结论
 
@@ -22,7 +22,7 @@ Java Runtime Broker 持久化 endpoint 后，不能因为地址可连接或 `/he
 - Broker 再与持久 seed、lease 和 `RuntimeProvisionRequest.scope` 比较。只有仍持有同一个 operation generation 时，才以一次 CAS 更新 endpoint/handle、递增 `attestation_generation`、写 `last_reconciled_at` 并完成进程内 ready gate。
 - `34ea187c62` 的 route 已在 Express 注册，但 owned-worker 外层 HTTP 白名单遗漏 `attest`，因此真实请求在到达 Express 前返回 404。`e666150153` 已把该 method/path 加入白名单，并增加穿过真实外层 gate 的测试；同一提交也为 E2E 生成并注入临时 Broker 凭据加密密钥。
 
-预览分支的即时修复解决了已知 404 和 E2E 启动失败。已合入的 upstream #12447 使用一个 typed manifest 取代重复的 `attest` method/path，通过真实 raw TypeScript HTTP gate 执行共享 fixtures，并让 Java Runtime Broker 测试读取同一 schema/fixtures。完整 Hosted profile 仍未挂载；Java attestation client 已由 #12522 合入，独立 worker 已由 #12506 合入；#12552 当前 open diff 才尝试本地进程采用。真实 worker 的端到端采用和 required 跨语言 CI lane 仍待验证。
+预览分支的即时修复解决了已知 404 和 E2E 启动失败。已合入的 upstream #12447 使用一个 typed manifest 取代重复的 `attest` method/path，通过真实 raw TypeScript HTTP gate 执行共享 fixtures，并让 Java Runtime Broker 测试读取同一 schema/fixtures。Java attestation client、独立 worker 和本地进程采用已由 #12522/#12506/#12552 合入；#12627 又合入持久 seed/handle、observe→attest→CAS 恢复与 LOST/RECOVERY_BLOCKED。但 `LocalProcessRuntimeProvisioner` 仍是 `legacy` kind；真实 durable provisioner、Hosted profile 和 required 跨语言 CI lane 仍待验证。
 
 ## 3. `attest` 精确证明什么
 

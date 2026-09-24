@@ -3584,7 +3584,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
                 <li>upstream #12445 已以 <code>d2e4cc74d5</code> 合入 Tool Execution JDBC 第四表（评审 head <code>15d395bc40</code>），并通过 H2 与一次性真实 MySQL 共用合约；仍待 service/dispatch 接线。</li>
                 <li>upstream #12477 已合入旧 dispatch owner 的 transport 边界 fencing；#12478 已合入 JDBC epoch 时钟与秒级存储精度修复，并增加 MariaDB CI lane。</li>
                 <li>upstream #12447 已合入 <code>attest</code> route 单源、共享 schema/fixtures、真实 raw HTTP TypeScript 测试与 Java fixture consumer。</li>
-                <li>upstream #12506 已合入独立 loopback attestation worker，#12522 已合入 Java HTTP attestation client；#12552 本地进程采用仍为 open diff，完整 Tool Runtime 未落地。</li>
+                <li>upstream #12506/#12522/#12552/#12627 已合入 loopback attestation worker、Java HTTP client、本地进程采用与持久恢复基础；#12630/#12637 已合入工具契约和 Java HTTP 方法，但完整 Tool Runtime 未落地。</li>
                 <li>P3 预览分支当前 <code>e666150153</code> 已接 Spring JDBC/Flyway V3、AES-GCM seed、reconcile/attest gate、同宿主进程接管与 Kubernetes 参考 adapter，并修复 <code>v2/attest</code> 外层路由 404 和 E2E 测试密钥注入。</li>
                 <li>统一 Session UUID、MySQL Session/Turn/Command/Event 状态。</li>
                 <li>有界 Harness 事件批处理、原子状态推进与本机提交后 SSE 直推。</li>
@@ -3597,7 +3597,7 @@ H0 领域 validator / outbox / OperationGrant / SessionTaskView / quota
               <h3>待补齐</h3>
               <ul>
                 <li>在真实集群验证已接线的 Broker 恢复：网络/RBAC、service-account 轮换、Pod 生命周期、条件清理与部署容量。</li>
-                <li>在已合入 #12506 worker 与 #12522 Java client 基础上，完成 #12552 open 进程采用方案的审查，并建立 required 跨语言 CI、真实进程 E2E 与完整 Tool Runtime 路由。</li>
+                <li>在已合入 #12506/#12522/#12552/#12627/#12630/#12637 的基础上，建立生产 durable provisioner、required 跨语言 CI、真实进程 E2E 与完整 Tool Runtime 路由。</li>
                 <li>Hosted Harness 安全 Profile 的生产化与多实例 owner 路由。</li>
                 <li>完整 Public Agent API 与 AgentDefinition Repository。</li>
                 <li>W0 Session 持久 Workspace/cwd 绑定，替换 Broker 全局静态目录；再按 W1/W2 补恢复与目录切换。</li>

@@ -1,6 +1,6 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复预览分支真实 outer gate 的 404 和 E2E 密钥注入；upstream #12447 已合入 route/fixture 基础，#12506 已合入真实 loopback attestation worker，#12522 已合入 Java HTTP client；#12552 的本地进程采用仍为 open diff。尚未挂入完整 Hosted Tool Runtime，也没有持久 READY reconcile/CAS 或真实部署身份验收。该私有协议不新增公共 OpenAPI 路由。
+> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复预览分支真实 outer gate 的 404 和 E2E 密钥注入；upstream #12447/#12506/#12522/#12552/#12627 已合入 route/worker/Java client、本地进程采用和持久恢复基础。尚未挂入完整 Hosted Tool Runtime，也没有生产 durable provisioner 或真实部署身份验收。该私有协议不新增公共 OpenAPI 路由。
 
 > **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)细化工作区选择器、可选子目录、创建前能力/默认查询、原键重试、持久绑定及 Broker/Worker 接线。OpenAPI v1.12 同步 planned 契约；W0a～W0e 尚待实现，Session 目录切换仍属 W2。
 
@@ -12,7 +12,7 @@
 >
 > **Workspace/cwd 设计补充（2026-09-21）：** [中文方案](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md) 区分稳定 Workspace、Session 相对 cwd 与 Runtime 挂载路径，补齐创建绑定、冷恢复、受控目录切换、后台任务归属及旧数据迁移。[OpenAPI](managed-agent-public-api.openapi.yaml) 与 [增量目标 DDL](managed-agent-workspace-schema.mysql.sql) 同步；W0/W1/W2 均为待实现设计，当前 Java 仍使用全局静态工作区配置。
 >
-> **Runtime Broker JDBC 补充（更新于 2026-09-24）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的四表切片。upstream #12390 已合入前三张表的 DataSource-only binding/session Repository，#12391 已合入 Tool Execution 内存状态契约，#12438 已合入无框架 Broker service core；#12445 已以 `d2e4cc74d5` 合入第四张 `qwen_tool_execution` 表及 JDBC adapter（评审 head `15d395bc40`），#12458 作为相同范围的平行实现已关闭并明确由 #12445 取代。已合入实现通过 JDK 21 下 63 个测试、H2 共用合约与一次性 MySQL 26.7.0 的 `utf8mb4_0900_ai_ci` 契约，覆盖数据库时钟、行锁、generation/owner fencing、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返，以及大小写敏感标识。#12477 已合入 transport 前 dispatch owner/generation 最终复核；#12478 已合入时区无关、秒级存储安全的数据库时钟读取和 MariaDB CI lane。#12522 的 Java attestation client 已合入，#12552 的本地进程采用仍为 open。Spring/Flyway 接线、完整 Tool Runtime transport、持久 Runtime reconcile 与多进程端到端验证仍待后续实现。
+> **Runtime Broker JDBC 补充（更新于 2026-09-25）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的四表切片。#12390/#12391/#12438/#12445 已依次合入 JDBC binding/session、内存 execution、Broker core 和第四表 JDBC；#12458 是关闭的平行实现。#12477/#12478 已合入 owner fence 与数据库时钟修复；#12522/#12552 已合入 attestation client 与本地进程采用。#12627 已合入加密 seed/handle 持久化与恢复 CAS 基础；Spring/Flyway 接线、生产 durable provisioner、完整 Tool Runtime 与多进程端到端验证仍待实现。
 
 > **Hosted Harness 私有协议基础（2026-09-22）：** #12409 已合入 `HostedHarnessContract` 与 Express middleware：protocol v1、进程级 boot UUID、canonical capability digest，以及稳定 426/400/409 generation fence。该 PR 没有创建 Hosted profile、挂载 route、广告 capability 或接入 Java client；bearer authentication 与部署 capability canonicalization 仍由后续集成完成。
 >
@@ -22,7 +22,7 @@
 
 > **W38 upstream PR 快照（更新于 2026-09-22）：** #12301 与 #12302 已合入上游，分别提供 Java Runtime 状态基础和 Managed Session v1 Transcript 基础。#12358 仍是 open draft architecture preview，当前 head `e666150153` 已修复私有 `v2/attest` 的 outer-route 404、增加穿过真实 gate 的回归测试，并为 E2E 注入临时 Broker 凭据加密密钥。该分支已有 reconcile/attest gate、同宿主进程接管与 Kubernetes adapter，但 route 仍是双清单，且跨 TS/Java conformance、真实集群、生产 MQ/Redis 和跨平台验收尚未完成；不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
 
-> **W39 upstream PR 快照（更新于 2026-09-24）：** #12390 已合入 JDBC Binding/Runtime Session 持久化，#12391 已合入 Tool Execution 内存状态契约，#12409 已合入 Hosted Harness 私有 contract foundation，#12438 已合入 Broker service core，#12445 已合入 Tool Execution JDBC，#12447 已合入 attestation route/conformance foundation；#12458 是由 #12445 取代的 closed 平行实现，#12477/#12478 已合入 dispatch owner/generation 最终复核和数据库时钟时区/存储精度修复；#12506/#12522 已合入 attestation worker 和 Java client。#12552 本地进程采用仍为 open diff；这些切片尚未形成完整 Tool Runtime、Hosted profile、持久 reconcile/CAS ready gate 或生产 Hosted Managed 链路。
+> **W39 upstream PR 快照（更新于 2026-09-25）：** #12390/#12391/#12438/#12445 已合入 Broker/JDBC 基础，#12409/#12447/#12506/#12522 已合入私有协议与 attestation 基础，#12477/#12478 已合入正确性修复；#12458 为 closed 平行实现。#12552/#12627/#12630/#12637/#12654 已合入本地进程采用、持久 binding 恢复基础、v2 工具 wire contract、Java HTTP 方法和 Hosted Harness Java client；真实 worker handler、生产 durable provisioner 与 Hosted profile 仍未接齐，不能视作生产 Hosted Managed 链路。
 
 ## 当前方案入口
 

@@ -16,7 +16,11 @@
 | [#12491](https://github.com/QwenLM/qwen-code/pull/12491) | ✅ merged | fix(review): Move trusted state outside workspaces | [pr-12491.md](pr-12491.md) |
 | [#12506](https://github.com/QwenLM/qwen-code/pull/12506) | ✅ merged | feat(cli): Add managed runtime attestation worker | [pr-12506.md](pr-12506.md) |
 | [#12522](https://github.com/QwenLM/qwen-code/pull/12522) | ✅ merged | feat(sdk-java): Add managed runtime attestation client | [pr-12522.md](pr-12522.md) |
-| [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | 🟡 open | fix(core): deduplicate system prompt guidance in a second pass | [pr-12546.md](pr-12546.md) |
-| [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | 🟡 open | feat(sdk-java): Adopt a Managed Runtime only after attestation | [pr-12552.md](pr-12552.md) |
+| [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | ✅ merged | fix(core): deduplicate system prompt guidance in a second pass | [pr-12546.md](pr-12546.md) |
+| [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | ✅ merged | feat(sdk-java): Adopt a Managed Runtime only after attestation | [pr-12552.md](pr-12552.md) |
+| [#12627](https://github.com/QwenLM/qwen-code/pull/12627) | ✅ merged | feat(sdk-java): Reconcile and adopt restored Runtime bindings | [pr-12627.md](pr-12627.md) |
+| [#12630](https://github.com/QwenLM/qwen-code/pull/12630) | ✅ merged | feat(cli): Declare the v2 execute/status/cancel Managed Runtime contract | [pr-12630.md](pr-12630.md) |
+| [#12637](https://github.com/QwenLM/qwen-code/pull/12637) | ✅ merged | feat(sdk-java): Add the v2 tool operations to the runtime transport | [pr-12637.md](pr-12637.md) |
+| [#12654](https://github.com/QwenLM/qwen-code/pull/12654) | ✅ merged | feat(sdk-java): Add the Hosted Harness private client | [pr-12654.md](pr-12654.md) |
 
-_按个人 PR 口径更新于 2026-09-24_
+_按个人 PR 口径更新于 2026-09-25_
