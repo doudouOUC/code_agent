@@ -4,7 +4,7 @@
 
 状态：基础切片已由 upstream #12445 合入；接线门槛修复 #12477 与 #12478 也已合入
 
-> Upstream 交付状态（2026-09-25）：#12390/#12391/#12438/#12445 已合入 Binding/Session JDBC、Tool Execution 状态、Broker core 与第四表 JDBC；#12458 是关闭的平行实现。#12445 的精确评审 head 曾通过 JDK 21 下 63 个测试、Checkstyle、H2 共用合约及一次性 MySQL 26.7.0 `utf8mb4_0900_ai_ci` 验证，覆盖大小写敏感标识、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返。#12477/#12478 已合入 dispatch owner 最终 fence、时区无关且秒级存储安全的数据库时钟读取，并有 MariaDB CI lane；#12552 已合入本地进程采用。#12627 已为持久 binding 合入加密 seed、resource handle、attestation generation、LOST/RECOVERY_BLOCKED 与 observe→attest→CAS 恢复基础。主干 local-process provisioner 仍为 `legacy`，缺生产 durable provisioner、完整 Tool Runtime transport、Spring/Flyway 接线与多进程端到端验证。
+> Upstream 交付状态（更新于 2026-09-27）：#12390/#12391/#12438/#12445 已合入 Binding/Session JDBC、Tool Execution 状态、Broker core 与第四表 JDBC；#12458 是关闭的平行实现。#12445 的精确评审 head 曾通过 JDK 21 下 63 个测试、Checkstyle、H2 共用合约及一次性 MySQL 26.7.0 `utf8mb4_0900_ai_ci` 验证，覆盖大小写敏感标识、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返。#12477/#12478 已合入 dispatch owner 最终 fence、时区无关且秒级存储安全的数据库时钟读取，并有 MariaDB CI lane；#12552 已合入本地进程采用。#12627 已为持久 binding 合入加密 seed、resource handle、attestation generation、LOST/RECOVERY_BLOCKED 与 observe→attest→CAS 恢复基础。后续主干的 local-process provisioner 已返回 `local-process` kind、实现 ensure/reconcile，但 observe 仍依赖本进程 owned map；生产跨 Broker 接管、完整 Tool Runtime transport 与多进程端到端验证仍需单独证明。
 
 ## 问题
 

@@ -60,22 +60,22 @@
 | [#12546](https://github.com/QwenLM/qwen-code/pull/12546) | 默认系统提示词仍重复说明工具、验证、报告和 Git 规则。 | 最终合入去重提示词、结构/模式断言及 token governance 测量修订；结构验证不能替代真实模型 A/B。 | 已更新系统提示词专题，标注已合入及验证边界；完整实现见 [implementations/pr-12546.md](implementations/pr-12546.md)。 |
 | [#12552](https://github.com/QwenLM/qwen-code/pull/12552) | Broker 尚不能启动并核验本地 worker 后才采用 lease。 | 最终合入本地 provisioner 的 boot/ready/attest 采用与 warm confirm，补进程失活/竞争测试；worker 仍无 execute route，未实现持久 reconcile。 | 已更新 Managed Runtime/SDK 专题，标注已合入及边界；完整实现见 [implementations/pr-12552.md](implementations/pr-12552.md)。 |
 | [#12627](https://github.com/QwenLM/qwen-code/pull/12627) | 持久 READY binding 在新 Broker 进程没有 live lease，既不能盲信旧 endpoint，也缺少恢复仍存活资源的机制。 | 最终合入加密 seed/handle 持久化与 observe→attest→CAS 的本 JVM gate；身份冲突阻塞恢复，其他 attest 失败不误判身份，LOST 遗留会话有条件释放。 | 已更新 Managed Runtime/JDBC/SDK 专题，标注已合入与生产 provisioner 缺口；完整实现见 [implementations/pr-12627.md](implementations/pr-12627.md)。 |
-| [#12630](https://github.com/QwenLM/qwen-code/pull/12630) | v2 工具 execute/status/cancel 缺统一 wire contract，原调用与 UNKNOWN 语义易漂移。 | 最终合入 route manifest、schema/fixtures 和 TS/Java conformance；没有真实 handler，raw gate 仍只放行 attest。 | 已更新私有协议专题，标注已合入契约与执行缺口；完整实现见 [implementations/pr-12630.md](implementations/pr-12630.md)。 |
-| [#12637](https://github.com/QwenLM/qwen-code/pull/12637) | Java HTTP adapter 只有 attest，不能按稳定调用引用查询/取消工具结果。 | 最终在 #12630 契约基础上合入 execute/status/cancel HTTP 方法与严格结果校验；最终 diff 为 7 个文件，未接真实 worker handler。 | 已更新私有协议/SDK 专题，标注已合入客户端与执行缺口；完整实现见 [implementations/pr-12637.md](implementations/pr-12637.md)。 |
+| [#12630](https://github.com/QwenLM/qwen-code/pull/12630) | v2 工具 execute/status/cancel 缺统一 wire contract，原调用与 UNKNOWN 语义易漂移。 | 最终合入 route manifest、schema/fixtures 和 TS/Java conformance；该 PR 本身未实现 worker handler，后续主干已挂载工具路由。 | 已更新私有协议专题，区分契约与后续主干接线；完整实现见 [implementations/pr-12630.md](implementations/pr-12630.md)。 |
+| [#12637](https://github.com/QwenLM/qwen-code/pull/12637) | Java HTTP adapter 只有 attest，不能按稳定调用引用查询/取消工具结果。 | 最终在 #12630 契约基础上合入 execute/status/cancel HTTP 方法与严格结果校验；最终 diff 为 7 个文件，worker handler 属于后续主干演进。 | 已更新私有协议/SDK 专题，区分客户端与后续主干接线；完整实现见 [implementations/pr-12637.md](implementations/pr-12637.md)。 |
 | [#12654](https://github.com/QwenLM/qwen-code/pull/12654) | Java 产品控制面缺少 Hosted Harness 专用的会话、turn、SSE 与恢复客户端。 | 最终合入 Java 私有 client：协商 capability digest/boot ID 并为请求做代际 fence，提供会话生命周期、prompt 身份重试、事件流与恢复操作；Java 公共投影/生产接线仍未实现。 | 已更新 Managed Agents/SDK 专题，标注已合入及边界；完整实现见 [implementations/pr-12654.md](implementations/pr-12654.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [Managed Agents 双链路方案](../../feature/managed-agents/README.md) | #12390/#12391/#12409/#12438/#12445/#12447/#12477/#12478/#12506/#12522/#12552/#12627/#12630/#12637/#12654(merged), #12458(closed) | 持久恢复基础、工具契约/Java 客户端已合入；生产 provisioner/worker handler 仍缺，未形成生产 Hosted Runtime。 |
+| [Managed Agents 双链路方案](../../feature/managed-agents/README.md) | #12390/#12391/#12409/#12438/#12445/#12447/#12477/#12478/#12506/#12522/#12552/#12627/#12630/#12637/#12654(merged), #12458(closed) | 持久恢复基础、工具契约/Java 客户端已合入；后续主干已挂载 worker 路由，但生产跨进程恢复与 Hosted 链路验收仍缺。 |
 | [Runtime Broker JDBC 持久化](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #12390/#12391/#12438/#12445/#12477/#12478/#12627(merged), #12458(closed) | 登记持久 seed/handle 与恢复 CAS 已合入，生产 durable provisioner 仍缺。 |
 | [Managed Runtime 身份核验](../../feature/managed-agents/managed-runtime-attestation.zh-CN.md) | #12447/#12506/#12522/#12552/#12627(merged) | 本地进程采用与持久 READY reconcile 基础已合入；生产 scheduler 接线仍缺。 |
-| [Session / Harness / Runtime 私有协议](../../feature/managed-agents/managed-agent-control-protocol.md) | #12409/#12447/#12506/#12522/#12552/#12630/#12637/#12654(merged) | 工具 wire contract 与 Java HTTP 方法已合入，真实 worker handler 和完整 Tool Runtime 未挂载。 |
-| [SDK](../../feature/sdk.md) | #12390/#12391/#12438/#12445/#12477/#12478/#12522/#12552/#12627/#12637/#12654(merged), #12458(closed) | 持久恢复基础、工具 HTTP 操作和 Hosted Harness client 已合入；生产工具链路仍缺。 |
+| [Session / Harness / Runtime 私有协议](../../feature/managed-agents/managed-agent-control-protocol.md) | #12409/#12447/#12506/#12522/#12552/#12630/#12637/#12654(merged) | 工具 wire contract 与 Java HTTP 方法已合入；后续主干已挂载 worker 路由，完整 Hosted Tool Runtime 验收仍未证明。 |
+| [SDK](../../feature/sdk.md) | #12390/#12391/#12438/#12445/#12477/#12478/#12522/#12552/#12627/#12637/#12654(merged), #12458(closed) | 持久恢复基础、工具 HTTP 操作和 Hosted Harness client 已合入；生产跨进程恢复与产品接线仍需验收。 |
 | [Review 信任状态](../../feature/review-trusted-state.md) | #12491(merged) | 记录权威状态移出工作区及旧路径兼容镜像。 |
 | [系统提示词指引](../../feature/system-prompt-guidance.md) | #12546(merged) | 记录第二轮去重已合入与真实模型 A/B 缺口。 |
 | [telemetry 可观测性](../../feature/telemetry-observability/README.md) | #12374(merged) | 登记 session debug log 的交互式 retention 方案及非交互入口边界。 |
 | [feature索引](../../feature/README.md) | #12374/#12390/#12391/#12409/#12438/#12445/#12447/#12458/#12477/#12478/#12491/#12506/#12522/#12546/#12552/#12627/#12630/#12637/#12654 | 同步 W39 当前状态和入口；#12482 未合入且无 feature。 |
 
-_按个人 PR 口径更新于 2026-09-25_
+_按个人 PR 口径更新于 2026-09-27_

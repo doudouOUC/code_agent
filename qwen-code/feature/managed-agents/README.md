@@ -22,7 +22,7 @@
 
 > **W38 upstream PR 快照（更新于 2026-09-22）：** #12301 与 #12302 已合入上游，分别提供 Java Runtime 状态基础和 Managed Session v1 Transcript 基础。#12358 仍是 open draft architecture preview，当前 head `e666150153` 已修复私有 `v2/attest` 的 outer-route 404、增加穿过真实 gate 的回归测试，并为 E2E 注入临时 Broker 凭据加密密钥。该分支已有 reconcile/attest gate、同宿主进程接管与 Kubernetes adapter，但 route 仍是双清单，且跨 TS/Java conformance、真实集群、生产 MQ/Redis 和跨平台验收尚未完成；不能用预览实现覆盖本文 A～H 目标契约或宣布完整 Managed Agents 已交付。
 
-> **W39 upstream PR 快照（更新于 2026-09-25）：** #12390/#12391/#12438/#12445 已合入 Broker/JDBC 基础，#12409/#12447/#12506/#12522 已合入私有协议与 attestation 基础，#12477/#12478 已合入正确性修复；#12458 为 closed 平行实现。#12552/#12627/#12630/#12637/#12654 已合入本地进程采用、持久 binding 恢复基础、v2 工具 wire contract、Java HTTP 方法和 Hosted Harness Java client；真实 worker handler、生产 durable provisioner 与 Hosted profile 仍未接齐，不能视作生产 Hosted Managed 链路。
+> **W39 upstream PR 快照（更新于 2026-09-27）：** #12390/#12391/#12438/#12445 已合入 Broker/JDBC 基础，#12409/#12447/#12506/#12522 已合入私有协议与 attestation 基础，#12477/#12478 已合入正确性修复；#12458 为 closed 平行实现。#12552/#12627/#12630/#12637/#12654 已合入本地进程采用、持久 binding 恢复基础、v2 工具 wire contract、Java HTTP 方法和 Hosted Harness Java client；后续主干已挂载 worker 工具路由并扩展本地 provisioner，但跨 Broker 接管与生产 Hosted Managed 链路仍未验收。
 
 ## 当前方案入口
 

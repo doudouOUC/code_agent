@@ -9,7 +9,7 @@
 
 | 主题 | 文档 | 状态 | 一句话 |
 |---|---|---|---|
-| Managed Agents | [managed-agents/](managed-agents/README.md) | #12301/#12302/#12390/#12391/#12409/#12438/#12445/#12447/#12477/#12478/#12506/#12522/#12552/#12627/#12630/#12637/#12654 merged；#12458 closed superseded；#12358 open preview | upstream 已落地 Broker/JDBC、attestation、持久恢复基础、v2 工具协议/Java HTTP 方法及 Hosted Harness Java client；生产 provisioner、worker handler 和完整 Tool Runtime 尚未完成。 |
+| Managed Agents | [managed-agents/](managed-agents/README.md) | #12301/#12302/#12390/#12391/#12409/#12438/#12445/#12447/#12477/#12478/#12506/#12522/#12552/#12627/#12630/#12637/#12654 merged；#12458 closed superseded；#12358 open preview | 这些 PR 已落地 Broker/JDBC、attestation、持久恢复基础、v2 工具协议/Java HTTP 方法及 Hosted Harness Java client；后续主干另有 worker 工具路由与本地 provisioner 扩展，完整跨 Broker/产品链路仍需验收。 |
 
 > 本节不计入下方按 @doudouOUC 个人 PR 汇总的 26 篇方案，也不代表完整 Hosted Runtime 已落地。
 
@@ -56,7 +56,7 @@
 >
 > W38 最终 follow-up：#11812已合入普通HTTP非回环standalone UUID fallback；#11911/#11940/#12008已完成ACP child数量准入、零session自动回收和loaded runtime用户确认stop，#12265已合入fixed-heap校准证据，#12353仍只是opt-in enforcement draft。#11960已合入MCP App资源失败可见fallback。Linux sandbox方面，#12067/#12269已合入foundation与内部runtime integration；#11981已关闭未合入，#12064是总体draft，#12267是已在`main`重基线的公开cutover，#12278仍叠加在其pre-review-fix commit。Managed Agents方面，#12301/#12302已合入独立state/record foundations，#12358加入durable Runtime recovery但仍是必须拆分的超大preview。#12360精简系统提示词并移除headless冲突示例，但真实模型A/B未验证。#11781/#11819/#11938只修构建或CI。
 >
-> W39 当前 follow-up：#12374已把session debug日志纳入interactive housekeeping，但不覆盖headless/ACP/serve主动清理。Managed Runtime方面，#12390/#12391/#12438/#12445已依次合入Binding/Session JDBC、Tool Execution状态、service core与第四表持久账本，#12458作为平行实现关闭并由#12445取代；#12477/#12478已合入dispatch owner最终fence及JDBC时区/存储精度修复。#12409/#12447/#12506/#12522/#12552/#12627/#12630/#12637/#12654已合入私有协议、attestation、持久恢复基础、工具契约/Java HTTP 方法及Hosted Harness Java client；仍无生产durable provisioner、worker handler或完整Hosted Tool Runtime。#12491已合入review权威状态迁移；#12546第二轮提示词去重已合入，真实模型A/B未验证。
+> W39 当前 follow-up：#12374已把session debug日志纳入interactive housekeeping，但不覆盖headless/ACP/serve主动清理。Managed Runtime方面，#12390/#12391/#12438/#12445已依次合入Binding/Session JDBC、Tool Execution状态、service core与第四表持久账本，#12458作为平行实现关闭并由#12445取代；#12477/#12478已合入dispatch owner最终fence及JDBC时区/存储精度修复。#12409/#12447/#12506/#12522/#12552/#12627/#12630/#12637/#12654已合入私有协议、attestation、持久恢复基础、工具契约/Java HTTP 方法及Hosted Harness Java client；后续主干已挂载worker工具路由并扩展本地provisioner，完整跨Broker/产品链路仍需验收。#12491已合入review权威状态迁移；#12546第二轮提示词去重已合入，真实模型A/B未验证。
 
 ## 使用口径
 

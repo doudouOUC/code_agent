@@ -23,4 +23,4 @@
 | [#12637](https://github.com/QwenLM/qwen-code/pull/12637) | ✅ merged | feat(sdk-java): Add the v2 tool operations to the runtime transport | [pr-12637.md](pr-12637.md) |
 | [#12654](https://github.com/QwenLM/qwen-code/pull/12654) | ✅ merged | feat(sdk-java): Add the Hosted Harness private client | [pr-12654.md](pr-12654.md) |
 
-_按个人 PR 口径更新于 2026-09-25_
+_按个人 PR 口径更新于 2026-09-27_
