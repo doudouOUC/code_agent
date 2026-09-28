@@ -4,9 +4,9 @@
 
 > 周目录 `README.md` 的状态与规模保留周归档快照；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
-**时间范围**: 2026-04-06 ~ 2026-09-24（持续更新）
-**总计**: 532 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计）
-**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37/W38/W39 见对应周目录（W39 当前个人增量 +29,058 / -4,661，220 个文件变更）
+**时间范围**: 2026-04-06 ~ 2026-09-28（持续更新）
+**总计**: 539 PRs（按当前保留的 @doudouOUC 个人 PR 实现与方案记录计；W39 保留原归档快照，W40 为周内累计）
+**代码量**: W15–W22 历史累计 +361,436 / -61,427；W23/W24/W25/W27/W28/W29/W30/W31/W32/W33/W34/W35/W36/W37/W38/W39/W40 见对应周目录（W40 当前个人增量 +20,748 / -571，187 个文件变更）
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
 ## 按周
@@ -39,10 +39,11 @@
 | 2026-09-07 ~ 2026-09-13 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-07_2026-09-13) · [Obsidian](2026-09-07_2026-09-13/README.md)) (W37 最终版) | 21 | 21/0/0 | +32,642/-1,392 | relaxed Conversations ownership runtime、WebShell 连续历史/turn rail/轮询/通知与点击导航、Mem0与Channel worktree、workspace容量扩展、Linux bwrap沙箱、ACP child heap哨兵修复、Shell输出预算单一决策 |
 | 2026-09-14 ~ 2026-09-20 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-14_2026-09-20) · [Obsidian](2026-09-14_2026-09-20/README.md)) (W38 最终版) | 20 | 11/8/1 | +163,385/-18,127 | ACP容量/恢复/堆执行、MCP App诊断、bwrap工具级拆分与Landlock、Managed Agent状态/Runtime恢复预览、系统提示词精简、HTTP UUID |
 | 2026-09-21 ~ 2026-09-27 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-21_2026-09-27) · [Obsidian](2026-09-21_2026-09-27/README.md)) (W39 周内累计) | 20 | 18/0/2 | +29,058/-4,661 | session debug、review信任状态、Runtime Broker/JDBC/恢复与工具协议、Hosted Harness Java client、提示词去重 |
+| 2026-09-28 ~ 2026-10-04 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-28_2026-10-04) · [Obsidian](2026-09-28_2026-10-04/README.md)) (W40 周内累计) | 7 | 1/6/0 | +20,748/-571 | durable local Runtime、reboot holder、远程 Shell 结果、审批模式冷恢复、附件分块与 Hosted 路径拒绝 |
 
 ## 类型分布
 
-feat ×263, fix ×191, refactor ×17, other ×14, docs ×15, chore ×7, perf ×17, test ×7, merge ×1
+feat ×266, fix ×194, refactor ×17, other ×14, docs ×16, chore ×7, perf ×17, test ×7, merge ×1
 
 ## 范围 (scope) 分布 — 工作重心
 

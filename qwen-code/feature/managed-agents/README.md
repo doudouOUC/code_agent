@@ -24,6 +24,8 @@
 
 > **W39 upstream PR 快照（更新于 2026-09-27）：** #12390/#12391/#12438/#12445 已合入 Broker/JDBC 基础，#12409/#12447/#12506/#12522 已合入私有协议与 attestation 基础，#12477/#12478 已合入正确性修复；#12458 为 closed 平行实现。#12552/#12627/#12630/#12637/#12654 已合入本地进程采用、持久 binding 恢复基础、v2 工具 wire contract、Java HTTP 方法和 Hosted Harness Java client；后续主干已挂载 worker 工具路由并扩展本地 provisioner，但跨 Broker 接管与生产 Hosted Managed 链路仍未验收。
 
+> **W40 当前观察（更新于 2026-09-29）：** #12865 的显式 Linux durable local provisioner、叠加其上的 #12869 可信同宿主 reboot/holder 恢复、#12894 远程 Shell 原始结果 publication，以及 #12950 Hosted 文件路径整批持久拒绝均仍为 open diff，不能作为 `main` 能力；尤其 #12869 的 39 文件增量不能与 #12865 base 重复计算。#12920 仅为 open 的中英文设计排期调整：保留已完成 M1/M3，建议将本地 Managed engine M2/M4–M6 后置到 Hosted 首个工具/结果/故障闭环之后，不表示这些阶段已实现。当前 `main` 尚不能据此宣布完整 Hosted 链路或真实物理重启验收通过。
+
 ## 当前方案入口
 
 v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。v1.12 细化[创建时选择 Workspace](managed-agent-workspace-context.md#3-创建与请求路由w0)，OpenAPI 升至 v1.12。v1.13 细化[Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md)，不改变公共 OpenAPI；既有目标 DDL 不变，完整工具结果新增接口仍需在 O1～O4 实现前纳入类型和契约测试。

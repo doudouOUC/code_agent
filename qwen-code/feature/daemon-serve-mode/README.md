@@ -3,6 +3,8 @@
 > 适用分支：daemon-mode feature batch 已随 #4490 于 2026-06-11 合入 `main`；#5144 于 2026-06-15 刷新 upstream daemon developer docs 并重新对齐当前 `main` 实现面。本文早期函数/行级锚点可能仍带 `daemon_mode_b_main` 历史语境，阅读时以当前 `main` 源码为准。
 > 关联 epic：[#4175](https://github.com/QwenLM/qwen-code/issues/4175)（Mode B daemon roadmap），上游设计 [#3803](https://github.com/QwenLM/qwen-code/issues/3803)。
 
+> **W40 状态（2026-09-29）：** #12918 已合入 `main`：Session 审批模式写入 `session_approval_mode` transcript record，并在非 safe/bare 的冷恢复中应用；未变化的 workspace settings reload 不覆盖会话内切换。#12923 的 512 KiB 附件分块路由、ACP 暂存与 TS SDK capability 探测仍是 open diff；旧 daemon/小附件仍依赖原单请求路径，不能宣称代理 413 已在主干修复。
+
 ---
 
 ## 深入子文档导航
