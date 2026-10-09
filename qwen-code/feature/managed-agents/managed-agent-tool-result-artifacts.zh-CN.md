@@ -4,7 +4,7 @@
 
 状态：设计提案，本文未实现这些能力。调研日期：2026-09-21。核实源码基线：`feature/managed-agent-p2-delivery` 的 `72e215c1e5047b5291430b3dd4c1862c9439f0f6`。本文补齐现有本地工具结果存储、Session authority、Java 公共投影与 WebShell 之间的交付契约，细化已有普通工具回执及资源设计，不建立第二份执行权威。下文仓库路径均对应此基线。
 
-> **2026-09-29 实施观察：** #12894 的当前 open diff 已尝试交付 O1/O2 的远程 Shell `process_pipes` 捕获、publication grant/容量准入、分段对象存储与原执行 receipt；这不是 `main` 已落地结论，也不覆盖本设计中的其他工具、O3 公共投影/WebShell 和 O4 部署故障验收。以下目标契约继续保留，需在该 PR 合入及跨端验证后再更新实现状态。
+> **2026-10-09 实施快照（主干 `55ee50d34e55`）：** #12767/#12821 已合入本地分段与前台 Shell receipt，#12848/#12894 合入 Hosted/远程 publication，#13037 合入公共投影、授权有界读取与 WebShell 展示。#13114 用 bytes/吞吐预算约束同步验证和原 operation 重试。#13084 提供 Session retirement/read lease/pin/恢复保护，#13225 是实际合入的默认关闭 collector（#13087 closed 未合入），#13296 增加保护候选退避；#13090 提供 O4 MySQL/OSS 门禁。测试与部署门禁存在不代表本次通过真实 OSS 或允许生产启用 GC。#13654 的有界异步 verifier 仍为 open diff。下文保留 2026-09-21 目标设计与当时基线，实施状态以上述逐切片及周报为准。
 
 ## 1. 调研结论与范围
 

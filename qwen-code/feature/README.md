@@ -1,6 +1,6 @@
 # qwen-code feature 技术方案
 
-按 **@doudouOUC 个人 PR** 口径汇总 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 的重点实现（2026-04 ~ 09），并结合代码整理详细技术方案。每篇含：背景动机 / 整体架构 / 子系统详解（带 `file:symbol` 锚点）/ 关键流程（mermaid 时序图、调用链、状态机）/ 设计决策与权衡 / 涉及 PR / 已知限制。
+按 **@doudouOUC 个人 PR** 口径汇总 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 的重点实现（2026-04 ~ 10），并结合代码整理详细技术方案。每篇含：背景动机 / 整体架构 / 子系统详解（带 `file:symbol` 锚点）/ 关键流程（mermaid 时序图、调用链、状态机）/ 设计决策与权衡 / 涉及 PR / 已知限制。
 
 > 配套：逐 PR 的描述↔实现一致性 + 正确性审查见 [`../weekly-report/`](../weekly-report/README.md)。
 > 口径：这里只保留 @doudouOUC 自己创建的 PR；其他作者 PR 不再作为本目录统计或专题入口。open/closed 未合入 PR 只作为方案记录，不能视为当前 `main` 已落地能力。
@@ -40,7 +40,7 @@
 | Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614/#12067/#12269(merged) / #11981(closed) / #12064/#12267/#12278(open) | #11614 已合入 whole-CLI bwrap，#12067/#12269已合入 execution foundation 与内部 runtime integration；#11981真实Linux CI已关闭未合入，#12064是总体参考，#12267是公开cutover，#12278是open-network-only的Landlock partial fallback，后三者未进入`main`。 |
 | Scheduled Tasks | [scheduled-tasks.md](scheduled-tasks.md) | #9838 / #10144 / #10828 / #10924 / #11207 | 已合入current-session reuse、empty-session persistence与relaxed ownership task设计；#10924提供mandatory lease/controller-binding fence，#11207已完成新版daemon global-owner runtime cutover，不改变at-least-once dispatch窗口。 |
 | Review 信任状态 | [review-trusted-state.md](review-trusted-state.md) | #12491(merged) | 将 review lease/base-tree 权威记录移到 `$QWEN_HOME`，旧工作区路径仅作兼容镜像。 |
-| 系统提示词指引 | [system-prompt-guidance.md](system-prompt-guidance.md) | #12360/#12546(merged) | 两轮去重及结构断言已合入；结构测试不等于真实模型 A/B。 |
+| 系统提示词指引 | [system-prompt-guidance.md](system-prompt-guidance.md) | #12360/#12546/#12784(merged) | 三轮去重及结构断言已合入；结构测试不等于真实模型 A/B。 |
 | 诊断 / creator skills | [diagnostic-skills.md](diagnostic-skills.md) | #3404 #4133 #3079 #6117 #6233(closed) | `/doctor` 代码命令、`/stuck` 诊断技能、`/batch` prompt 技能、ACP/non-interactive `/skills` 列表输出；disabled skill wire/filtering 仅为 #6233 closed 方案记录。 |
 | Hooks / submitted prompt provenance | [hooks.md](hooks.md) | #7762 / #7877 / #10100 / #10288 / #10512(closed) / #11455 | `UserPromptSubmit.submitted_prompt` 保留扩展前 provenance；#10100 已合入 command hook process-group ownership、TERM→KILL 与 bounded stream drain；#10288 已合入 staged-input + detached supervisor 的 fire-and-forget 生命周期，#10512 closed hardening 未进入 `main`；#11455已合入WebShell/显式ACP逐请求声明与daemon trust边界，缺失时不从request text推断。 |
 | auth/provider | [auth-providers.md](auth-providers.md) | #3212 #3495 #3623 #3624 #4255 #4291 #4305 #5179 #5638 #5769 #8862 #8893 #10269 | provider 配置、apiKey 保留、auth status 识别、device-flow、workspace provider defaults、重复 display name 消歧、OpenAI-compatible API log retention，以及已合入的 provider mutation runtime sync。 |
@@ -57,6 +57,8 @@
 > W38 最终 follow-up：#11812已合入普通HTTP非回环standalone UUID fallback；#11911/#11940/#12008已完成ACP child数量准入、零session自动回收和loaded runtime用户确认stop，#12265已合入fixed-heap校准证据，#12353仍只是opt-in enforcement draft。#11960已合入MCP App资源失败可见fallback。Linux sandbox方面，#12067/#12269已合入foundation与内部runtime integration；#11981已关闭未合入，#12064是总体draft，#12267是已在`main`重基线的公开cutover，#12278仍叠加在其pre-review-fix commit。Managed Agents方面，#12301/#12302已合入独立state/record foundations，#12358加入durable Runtime recovery但仍是必须拆分的超大preview。#12360精简系统提示词并移除headless冲突示例，但真实模型A/B未验证。#11781/#11819/#11938只修构建或CI。
 >
 > W39 当前 follow-up：#12374已把session debug日志纳入interactive housekeeping，但不覆盖headless/ACP/serve主动清理。Managed Runtime方面，#12390/#12391/#12438/#12445已依次合入Binding/Session JDBC、Tool Execution状态、service core与第四表持久账本，#12458作为平行实现关闭并由#12445取代；#12477/#12478已合入dispatch owner最终fence及JDBC时区/存储精度修复。#12409/#12447/#12506/#12522/#12552/#12627/#12630/#12637/#12654已合入私有协议、attestation、持久恢复基础、工具契约/Java HTTP 方法及Hosted Harness Java client；后续主干已挂载worker工具路由并扩展本地provisioner，完整跨Broker/产品链路仍需验收。#12491已合入review权威状态迁移；#12546第二轮提示词去重已合入，真实模型A/B未验证。
+
+> **W39–W41 补录（2026-10-09）：** Managed Agents 的 Hosted 控制面、Workspace/W1/生命周期、完整工具结果和实验 CSI 状态见 [当前总览](managed-agents/README.md)。#13526/#13642/#13654/#13673/#13674 仍 open。#12783 已补 WebShell 中文设置文案；#12784 已合入第三轮提示词去重。#13119/#13140/#13293 已将 settings 保存改为旁路 staging/恢复副本后 rename、恢复前身份检查及权限保留，并等待 sandbox stdout/stderr flush；这些是现有 CLI 可靠性修复，未创建新的产品能力入口。逐条问题、路径和验证见 [周报](../weekly-report/README.md)。
 
 ## 使用口径
 

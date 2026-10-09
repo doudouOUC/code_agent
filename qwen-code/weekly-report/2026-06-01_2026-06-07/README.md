@@ -4,7 +4,7 @@
 
 **统计**: 26 PRs — 23 merged / 0 open / 3 closed
 **代码量**: +13,052 / -12,307，272 个文件变更
-**类型**: feat ×14, fix ×9, refactor ×1, chore ×1
+**类型**: feat ×14, fix ×9, refactor ×1, chore ×1, other ×1
 **范围 (scope)**: daemon ×7, serve ×5, cli ×4, telemetry ×4, core ×2, integration ×1
 
 **本周最大改动**:

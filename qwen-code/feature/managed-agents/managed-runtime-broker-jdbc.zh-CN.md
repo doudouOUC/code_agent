@@ -1,5 +1,7 @@
 # Managed Runtime Broker JDBC 持久化
 
+> **2026-10-09 当前增量：** #12692 已合入 Spring/Flyway 接线，#12865 durable local provisioner 用持久本机/boot/process 身份突破旧 owned-map 限制；#12869/#12977 增加可信 reboot 与人工审计清理。#13289 实验 CSI/持久 ACK 已合入。#13642 的 JdbcRuntimeRetention 游标扫描和引用 guard 仍 open；#13673 原 Hook stopped release 仍 open。下方 2026-09-27 交付记录保留为历史快照，不作为当前 owned-map-only 结论。
+
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
 状态：基础切片已由 upstream #12445 合入；接线门槛修复 #12477 与 #12478 也已合入

@@ -1,5 +1,11 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+> **2026-10-09 实施快照：** #12839/#12869 已合入原终态/holder fence 与可信同宿主 reboot 清理；#12977 的离线 inspect/prepare/complete 固定原 generation/holder，记录操作员 stop evidence 和 producer_lost，不恢复原回合。#13088 的 W1a 核验原 storage marker/身份与资源闭合；#13138 W1b 导出和验证离线 bundle；#13260 W1c 以 storage fence、原 request 和历史证据分阶段迁移，#13655 成功迁移清除旧诊断。#13135/#13194/#13354 以持久 lifecycle authority 排空、关闭、保留和删除 Session。#13673 原 Hook 退休恢复仍 open。所有路径继续要求原资源证据，UNKNOWN 不换 Runtime 重放；本文未执行物理 reboot、迁移或部署故障门禁。
+
+关键实现：`WorkspaceOperatorRecoveryStore.java:prepare`、`WorkspaceStorageGuard.java:inspect`、`workspace-recovery-bundle.ts`、`WorkspaceMigrationStore.java:retire`、`WorkspaceLifecycleStore.java:requireClaim`、`RuntimeBrokerService.java:drainHarnessSession`。逐 PR 与验证入口见 [W40 实现索引](../../weekly-report/2026-09-28_2026-10-04/implementations/README.md) 和 [W41 实现索引](../../weekly-report/2026-10-05_2026-10-11/implementations/README.md)。
+
+#12693 已合入持久 journal 与 failover 基础，原操作按持久记录恢复或准确阻塞；它不授权新进程重放状态未知的副作用。该切片的控制流与回归入口见 [PR #12693](../../weekly-report/2026-09-21_2026-09-27/implementations/pr-12693.md)。
+
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具另须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。干净 idle 回收后的新 binding 可挂回原持久存储；started/unknown 的故障恢复仍阻塞，不能混用两条路径。
 
 > **HTML 对齐（2026-09-18）：** Java 恢复 SessionBackendBinding、RuntimeBinding、Execution Ledger；Harness 依据正式 Transcript/checkpoint 和原 Ledger 恢复；Runtime 提供物理回执。started 无终态保持 recovery_blocked，禁止换 Runtime 重放。F 验收现有部署故障，G 验收共享 Authority 与跨实例接管；内部 UNKNOWN 须显式映射，不直接替换目标状态。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。

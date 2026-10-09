@@ -1,8 +1,10 @@
 # Managed Agent Tool Results and Durable Artifacts
 
+> Implementation snapshot, 2026-10-09 (`main` `55ee50d34e55`): #12767/#12821 merged local segments and foreground Shell receipts; #12848/#12894 merged Hosted/remote publication; #13037 merged public projection, authorized bounded reads and WebShell display. #13114 bounds synchronous verification and original-operation retries. #13084 adds Session retirement, read leases and recovery protection; #13225 is the merged default-off collector (#13087 closed unmerged), with protected-candidate backoff from #13296. #13090 adds O4 MySQL/OSS deployment gates. Gate code does not prove this documentation run passed real OSS or authorize production GC. #13654 asynchronous verification remains an open diff. The research baseline below remains historical; consult the weekly implementation records for current slice status.
+
 [English](managed-agent-tool-result-artifacts.md) | [简体中文](managed-agent-tool-result-artifacts.zh-CN.md)
 
-Status: proposed, not implemented by this document. Research date: 2026-09-21. Verified code baseline: `72e215c1e5047b5291430b3dd4c1862c9439f0f6` on `feature/managed-agent-p2-delivery`. This specifies the missing delivery contract between existing local tool-result storage, Session authority, Java public projections, and WebShell. It refines the existing ordinary-tool receipt and resource design; it does not introduce a second execution authority. Repository paths below refer to this baseline.
+Status: target design with merged slices described above; this document does not itself implement runtime behavior. Research date: 2026-09-21. Verified code baseline: `72e215c1e5047b5291430b3dd4c1862c9439f0f6` on `feature/managed-agent-p2-delivery`. This specifies the missing delivery contract between existing local tool-result storage, Session authority, Java public projections, and WebShell. It refines the existing ordinary-tool receipt and resource design; it does not introduce a second execution authority. Repository paths below refer to this baseline.
 
 ## 1. Findings and Scope
 

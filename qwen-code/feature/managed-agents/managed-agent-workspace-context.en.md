@@ -1,16 +1,18 @@
 # Managed Agent Workspace and Session cwd Contract
 
+> Implementation snapshot, 2026-10-09: #12709/#12730/#12754/#12797/#12839/#12869 merged W0 selection, admission, context, private execution and recovery fences. #13088/#13138/#13260 merged W1a/W1b/W1c; #13655 clears successful migration diagnostics. #13135/#13194/#13354 add Workspace Session lifecycle operations. The 2026-09-21 baseline below is historical, including its global-static-Workspace gap. W2 cwd change is separate. W1c does not support persisted Shell profiles; open public Shell admission #13674 does not enable that migration.
+
 > **v1.10 clarification:** [Contract closure](managed-agent-contract-closure.en.md) section 4 binds context installation to private envelopes and receipts. Idle MCP connections are drainable after sealing admission, not hard blockers before the drain step. Runtime reclamation still treats an open connection as a hold. Section 6 adds actor-scoped authorization/idempotency; apply the command SQL delta after this Workspace delta.
 
 [English](managed-agent-workspace-context.en.md) | [简体中文](managed-agent-workspace-context.md)
 
-Status: v1.12 target design, not implemented. Date: 2026-09-21. Refines W0 Workspace selection at Session creation on top of v1.9 ownership and v1.10 private wiring. Supplements the [HTML architecture](managed-agent-dual-path-architecture.html#workspace-context), [public contract](managed-agent-api-contract.md), and [extension runtime](managed-agent-extension-runtime.md). This update changes the design and planned OpenAPI; it reuses the existing target DDL and does not enable multiple Workspaces or Session cwd changes in Java.
+Status: v1.12 target design; merged slices are listed above. Date: 2026-09-21. Refines W0 Workspace selection at Session creation on top of v1.9 ownership and v1.10 private wiring. Supplements the [HTML architecture](managed-agent-dual-path-architecture.html#workspace-context), [public contract](managed-agent-api-contract.md), and [extension runtime](managed-agent-extension-runtime.md). This update changes the design and planned OpenAPI; it reuses the existing target DDL and does not enable multiple Workspaces or Session cwd changes in Java.
 
 ## 1. Verified Baseline and Scope
 
 The original source baseline is `feature/managed-agents-p0-p8@2695220a3a`. This update rechecks P3 `34ea187c628c` and P2 `c0905b2c3b`; the Workspace gaps below remain. The daemon WorkspaceRegistry distinguishes registered workspaces and Session owners. Ordinary Session creation, restore, history, and `/session/:id/cd` retain their existing routing restrictions. Hosted APIs do not inherit local primary fallback or expand Legacy `/cd` support.
 
-Java CreateSessionRequest, PublicSession, and managed_agent_session have no Workspace binding. EmbeddedRuntimeBroker resolves one global workspaceCwd/workspaceId/workspaceGeneration at startup and uses it for all Sessions. RuntimeScope carrying a directory does not make Session ownership durable. qwen Authority records cwd in its private journal, but cannot replace Java admission and Workspace authorization. The current implementation supports one statically configured Workspace.
+In the 2026-09-21 baseline, Java CreateSessionRequest, PublicSession, and managed_agent_session have no Workspace binding. EmbeddedRuntimeBroker resolves one global workspaceCwd/workspaceId/workspaceGeneration at startup and uses it for all Sessions. RuntimeScope carrying a directory does not make Session ownership durable. qwen Authority records cwd in its private journal, but cannot replace Java admission and Workspace authorization. The current implementation supports one statically configured Workspace.
 
 Workspace creation, clone, worktree creation, migration between Workspaces, and standalone scratch allocation are outside W0. W0 uses administrator-registered, authorizable Workspaces. W2 changes cwd only within the same authorized filesystem scope.
 

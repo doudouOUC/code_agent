@@ -1,8 +1,8 @@
 # Qwen Code Managed Agents 双链路方案
 
-> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复预览分支真实 outer gate 的 404 和 E2E 密钥注入；upstream #12447/#12506/#12522/#12552/#12627 已合入 route/worker/Java client、本地进程采用和持久恢复基础。尚未挂入完整 Hosted Tool Runtime，也没有生产 durable provisioner 或真实部署身份验收。该私有协议不新增公共 OpenAPI 路由。
+> **v1.13 Runtime 身份核验：** [中文设计](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md)定义持久 `READY` 恢复后的 scheduler reconcile、私有 `attest`、数据库 CAS 与本 JVM ready gate。`feature/managed-agents-p0-p8@e666150153` 已修复预览分支真实 outer gate 的 404 和 E2E 密钥注入；upstream #12447/#12506/#12522/#12552/#12627 已合入 route/worker/Java client、本地进程采用和持久恢复基础。后续 #12691/#12692/#12865 已补 Hosted 接线、Spring 控制面和显式 durable provisioner；真实部署保证仍按各切片验收。该私有协议不新增公共 OpenAPI 路由。
 
-> **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)细化工作区选择器、可选子目录、创建前能力/默认查询、原键重试、持久绑定及 Broker/Worker 接线。OpenAPI v1.12 同步 planned 契约；W0a～W0e 尚待实现，Session 目录切换仍属 W2。
+> **v1.12 创建时选择 Workspace：** [中文设计](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md)细化工作区选择器、可选子目录、创建前能力/默认查询、原键重试、持久绑定及 Broker/Worker 接线。OpenAPI v1.12 同步 planned 契约；W0 准入、选择器、私有执行和恢复 fence 已由 #12709/#12730/#12754/#12797/#12839/#12869 合入；Session 目录切换仍属独立 W2。
 
 > **v1.10 审查修订（2026-09-21）：** [中文](managed-agent-contract-closure.md) / [English](managed-agent-contract-closure.en.md) 明确两种受理 Profile、逐批 delivery 认领、Action API、ContextBinding、真实 V1/V2 升级、actor ACL、close/archive/delete 与容量门槛。同步 HTML/OpenAPI/[storage delta](managed-agent-storage-schema.mysql.sql)/[command delta](managed-agent-command-schema.mysql.sql)；目标契约不表示已全部实现，后续切片状态见下文。
 
@@ -10,9 +10,9 @@
 >
 > **存储与事件实现补充（更新于 2026-09-21）：** [Java 存储、事件与会话恢复设计](managed-agent-storage-event-architecture.md)已经收敛数据库/MQ 边界，并冻结 [OpenAPI](managed-agent-public-api.openapi.yaml)、[MySQL 目标 DDL](managed-agent-storage-schema.mysql.sql)、多实例 owner/通知及 Harness 恢复协议。源码分支已完成 `AgentStateStore`、有界 Harness 事件批处理、游标/序号/终态单事务提交、提交后本机 SSE 直推、V2 Item/Snapshot 物化及 WebShell Snapshot 加尾部恢复；独立 `feature/managed-agent-p2-delivery` 分支的 `72e215c1e5` 又实现 V4 SQL Batch/Delivery，尚待与 P3 的 V3 集成。Outbox Relay、RocketMQ/Redis Transport、PostgreSQL 适配器及完整 Harness/资源恢复仍待实现。这一补充细化 D/F/G，不改变既有组件职责与 A～H 顺序。
 >
-> **Workspace/cwd 设计补充（2026-09-21）：** [中文方案](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md) 区分稳定 Workspace、Session 相对 cwd 与 Runtime 挂载路径，补齐创建绑定、冷恢复、受控目录切换、后台任务归属及旧数据迁移。[OpenAPI](managed-agent-public-api.openapi.yaml) 与 [增量目标 DDL](managed-agent-workspace-schema.mysql.sql) 同步；W0/W1/W2 均为待实现设计，当前 Java 仍使用全局静态工作区配置。
+> **Workspace/cwd 设计补充（2026-09-21）：** [中文方案](managed-agent-workspace-context.md) / [English](managed-agent-workspace-context.en.md) 区分稳定 Workspace、Session 相对 cwd 与 Runtime 挂载路径，补齐创建绑定、冷恢复、受控目录切换、后台任务归属及旧数据迁移。[OpenAPI](managed-agent-public-api.openapi.yaml) 与 [增量目标 DDL](managed-agent-workspace-schema.mysql.sql) 同步；该段保留 2026-09-21 设计基线；当前 W0 与 W1a/W1b/W1c 已有实现，Java 已持久绑定 Workspace，状态见下方补录快照。
 >
-> **Runtime Broker JDBC 补充（更新于 2026-09-25）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的四表切片。#12390/#12391/#12438/#12445 已依次合入 JDBC binding/session、内存 execution、Broker core 和第四表 JDBC；#12458 是关闭的平行实现。#12477/#12478 已合入 owner fence 与数据库时钟修复；#12522/#12552 已合入 attestation client 与本地进程采用。#12627 已合入加密 seed/handle 持久化与恢复 CAS 基础；Spring/Flyway 接线、生产 durable provisioner、完整 Tool Runtime 与多进程端到端验证仍待实现。
+> **Runtime Broker JDBC 补充（更新于 2026-09-25）：** [中文方案](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) 记录 Binding、Runtime Session 和 Tool Execution 三类 Repository 的四表切片。#12390/#12391/#12438/#12445 已依次合入 JDBC binding/session、内存 execution、Broker core 和第四表 JDBC；#12458 是关闭的平行实现。#12477/#12478 已合入 owner fence 与数据库时钟修复；#12522/#12552 已合入 attestation client 与本地进程采用。#12627 已合入加密 seed/handle 持久化与恢复 CAS 基础；Spring/Flyway 与 durable provisioner 已分别由 #12692/#12865 合入；多进程与部署故障保证仍须对应验收。
 
 > **Hosted Harness 私有协议基础（2026-09-22）：** #12409 已合入 `HostedHarnessContract` 与 Express middleware：protocol v1、进程级 boot UUID、canonical capability digest，以及稳定 426/400/409 generation fence。该 PR 没有创建 Hosted profile、挂载 route、广告 capability 或接入 Java client；bearer authentication 与部署 capability canonicalization 仍由后续集成完成。
 >
@@ -24,7 +24,13 @@
 
 > **W39 upstream PR 快照（更新于 2026-09-27）：** #12390/#12391/#12438/#12445 已合入 Broker/JDBC 基础，#12409/#12447/#12506/#12522 已合入私有协议与 attestation 基础，#12477/#12478 已合入正确性修复；#12458 为 closed 平行实现。#12552/#12627/#12630/#12637/#12654 已合入本地进程采用、持久 binding 恢复基础、v2 工具 wire contract、Java HTTP 方法和 Hosted Harness Java client；后续主干已挂载 worker 工具路由并扩展本地 provisioner，但跨 Broker 接管与生产 Hosted Managed 链路仍未验收。
 
-> **W40 当前观察（更新于 2026-09-29）：** #12865 的显式 Linux durable local provisioner、叠加其上的 #12869 可信同宿主 reboot/holder 恢复、#12894 远程 Shell 原始结果 publication，以及 #12950 Hosted 文件路径整批持久拒绝均仍为 open diff，不能作为 `main` 能力；尤其 #12869 的 39 文件增量不能与 #12865 base 重复计算。#12920 仅为 open 的中英文设计排期调整：保留已完成 M1/M3，建议将本地 Managed engine M2/M4–M6 后置到 Hosted 首个工具/结果/故障闭环之后，不表示这些阶段已实现。当前 `main` 尚不能据此宣布完整 Hosted 链路或真实物理重启验收通过。
+> **W39–W41 实施快照（2026-10-09，主干 `55ee50d34e55`）：** #12671 挂载 worker 工具路由；#12691/#12692/#12693 合入 Hosted 基础、Spring/双链路 WebShell 与持久 journal；#12709/#12730/#12754/#12797 合入 Workspace 准入、context、私有执行与选择器，#12713/#12831/#12848 合入私有文本/文件/前台 Shell。#12865/#12869/#12977 合入持久本地 worker、可信 reboot 和人工审计恢复；#12920 是已合入的 docs-only 后置排期决定，M2/M4–M6 不由此实现。#12894/#13037 合入远程结果与公共投影；#13084/#13225/#13090/#13296 合入退休保护、默认关闭 collector、部署门禁与保护候选退避，#13087 closed 未合入。#13088/#13138/#13260 合入 W1a/W1b/W1c；#13135/#13194/#13354 合入 Session close、closed retention 和 ACTIVE 删除。#13289 仅为已合入的实验 CSI worker/ACK 基础。
+
+> **W41 当前 open diff：** #13526 私有 CSI、#13642 JDBC 有界保留、#13654 publication 异步验证、#13673 原 Hook 退休恢复、#13674 强制审批的公开前台 Shell 均未合入；不得作为主干能力。#13655 迁移成功后清诊断已合入。详细控制流、原调用不重放边界与验证入口见 [W39](../../weekly-report/2026-09-21_2026-09-27/README.md)、[W40](../../weekly-report/2026-09-28_2026-10-04/README.md)、[W41](../../weekly-report/2026-10-05_2026-10-11/README.md)。
+
+> **读取失败边界：** #12742 已合入准入后瞬时读取失败的结算保护，以原 sink 重试终态写入；只有再次结算失败才阻塞，不能把失败写入当成功。#12950 已合入托管文件路径拒绝的结果保全，保留拒绝原因和原调用结算，不把路径拒绝变成挂起执行。
+
+> **提交前 open head 复核：** #13526 的 `311b29ef5dec` 已接入私有 CSI 原工具批次的真实 Read/Write/Edit 执行、完整 receipt 与已结算结果的冷恢复，仍未合入。#13674 的 `767ef183025b` 区分 Shell 开关和 Workspace files 总准入开关；`workspaceTurns` 不证明 Shell 可发送，客户端还需 `foregroundShell=true`，Connector 再次核验原持久审批模式。实现代码以 `55ee50d34e55` 深读，并比对最新主干 `e6e2c9efd1dd` 的相关路径；不把其他创建窗口的 PR 新增到本次统计。
 
 ## 当前方案入口
 
@@ -138,7 +144,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [配置与扩展](managed-agent-config-extensions.md) | AgentBundle、MCP/Skills/Hooks 版本和执行归属 |
 | [扩展运行时](managed-agent-extension-runtime.md) | MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor 的共同状态机、任务投影、恢复和 H0～H6 顺序 |
 | [全部工具与文件历史](managed-agent-tools-history.md) | 工具族、Artifact、备份、撤销、迁移 |
-| [完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md) / [English](managed-agent-tool-result-artifacts.md) | v1.11 调研与拟议契约：裁剪前捕获、不可变分段、receipt ACK、三种结果表示、range/下载、WebShell 与引用保留；O1～O4 尚待实现 |
+| [完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md) / [English](managed-agent-tool-result-artifacts.md) | v1.11 调研与拟议契约：裁剪前捕获、不可变分段、receipt ACK、三种结果表示、range/下载、WebShell 与引用保留；Shell O1/O2、O3 投影及 O4 保护/collector/门禁已合入；其它工具与部署验收仍按目标契约推进 |
 | [子作用域](managed-agent-child-scopes.md) / [自动任务](managed-agent-automation.md) | 扩展范围的持久准入、调度、交付与父子关系 |
 | [搜索](managed-agent-search-tools.md) / [Grep](managed-agent-grep-tools.md) / [Notebook](managed-agent-notebook-tools.md) / [媒体](managed-agent-media.md) | 局部工具能力与有限验收，不能外推全部阶段完成 |
 

@@ -1,20 +1,22 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+> **2026-10-09 实施状态：** W0 的选择/准入/context/私有执行/恢复 fence 已由 #12709/#12730/#12754/#12797/#12839/#12869 合入。W1a/W1b/W1c 分别由 #13088/#13138/#13260 合入；#13655 已修迁移成功诊断。#13135/#13194/#13354 提供 Workspace Session 生命周期。下文保留原 2026-09-21 目标契约与源码基线；不再用当时全局静态 Workspace 描述当前 Java。W2 cwd 切换是独立能力，W1c 不支持持久 Shell profile，不能据公开 Shell open 方案 #13674 推断迁移已支持。
+
 > **v1.10 补充：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节补齐上下文安装的私有协议与回执映射。空闲 MCP 连接在封准入后可排空，不作为到达排空步骤前的硬阻塞；Runtime 回收仍把未关闭连接计入 hold。第 6 节增加 actor 授权/幂等域；command SQL delta 在本 Workspace delta 之后应用。
 
 [English](managed-agent-workspace-context.en.md) | [简体中文](managed-agent-workspace-context.md)
 
-状态：v1.12 目标设计，尚未实现。日期：2026-09-21。在 v1.9 归属与 v1.10 私有接线基础上细化“创建会话时选择 Workspace”的 W0 交付。补充 [HTML 总方案](managed-agent-dual-path-architecture.html#workspace-context)、[公共接口](managed-agent-api-contract.md)和[扩展运行时](managed-agent-extension-runtime.md)。本次更新设计和 planned OpenAPI；原目标 DDL 继续复用，不表示 Java 已支持多 Workspace 或 Session 目录切换。
+状态：v1.12 目标设计；已合入切片见上方实施状态。日期：2026-09-21。在 v1.9 归属与 v1.10 私有接线基础上细化“创建会话时选择 Workspace”的 W0 交付。补充 [HTML 总方案](managed-agent-dual-path-architecture.html#workspace-context)、[公共接口](managed-agent-api-contract.md)和[扩展运行时](managed-agent-extension-runtime.md)。本次更新设计和 planned OpenAPI；原目标 DDL 继续复用，不表示 Java 已支持多 Workspace 或 Session 目录切换。
 
 ## 1. 核实的起点与范围
 
 原源码基线为 `feature/managed-agents-p0-p8@2695220a3a`；本次复核 P3 `34ea187c628c` 和 P2 `c0905b2c3b`，下述 Workspace 缺口仍存在。daemon 的 `WorkspaceRegistry` 已区分已注册工作区和 Session owner，普通 Session 创建、恢复、历史查询与 `/session/:id/cd` 各有原有路由约束。新 Hosted API 不直接继承本地 primary fallback，也不扩大 Legacy `/cd` 的适用范围。
 
-Java 当前 `CreateSessionRequest`、`PublicSession` 和 `managed_agent_session` 尚无 Workspace 绑定。`EmbeddedRuntimeBroker` 在启动时解析一组全局 `workspaceCwd/workspaceId/workspaceGeneration`，为所有 Session 构造同一 Workspace scope；RuntimeScope 能携带目录不等于 Session 已有持久归属。qwen Session Authority 还会在私有日志记录 cwd，但它不能替代 Java 的创建准入与 Workspace 授权记录。现阶段只能按单个静态配置工作区理解。
+2026-09-21 基线的 Java `CreateSessionRequest`、`PublicSession` 和 `managed_agent_session` 尚无 Workspace 绑定。`EmbeddedRuntimeBroker` 在启动时解析一组全局 `workspaceCwd/workspaceId/workspaceGeneration`，为所有 Session 构造同一 Workspace scope；RuntimeScope 能携带目录不等于 Session 已有持久归属。qwen Session Authority 还会在私有日志记录 cwd，但它不能替代 Java 的创建准入与 Workspace 授权记录。现阶段只能按单个静态配置工作区理解。
 
 Workspace 创建、仓库 clone、worktree 创建、跨 Workspace 迁移和独立聊天 scratch 分配不在 W0 内。W0 使用管理员预注册且可授权的 Workspace；W2 只开放同一允许文件系统范围内的目录切换。
 
-前端 `java-managed-agent-provider.ts` 当前设置 `acceptsWorkspaceCwd: false`，创建请求未传 Workspace；本地 daemon Provider 才会发送 cwd。`managed-runtime-worker-bootstrap.ts` 又要求 Worker 的 workspaceId 等于 canonical cwd 的本地哈希。因此 W0 必须同时打通 UI、Java、Harness 和 Worker，不能只加一个目录输入框或直接把不透明 Hosted ID 塞进旧 boot 字段。
+原基线的前端 `java-managed-agent-provider.ts` 设置 `acceptsWorkspaceCwd: false`，创建请求未传 Workspace；本地 daemon Provider 才会发送 cwd。`managed-runtime-worker-bootstrap.ts` 又要求 Worker 的 workspaceId 等于 canonical cwd 的本地哈希。因此 W0 必须同时打通 UI、Java、Harness 和 Worker，不能只加一个目录输入框或直接把不透明 Hosted ID 塞进旧 boot 字段。
 
 ## 2. 身份、目录与权威
 
