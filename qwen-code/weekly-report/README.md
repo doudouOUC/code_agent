@@ -2,10 +2,10 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文实现或方案观察放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-> 历史周目录 `README.md` 的状态与规模保留归档快照；W39–W41 已在 2026-10-09 同次复核；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
+> 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 在 2026-10-10 日更复核；`implementations/` 中的单 PR 文档可在后续复核时更新为最终状态，因此两者可能反映不同时间点。
 
-**时间范围**: 2026-04-06 ~ 2026-10-08（持续更新）
-**总计**: 580 PRs（W39/W40 已补齐整周；W41 为截至 2026-10-08 的周内累计）
+**时间范围**: 2026-04-06 ~ 2026-10-09（持续更新）
+**总计**: 587 PRs（W39/W40 已补齐整周；W41 为截至 2026-10-09 的周内累计）
 **代码量**: W15–W22 历史累计 +361,436 / -61,427；后续逐周规模见下表及周目录。文件数为逐 PR changedFiles 累加，不是去重文件数。
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
@@ -42,11 +42,11 @@
 | 2026-09-14 ~ 2026-09-20 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-14_2026-09-20) · [Obsidian](2026-09-14_2026-09-20/README.md)) (W38 最终版) | 20 | 11/8/1 | +163,385/-18,127 | ACP容量/恢复/堆执行、MCP App诊断、bwrap工具级拆分与Landlock、Managed Agent状态/Runtime恢复预览、系统提示词精简、HTTP UUID |
 | 2026-09-21 ~ 2026-09-27 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-21_2026-09-27) · [Obsidian](2026-09-21_2026-09-27/README.md)) (W39 最终版) | 37 | 35/0/2 | +112,728/-6,923 | Hosted 控制面与 journal、Workspace 准入/文件/Shell、Runtime 恢复基础 |
 | 2026-09-28 ~ 2026-10-04 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-28_2026-10-04) · [Obsidian](2026-09-28_2026-10-04/README.md)) (W40 最终版) | 25 | 24/0/1 | +100,820/-2,947 | 完整结果投影/退休/清理、W1 恢复迁移、Session 生命周期、CSI 与设置耐久 |
-| 2026-10-05 ~ 2026-10-11 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-05_2026-10-11) · [Obsidian](2026-10-05_2026-10-11/README.md)) (W41 周内累计) | 6 | 1/5/0 | +53,734/-1,544 | 私有 CSI、JDBC 保留、异步 publication、Hook 退休与公开 Shell 审批 |
+| 2026-10-05 ~ 2026-10-11 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-05_2026-10-11) · [Obsidian](2026-10-05_2026-10-11/README.md)) (W41 周内累计) | 13 | 3/9/1 | +67,908/-2,547 | CSI/挂载身份、cwd、G3/Parts、publication、文件单源读取与 Java CI |
 
 ## 类型分布
 
-feat ×298, fix ×210, refactor ×17, other ×6, docs ×16, chore ×7, perf ×17, test ×8, merge ×1
+feat ×302, fix ×212, refactor ×17, other ×7, docs ×16, chore ×7, perf ×17, test ×8, merge ×1
 
 类型按各周明细的类型字段（旧周）或标题前缀（新周）汇总，与逐周统计一致；不在总索引另行重分类。W23 的 revert 计入 other。
 

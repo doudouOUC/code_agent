@@ -126,6 +126,18 @@ W0 必须在 Java 重启后读回同一绑定；干净回收后在可用的原�
 
 ## 4. 目录切换（W2）
 
+### 4.1 WebShell 当前 open diff（2026-10-10）
+
+#13760（head `19f50d7aa82b`）在既有 Java cwd operation 上接 WebShell，不表示下文全量 W2 目标或当前 `main` 均已交付。Java 批量为 creator-owned、ACTIVE、Workspace 绑定且 files 开启的 Session 核对冻结 generation/storage、活跃 registry 和 OPERATOR/OWNER grant，再派生 `cwdChange`。Provider 只在可信 productScope 下提供 API，校验原 Session/operation 类型/ID。#13761（head `a8c8dd275310`）是 closed 未合入的 capability-only 观察；同类能力在 #13760 diff 中存在，不推断关闭原因。
+
+`use-managed-cwd-change.ts` 先持久保存按 provider/session 隔离的原 revision、目标和幂等键，再提交。pending/installing 持续查询原 operation；completed 必须 revision 增长且 Session/Workspace 摘要追平后才解除发送屏障。网络不确定、408/429 和超时保留原意图；刷新查询原 operation 或用同一键重提，不能生成第二个命令。Session 切换终止当前轮询，但不删除持久意图。`ManagedSessionCwdControl.tsx` 在对话框打开时冻结 revision，过期/忙碌/无 capability 时不准入新切换。
+
+该 UI 不改变同 Workspace 限制、后端 CAS/hold/安装验证，也不解除 Shell/W1c 的限制。回归与浏览器故障检查见 [#13760 实现观察](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13760.md)；本次文档更新未运行产品 E2E。
+
+提交前最新主干 `5b1c701400c9` 的 `ManagedAgentStore.java:beginCwdChangeOperation` 已改为 Workspace OPERATOR 准入，actor-scoped 原键重试先于可变角色拒绝，并通过 V56 actor_key 在结算时复核持久 initiator。上文 creator-owned 是 #13760 当前 diff 的筛选，不是最新主干规则；该分支合入前须对齐能力广告与后端角色/执行事实边界。本次只核对主干演进，不跨创建窗口新增 PR。
+
+### 4.2 目标操作契约
+
 `POST /v1/agents/sessions/{sessionId}/cwd` 接收 `cwd_relative` 和 `expected_context_revision`，携带 `Idempotency-Key`。返回持久 operation（202）；客户端通过 operation 查询或 `session.context.changed` 事件确认生效。BFF 使用 `/sessions/cwd/change` 和 `/operations/query` 的等价 DTO。
 
 只支持同一 Workspace 授权范围内切换；跨 Workspace、进入新的独立 worktree 或改变共享写入边界需单独准入，首版创建新 Session。不能把 shell 命令里的 `cd` 当作持久 Session 目录切换。

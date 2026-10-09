@@ -6,6 +6,10 @@
 
 #12693 已合入持久 journal 与 failover 基础，原操作按持久记录恢复或准确阻塞；它不授权新进程重放状态未知的副作用。该切片的控制流与回归入口见 [PR #12693](../../weekly-report/2026-09-21_2026-09-27/implementations/pr-12693.md)。
 
+> **G3 停靠 Turn（2026-10-10，#13777 open，head `c2f448d1b565`）：** 当前 diff 保存有界的原模型请求、原生审批 continuation 和 cleanup descriptor；这不是已合入能力或泛化接管。主模型快照固定原 Session/header/activation、请求/config/route/provider 摘要和已完成调用，不保存 secret/瞬态 transport 字段。完整证据且没有后继输出/intent 时沿用原 prompt/deadline 重发模型；已有最终 assistant 消息时只补终态，部分公开输出按原 journal 身份撤回。审批保存原 Action/批次/参数/定义/Runtime generation，只恢复 read_file/write_file/edit/glob 的限定无 Hooks/MCP 路径，原 execution/prepare 不换 ID 重放。
+
+`hosted-turn-cleanup.ts:reconcileHostedTurnCleanup` 在 durable terminal 和 file-history 闭合后释放原 binding/generation，再写 confirmed；释放失败保留 owed、输入屏障及可重试清理，不重复终态。load/resident attachment/lifecycle 对账原 debt；Java 递归检查新资源引用闭包，并以 reader floor 2/private ceiling 拒绝旧 reader。无快照、未知副作用、Hooks/MCP、未完成 prefix continuation、Shell owner、两侧 owner 同时重启及跨宿主接管均不能从此推断支持。模型重发不保证 provider exactly-once。完整路径、回归和 PR 内 Linux fixture 证据的范围限制见 [#13777 实现观察](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13777.md)，本次未独立执行源码/故障门禁。
+
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具另须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。干净 idle 回收后的新 binding 可挂回原持久存储；started/unknown 的故障恢复仍阻塞，不能混用两条路径。
 
 > **HTML 对齐（2026-09-18）：** Java 恢复 SessionBackendBinding、RuntimeBinding、Execution Ledger；Harness 依据正式 Transcript/checkpoint 和原 Ledger 恢复；Runtime 提供物理回执。started 无终态保持 recovery_blocked，禁止换 Runtime 重放。F 验收现有部署故障，G 验收共享 Authority 与跨实例接管；内部 UNKNOWN 须显式映射，不直接替换目标状态。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。

@@ -26,13 +26,19 @@
 
 > **W39–W41 实施快照（2026-10-09，主干 `55ee50d34e55`）：** #12671 挂载 worker 工具路由；#12691/#12692/#12693 合入 Hosted 基础、Spring/双链路 WebShell 与持久 journal；#12709/#12730/#12754/#12797 合入 Workspace 准入、context、私有执行与选择器，#12713/#12831/#12848 合入私有文本/文件/前台 Shell。#12865/#12869/#12977 合入持久本地 worker、可信 reboot 和人工审计恢复；#12920 是已合入的 docs-only 后置排期决定，M2/M4–M6 不由此实现。#12894/#13037 合入远程结果与公共投影；#13084/#13225/#13090/#13296 合入退休保护、默认关闭 collector、部署门禁与保护候选退避，#13087 closed 未合入。#13088/#13138/#13260 合入 W1a/W1b/W1c；#13135/#13194/#13354 合入 Session close、closed retention 和 ACTIVE 删除。#13289 仅为已合入的实验 CSI worker/ACK 基础。
 
-> **W41 当前 open diff：** #13526 私有 CSI、#13642 JDBC 有界保留、#13654 publication 异步验证、#13673 原 Hook 退休恢复、#13674 强制审批的公开前台 Shell 均未合入；不得作为主干能力。#13655 迁移成功后清诊断已合入。详细控制流、原调用不重放边界与验证入口见 [W39](../../weekly-report/2026-09-21_2026-09-27/README.md)、[W40](../../weekly-report/2026-09-28_2026-10-04/README.md)、[W41](../../weekly-report/2026-10-05_2026-10-11/README.md)。
+> **W41 日更快照（2026-10-10，主干 `5b1c701400c9`）：** #13526 私有 CSI、#13642 JDBC 有界保留、#13654 publication 异步验证、#13673 原 Hook 退休恢复、#13674 强制审批的公开前台 Shell、#13760 WebShell cwd、#13772 CSI 挂载身份生命周期、#13777 Hosted G3 停靠 Turn 恢复均为 open diff，不得作为主干能力；#13761 capability-only 方案 closed 未合入。#13655 迁移成功后清诊断、#13750 无工具模型 Parts 保全和 #13763 Java verify 工具链已合入。详细控制流、原调用不重放边界与验证入口见 [W39](../../weekly-report/2026-09-21_2026-09-27/README.md)、[W40](../../weekly-report/2026-09-28_2026-10-04/README.md)、[W41](../../weekly-report/2026-10-05_2026-10-11/README.md)。
 
 > **读取失败边界：** #12742 已合入准入后瞬时读取失败的结算保护，以原 sink 重试终态写入；只有再次结算失败才阻塞，不能把失败写入当成功。#12950 已合入托管文件路径拒绝的结果保全，保留拒绝原因和原调用结算，不把路径拒绝变成挂起执行。
 
-> **提交前 open head 复核：** #13526 的 `311b29ef5dec` 已接入私有 CSI 原工具批次的真实 Read/Write/Edit 执行、完整 receipt 与已结算结果的冷恢复，仍未合入。#13674 的 `767ef183025b` 区分 Shell 开关和 Workspace files 总准入开关；`workspaceTurns` 不证明 Shell 可发送，客户端还需 `foregroundShell=true`，Connector 再次核验原持久审批模式。实现代码以 `55ee50d34e55` 深读，并比对最新主干 `e6e2c9efd1dd` 的相关路径；不把其他创建窗口的 PR 新增到本次统计。
+> **当前 open head 复核：** #13526 的 `531f6a98effe` 保留私有 CSI 原批次 Read/Write/Edit、完整 receipt 与已结算结果冷恢复；本次 rebase 不扩展范围，Parts 修复已拆为 merged #13750。#13642 的 `33c6ffd3abda` 将 retention index 迁移顺延到 V56，升级全部 writer 锁协议前保持 cleanup 关闭。#13654 的 `5e69a4e9a1a7` 增补 FAILED operation 可结算清理资格，但对象仍须全部 VERIFIED。#13674 的 `767ef183025b` 仍区分 Shell 开关和 Workspace files 总准入开关；fresh sending 需 `foregroundShell=true`，Connector 再核验原审批模式。相关实现与最新主干 `5b1c701400c9` 对照，不将跨窗口创建的 PR 纳入本次新增统计。
+
+> **Parts 与验证基础（已合入）：** #13750 的 `hosted-harness-model.ts:runHostedHarnessTextTurn` 校验并复制完整模型 Parts，无工具分支不再只返回 text，thought-only 不算已回答；suppressOutput 仍抑制返回 Parts。#13763 的 `.github/workflows/qwen-triage.yml` 在不可信 PR checkout 前安装固定校验的 Java/Maven，PR 只恢复可信 Maven cache，随后无 token 准备 siblings；准备失败明确 Not covered。它们分别修复历史保全和 CI 覆盖基础，不证明完整冷恢复、Java 测试或 MySQL/OSS 门禁已通过。
+
+> **W2/G3/CSI 当前观察：** #13760 在 [Workspace/cwd 双语方案](managed-agent-workspace-context.md)补充可信 capability、原 revision/幂等键持久意图与完成后摘要确认；#13761 仅保留关闭前 capability-only 观察。#13777 在[恢复与运维](managed-agent-recovery-operations.md)保存原模型请求、限定原生审批批次与 cleanup debt，未知副作用不重放。#13772 以 `managed-csi-root-directory.ts` 固定 root descriptor，`managed-csi-mount.ts` 前后验证 mount/disk/dev/inode 并逐级 O_NOFOLLOW 解析 cwd；close join 借用/观察、异常永久 fence，worker 启动/退出也清理 descriptor。后三项仍未合入；挂载身份不保证内容不可变，也不等于公共 CSI 或完整 sandbox。
 
 ## 当前方案入口
+
+提交前最新主干已将 cwd 准入切至 OPERATOR，并用 V56 固定 operation initiator；见 [Workspace/cwd 当前观察](managed-agent-workspace-context.md#41-webshell-当前-open-diff2026-10-10)。#13760 的 creator-owned capability 筛选须按该后端权限重新对齐。#13526/#13642/#13654 当前分支仍使用各自 V56 迁移，合入前须顺延并复核升级顺序，不能直接叠加到已占用 V56 的主干；这属于集成风险，不新增跨窗口 PR 统计。
 
 v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。v1.12 细化[创建时选择 Workspace](managed-agent-workspace-context.md#3-创建与请求路由w0)，OpenAPI 升至 v1.12。v1.13 细化[Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md)，不改变公共 OpenAPI；既有目标 DDL 不变，完整工具结果新增接口仍需在 O1～O4 实现前纳入类型和契约测试。
 

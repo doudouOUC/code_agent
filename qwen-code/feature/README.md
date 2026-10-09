@@ -35,7 +35,7 @@
 | Mobile MCP | [mobile-mcp.md](mobile-mcp.md) | #8311(closed) | 独立发布的 `@qwen-code/mobile-mcp` 关闭前 diff 曾将运行时基线提升到 Node.js 22，升级 MCP SDK 1.30.0，并用 `@hono/node-server` `^2.0.12` 移除 Hono 1.x advisory path；同时记录 split-Zod type bridge、release bump 与 CI follow-up。 |
 | 工具调用 ID 完整性 | [tool-call-id-integrity.md](tool-call-id-integrity.md) | #5107 #5624 #9435 #9436 | OpenAI-compatible provider 的 `tool_call.id` 规范化、去重执行、dangling replay 终止化、duplicate provider id 可见 loop-detected stop 与参数敏感 replay 判定。 |
 | Diff 渲染与变更统计 | [diff-rendering.md](diff-rendering.md) | #6141 | edit/write/shell 等工具的 whitespace-only diff 不再显示为 “No changes detected”，diff stat 也按 smart fallback 统计。 |
-| 文件读取 / 大文本范围 / PDF 预算 | [file-reading.md](file-reading.md) | #6404 / #6409 / #6585 / #6846 / #7947 / #7967 / #8002 / #8383 | 大文本范围读取与 PDF 读取预算：Core 超过旧 10MB 文本 guard 时返回有界行范围，大型 PDF 不带 `pages` 时返回 guidance/reference；文本提取失败或单页超预算时可用 bounded PDF vision bridge fallback；#7947 让 Serve workspace `/file` 也能对超过 256 KiB 的 UTF-8 文本返回 bounded line window；#7967 已合入 handle-bound range reader 分层清理；#8002 增加 byte-cursor paging；#8383 已合入 CRLF cursor paging 的 lineEnding 文件级 metadata 修复。 |
+| 文件读取 / 大文本范围 / PDF 预算 | [file-reading.md](file-reading.md) | #6404 / #6409 / #6585 / #6846 / #7947 / #7967 / #8002 / #8383 / #13776(open) | 大文本范围读取与 PDF 读取预算：Core 超过旧 10MB 文本 guard 时返回有界行范围，大型 PDF 不带 `pages` 时返回 guidance/reference；文本提取失败或单页超预算时可用 bounded PDF vision bridge fallback；#7947 让 Serve workspace `/file` 返回 bounded 大文本窗口，#7967/#8002/#8383 已合入 handle reader、cursor 和 lineEnding 修复。#13776 当前 open diff 将完整 inline read_file 接入单 descriptor 与 PDF FD 继承，保留 path 兼容及同 inode 可变边界。 |
 | Shell 工具执行语义 | [shell-tool.md](shell-tool.md) | #6864 / #6876 / #7053 / #7172 / #11727 | 前台shell timeout、静默心跳与安全三态保持一致；#11727已新增producer预算标记，避免默认配置下generic gate抢先丢掉Shell尾部终态。 |
 | Linux 内核沙箱 | [linux-kernel-sandbox.md](linux-kernel-sandbox.md) | #11614/#12067/#12269(merged) / #11981(closed) / #12064/#12267/#12278(open) | #11614 已合入 whole-CLI bwrap，#12067/#12269已合入 execution foundation 与内部 runtime integration；#11981真实Linux CI已关闭未合入，#12064是总体参考，#12267是公开cutover，#12278是open-network-only的Landlock partial fallback，后三者未进入`main`。 |
 | Scheduled Tasks | [scheduled-tasks.md](scheduled-tasks.md) | #9838 / #10144 / #10828 / #10924 / #11207 | 已合入current-session reuse、empty-session persistence与relaxed ownership task设计；#10924提供mandatory lease/controller-binding fence，#11207已完成新版daemon global-owner runtime cutover，不改变at-least-once dispatch窗口。 |
@@ -60,6 +60,8 @@
 
 > **W39–W41 补录（2026-10-09）：** Managed Agents 的 Hosted 控制面、Workspace/W1/生命周期、完整工具结果和实验 CSI 状态见 [当前总览](managed-agents/README.md)。#13526/#13642/#13654/#13673/#13674 仍 open。#12783 已补 WebShell 中文设置文案；#12784 已合入第三轮提示词去重。#13119/#13140/#13293 已将 settings 保存改为旁路 staging/恢复副本后 rename、恢复前身份检查及权限保留，并等待 sandbox stdout/stderr flush；这些是现有 CLI 可靠性修复，未创建新的产品能力入口。逐条问题、路径和验证见 [周报](../weekly-report/README.md)。
 
+> **W41 日更（2026-10-10）：** #13750 完整 Hosted 模型 Parts 和 #13763 Java verify 工具链已合入；#13760 WebShell cwd、#13772 CSI descriptor 生命周期、#13777 G3 停靠 Turn 恢复仍 open，#13761 capability-only closed 未合入，见 [Managed Agents](managed-agents/README.md)。#13776 完整文件单源读取仍 open，见[文件读取](file-reading.md)。实现、风险与本次未执行的源码门禁见 [W41](../weekly-report/2026-10-05_2026-10-11/README.md)，不把方案或 CI 工具可用写成已上线/测试通过。
+
 ## 使用口径
 
 - 查单个 PR 的最终实现，优先看对应周目录的 `implementations/pr-*.md`。
@@ -72,4 +74,4 @@
 - **acp-bridge 抽包**（#4295/4298/4300/4304/4319/4334/4445）作为 daemon/serve 的内部分层，归入 [daemon-serve-mode/](daemon-serve-mode/README.md)（见其 07 子文档）。
 - 每篇「已知限制」综合 weekly-report 的 review 发现（描述漂移、遗留缺口、待修项），便于直接对照跟进。
 
-_生成于 2026-05-31；按个人 PR 口径更新于 2026-09-23_
+_生成于 2026-05-31；按个人 PR 口径更新于 2026-10-10_

@@ -126,6 +126,18 @@ A missing directory/volume, changed generation, or revoked authorization blocks 
 
 ## 4. Directory Changes (W2)
 
+### 4.1 Current WebShell Open Diff (2026-10-10)
+
+#13760 (head `19f50d7aa82b`) connects WebShell to the existing Java cwd operation; it does not ship every W2 target below or establish current `main` support. Java batches checks for creator-owned ACTIVE, Workspace-bound Sessions with files enabled, then verifies frozen generation/storage, active registry and OPERATOR/OWNER grants before deriving `cwdChange`. The provider exposes the API only within trusted productScope and validates the original Session, operation type and ID. #13761 (head `a8c8dd275310`) is a closed, unmerged capability-only observation. Similar capability code exists in #13760's diff; the closure reason is not inferred.
+
+`use-managed-cwd-change.ts` persists the original revision, target and idempotency key, isolated by provider/session, before submission. Pending/installing polls the original operation. Completed requires a higher revision and refreshed Session/Workspace summaries at least at that revision before sending resumes. Uncertainty, 408/429 and timeouts retain the original intent. Reload queries the original operation or resubmits the same key, never a second command. Session switching aborts polling without deleting durable intent. `ManagedSessionCwdControl.tsx` freezes revision when the dialog opens and rejects new changes while stale, busy or lacking capability.
+
+The UI does not relax same-Workspace scope, backend CAS/holds/installation checks or Shell/W1c restrictions. Regression and browser fault checks are in the [#13760 implementation observation](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13760.md); this documentation run did not execute product E2E.
+
+Pre-submit latest main `5b1c701400c9` changed `ManagedAgentStore.java:beginCwdChangeOperation` to Workspace OPERATOR admission. Actor-scoped same-key replay precedes mutable role refusal, and V56 actor_key lets settlement recheck the durable initiator. The creator-owned filter above belongs to #13760's current diff, not latest main. Integration must align capability advertising with the backend role/execution-fact boundary. This run checks main evolution without adding PRs created outside the window.
+
+### 4.2 Target Operation Contract
+
 `POST /v1/agents/sessions/{sessionId}/cwd` accepts cwd_relative, expected_context_revision, and Idempotency-Key. Return a durable operation with 202; operation lookup or session.context.changed confirms completion. BFF equivalents are `/sessions/cwd/change` and `/operations/query`.
 
 Only the same authorized Workspace scope is supported. Another Workspace, independent worktree, or changed shared-write boundary needs separate admission; initially create a new Session. A shell command's `cd` does not change persistent Session cwd.
