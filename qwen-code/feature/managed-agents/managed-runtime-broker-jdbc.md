@@ -1,5 +1,9 @@
 # Managed Runtime Broker JDBC Persistence
 
+> Current delta, 2026-10-12: #12692 merged Spring/Flyway wiring; #12865's durable local provisioner uses persisted host/boot/process identity beyond the old owned map. #12869/#12977 add trusted reboot and operator-audited cleanup; #13289 merged experimental CSI/persistent ACK foundations. #13642 remains open at `a1146f341ed7`, with V68 retention indexes and DAYS maxAge; cleanup stays off until every writer upgrades its lock protocol. Its V68 collides with #13654 and must be renumbered during integration. #13673 merged Hook stopped release based on original drain/stop/holder evidence. The September 27 delivery note below is historical, not a current owned-map-only claim.
+
+> Private CSI boundary: closed [#13893](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13893.md) rejects private file profiles across local-process create/adopt/register/observe/confirm/release/operator paths; it is not merged support. Similar guards appear in open [#13899](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13899.md), whose separate v5 file worker checks original input/readback/history identity but always returns BLOCKED drain and retains backups. This worker diff does not establish complete Java/Hosted native/readback wiring, production CSI deletion or cross-owner recovery.
+
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
 Status: Base merged upstream by #12445; wiring-gate fixes #12477 and #12478 have also merged

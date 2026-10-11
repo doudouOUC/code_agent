@@ -3,9 +3,12 @@
 **主题**: daemon 修复（btw 泄漏/transcript 隔离/compaction/resync）、ACP 命令扩展（rewind/hooks/directory/remember）、telemetry metrics + 响应元数据、大规模重构
 
 **统计**: 26 PRs — 23 merged / 0 open / 3 closed
-**代码量**: +13,052 / -12,307，272 个文件变更
+**当前已合并 PR 代码量**: +12,949 / -12,306，261 个文件变更
+**全量代码量**: +13,647 / -12,419，288 个文件变更
 **类型**: feat ×14, fix ×9, refactor ×1, chore ×1, other ×1
 **范围 (scope)**: daemon ×7, serve ×5, cli ×4, telemetry ×4, core ×2, integration ×1
+
+> 2026-10-12 审计仅按下表归档规模重算上述汇总；PR 状态和单项规模仍保留原快照，未刷新为当前 GitHub 状态。
 
 **本周最大改动**:
 - [#4774](https://github.com/QwenLM/qwen-code/pull/4774) (+2775/-4969, 81 files) refactor(daemon): simplify code and strip PR/commit references from comments — net -2194 行

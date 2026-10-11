@@ -1,6 +1,8 @@
 # Managed Runtime Broker JDBC 持久化
 
-> **2026-10-09 当前增量：** #12692 已合入 Spring/Flyway 接线，#12865 durable local provisioner 用持久本机/boot/process 身份突破旧 owned-map 限制；#12869/#12977 增加可信 reboot 与人工审计清理。#13289 实验 CSI/持久 ACK 已合入。#13642 的 JdbcRuntimeRetention 游标扫描和引用 guard 仍 open；#13673 原 Hook stopped release 仍 open。下方 2026-09-27 交付记录保留为历史快照，不作为当前 owned-map-only 结论。
+> **2026-10-12 当前增量：** #12692 已合入 Spring/Flyway 接线，#12865 durable local provisioner 用持久本机/boot/process 身份突破旧 owned-map 限制；#12869/#12977 增加可信 reboot 与人工审计清理。#13289 实验 CSI/持久 ACK 已合入。#13642 的 JdbcRuntimeRetention 游标扫描和引用 guard 仍 open，head `a1146f341ed7` 使用 V68 索引与 DAYS maxAge，全部 writer 升级锁协议前 cleanup 保持关闭；V68 与 #13654 相撞，集成时须重新编号。#13673 已合入基于原 drain/stop/holder 证据的 Hook stopped release。下方 2026-09-27 交付记录保留为历史快照，不作为当前 owned-map-only 结论。
+
+> **私有 CSI 边界：** closed [#13893](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13893.md) 在 create/adopt/register/observe/confirm/release/operator 路径拒绝私有文件 profile 误入 local-process，不能当作已合入支持；同类 guard 位于 open [#13899](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13899.md)。后者提供独立 v5 文件 worker 与原输入/readback/history 身份校验，但 drain 始终 BLOCKED，保留 backup。不能据 worker diff 推断完整 Java/Hosted native/readback 接线、生产 CSI 删除或跨 owner 恢复已交付。
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 

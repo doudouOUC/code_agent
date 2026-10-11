@@ -2,15 +2,17 @@
 
 [English](managed-agent-tool-result-artifacts.md) | [简体中文](managed-agent-tool-result-artifacts.zh-CN.md)
 
-状态：设计提案，本文未实现这些能力。调研日期：2026-09-21。核实源码基线：`feature/managed-agent-p2-delivery` 的 `72e215c1e5047b5291430b3dd4c1862c9439f0f6`。本文补齐现有本地工具结果存储、Session authority、Java 公共投影与 WebShell 之间的交付契约，细化已有普通工具回执及资源设计，不建立第二份执行权威。下文仓库路径均对应此基线。
+状态：目标设计，已合入切片见下方实施快照；文档本身不实现运行能力。调研日期：2026-09-21。核实源码基线：`feature/managed-agent-p2-delivery` 的 `72e215c1e5047b5291430b3dd4c1862c9439f0f6`。本文补齐现有本地工具结果存储、Session authority、Java 公共投影与 WebShell 之间的交付契约，细化已有普通工具回执及资源设计，不建立第二份执行权威。下文仓库路径均对应此基线。
 
 > **2026-10-09 实施快照（主干 `55ee50d34e55`）：** #12767/#12821 已合入本地分段与前台 Shell receipt，#12848/#12894 合入 Hosted/远程 publication，#13037 合入公共投影、授权有界读取与 WebShell 展示。#13114 用 bytes/吞吐预算约束同步验证和原 operation 重试。#13084 提供 Session retirement/read lease/pin/恢复保护，#13225 是实际合入的默认关闭 collector（#13087 closed 未合入），#13296 增加保护候选退避；#13090 提供 O4 MySQL/OSS 门禁。测试与部署门禁存在不代表本次通过真实 OSS 或允许生产启用 GC。#13654 的有界异步 verifier 仍为 open diff。下文保留 2026-09-21 目标设计与当时基线，实施状态以上述逐切片及周报为准。
 
-> **异步验证增量（2026-10-10，#13654 open，head `5e69a4e9a1a7`）：** 新增 V56 operation request/claim 元数据，默认关闭且要求 journal-head-authorization、全 server 升级。`ToolPublicationRetentionStore.java:candidate` 将 SUCCEEDED/FAILED 视为已结算 operation，但仍要求全部 object VERIFIED 及原退休/引用保护；CANDIDATE/QUARANTINED 不会因 prefix operation FAILED 就释放对象、inline bytes 或 quota。`ToolPublicationCollectorTest` 覆盖该差异。本次核对 diff 与最新 main `5b1c701400c9`，未运行源码/真实 OSS；详见 [#13654](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13654.md)。
+> **异步验证增量（2026-10-12，#13654 open，head `569befb8de3c`）：** V68 新增 operation request/claim 元数据，默认关闭且要求 journal-head-authorization、全 server 升级。CLAIM 保全已受理的验证，即使原 CSI execution 已结算/退休；原 grant/activation horizon 失效可退避，writer/身份 epoch 改变仍硬拒绝，poison candidate 的异常处理也有后备退避。失败 FINISHING 事务删除原 terminal candidate 行/charge 并把 producer 还原 OPEN，事务后再尝试删原对象；不等于任意 CANDIDATE 可被 collector 删除。`ToolPublicationRetentionStore.java:candidate` 将 SUCCEEDED/FAILED 视为已结算 operation，但仍要求全部 object VERIFIED 及原退休/引用保护；FAILED 不自动释放 CANDIDATE/QUARANTINED 对象、inline bytes 或 quota。本次核对 diff 与主干 `a8990042e648`，未运行源码/真实 OSS；详见 [#13654](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13654.md)。
+
+> **锁顺序增量（2026-10-12，#13894 open，head `a601d0d0146e`）：** `ToolPublicationStore` 对已有 publication 使用持久 scope/digest/身份，candidate 只用于新预留。锁定 placement 前查找 original Runtime，核验同数据库 tenant/Workspace/generation/provisioner，再按 placement → retention/quota/Session writer 顺序取锁；取行锁后重验完整 binding digest。ambient transaction 先锁 staged placement，standalone 边界保留。范围仅普通 publication/K1 split，不涵盖私有 CSI 全部 retention guard；H2 用例不证明 MySQL/完整 HTTP 故障门禁通过，见 [#13894](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13894.md)。
 
 ## 1. 调研结论与范围
 
-当前 open 分支的 async migration 为 V56；提交前主干 `5b1c701400c9` 已占用该号作为 actor-key 迁移。异步验证的集成顺序须重新对齐，不可把分支 V56 当作可直接叠加的主干升级步骤。
+当前 open #13654 的 async migration 与 #13642 的 retention migration 都使用 V68；主干 `a8990042e648` 已到 V67。两分支合入顺序须重新对齐并顺延其中的编号，不可把各自 V68 当作可同时直接叠加的主干升级步骤。
 
 | 核实的来源                                                                                                                   | 已有行为                                                                                                                                                | 缺少的边界                                                                     |
 | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

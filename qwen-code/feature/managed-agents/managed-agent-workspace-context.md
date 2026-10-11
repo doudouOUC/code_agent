@@ -1,6 +1,6 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
-> **2026-10-09 实施状态：** W0 的选择/准入/context/私有执行/恢复 fence 已由 #12709/#12730/#12754/#12797/#12839/#12869 合入。W1a/W1b/W1c 分别由 #13088/#13138/#13260 合入；#13655 已修迁移成功诊断。#13135/#13194/#13354 提供 Workspace Session 生命周期。下文保留原 2026-09-21 目标契约与源码基线；不再用当时全局静态 Workspace 描述当前 Java。W2 cwd 切换是独立能力，W1c 不支持持久 Shell profile，不能据公开 Shell open 方案 #13674 推断迁移已支持。
+> **2026-10-12 实施状态：** W0 的选择/准入/context/私有执行/恢复 fence 已由 #12709/#12730/#12754/#12797/#12839/#12869 合入。W1a/W1b/W1c 分别由 #13088/#13138/#13260 合入；#13655 已修迁移成功诊断。#13135/#13194/#13354 提供 Workspace Session 生命周期。下文保留原 2026-09-21 目标契约与源码基线；不再用当时全局静态 Workspace 描述当前 Java。#13760 已合入独立 W2 WebShell cwd；W1c 不支持持久 Shell profile，不能据已合入的公开前台 Shell #13674 推断迁移已支持。
 
 > **v1.10 补充：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节补齐上下文安装的私有协议与回执映射。空闲 MCP 连接在封准入后可排空，不作为到达排空步骤前的硬阻塞；Runtime 回收仍把未关闭连接计入 hold。第 6 节增加 actor 授权/幂等域；command SQL delta 在本 Workspace delta 之后应用。
 
@@ -126,15 +126,15 @@ W0 必须在 Java 重启后读回同一绑定；干净回收后在可用的原�
 
 ## 4. 目录切换（W2）
 
-### 4.1 WebShell 当前 open diff（2026-10-10）
+### 4.1 WebShell 最终实现（2026-10-12）
 
-#13760（head `19f50d7aa82b`）在既有 Java cwd operation 上接 WebShell，不表示下文全量 W2 目标或当前 `main` 均已交付。Java 批量为 creator-owned、ACTIVE、Workspace 绑定且 files 开启的 Session 核对冻结 generation/storage、活跃 registry 和 OPERATOR/OWNER grant，再派生 `cwdChange`。Provider 只在可信 productScope 下提供 API，校验原 Session/operation 类型/ID。#13761（head `a8c8dd275310`）是 closed 未合入的 capability-only 观察；同类能力在 #13760 diff 中存在，不推断关闭原因。
+#13760 已合入（merge `6936c77e60da`），在既有 Java cwd operation 上接 WebShell，不表示下文全量 W2 目标均已交付。Java 为 ACTIVE、Workspace 绑定且 files 开启的 Session 核对冻结 generation/storage、按 creator 查询的活跃执行 registry 与 caller OPERATOR/OWNER grant，再派生 `cwdChange`；不再把调用者限定为 creator。Provider 只在可信 productScope 下提供 API，校验原 Session/operation 类型/ID。#13761（head `a8c8dd275310`）是 closed 未合入的 capability-only 观察；同类能力在 #13760 最终 diff 中存在，不推断关闭原因。
 
-`use-managed-cwd-change.ts` 先持久保存按 provider/session 隔离的原 revision、目标和幂等键，再提交。pending/installing 持续查询原 operation；completed 必须 revision 增长且 Session/Workspace 摘要追平后才解除发送屏障。网络不确定、408/429 和超时保留原意图；刷新查询原 operation 或用同一键重提，不能生成第二个命令。Session 切换终止当前轮询，但不删除持久意图。`ManagedSessionCwdControl.tsx` 在对话框打开时冻结 revision，过期/忙碌/无 capability 时不准入新切换。
+`use-managed-cwd-change.ts` 先在 sessionStorage 保存按 provider/session 隔离的原 revision、目标和幂等键，再提交。pending/installing 持续查询原 operation；completed 必须 revision 增长且 Session/Workspace 摘要追平后才解除发送屏障。受理前的确定性 4xx 在初次提交和原键 replay 都可清理意图，但 401/404（可能发生在幂等查找前）、408/429、网络不确定和超时保留原意图；刷新查询原 operation 或用同一键重提，不能生成第二个命令。Session 切换终止当前轮询，但不删除持久意图。`ManagedSessionCwdControl.tsx` 在对话框打开时冻结 revision，过期/忙碌/无 capability 时不准入新切换。
 
-该 UI 不改变同 Workspace 限制、后端 CAS/hold/安装验证，也不解除 Shell/W1c 的限制。回归与浏览器故障检查见 [#13760 实现观察](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13760.md)；本次文档更新未运行产品 E2E。
+该 UI 不改变同 Workspace 限制、后端 CAS/hold/安装验证，也不解除 Shell/W1c 的限制。回归与浏览器故障检查见 [#13760 最终实现](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13760.md)；本次文档更新未运行产品 E2E。
 
-提交前最新主干 `5b1c701400c9` 的 `ManagedAgentStore.java:beginCwdChangeOperation` 已改为 Workspace OPERATOR 准入，actor-scoped 原键重试先于可变角色拒绝，并通过 V56 actor_key 在结算时复核持久 initiator。上文 creator-owned 是 #13760 当前 diff 的筛选，不是最新主干规则；该分支合入前须对齐能力广告与后端角色/执行事实边界。本次只核对主干演进，不跨创建窗口新增 PR。
+最新主干 `a8990042e648` 的 `ManagedAgentStore.java:beginCwdChangeOperation` 使用 Workspace OPERATOR 准入，actor-scoped 原键重试先于可变角色拒绝，并通过 V56 actor_key 在结算时复核持久 initiator。最终 capability 与该后端角色边界一致；creator-keyed registry 只核验原执行身份，不限制 caller 必须是 creator。本次核对主干演进，不跨创建窗口新增 PR。
 
 ### 4.2 目标操作契约
 

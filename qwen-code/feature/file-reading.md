@@ -2,7 +2,7 @@
 
 > 适用代码库：`QwenLM/qwen-code`。
 > 当前记录：#6404 大文本范围读取、#6409 大型 PDF 文本提取预算、#6585 PDF page image fallback、#6846 PDF vision bridge fallback、#7947 Serve large text bounded reads、#7967 handle-bound range reader refactor 已合入、#8002 Serve byte-cursor paging 已合入最终实现、#8383 lineEnding metadata consistency 已合入。
-> 2026-10-10 增量：#13776（head `39a05a857d42`）完整文件单源读取仍为 open diff，不能作为 `main` 能力；既有 merged 路径保留，当前方案见下文 3.6。
+> 2026-10-12 增量：#13776 已合入（merge `d534f90d32be`）完整文件单源读取；标准 Linux/macOS inline 的非空普通文件使用单 descriptor，特殊文件和 size=0 保留 path 兼容。最终实现与边界见下文 3.6。
 
 ---
 
@@ -159,13 +159,13 @@ PR #6846 在 `read_file` 直读路径上新增 `preparePdfForVisionBridge`，用
 
 ---
 
-### 3.6 完整文件单源读取（#13776 open）
+### 3.6 完整文件单源读取（#13776 merged）
 
-当前 diff 在 `FileSystemService.withReadFile` 作用域内一次打开标准 Linux/macOS inline 源并 fstat，将 descriptor 与准入 stats 传入整个 read_file 内容/缓存/媒体流程，finally 关闭。`file-read-source.ts` 显式区分 descriptor/path，`fileUtils.ts:processSingleFileContent` 将 sniff、编码、小文本、range、图片、Notebook 和 PDF 接到同一源；bytes 按 64 KiB 块、explicit position 和 AbortSignal 读取，图片 overview/Notebook 格式化不再内部重开 pathname。
+最终实现先 stat 分类：非 regular 或 size=0 使用兼容 path，避免 FIFO/TTY/device 的 open 副作用及 procfs size=0 的错误空文件语义。标准 Linux/macOS inline 的非空普通文件在 `FileSystemService.withReadFile` 作用域内以 O_RDONLY/O_NONBLOCK/O_NOCTTY 打开并 fstat，将 descriptor 与准入 stats 传入整个 read_file 内容/缓存/媒体流程，finally 关闭。`file-read-source.ts` 显式区分 descriptor/path，`fileUtils.ts:processSingleFileContent` 将 sniff、编码、小文本、range、图片、Notebook 和 PDF 接到同一源；bytes 按 64 KiB 块、explicit position 和 AbortSignal 读取，图片 overview/Notebook 格式化不再内部重开 pathname。
 
-`pdf-command.ts` 让 pdfinfo/pdftotext/pdftoppm 继承 FD 3，经 Linux `/proc/self/fd/3` 或 macOS `/dev/fd/3` 读取原源，保留预算和 TERM/KILL 清理。`pdf.ts:renderPDFPagesToImages` 固定输出目录身份，拒绝非预期条目、symlink 和非 regular 输出，清理前复核 dev/inode。read_file 缓存使用准入 stats，失败使原源/path 缓存失效；取消不伪装成功。
+`pdf-command.ts` 让 pdfinfo/pdftotext/pdftoppm 继承 FD 3，经 Linux `/proc/self/fd/3` 或 macOS `/dev/fd/3` 读取原源，保留预算和 TERM/KILL 清理。`pdf.ts:renderPDFPagesToImages` 固定输出目录身份，拒绝非预期条目、symlink 和非 regular 输出，清理前复核 dev/inode；清理失败被吞掉以保留已生成结果，不能保证临时目录总已删除。read_file 缓存使用准入 stats，失败只使本次实际记录的 stats 缓存失效，不按 pathname 清空所有并发条目；取消不伪装成功。
 
-Windows/其它平台、Omni pathname delivery 和未实现 callback 的 custom filesystem service 保留兼容 path，不具有这项 descriptor 保证。固定 inode 防路径替换，但不冻结同一 inode 的并发写入，也不是不可变快照/新增 sandbox 授权。本次未执行源码/Poppler 测试；详细回归入口与平台故障检查见 [#13776 实现观察](../weekly-report/2026-10-05_2026-10-11/implementations/pr-13776.md)。
+Windows/其它平台、Omni pathname delivery 和未实现 callback 的 custom filesystem service 保留兼容 path，不具有这项 descriptor 保证。固定 inode 防路径替换，但不冻结同一 inode 的并发写入，也不是不可变快照/新增 sandbox 授权。本次未执行源码/Poppler 测试；详细回归入口与平台故障检查见 [#13776 最终实现](../weekly-report/2026-10-05_2026-10-11/implementations/pr-13776.md)。
 
 ---
 
@@ -215,7 +215,7 @@ Windows/其它平台、Omni pathname delivery 和未实现 callback 的 custom f
 | [#7967](https://github.com/QwenLM/qwen-code/pull/7967) | merged | handle-bound text range refactor | 最终实现将 path reader 与 caller-owned handle reader 分离，删除混合 flag 和 dead fields，供 Serve large-window 与后续 cursor paging 复用。 |
 | [#8002](https://github.com/QwenLM/qwen-code/pull/8002) | merged | Serve byte-cursor paging | 为 workspace text read 增加 `hasMore` / `nextCursor` / `cursor`，用 snapshot-bound byte cursor 支持大文本连续翻页。 |
 | [#8383](https://github.com/QwenLM/qwen-code/pull/8383) | merged | Serve lineEnding metadata consistency | 最终实现让 `meta.lineEnding` 从完整 decoded file 检测一次，避免 CRLF 文件分页时第一页和后续页报告不同 line ending。 |
-| [#13776](https://github.com/QwenLM/qwen-code/pull/13776) | open | complete file read source | 当前 diff 将标准 Linux/macOS inline read_file 内容/缓存/媒体包在一次打开的 descriptor scope，PDF 继承 FD；path 兼容及同 inode 可变边界仍保留。 |
+| [#13776](https://github.com/QwenLM/qwen-code/pull/13776) | merged | complete file read source | 标准 Linux/macOS inline 非空普通文件的内容/缓存/媒体使用一次打开的 descriptor，PDF 继承 FD；特殊文件、size=0 与其它 path 兼容及同 inode 可变边界仍保留。 |
 
 ---
 
