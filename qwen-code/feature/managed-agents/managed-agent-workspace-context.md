@@ -134,7 +134,7 @@ W0 必须在 Java 重启后读回同一绑定；干净回收后在可用的原�
 
 该 UI 不改变同 Workspace 限制、后端 CAS/hold/安装验证，也不解除 Shell/W1c 的限制。回归与浏览器故障检查见 [#13760 最终实现](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13760.md)；本次文档更新未运行产品 E2E。
 
-最新主干 `a8990042e648` 的 `ManagedAgentStore.java:beginCwdChangeOperation` 使用 Workspace OPERATOR 准入，actor-scoped 原键重试先于可变角色拒绝，并通过 V56 actor_key 在结算时复核持久 initiator。最终 capability 与该后端角色边界一致；creator-keyed registry 只核验原执行身份，不限制 caller 必须是 creator。本次核对主干演进，不跨创建窗口新增 PR。
+最新主干 `18f80f56666a` 的 `ManagedAgentStore.java:beginCwdChangeOperation` 使用 Workspace OPERATOR 准入，actor-scoped 原键重试先于可变角色拒绝，并通过 V56 actor_key 在结算时复核持久 initiator。最终 capability 与该后端角色边界一致；creator-keyed registry 只核验原执行身份，不限制 caller 必须是 creator。本次核对主干演进，不跨创建窗口新增 PR。
 
 ### 4.2 目标操作契约
 

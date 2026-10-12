@@ -1,5 +1,17 @@
 # Managed 普通客户端、交互与事件投影
 
+> **2026-10-13 实施快照（主干 `18f80f56666a`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) 已合入 child_agent 任务面板；[#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 复用仍 open，不能作为主干 UI 承诺。以下历史设计不代表所有客户端能力已交付。本次只核对代码、diff 与回归入口，未运行源码、浏览器或真实宿主门禁。
+
+### 已合入的子 Agent 任务面板
+
+`ManagedSessionsPage.tsx` 按容器 1100px 阈值选择 360px 侧栏或 Dialog，关闭后归还焦点。`use-managed-tasks.ts` 对原 task API 每页 50 条做查询，面板打开且页面可见时每 3 秒轮询；混合页只过滤 child_agent，不扫描其它页或声称有 child 总数。task/Session 身份、owner/generation/AbortController 隔离旧请求，终态不回退，events 按 cursor 去重；游标过期显示历史缺口。artifactRefs 通过既有授权 reader 读取，不新增公共最终结果。
+
+`use-managed-task-cancel.ts` 先保存按 provider/Session 分区的原 task/idempotencyKey 再 POST，存储失败不发送。显式 productScope 与当前 capability 限定新取消；operation completed 只表示原停止请求被接受，仍查询 task 真终态，自然完成不改成 cancelled。30 秒确认预算后保留 stopping/unconfirmed，重放拒绝不证明未受理；刷新优先查询原 operationId，未知 ID 的意图只能恢复原键。capability 撤销后仍有保存意图的恢复入口，不额外锁住聊天输入。
+
+### 标准 UI 的当前 open 方案
+
+#13973 head `e97617cf7a10` 复用 WelcomeHeader/MessageList/ChatEditor 和 frame/theme；model presets 是宿主发布的 AgentDefinition ID，仅新建时选择，不热改现有 Session。初始 input_text 与原 Workspace/cwd/key 一次创建并核验 admission，未确认重试原 payload/key；拿到 sessionId 后读回失败仅重读。受理确认才 commit，按原 provider/Session 和原文本精确清草稿，跨 Session 重试和较新不同草稿不丢失；empty-only provider 保持兼容。Managed 明确禁用 Shell mode、附件、slash commands 和 daemon Workspace 特性，!/? 保留字面语义。标准视觉组件不能扩大执行权限，现有 cwd/进度/审批/取消屏障仍保留。
+
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 > **首版运行范围（2026-09-19）：** [运行契约](managed-agent-first-runtime.md#7-审批与用户问答)要求已开放能力的审批/问答经过 Java 回到原持久仲裁；复用既有产品入口、SSE 和历史查询。独立公共 Item/eventSequence 投影属于 D，不阻塞首版 Hosted 运行；首版 accepted 必须等待 qwen 持久受理。

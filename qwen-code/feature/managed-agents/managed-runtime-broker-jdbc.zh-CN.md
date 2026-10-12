@@ -1,10 +1,16 @@
 # Managed Runtime Broker JDBC 持久化
 
-> **2026-10-12 当前增量：** #12692 已合入 Spring/Flyway 接线，#12865 durable local provisioner 用持久本机/boot/process 身份突破旧 owned-map 限制；#12869/#12977 增加可信 reboot 与人工审计清理。#13289 实验 CSI/持久 ACK 已合入。#13642 的 JdbcRuntimeRetention 游标扫描和引用 guard 仍 open，head `a1146f341ed7` 使用 V68 索引与 DAYS maxAge，全部 writer 升级锁协议前 cleanup 保持关闭；V68 与 #13654 相撞，集成时须重新编号。#13673 已合入基于原 drain/stop/holder 证据的 Hook stopped release。下方 2026-09-27 交付记录保留为历史快照，不作为当前 owned-map-only 结论。
+> **2026-10-13 当前增量：** #12692 Spring/Flyway、#12865 持久本机/boot/process 与 #12869/#12977 可信 reboot/人工清理已合入，#13289 实验 CSI/持久 ACK 已合入。#13642 retention 仍 open，head `5832d8824a31` 已顺延 V69，maxAge 按 DAYS、scanDelay 按 MILLIS，maxAge 至少 1ms，并保护未结算 background_shell 的原 process 行。主干 V68 async 已合入，原编号冲突已解决，但writer 锁协议及独立 Hosted cleanup 释放证明均验证前 cleanup 仍关闭。#13673 原 drain/stop/holder Hook 恢复已合入。下方 2026-09-27 记录保留为历史，不作当前 owned-map-only 结论。
 
-> **私有 CSI 边界：** closed [#13893](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13893.md) 在 create/adopt/register/observe/confirm/release/operator 路径拒绝私有文件 profile 误入 local-process，不能当作已合入支持；同类 guard 位于 open [#13899](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13899.md)。后者提供独立 v5 文件 worker 与原输入/readback/history 身份校验，但 drain 始终 BLOCKED，保留 backup。不能据 worker diff 推断完整 Java/Hosted native/readback 接线、生产 CSI 删除或跨 owner 恢复已交付。
+> **私有 CSI 边界：** closed [#13893](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13893.md) 在 create/adopt/register/observe/confirm/release/operator 路径拒绝私有文件 profile 误入 local-process，不能当作已合入支持；同类 guard 位于 merged [#13899](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13899.md)。后者提供独立 v5 文件 worker 与原输入/readback/history 身份校验，但 drain 始终 BLOCKED，保留 backup。不能据 worker diff 推断完整 Java/Hosted native/readback 接线、生产 CSI 删除或跨 owner 恢复已交付。
+
+> **周更补充：** #13642 为 execution lease 的 `(binding_id, runtime_generation)` 引用查询补齐 Flyway/幂等 JDBC 索引。#13899 的 worker 在 history prepare 前预估 100 snapshot/64 KiB envelope 容量；准备失败后效果改变或不能证明时 historyFailed 并拒绝后续写入/排队 snapshot，只有准备前后观察相等才允许原引用重试。普通读取路径拒绝不自动 fence 挂载；部分文件写入/取消尝试按原 inode 回滚，失败才保留聚合故障。seal 也封 executor 准入，drain 仍 BLOCKED；不承诺整个调用原子回滚或物理删除。本次未执行源码/CSI 门禁。
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
+
+#13642 最新版先按原 Session 值和二进制身份共同去重，再查 indexed projection，permissive collation 不合并不同 owner；这是保守 Session 级保护。retention 必须保持关闭，直到独立的精确身份 Hosted cleanup 释放证明交付并验证：owed descriptor 可比 RELEASED binding 保留更久，收集后原释放会冲突并阻塞 Session。当前 open PR 未实现该契约，仅升级 writer 锁协议不足以开启清理。新增 H2/MySQL 大量 settled Shell 与折叠身份用例，本次未执行。
+
+#13899 最终合入版还排斥 prepare/execution 重叠，此类时序拒绝不退役 Session；scoped 新文件/目录请求 0600/0700，旧文件保留 mode。只有成功回滚且错误正是原取消 reason 才恢复可用，ENOSPC 等存储故障即使恢复 bytes 仍 fence；普通 Write 保留 pre-write 抛错。boot6 CUT/finalization 与完整 native 控制面仍在 open #13526，不属于已合入 boot4/5 worker。
 
 状态：基础切片已由 upstream #12445 合入；接线门槛修复 #12477 与 #12478 也已合入
 

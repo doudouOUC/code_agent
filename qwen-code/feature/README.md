@@ -58,9 +58,9 @@
 >
 > W39 当前 follow-up：#12374已把session debug日志纳入interactive housekeeping，但不覆盖headless/ACP/serve主动清理。Managed Runtime方面，#12390/#12391/#12438/#12445已依次合入Binding/Session JDBC、Tool Execution状态、service core与第四表持久账本，#12458作为平行实现关闭并由#12445取代；#12477/#12478已合入dispatch owner最终fence及JDBC时区/存储精度修复。#12409/#12447/#12506/#12522/#12552/#12627/#12630/#12637/#12654已合入私有协议、attestation、持久恢复基础、工具契约/Java HTTP 方法及Hosted Harness Java client；后续主干已挂载worker工具路由并扩展本地provisioner，完整跨Broker/产品链路仍需验收。#12491已合入review权威状态迁移；#12546第二轮提示词去重已合入，真实模型A/B未验证。
 
-> **W39–W41 补录（2026-10-12）：** Managed Agents 的 Hosted 控制面、Workspace/W1/生命周期、完整工具结果和实验 CSI 状态见 [当前总览](managed-agents/README.md)。#13526/#13642/#13654 仍 open；#13673 原 Hook 退休恢复和 #13674 强制审批的公开前台 Shell 已合入。#12783 已补 WebShell 中文设置文案；#12784 已合入第三轮提示词去重。#13119/#13140/#13293 已将 settings 保存改为旁路 staging/恢复副本后 rename、恢复前身份检查及权限保留，并等待 sandbox stdout/stderr flush；这些是现有 CLI 可靠性修复，未创建新的产品能力入口。逐条问题、路径和验证见 [周报](../weekly-report/README.md)。
+> **W39–W42 补录（2026-10-13）：** Managed Agents 的 Hosted 控制面、Workspace/W1/生命周期、完整工具结果和实验 CSI 状态见 [当前总览](managed-agents/README.md)。#13526/#13642 仍 open；#13654 异步 verifier 已合入但默认关闭，#13673 原 Hook 退休恢复和 #13674 强制审批的公开前台 Shell 已合入。#12783 中文设置文案、#12784 提示词去重及 #13119/#13140/#13293 settings staging/恢复身份/权限与 sandbox flush 为既有可靠性修复，逐条路径和验证见 [周报](../weekly-report/README.md)。
 
-> **W41 日更（2026-10-12）：** #13750 完整 Hosted 模型 Parts、#13763 Java verify、#13760 WebShell cwd 和 #13772 CSI descriptor 生命周期已合入；#13777 G3、#13894 publication 锁顺序、#13899 私有 CSI 文件 worker 仍 open，#13761 capability-only 与 #13893 私有 CSI 退休 profile closed 未合入，见 [Managed Agents](managed-agents/README.md)。#13776 完整文件单源读取已合入，见[文件读取](file-reading.md)。实现、风险与本次未执行的源码门禁见 [W41](../weekly-report/2026-10-05_2026-10-11/README.md)，不把方案或 CI 工具可用写成已上线/测试通过。
+> **W41 周更完成与 W42 日更（2026-10-13）：** #13777 G3、#13894 publication 锁顺序、#13899 私有文件 worker 和 #13936 child_agent 任务面板已合入；#13931 L4 与 #13973 标准 UI 仍 open，#13761/#13893 closed 未合入。#13750/#13763/#13760/#13772 既有合入状态不变，见 [Managed Agents](managed-agents/README.md)；#13776 单源读取见[文件读取](file-reading.md)。源码与部署门禁本次未执行，不把代码或 CI 工具可用写成已上线/测试通过。
 
 ## 使用口径
 

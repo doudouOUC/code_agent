@@ -134,7 +134,7 @@ A missing directory/volume, changed generation, or revoked authorization blocks 
 
 The UI does not relax same-Workspace scope, backend CAS/holds/installation checks or Shell/W1c restrictions. Regression and browser fault checks are in the [#13760 final implementation](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13760.md); this documentation run did not execute product E2E.
 
-Latest main `a8990042e648` uses Workspace OPERATOR admission in `ManagedAgentStore.java:beginCwdChangeOperation`. Actor-scoped same-key replay precedes mutable role refusal, and V56 actor_key lets settlement recheck the durable initiator. Final capability advertising matches that role boundary; creator-keyed registry facts authenticate the original execution identity, not caller ownership. This run checks main evolution without adding PRs created outside the window.
+Latest main `18f80f56666a` uses Workspace OPERATOR admission in `ManagedAgentStore.java:beginCwdChangeOperation`. Actor-scoped same-key replay precedes mutable role refusal, and V56 actor_key lets settlement recheck the durable initiator. Final capability advertising matches that role boundary; creator-keyed registry facts authenticate the original execution identity, not caller ownership. This run checks main evolution without adding PRs created outside the window.
 
 ### 4.2 Target Operation Contract
 
