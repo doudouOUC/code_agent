@@ -12,6 +12,20 @@
 
 #13899 最终合入版还排斥 prepare/execution 重叠，此类时序拒绝不退役 Session；scoped 新文件/目录请求 0600/0700，旧文件保留 mode。只有成功回滚且错误正是原取消 reason 才恢复可用，ENOSPC 等存储故障即使恢复 bytes 仍 fence；普通 Write 保留 pre-write 抛错。boot6 CUT/finalization 与完整 native 控制面仍在 open #13526，不属于已合入 boot4/5 worker。
 
+## 2026-10-14 私有 authority 与新库的 open 观察
+
+[#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) head `2d32f7f46196` 新增离线私有 CREATE、csi_guard 和同源 SQL/native authority。`WorkspaceCsiRuntimeAccess` 以原 DataSource 的新事务锁 placement/control/registration，核验 READY、原 binding/generation/lease/seed/handle/context；native 认证同时校验 provision seed 与 Runtime lease token，response comparison reference 必须来自原生读回。`ManagedSessionStore` 在 journal 提交事务核验 genesis、首 writer/activation、原有限批次与 execution/history receipt，资源读取使用原 read lease 和结算前 bytes/identity 再验。该 diff 不开放 generic cancel/close/delete，release 仍 `csi_finalize_required`，正向 SQL grant→worker→retained history 与真实 CSI 尚需验收。
+
+branch V69–V72 是上述 request/activation/execution/read 的编号；#13642 当前 head `d8ddc6ac9871` 也包含 `V69__runtime_broker_retention.sql`。主干为 `96cfa244917c`、已有 V68，不能沿用旧“编号冲突已解决”声明来批准这两条 open 分支联合部署，集成须重新核对编号、锁序与兼容门禁。
+
+[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `94167b93b28c` 叠加在 #13996 base branch，只有相对父分支的文本增量。认证 Hosted 私有 attach/text/history 固定原 UUID/writer/activation，fresh admission 后生产纯文本；失去续租时阻塞，`stopLocal` 不 seal authority 或 release Runtime。不安装文件 toolTurn、finalization、public selector 或冷替换写者，进程内 prompt 去重不证明跨 boot replay。
+
+[#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) head `740f8e8c5df6` 对 fresh database 收敛为固定 32 张 ma_* 业务表，共用 canonical V1 DDL，先验证完整 catalog/列/键/索引/check/FK 后才 Flyway baseline/migrate。旧迁移移出 classpath，不能对已有旧库原地升级；通用 receipt/work 有封闭 namespace/scope，Runtime generation、Session head、operation claim 和 read lease 仍独立。分页/投影 GC 与切换策略见[存储、事件方案](managed-agent-storage-event-architecture.md)。本次未运行源码、MySQL、OSS/CSI 或部署门禁，三者均不承诺 main 能力或生产迁移完成。
+
+## 历史基础切片
+
+以下非目标、四表 Schema 和初始化方式保留 2026-09-27 的基础切片语义，不是对当前全部实现或 32 表 open branch 的描述。
+
 状态：基础切片已由 upstream #12445 合入；接线门槛修复 #12477 与 #12478 也已合入
 
 > Upstream 交付状态（更新于 2026-09-27）：#12390/#12391/#12438/#12445 已合入 Binding/Session JDBC、Tool Execution 状态、Broker core 与第四表 JDBC；#12458 是关闭的平行实现。#12445 的精确评审 head 曾通过 JDK 21 下 63 个测试、Checkstyle、H2 共用合约及一次性 MySQL 26.7.0 `utf8mb4_0900_ai_ci` 验证，覆盖大小写敏感标识、不透明 `$ref`/`@type` 与正指数 BigDecimal 往返。#12477/#12478 已合入 dispatch owner 最终 fence、时区无关且秒级存储安全的数据库时钟读取，并有 MariaDB CI lane；#12552 已合入本地进程采用。#12627 已为持久 binding 合入加密 seed、resource handle、attestation generation、LOST/RECOVERY_BLOCKED 与 observe→attest→CAS 恢复基础。后续主干的 local-process provisioner 已返回 `local-process` kind、实现 ensure/reconcile，但 observe 仍依赖本进程 owned map；生产跨 Broker 接管、完整 Tool Runtime transport 与多进程端到端验证仍需单独证明。

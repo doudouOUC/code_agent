@@ -14,7 +14,17 @@
 
 最终 G3 使用 `{promptId, runtimeSessionId}` 保持原实际 lease，MCP configuration owner 不被普通 prompt handback 提前释放；原 debt 与 drain 一起对账，清理失败 kick 维护泵。此范围仍不扩展成 MCP/Hook/Shell 模型重放。
 
-> **L4 当前 open 方案（2026-10-13，#13931，head `2ef8fba0d2b6`）：** 精确 Shell/1、MCP/1 用 lifecycle v2，files/1 保留 v1，`QWEN_HOSTED_LIFECYCLE_V2_PROFILES` 默认空，未知版本不走 legacy。close 的 SessionEnd、delete 的 SessionEnd→SessionDelete 先存原 effects 回执，再以原 operation/claim 在 DRAINING 做 prepare_resources/settle_resources；冷加载只建立清理 writer，不触发 SessionStart/模型/新 Monitor。Shell drain 保留最终输出但抑制通知，MCP 先释放各连接再共享 owner；死 worker 必须可信 stopped proof。Java 核验原 binding/generation/owner、publication 内容与资源闭包，私有输出退役和 tombstone 在最终事务完成，共享 Workspace/其它 Session 不删除。不确定身份/效果仍 blocked；必须先升级全部 consumer 再开精确 profile。主干尚无该 v2 广告，完整路径与未运行门禁见 [#13931 当前观察](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13931.md)。
+> **L4 最终实现（2026-10-14，#13931 merged，主干 `96cfa244917c`）：** 精确 Shell/1、MCP/1 用 lifecycle v2，files/1 保留 v1，`QWEN_HOSTED_LIFECYCLE_V2_PROFILES` 默认空，未知版本不走 legacy。close 的 SessionEnd、delete 的 SessionEnd→SessionDelete 先存原 effects 回执，再以原 operation/claim 在 DRAINING 做 prepare_resources/settle_resources；冷加载只建立清理 writer，不触发 SessionStart/模型/新 Monitor。Shell drain 保留最终输出但抑制通知，MCP 先释放各连接再共享 owner；死 worker 必须可信原 stopped proof。Java 核验原 binding/generation/owner、publication 内容与资源闭包，私有输出退役和 tombstone 在最终事务完成，共享 Workspace/其它 Session 不删除。不确定身份/效果仍 blocked；必须先升级全部 consumer 再开精确 profile。完整路径与未运行门禁见 [#13931 最终实现](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13931.md)。
+
+L4 的原 cleanup writer seal 仍核验 head 的原 token/generation 与有效 cleanup claim，但不只因 writer lease 到期拒绝清理。Broker 在原 lease/resource handle、无 active execution 和原 lifecycle authority 匹配后保存可信 stopped drain receipt，再允许 LOST→DRAINING；receipt CAS 继续复核 claim。MCP 的 workspace_close_identity_unverified 可尝试该原 stopped recovery，不能绕过其它身份/授权/closed-admission 拒绝或把断线当完成。
+
+### 已合入的原清理与结果续接修复
+
+- [#14039](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14039.md)：`QwenHostedHarnessConnector:settleLifecycle` 仅在 v2 非 effects 404 时条件删除仍匹配的 AttachmentRef，继续抛原异常；下一次从 SQL 原 effects/claim cleanup-only load，不删除并发替换附件，也不把 404 当释放证明。
+- [#14045](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14045.md)：`WorkspaceProfileLifecycleVerifier` 读取原 scoped input 并核验 payload/hash，仅已结算的 deferred read_file/write_file/edit/glob 且无 protocol/publication/source 才免不适用的 Shell 输出检查；真实 Shell/MCP 输出和原 owner 关闭条件保留。
+- [#14059](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14059.md)：`hosted-workspace-tool-turn:restoreRuntime` 只对 files 的 settled/results_ready、完整 outcome/history、无 Hooks/MCP/未决 history/undo 续接。`confirmReplacedHostedTurnOwner` 在同 Workspace generation 下复核 owed 原 binding/generation 与 prompt/runtimeSession，确认原 release 后只消费结果，不再 acquire/运行新工具；构造器仍可能预热，不承诺零 provision。Write/Edit 必须有原 history，下一工具用新 Turn。
+
+上述修复不开放 UNKNOWN 重放、跨 owner 泛化接管或 CSI finalization，也不交付 JDBC retention 所需的独立 Hosted cleanup release-proof。合入与 default-off profile 开启、真实 MySQL/Runtime/Linux 故障验收是不同证据；本次仅审阅代码与回归入口，未运行这些门禁。
 
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具另须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。干净 idle 回收后的新 binding 可挂回原持久存储；started/unknown 的故障恢复仍阻塞，不能混用两条路径。
 

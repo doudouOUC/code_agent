@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-13 实施快照（主干 `18f80f56666a`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) 已合入 child_agent 任务面板；[#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 复用仍 open，不能作为主干 UI 承诺。以下历史设计不代表所有客户端能力已交付。本次只核对代码、diff 与回归入口，未运行源码、浏览器或真实宿主门禁。
+> **2026-10-14 实施快照（主干 `96cfa244917c`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) child_agent 任务面板和 [#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 均已合入；[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) 私有 CSI 文本仍 open。以下历史设计不代表所有客户端能力已交付。本次只核对代码、diff 与回归入口，未运行源码、浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -8,9 +8,17 @@
 
 `use-managed-task-cancel.ts` 先保存按 provider/Session 分区的原 task/idempotencyKey 再 POST，存储失败不发送。显式 productScope 与当前 capability 限定新取消；operation completed 只表示原停止请求被接受，仍查询 task 真终态，自然完成不改成 cancelled。30 秒确认预算后保留 stopping/unconfirmed，重放拒绝不证明未受理；刷新优先查询原 operationId，未知 ID 的意图只能恢复原键。capability 撤销后仍有保存意图的恢复入口，不额外锁住聊天输入。
 
-### 标准 UI 的当前 open 方案
+### 标准 UI 的最终实现
 
-#13973 head `e97617cf7a10` 复用 WelcomeHeader/MessageList/ChatEditor 和 frame/theme；model presets 是宿主发布的 AgentDefinition ID，仅新建时选择，不热改现有 Session。初始 input_text 与原 Workspace/cwd/key 一次创建并核验 admission，未确认重试原 payload/key；拿到 sessionId 后读回失败仅重读。受理确认才 commit，按原 provider/Session 和原文本精确清草稿，跨 Session 重试和较新不同草稿不丢失；empty-only provider 保持兼容。Managed 明确禁用 Shell mode、附件、slash commands 和 daemon Workspace 特性，!/? 保留字面语义。标准视觉组件不能扩大执行权限，现有 cwd/进度/审批/取消屏障仍保留。
+#13973 最终合入 `72316e6608d7`，复用 WelcomeHeader/MessageList/ChatEditor 和 frame/theme；model presets 是宿主发布的 AgentDefinition ID，仅新建时选择，不热改现有 Session。初始 input_text 与原 Workspace/cwd/key 一次创建并核验 admission，未确认重试原 payload/key；拿到 sessionId 后读回失败仅重读。受理确认才 commit，按原 provider/Session 和原 draftText 精确清草稿，跨 Session 重试和较新不同草稿不丢失；empty-only provider 保持兼容。Managed 明确禁用 Shell mode、附件、slash commands 和 daemon Workspace 特性，!/? 保留字面语义。标准视觉组件不能扩大执行权限，现有 cwd/进度/审批/取消屏障仍保留。
+
+放弃未知创建恢复原 initial input、清本地 pending/commit callback，并由 `WorkspaceBindingCreator:onAbandoned` 刷新 Session 列表，允许重新发现服务器已创建但响应丢失的 Session。仅 pending 且不 busy 显示恢复行；含初始输入与空创建分别提示风险，不能凭放弃断言原输入未执行。
+
+### 私有 CSI 文本的当前 open 方案
+
+[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `94167b93b28c` 叠加在 open [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 的 SQL authority 分支上，不是标准 UI 或公共 CSI selector。Hosted-only `QWEN_HOSTED_CSI_SESSION_STORE_URL` 使认证 primary listener 提供 private attach/text/history；固定原 canonical Session UUID、writer/binding generation 1、activation epoch 1，text/history 前 fresh acquire 核验原准入。只生产纯文本与已结算 history，不安装 file toolTurn 或生命周期。
+
+`hosted-csi-session.ts` 续租失效阻塞 owner 并 abort 原 prompt；`http-managed-session-store.ts:stopLocal` 停本地续租/写入而不 seal authority，shutdown 不 release Runtime。普通 route 拒绝私有 owner 的大小写变体，原 prompt/相同文本只在本进程复用原结果，不承诺跨 boot exactly-once。真实模型、SQL/CSI 正向链路与部署仍须独立验收。
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

@@ -1,5 +1,19 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+> **2026-10-14 新库方案观察：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 仍 open，head `740f8e8c5df6`，不是主干或旧库升级承诺。以下 2026-09-20/21 的分支演进保留为历史；新增 baseline 只用于 fresh database，不能据表数下降宣布持久恢复或生产切换完成。
+
+## 新库 32 表的当前 open 切片
+
+`managedschema/ManagedSchemaContract.java` 固定 32 张 ma_* 业务表及封闭 operation/receipt/work/owner/delivery/head/guard 类型，Broker 与 Spring 共用 `db/managed-schema/V1__managed_schema.sql`。`ManagedSchemaCatalog.validate` 拒绝缺表/额外表/view，核验 InnoDB、列/生成列、键/索引/check/FK；空 catalog 初始化，已有 canonical catalog 先验证再 baseline/migrate，history-only catalog 拒绝。旧 Flyway SQL 移至非 classpath archive，没有原地转换 legacy 数据。
+
+表族收敛不合并权威：Session head/journal revision、公开 event stream 水位、Runtime generation、operation claim、storage owner/read lease 仍独立。`ManagedReceipts` 用 namespace/tenant/scope/key digest 定位，再比较原 byte identity，actor replay scope 与 Session command 分开；`ManagedSchemaJdbcTemplate` 适配 map/binary 身份，不重写 SQL。journal、资源引用、投影及 head 保留原事务边界。
+
+`ManagedSnapshotStore` 以冻结 descriptor 和 body refs 建 versioned page/manifest，目标每页 100 items/128 KiB，cursor 固定 tenant/Session/snapshot 并签名、到期失效；SnapshotReadLease 保护构建和读取。该实现仍读取 item 集合，page 目标不等于总内存硬上限。`ManagedProjectionResourceCollector` 每批 32，复核 active refs/recovery/read lease 后只清 orphan MYSQL_INLINE 投影正文并留 tombstone；不做外部 I/O，也不允许任意 Session 资源收集。
+
+切换策略是保留旧数据库/历史 endpoint，新 Session 进入新环境，回滚也保全新库已接受数据。DataAgent 的 da_qwen_session_* 不在此范围。真实 MySQL 的 journal 原子性、旧 writer、receipt、snapshot/GC/read lease 竞争及 load/query budget、OSS/CSI 与生产流量门禁本次均未执行；命令与测试入口见单 PR 观察。
+
+## 历史存储与事件设计
+
 > **v1.11 工具结果专项：** [完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)细化 bytes 捕获、receipt ACK、公开预览、有界读取和资源保留，尚待实现。当前 SQL Batch 只保存公开投影，不等于原生完整工具输出。
 
 > **v1.10 修订（2026-09-21）：** [v1.10 契约收敛](managed-agent-contract-closure.md)替换全局 offset 扫描，区分入口受理边界，补齐真实 V1/V2 的增量迁移及容量/清理门槛。后续源码提交 `72e215c1e5`（`feature/managed-agent-p2-delivery`）已实现 V4 SQL Batch/Delivery、generation fencing 和连续物化；MQ、保留清理和完整命令交付仍为目标设计，V4 与原 V3 需按顺序集成。

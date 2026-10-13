@@ -60,7 +60,7 @@
 
 > **W39–W42 补录（2026-10-13）：** Managed Agents 的 Hosted 控制面、Workspace/W1/生命周期、完整工具结果和实验 CSI 状态见 [当前总览](managed-agents/README.md)。#13526/#13642 仍 open；#13654 异步 verifier 已合入但默认关闭，#13673 原 Hook 退休恢复和 #13674 强制审批的公开前台 Shell 已合入。#12783 中文设置文案、#12784 提示词去重及 #13119/#13140/#13293 settings staging/恢复身份/权限与 sandbox flush 为既有可靠性修复，逐条路径和验证见 [周报](../weekly-report/README.md)。
 
-> **W41 周更完成与 W42 日更（2026-10-13）：** #13777 G3、#13894 publication 锁顺序、#13899 私有文件 worker 和 #13936 child_agent 任务面板已合入；#13931 L4 与 #13973 标准 UI 仍 open，#13761/#13893 closed 未合入。#13750/#13763/#13760/#13772 既有合入状态不变，见 [Managed Agents](managed-agents/README.md)；#13776 单源读取见[文件读取](file-reading.md)。源码与部署门禁本次未执行，不把代码或 CI 工具可用写成已上线/测试通过。
+> **W41 周更完成与 W42 日更（2026-10-14）：** #13777 G3、#13894 publication 锁顺序、#13899 私有文件 worker 和 #13936 child_agent 任务面板已合入；#13931 L4、#13973 标准 UI 及 #14039/#14045/#14059 原清理/文件关闭/退役后结果续接也已合入，#13761/#13893 closed 未合入。#13996 私有 CSI SQL authority、#14069 fresh database 32 表、#14081 stacked 私有文本仍 open，见 [Managed Agents](managed-agents/README.md)、[存储、事件](managed-agents/managed-agent-storage-event-architecture.md)、[JDBC 中文](managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-agents/managed-runtime-broker-jdbc.md)与[客户端](managed-agents/managed-agent-client-surfaces.md)。#13750/#13763/#13760/#13772 既有合入状态不变；#13776 单源读取见[文件读取](file-reading.md)。源码与部署门禁本次未执行，不把代码或 CI 工具可用写成已上线/测试通过。
 
 ## 使用口径
 

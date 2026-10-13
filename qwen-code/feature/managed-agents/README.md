@@ -26,13 +26,13 @@
 
 > **W39–W41 实施快照（2026-10-09，主干 `55ee50d34e55`）：** #12671 挂载 worker 工具路由；#12691/#12692/#12693 合入 Hosted 基础、Spring/双链路 WebShell 与持久 journal；#12709/#12730/#12754/#12797 合入 Workspace 准入、context、私有执行与选择器，#12713/#12831/#12848 合入私有文本/文件/前台 Shell。#12865/#12869/#12977 合入持久本地 worker、可信 reboot 和人工审计恢复；#12920 是已合入的 docs-only 后置排期决定，M2/M4–M6 不由此实现。#12894/#13037 合入远程结果与公共投影；#13084/#13225/#13090/#13296 合入退休保护、默认关闭 collector、部署门禁与保护候选退避，#13087 closed 未合入。#13088/#13138/#13260 合入 W1a/W1b/W1c；#13135/#13194/#13354 合入 Session close、closed retention 和 ACTIVE 删除。#13289 仅为已合入的实验 CSI worker/ACK 基础。
 
-> **W41/W42 当前快照（2026-10-13，主干 `18f80f56666a`）：** W41 的 #13654 publication 异步验证、#13777 Hosted G3、#13894 锁顺序及 #13899 私有 CSI 文件 worker 已合入，其余合入项不变；#13526 完整 CSI 接线和 #13642 JDBC retention 仍 open。#13761/#13893 closed 未合入，不按重叠代码推断关闭原因。W42 新增 #13936 child_agent 任务面板已合入，#13931 L4 生命周期与 #13973 标准 UI 仍 open。各 PR 保留创建周，详见 [W39](../../weekly-report/2026-09-21_2026-09-27/README.md)、[W40](../../weekly-report/2026-09-28_2026-10-04/README.md)、[W41](../../weekly-report/2026-10-05_2026-10-11/README.md)、[W42](../../weekly-report/2026-10-12_2026-10-18/README.md)。
+> **W41/W42 当前快照（2026-10-14，主干 `96cfa244917c`）：** W41 的 #13654 publication 异步验证、#13777 Hosted G3、#13894 锁顺序及 #13899 私有 CSI 文件 worker 已合入，其余合入项不变；#13526 完整 CSI 接线和 #13642 JDBC retention 仍 open。#13761/#13893 closed 未合入，不按重叠代码推断关闭原因。W42 的 #13931 L4、#13936 child_agent 面板、#13973 标准 UI，以及 #14039 丢 detach、#14045 原生文件关闭、#14059 退役后原结果续接均已合入；#13996 私有 SQL authority、#14069 新库 32 表、#14081 叠加私有文本仍 open。各 PR 保留创建周，详见 [W39](../../weekly-report/2026-09-21_2026-09-27/README.md)、[W40](../../weekly-report/2026-09-28_2026-10-04/README.md)、[W41](../../weekly-report/2026-10-05_2026-10-11/README.md)、[W42](../../weekly-report/2026-10-12_2026-10-18/README.md)。
 
 > **读取失败边界：** #12742 已合入准入后瞬时读取失败的结算保护，以原 sink 重试终态写入；只有再次结算失败才阻塞，不能把失败写入当成功。#12950 已合入托管文件路径拒绝的结果保全，保留拒绝原因和原调用结算，不把路径拒绝变成挂起执行。
 
-> **当前 open head 复核：** #13526 `4088e2455c2c` 校验整个原批次与原资源后消费已结算结果，不重放副作用；新增 boot6 原 CUT/finalization、同连接五分钟 retirement 屏障与条件 source gate，应用 DRAINED 不证明 Pod/卷已释放。#13642 `5832d8824a31` 使用 V69 retention index，maxAge 按 DAYS、scanDelay 按 MILLIS，保护未结算 background_shell process 行；writer 锁协议及独立 Hosted cleanup 释放证明均验证前 cleanup 关闭。#13654 V68 async 已合入但默认关闭，FAILED operation 的 collector 对象仍须全部 VERIFIED。
+> **W41 的 2026-10-13 open diff 观察：** #13526 `4088e2455c2c` 校验整个原批次与原资源后消费已结算结果，不重放副作用；新增 boot6 原 CUT/finalization、同连接五分钟 retirement 屏障与条件 source gate，应用 DRAINED 不证明 Pod/卷已释放。#13642 `5832d8824a31` 使用 V69 retention index，maxAge 按 DAYS、scanDelay 按 MILLIS，保护未结算 background_shell process 行；writer 锁协议及独立 Hosted cleanup 释放证明均验证前 cleanup 关闭。两者当前 head 已分别推进至 `735321b21f45` / `d8ddc6ac9871`，本次不以旧观察承诺其新增内容。#13654 V68 async 已合入但默认关闭，FAILED operation 的 collector 对象仍须全部 VERIFIED。
 
-> **公开前台 Shell 最终实现：** #13674 区分默认关闭的 Shell opt-in 和 Workspace files 总准入，fresh sending 需 `foregroundShell=true`；只支持 default/auto-edit 的强制审批。Java create/load 抑制 child agents，Hosted 未附着 child orchestrator 时不接 message funnel，Connector 在 create/load/cancel/messageStop/lifecycle 重验原审批模式。公共 Shell Session 的 close/archive/unarchive/delete 能力仍关闭；不表示公开后台 Shell/Monitor 或 CSI 已开放。
+> **公开前台 Shell 最终实现：** #13674 区分默认关闭的 Shell opt-in 和 Workspace files 总准入，fresh sending 需 `foregroundShell=true`；只支持 default/auto-edit 的强制审批。Java create/load 抑制 child agents，Hosted 未附着 child orchestrator 时不接 message funnel，Connector 在 create/load/cancel/messageStop/lifecycle 重验原审批模式。其最初合入时公共 Shell 生命周期关闭；当前 #13931 已合入 L4 v2，但仍须全部 consumer 升级并显式开启精确 profile，不能以文件准入或 archive 操作推断物理关闭。不表示公开后台 Shell/Monitor 或 CSI 已开放。
 
 > **Parts 与验证基础（已合入）：** #13750 的 `hosted-harness-model.ts:runHostedHarnessTextTurn` 校验并复制完整模型 Parts，无工具分支不再只返回 text，thought-only 不算已回答；suppressOutput 仍抑制返回 Parts。#13763 的 `.github/workflows/qwen-triage.yml` 在不可信 PR checkout 前安装固定校验的 Java/Maven，PR 只恢复可信 Maven cache，随后无 token 准备 siblings；准备失败明确 Not covered。它们分别修复历史保全和 CI 覆盖基础，不证明完整冷恢复、Java 测试或 MySQL/OSS 门禁已通过。
 
@@ -44,9 +44,9 @@
 
 ## 当前方案入口
 
-最新主干 cwd 准入与广告对齐 caller OPERATOR/OWNER，V56 固定 initiator；execution facts 仍按 creator 查询，见 [Workspace/cwd 最终实现](managed-agent-workspace-context.md#41-webshell-最终实现2026-10-12)。主干已有 V68 async，#13642 retention 已顺延 V69；#13526 分支 V63–V67 仍与主干冲突，集成须重新编号及复核部署顺序。
+最新主干 cwd 准入与广告对齐 caller OPERATOR/OWNER，V56 固定 initiator；execution facts 仍按 creator 查询，见 [Workspace/cwd 最终实现](managed-agent-workspace-context.md#41-webshell-最终实现2026-10-12)。主干已有 V68 async，#13642 retention 的 V69 与 #13996 branch V69–V72 发生编号重叠；#13526 先前 V63–V67 仅为历史分支观察。集成须以各精确 head 重新核对编号、锁序及部署顺序，不沿用旧迁移清单。
 
-> **W42 增量：** [客户端与事件](managed-agent-client-surfaces.md)记录 #13936 已合入的 child_agent 原分页/产物/取消恢复，以及 #13973 open 的标准 UI、一次创建和原草稿身份；[恢复与运维](managed-agent-recovery-operations.md)记录 #13931 open 的 effects→资源屏障、默认关闭精确 profile v2。代码合入不代表真实产品、MySQL/OSS/CSI 或浏览器门禁在本次通过。
+> **W42 增量：** [客户端与事件](managed-agent-client-surfaces.md)记录 #13936/#13973 最终任务面板/标准 UI，以及 #14081 在 #13996 之上的 open 私有 attach/text/history，不开放 public CSI。[恢复与运维](managed-agent-recovery-operations.md)记录 #13931/#14039/#14045/#14059 最终原清理与原结果消费；[JDBC 双语](managed-runtime-broker-jdbc.zh-CN.md)与[存储、事件](managed-agent-storage-event-architecture.md)记录 #13996 SQL authority 和 #14069 fresh database 32 表的 open 边界。代码合入不代表真实产品、MySQL/OSS/CSI 或浏览器门禁在本次通过。
 
 v1.11 增加[完整工具结果与持久产物](managed-agent-tool-result-artifacts.zh-CN.md)及 [HTML 图解](managed-agent-dual-path-architecture.html#tool-results)，明确现有本地保存与待实现的 Hosted 交付、读取、展示边界。v1.12 细化[创建时选择 Workspace](managed-agent-workspace-context.md#3-创建与请求路由w0)，OpenAPI 升至 v1.12。v1.13 细化[Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md)，不改变公共 OpenAPI；既有目标 DDL 不变，完整工具结果新增接口仍需在 O1～O4 实现前纳入类型和契约测试。
 
