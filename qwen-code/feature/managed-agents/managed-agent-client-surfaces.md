@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-14 实施快照（主干 `96cfa244917c`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) child_agent 任务面板和 [#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 均已合入；[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) 私有 CSI 文本仍 open。以下历史设计不代表所有客户端能力已交付。本次只核对代码、diff 与回归入口，未运行源码、浏览器或真实宿主门禁。
+> **2026-10-15 实施快照（主干 `9dacfdbe1a20`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) child_agent 面板、[#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 和 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 私有 SQL authority 均已合入；[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) 私有文本已面向 main，仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -16,7 +16,7 @@
 
 ### 私有 CSI 文本的当前 open 方案
 
-[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `94167b93b28c` 叠加在 open [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 的 SQL authority 分支上，不是标准 UI 或公共 CSI selector。Hosted-only `QWEN_HOSTED_CSI_SESSION_STORE_URL` 使认证 primary listener 提供 private attach/text/history；固定原 canonical Session UUID、writer/binding generation 1、activation epoch 1，text/history 前 fresh acquire 核验原准入。只生产纯文本与已结算 history，不安装 file toolTurn 或生命周期。
+[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `2748e0bd28bc` 已从旧 stacked base 改为 main，继承已合入 #13996/#14069，不复制 schema 或沿用旧基线测试资格。Hosted-only `QWEN_HOSTED_CSI_SESSION_STORE_URL` 使认证 primary listener 提供 private attach/text/history；固定原 canonical Session UUID、writer/binding generation 1、activation epoch 1，text/history 前 fresh acquire 核验原准入。只生产纯文本与已结算 history，不安装 file toolTurn 或生命周期，也不是标准 UI/public CSI selector。
 
 `hosted-csi-session.ts` 续租失效阻塞 owner 并 abort 原 prompt；`http-managed-session-store.ts:stopLocal` 停本地续租/写入而不 seal authority，shutdown 不 release Runtime。普通 route 拒绝私有 owner 的大小写变体，原 prompt/相同文本只在本进程复用原结果，不承诺跨 boot exactly-once。真实模型、SQL/CSI 正向链路与部署仍须独立验收。
 

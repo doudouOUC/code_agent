@@ -14,7 +14,11 @@
 
 ## 1. 调研结论与范围
 
-#13654 的 V68 async migration 已合入主干 `18f80f56666a`；#13642 当前 retention migration 已顺延 V69，原同号冲突已解决。部署仍须全部 server/writer 升级并验证原锁序；默认关闭不因文档或合入记录而自动开启。
+> **2026-10-15 capture 接线（主干 `9dacfdbe1a20`）：** merged [#14124](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14124.md) 在 Java SDK create 增加可选 captureBytes，并由 Connector 对 publication enabled 的 Shell/1、Shell/2、内部 team-lead 传原 execution-bytes。Files/MCP/无工具省略；load 不传部署当前预算而恢复原 definition，已有 inline Session 不自动切换。raw capture 不含额外 producer/admission 开销，Session/tenant 容量须留余量；云凭证仍只在 Java OSS client，public Artifact/collector 独立开关不变。
+
+源码记录的历史真实 bucket 验收与 rebase 后本地不可变对象装置分开；本次只核对代码/caller/回归入口，没有复跑真实 OSS、Linux cuts、Monitor/background cgroup 或负载/跨主机门禁。代码合入不等于这些验收已通过。
+
+此前 V68 async / V69 retention 是 legacy 迁移历史；当前 main 已采用 32 表 canonical V1/V2，不能沿旧编号部署。全部 server/writer、原锁序与独立 default-off 开启门槛仍需验证，不因文档或合入自动启用。
 
 | 核实的来源                                                                                                                   | 已有行为                                                                                                                                                | 缺少的边界                                                                     |
 | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

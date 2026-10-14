@@ -1,16 +1,26 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-> **2026-10-14 新库方案观察：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 仍 open，head `740f8e8c5df6`，不是主干或旧库升级承诺。以下 2026-09-20/21 的分支演进保留为历史；新增 baseline 只用于 fresh database，不能据表数下降宣布持久恢复或生产切换完成。
+> **2026-10-15 新库最终基线（主干 `9dacfdbe1a20`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表已合入，后续 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 增加 canonical V2 私有 authority。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明旧库迁移、恢复全链路或生产切换完成。
 
-## 新库 32 表的当前 open 切片
+## 新库 32 表的最终实现
 
 `managedschema/ManagedSchemaContract.java` 固定 32 张 ma_* 业务表及封闭 operation/receipt/work/owner/delivery/head/guard 类型，Broker 与 Spring 共用 `db/managed-schema/V1__managed_schema.sql`。`ManagedSchemaCatalog.validate` 拒绝缺表/额外表/view，核验 InnoDB、列/生成列、键/索引/check/FK；空 catalog 初始化，已有 canonical catalog 先验证再 baseline/migrate，history-only catalog 拒绝。旧 Flyway SQL 移至非 classpath archive，没有原地转换 legacy 数据。
+
+最终 catalog 在 DDL 前拒绝 MySQL/MariaDB system/缺失 application 库，并要求 MariaDB global/session CHECK enforcement；不只信任 driver product name。当前 `V2__private_csi_authority.sql` 仅扩展原 request/generated guard、first activation 和 native authorization，resource read 使用 typed receipt/read lease，仍为 32 张业务表。已验证 V1 无 history 的 Broker 初始化与有 history 的 application Flyway V2 分开；closed [#14174](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14174.md) 只观察 baseline witness 1→2，main 同类断言不算它合入。
 
 表族收敛不合并权威：Session head/journal revision、公开 event stream 水位、Runtime generation、operation claim、storage owner/read lease 仍独立。`ManagedReceipts` 用 namespace/tenant/scope/key digest 定位，再比较原 byte identity，actor replay scope 与 Session command 分开；`ManagedSchemaJdbcTemplate` 适配 map/binary 身份，不重写 SQL。journal、资源引用、投影及 head 保留原事务边界。
 
 `ManagedSnapshotStore` 以冻结 descriptor 和 body refs 建 versioned page/manifest，目标每页 100 items/128 KiB，cursor 固定 tenant/Session/snapshot 并签名、到期失效；SnapshotReadLease 保护构建和读取。该实现仍读取 item 集合，page 目标不等于总内存硬上限。`ManagedProjectionResourceCollector` 每批 32，复核 active refs/recovery/read lease 后只清 orphan MYSQL_INLINE 投影正文并留 tombstone；不做外部 I/O，也不允许任意 Session 资源收集。
 
+最终 snapshot 返回/publish 前再验 lease；read-only view 的 checkReadView 只检查已提交 lease，不在只读事务伪续租，必须在原期限内完成。
+
 切换策略是保留旧数据库/历史 endpoint，新 Session 进入新环境，回滚也保全新库已接受数据。DataAgent 的 da_qwen_session_* 不在此范围。真实 MySQL 的 journal 原子性、旧 writer、receipt、snapshot/GC/read lease 竞争及 load/query budget、OSS/CSI 与生产流量门禁本次均未执行；命令与测试入口见单 PR 观察。
+
+### 当前 open 的资源与 SQL 时间增量
+
+[#14180](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14180.md) head `18fedc7bf42f` 仅使 HTTP adapter 对 schema2/csi-files-retirement/1 的 file-history preparation 收集 input/definition/intent refs，不重新纳入 predecessor。共享 commit/read/snapshot 闭包规则；其 MySQL/Node fixture 用真实 SQL grant/native/worker/history，但 placement/mount/proc-fd 明确映射，不是原生 CSI 部署，本次未执行。
+
+[#14185](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14185.md) head `af64ee849c86` 将 V1 时间列改为 epoch-ms BIGINT UNSIGNED/gmt_create/gmt_modified，Time/Rows/Projection 与 JdbcTemplate/Broker 同步，公开 DTO 时间形状不变。typed null/boolean/identity、原 actor settle 时间和显式列替 SELECT * 是行为改动，不是纯格式；它直接改 V1，未提供当前已存在 DATETIME/created_at catalog 的版本化升级，不能当作 main 已兼容的新迁移。数据库时区、signedness、lease、分页/GC/query budget 与回滚门禁仍需执行。
 
 ## 历史存储与事件设计
 

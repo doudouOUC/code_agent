@@ -1,6 +1,6 @@
 # Managed Runtime Broker JDBC 持久化
 
-> **2026-10-13 当前增量：** #12692 Spring/Flyway、#12865 持久本机/boot/process 与 #12869/#12977 可信 reboot/人工清理已合入，#13289 实验 CSI/持久 ACK 已合入。#13642 retention 仍 open，head `5832d8824a31` 已顺延 V69，maxAge 按 DAYS、scanDelay 按 MILLIS，maxAge 至少 1ms，并保护未结算 background_shell 的原 process 行。主干 V68 async 已合入，原编号冲突已解决，但writer 锁协议及独立 Hosted cleanup 释放证明均验证前 cleanup 仍关闭。#13673 原 drain/stop/holder Hook 恢复已合入。下方 2026-09-27 记录保留为历史，不作当前 owned-map-only 结论。
+> **2026-10-13 历史增量（当前状态见下方 2026-10-15）：** #12692 Spring/Flyway、#12865 持久本机/boot/process 与 #12869/#12977 可信 reboot/人工清理已合入，#13289 实验 CSI/持久 ACK 已合入。该快照的 #13642 retention 为 open，head `5832d8824a31` 顺延 V69，maxAge 按 DAYS、scanDelay 按 MILLIS，maxAge 至少 1ms，并保护未结算 background_shell 的原 process 行。当时主干 V68 async 已合入，旧编号冲突已解决，但writer 锁协议及独立 Hosted cleanup 释放证明均验证前 cleanup 仍关闭。#13673 原 drain/stop/holder Hook 恢复已合入。下方 2026-09-27 记录保留为历史，不作当前 owned-map-only 结论。
 
 > **私有 CSI 边界：** closed [#13893](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13893.md) 在 create/adopt/register/observe/confirm/release/operator 路径拒绝私有文件 profile 误入 local-process，不能当作已合入支持；同类 guard 位于 merged [#13899](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13899.md)。后者提供独立 v5 文件 worker 与原输入/readback/history 身份校验，但 drain 始终 BLOCKED，保留 backup。不能据 worker diff 推断完整 Java/Hosted native/readback 接线、生产 CSI 删除或跨 owner 恢复已交付。
 
@@ -8,19 +8,21 @@
 
 [English](managed-runtime-broker-jdbc.md) | [简体中文](managed-runtime-broker-jdbc.zh-CN.md)
 
-#13642 最新版先按原 Session 值和二进制身份共同去重，再查 indexed projection，permissive collation 不合并不同 owner；这是保守 Session 级保护。retention 必须保持关闭，直到独立的精确身份 Hosted cleanup 释放证明交付并验证：owed descriptor 可比 RELEASED binding 保留更久，收集后原释放会冲突并阻塞 Session。当前 open PR 未实现该契约，仅升级 writer 锁协议不足以开启清理。新增 H2/MySQL 大量 settled Shell 与折叠身份用例，本次未执行。
+#13642 已合入；main 的 guard 先按原 Session 值和二进制身份共同去重，再查 indexed projection，permissive collation 不合并不同 owner；这是保守 Session 级保护。retention 开启仍须独立的精确身份 Hosted cleanup release-proof 资格：owed descriptor 可比 RELEASED binding 保留更久，原释放不能因收集失去核对资格。不能仅据合入、writer 锁协议或本次文档启用清理。H2/MySQL 大量 settled Shell 与折叠身份用例本次未执行；创建归属仍在 W41。
 
 #13899 最终合入版还排斥 prepare/execution 重叠，此类时序拒绝不退役 Session；scoped 新文件/目录请求 0600/0700，旧文件保留 mode。只有成功回滚且错误正是原取消 reason 才恢复可用，ENOSPC 等存储故障即使恢复 bytes 仍 fence；普通 Write 保留 pre-write 抛错。boot6 CUT/finalization 与完整 native 控制面仍在 open #13526，不属于已合入 boot4/5 worker。
 
-## 2026-10-14 私有 authority 与新库的 open 观察
+## 2026-10-15 私有 authority 与新库最终基线
 
-[#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) head `2d32f7f46196` 新增离线私有 CREATE、csi_guard 和同源 SQL/native authority。`WorkspaceCsiRuntimeAccess` 以原 DataSource 的新事务锁 placement/control/registration，核验 READY、原 binding/generation/lease/seed/handle/context；native 认证同时校验 provision seed 与 Runtime lease token，response comparison reference 必须来自原生读回。`ManagedSessionStore` 在 journal 提交事务核验 genesis、首 writer/activation、原有限批次与 execution/history receipt，资源读取使用原 read lease 和结算前 bytes/identity 再验。该 diff 不开放 generic cancel/close/delete，release 仍 `csi_finalize_required`，正向 SQL grant→worker→retained history 与真实 CSI 尚需验收。
+已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `9dacfdbe1a20` 使用 canonical V2。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
 
-branch V69–V72 是上述 request/activation/execution/read 的编号；#13642 当前 head `d8ddc6ac9871` 也包含 `V69__runtime_broker_retention.sql`。主干为 `96cfa244917c`、已有 V68，不能沿用旧“编号冲突已解决”声明来批准这两条 open 分支联合部署，集成须重新核对编号、锁序与兼容门禁。
+`V2__private_csi_authority.sql` 只扩展 request key/generated csi_guard/index、first activation revision 和 native authorization，业务表仍 32。旧 V68/V69 与 CSI branch V69–V72 是 legacy/历史分支编号，不用于当前 32 表 V1/V2 部署；已验证 V1 无 history 的 Broker 初始化与 application Flyway V2 迁移分开。历史编号冲突不替代当前 catalog/check/锁序验收。
 
-[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `94167b93b28c` 叠加在 #13996 base branch，只有相对父分支的文本增量。认证 Hosted 私有 attach/text/history 固定原 UUID/writer/activation，fresh admission 后生产纯文本；失去续租时阻塞，`stopLocal` 不 seal authority 或 release Runtime。不安装文件 toolTurn、finalization、public selector 或冷替换写者，进程内 prompt 去重不证明跨 boot replay。
+open [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `2748e0bd28bc` 已面向 main，继承已合入 authority/catalog；旧 stacked baseline 的验证不自动资格化当前 head。私有 attach/text/history 固定原 UUID/writer/activation，fresh admission 后生产纯文本；失租阻塞，stopLocal 不 seal/release。不安装 file toolTurn/finalization/public selector/冷替换写者，进程内去重不证明跨 boot replay。
 
-[#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) head `740f8e8c5df6` 对 fresh database 收敛为固定 32 张 ma_* 业务表，共用 canonical V1 DDL，先验证完整 catalog/列/键/索引/check/FK 后才 Flyway baseline/migrate。旧迁移移出 classpath，不能对已有旧库原地升级；通用 receipt/work 有封闭 namespace/scope，Runtime generation、Session head、operation claim 和 read lease 仍独立。分页/投影 GC 与切换策略见[存储、事件方案](managed-agent-storage-event-architecture.md)。本次未运行源码、MySQL、OSS/CSI 或部署门禁，三者均不承诺 main 能力或生产迁移完成。
+已合入 [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 fresh database 32 表基线，DDL 前拒绝 system/missing catalog、要求 MariaDB CHECK enforcement，验证 catalog/列/键/索引/check/FK 后 baseline/migrate。typed receipt/work 不合并 Runtime generation、Session head、operation claim/read lease。snapshot 只读 view 不伪续租，分页/GC/切换见[存储、事件方案](managed-agent-storage-event-architecture.md)。本次未跑组件、MySQL、OSS/CSI 或部署门禁。
+
+open [#14180](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14180.md) `18fedc7bf42f` 补 private schema2 preparation 的 HTTP resource refs，排除旧 predecessor；其真实 SQL/native/worker/history fixture 有明确 placement/mount/proc-fd 映射，不是原生 CSI 部署。open [#14185](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14185.md) `af64ee849c86` 改 V1 时间为 epoch-ms/UNSIGNED/gmt 字段，接 typed Time/Rows/Projection 与 Broker/JdbcTemplate；没有现存 DATETIME catalog 的版本化升级，不能写成 main 或兼容迁移已交付。
 
 ## 历史基础切片
 
