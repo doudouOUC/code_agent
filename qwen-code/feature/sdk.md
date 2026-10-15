@@ -2,7 +2,15 @@
 
 > **2026-10-15 Java Hosted 增量：** merged [#14124](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14124.md) 的 `CreateHarnessSession.Builder:captureBytes` 是可选 `[1, 2^41]` 字段，旧请求省略它；Java Connector 只在 publication enabled 的原 Shell/1、Shell/2、内部 team-lead create 传既有 execution-bytes，load 恢复原预算，不携带新部署值或云凭证。raw capture 与 Session/tenant 额外开销分开，publication/原始 Artifact/GC 独立开关保持不变，详见[完整工具结果](managed-agents/managed-agent-tool-result-artifacts.zh-CN.md)。本次未执行 SDK/真实云门禁。
 
-> **静态规则的当前 open 观察：** [#14186](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14186.md) head `89aa735ba955` 新增 qwencode/qwen-code-checks.xml，并仅将 managed-agent-server pom 切向新配置、纳入测试源码；不能写成所有 SDK/Broker module 已接通。独立 JDK 21 parse 探针对该 head 的 BrokerSecurity/SessionLifecycleCoordinator 两份生产源观察到 10 个语法错误，错误 brace 进入三元式/substring 参数；不是纯格式或全 Checkstyle 已通过。修复后仍需重新 compile、checkstyle 与行为测试，本次只做该有限语法检查。
+> **2026-10-16 静态规则最终实现：** [#14186](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14186.md) 已 merged，server 使用 qwencode/qwen-code-checks.xml、纳入测试源码；SDK/Broker 不因此全量切换规则。最终 workflow 新增 Ubuntu/Java21 独立 server Checkstyle 步骤，不依赖 MySQL/host lock；workflow 仍按 schedule/dispatch 触发。历史 head `89aa735ba955` 的错误不在最终两文件 diff 中；本次在 main `01d97f571a66` 对 BrokerSecurity/SessionLifecycleCoordinator 做 JDK 21 parse，零 syntax errors。仅两文件语法证据，不代表完整 Maven/Checkstyle/行为测试或 CI 已验证。
+
+### W42 Java 应用与协议增量
+
+已合入 [#14280](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14280.md) 直接声明 Commons Lang/Codec 并复用固定 mapper/摘要组件，保留 canonical JSON、UTF-8/hex、流式长度前缀、HMAC 恒定比较及异常映射。专用标题空白与 ASCII-only 协议不改成通用判断；不产生新的 SDK 用户能力。
+
+已合入 [#14307](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 XML 三字符替换、LF 去空行及 HttpRange，保留旧 ASCII/逗号/错误门禁；这是独立于 #14280 的后续最终 diff。open [#14277](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14277.md) 才把 server/Broker 源码、资源和测试合并至 packages/managed-agent-server；当前 main 保留 sdk-java 下两个模块，不能提前替换构建命令或声称独立 Broker 产物已移除。
+
+open [#14316](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md) 通过 `model-selection/1` 将可选模型 ID/revision 固定进 Hosted admission 和每 Turn 快照；模型凭证留服务端，原 prepared request 不改写。该跨 UI/Java/Harness 方案含 V4/V5，不是已有 Java SDK 默认能力；本文未执行组件或真实链路验收。
 
 > 适用范围：qwen-code 对外的编程式 SDK——Python SDK（`packages/sdk-python`，子进程驱动 CLI）、TypeScript daemon SDK（`packages/sdk-typescript/src/daemon`，HTTP/SSE 连接 `qwen serve` 守护进程；#8002 已合入 workspace file read cursor paging，#8572 已合入的 REST SSE stream id / connect reason / previous stream lineage 诊断，#8691 已合入 restore timeout derivation，#8939 已合入 TS restore epoch / partial replay diagnostics 与 same-session refresh recovery 口径，#9007 已合入 ACP HTTP pre-attach counters，#9055 已合入 selective restore 对既有 load/resume contract 的 additive compatibility，#9180 已合入 Web Shell file chip 所需的本地 UI transcript metadata，#9261 已合入 workspace session live-state SDK surface，#9380 已合入 daemon status child heap measurement types，#9396 已合入 live-state `updatedAt` optional field；#10294 已在 #10179 merged daemon API 上增加 standalone lifecycle/recovery surface，#11812 已补普通 HTTP 非回环浏览器缺少 `crypto.randomUUID()` 时的安全 UUID v4 fallback），以及 #7463/#7603 已合入的 Java daemon transport alpha 与可靠性 follow-up（`packages/sdk-java/qwencode/src/main/java/com/alibaba/qwen/code/daemon`）。
 >

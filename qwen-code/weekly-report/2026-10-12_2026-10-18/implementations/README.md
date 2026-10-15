@@ -14,8 +14,18 @@
 | [#14124](https://github.com/QwenLM/qwen-code/pull/14124) | ✅ merged | fix(managed-agent): Wire OSS capture budgets into Hosted sessions | [pr-14124.md](pr-14124.md) |
 | [#14141](https://github.com/QwenLM/qwen-code/pull/14141) | 🔴 closed | fix(sdk-java): repair Hosted owner probes and mount fixtures | [pr-14141.md](pr-14141.md) |
 | [#14174](https://github.com/QwenLM/qwen-code/pull/14174) | 🔴 closed | test(managed-agent): align the baseline witness with canonical V2 | [pr-14174.md](pr-14174.md) |
-| [#14180](https://github.com/QwenLM/qwen-code/pull/14180) | 🟡 open | fix(core): retain CSI preparation resources through the HTTP store | [pr-14180.md](pr-14180.md) |
-| [#14185](https://github.com/QwenLM/qwen-code/pull/14185) | 🟡 open | fix(managed-agent): Standardize SQL timestamps and query mappings | [pr-14185.md](pr-14185.md) |
-| [#14186](https://github.com/QwenLM/qwen-code/pull/14186) | 🟡 open | chore: adopt qwen-code-checks.xml and fix all checkstyle violations | [pr-14186.md](pr-14186.md) |
+| [#14180](https://github.com/QwenLM/qwen-code/pull/14180) | ✅ merged | fix(core): retain CSI preparation resources through the HTTP store | [pr-14180.md](pr-14180.md) |
+| [#14185](https://github.com/QwenLM/qwen-code/pull/14185) | ✅ merged | fix(managed-agent): Standardize SQL timestamps and query mappings | [pr-14185.md](pr-14185.md) |
+| [#14186](https://github.com/QwenLM/qwen-code/pull/14186) | ✅ merged | chore: adopt qwen-code-checks.xml and fix all checkstyle violations | [pr-14186.md](pr-14186.md) |
+| [#14214](https://github.com/QwenLM/qwen-code/pull/14214) | ✅ merged | docs(runtime-broker): design Workspace-resident Managed Tool Runtime | [pr-14214.md](pr-14214.md) |
+| [#14254](https://github.com/QwenLM/qwen-code/pull/14254) | ✅ merged | refactor(runtime-broker): name the local-process kind and Workspace isolation policy | [pr-14254.md](pr-14254.md) |
+| [#14270](https://github.com/QwenLM/qwen-code/pull/14270) | ✅ merged | docs(design): drop stray conflict markers from the actor-roles design | [pr-14270.md](pr-14270.md) |
+| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | 🟡 open | refactor(managed-agent): Consolidate server and broker sources | [pr-14277.md](pr-14277.md) |
+| [#14280](https://github.com/QwenLM/qwen-code/pull/14280) | ✅ merged | refactor(managed-agent): Reuse Apache Commons utilities | [pr-14280.md](pr-14280.md) |
+| [#14290](https://github.com/QwenLM/qwen-code/pull/14290) | 🟡 open | feat(managed-agent): Add bounded Workspace search tools | [pr-14290.md](pr-14290.md) |
+| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | 🟡 open | fix(managed-agent): Align hosted prompts with declared tools | [pr-14306.md](pr-14306.md) |
+| [#14307](https://github.com/QwenLM/qwen-code/pull/14307) | ✅ merged | refactor(managed-agent): Reuse text and byte-range utilities | [pr-14307.md](pr-14307.md) |
+| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | 🟡 open | feat(web-shell): integrate Managed sessions into the home workflow | [pr-14316.md](pr-14316.md) |
+| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 🟡 open | feat(managed-agent): Add SSH Tool Runtime support | [pr-14318.md](pr-14318.md) |
 
-_按个人 PR 口径更新于 2026-10-15_
+_按个人 PR 口径更新于 2026-10-16_

@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-15 实施快照（主干 `9dacfdbe1a20`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) child_agent 面板、[#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 和 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 私有 SQL authority 均已合入；[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) 私有文本已面向 main，仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
+> **2026-10-16 实施快照（主干 `01d97f571a66`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) child_agent 面板、[#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 和 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 私有 SQL authority 已合入；[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) 与下列搜索、prompt、首页/模型及 SSH 增量仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -19,6 +19,16 @@
 [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `2748e0bd28bc` 已从旧 stacked base 改为 main，继承已合入 #13996/#14069，不复制 schema 或沿用旧基线测试资格。Hosted-only `QWEN_HOSTED_CSI_SESSION_STORE_URL` 使认证 primary listener 提供 private attach/text/history；固定原 canonical Session UUID、writer/binding generation 1、activation epoch 1，text/history 前 fresh acquire 核验原准入。只生产纯文本与已结算 history，不安装 file toolTurn 或生命周期，也不是标准 UI/public CSI selector。
 
 `hosted-csi-session.ts` 续租失效阻塞 owner 并 abort 原 prompt；`http-managed-session-store.ts:stopLocal` 停本地续租/写入而不 seal authority，shutdown 不 release Runtime。普通 route 拒绝私有 owner 的大小写变体，原 prompt/相同文本只在本进程复用原结果，不承诺跨 boot exactly-once。真实模型、SQL/CSI 正向链路与部署仍须独立验收。
+
+### 首页与工具集合的实施增量
+
+[#14290](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14290.md) 当前 /3 profile 新增受限 glob/grep_search/list_directory，开关默认关闭且只影响内置新会话。名称准入、只读原生审批、恢复和生命周期显式扩展，不能授权同名 MCP；worker 在五秒、目录 ownership、48 KiB 编码预算内运行，持久结果后才继续模型。/1、/2 与既有 Session 不被部署开关重写。
+
+[#14306](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14306.md) 在 Hosted fresh model request 之前由实际声明名称设 prompt snapshot，空集表示无工具；agent 只有实际声明才可达。名称集合或 Workspace context 变化合并一次 refresh，schema/描述继续更新 tools；preparedRecovery 沿原请求不重绘。不是过滤用户/AgentDefinition/Workspace 自带文本中的全部工具名称。
+
+[#14316](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md) 当前 diff 把托管导航以 portal 放进原 sidebar，App 持久化本地/托管 URL，隐藏状态保留但不捕获键盘，Java ID 不进入 daemon；草稿和原未确认请求不跨后端。服务端 options 驱动审批选择，当前 Session 固定；只有已配置目录和空闲/expected revision 允许换模型。原意图发出前持久化、响应后读回确认，Turn/model-admission 固定模型快照；最近成功 usage 才显示上下文，缺失保持未知。工作区创建使用受控根目录与原 actor receipt，不接受浏览器宿主路径。V4/V5 与 #14318 V4 冲突见[存储](managed-agent-storage-event-architecture.md)，不能当成纯前端改动或生产已验收。
+
+open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) 的 SSH 登记 UI 只展示授权静态节点，检查目录不授予登记权限，原 operation/幂等键读回后选工作区；默认关闭，仅 files/1 和 foreground shell/1，拒绝后台/Monitor/MCP/Hook/child Workspace。已合入 [#14307](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 Artifact 单 Range 在旧 ASCII/错误门禁后复用 HttpRange，不扩权限。以上源码、浏览器、物理重启及远端完整链路本次均未执行。
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
