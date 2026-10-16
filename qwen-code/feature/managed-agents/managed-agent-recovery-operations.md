@@ -32,15 +32,25 @@ L4 的原 cleanup writer seal 仍核验 head 的原 token/generation 与有效 c
 
 ### 常驻设计、搜索与 SSH 的增量边界
 
-截至 2026-10-16 main `01d97f571a66`，[#14214](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14214.md) 已合入的是常驻双语设计；后续 [#14254](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14254.md) 仅实现公开 local-process KIND 和 WorkspaceExecutionProfile.admitsIsolationClass。配置、resolver、stop/release 共用策略，仍严格只允许 session；idle retirement、硬预算共享和创建预热均未因此交付，keep-warm 推后。关闭、Hook/MCP/后台 owner 当前仍依赖原 Harness 身份，不能只切 workspace isolation。
+截至 2026-10-17 main `5af87595f346`，[#14214](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14214.md) 是常驻设计，[#14254](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14254.md) 的普通 local-process 准入仍 session-only。后续已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 binding 的 admission/recovery/release 按 Runtime Session/execution 真 Harness owner，而非 binding isolation key；缺原 Session 不能创清理 tombstone，storage/drain fence 仍保留。它不是打开任意 provider 共享的开关。
+
+已合入 [#14340](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14340.md) 的独立 resident CSI/files profile：管理员精确映射一 Workspace/原 Pod/PVC，锁内只许一个未完成 public Session 和活动上下文，Read/Write/Edit 后逻辑 close 撤销上下文并保留原 binding/reservation。释放未知阻止下一 Session；丢 Pod/重启/身份不符不自动重建，物理 release 明确拒绝。无 Shell/MCP/Hook/子环境共享/会话内 cwd 变更；Pod 关闭后仍计费。旧 ACK 证据和 H2/boot-2 同 JVM fixture 不证明当前真实 CSI/进程崩溃资格。通用 idle retirement、硬预算调度、创建预热和 keep-warm 仍未交付，不能把窄常驻路径写成 #13526 累计方案全部完成。
 
 open [#14290](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14290.md) 搜索沿原 execution 的 prepare/status/cancel/结果持久化恢复，取消/期限必须停止真实 rg/枚举 worker，不能只返回超时；未知或持久写入失败继续 blocked，不能重搜补回执。
 
-open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) 把 ssh-process kind、seed、immutable handle 固定后启动远端原 generation；bootstrap launch=false intent 在 SQL handle 前，launch=true 后模糊启动不再次 spawn。双向 loopback SSH 转发重建不改原 lease，严格 host key 与本地 OS 锁限制同控制面主机接管。原 worker 消失/host reboot/identity 冲突保持 blocked，UNKNOWN 不替换执行。
+open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) head `d9e44aaf030f` 已跟随统一 server 目录和 V7；独立 register、claim 前事务外 cwd/marker probe，确定拒绝不占 holder，claim 后未知保留。bootstrap launch=false intent 在 SQL handle 前，launch=true 后模糊不再 spawn；原子 no-overwrite launch/never-start claim 和 worker 自报同 PID 区分确定 spawn 前 FAILED 与已启动未知。startup-close 未决只 pending，不抢写 stop fence。双向 SSH 重连只接原 generation/lease，严格 host key/OS 锁限定同控制面主机接管；死亡/reboot/身份冲突继续 blocked。
 
 SSH close 必须结清原结果/ACK、Runtime Session 和原进程组，再以匹配 cleanProof+进程消失生成 drain receipt；not_started/capture:null 先 close_not_started 原 publication，再重试原 direct/deferred ACK。ledger 失败或进程组退出证据失败取消 clean proof 资格，空 holder/kill/超时不算停止证明；不保证 setsid 逃逸的任意 daemon。开关关闭只拒绝新 SSH 准入，原 operation/关闭仍需保留节点配置。仅 /1 文件和前台 Shell，无后台/MCP/Hook/child/池/idle/自动替换。
 
 PR 设计记载 macOS 本地和 loopback SSH 的分层验证，其中 publication 对端/页面有 mock；Linux、跨物理主机和完整 WebShell→Java→MySQL→远端 publication 未资格化。本次未独立执行这些源码/故障/部署门禁；具体入口见单 PR 文档。
+
+### 扩展、后台关闭与取消恢复增量
+
+已合入 [#14357](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14357.md) 的 Linux/MySQL 真实 MCP/Hook 进程门禁：受控模型、原 worker、SIGKILL Harness、Hook 后代/cgroup 与产品 close 分开观测；MCP 一次 fsync 后失联仍 UNKNOWN，拒绝新输入/close，不强写 FAILED。测试强制收尾不替代产品停止证据；本次未运行。
+
+已合入 [#14364](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14364.md)：publication 局部 READ_COMMITTED 修复 discovery 后 head 锁读取旧 journal；只对原 child_run shell/monitor_run 的精确调用免前台 receipt，后台原记录、物理停止及输出闭包仍要核验。
+
+open [#14377](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14377.md) head `3787cdd4fd23`：原有效 grant 内重排瞬态续租，activation 沿同事务重试，不复活过期 writer。未 admission 取消须持 dispatch claim 并锁定 fenced head、完整 idle journal 和无原 input.accepted；恢复失败先以原 checkpoint/activation 取消接管，不覆盖并发用户取消。UNKNOWN Runtime 仅尝试原 cancel；前台 publisher 丢失只有原 aborted/PID/POSIX 组 gone 才保留 cancelled/blocked capture。当前 writer 先验原已结算 Shell 结果并持久唯一原生 receipt，再解除等待；物理停止或普通历史不替代 receipt，不放松 requireIdleJournal。此 diff 未合入，本次未跑 Linux/数据库/whole-JVM 验收。
 
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具另须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。干净 idle 回收后的新 binding 可挂回原持久存储；started/unknown 的故障恢复仍阻塞，不能混用两条路径。
 

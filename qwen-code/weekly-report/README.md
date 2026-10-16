@@ -2,10 +2,10 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文实现或方案观察放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-> 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 周更完整集合已核验，2026-10-13 完成整理并刷新后续合入状态；W42 日更截至北京时间 10-15 创建集合，于 2026-10-16 复核本周全部已收录 PR。PR 按 createdAt 固定周归属，不能按后续合入日期移动，#13642 后续合入也仍属 W41。单 PR 文档可后续复核为最终状态。
+> 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 周更完整集合已核验，2026-10-13 完成整理并刷新后续合入状态；W42 日更截至北京时间 10-16 创建集合，于 2026-10-17 复核本周全部已收录 PR。PR 按 createdAt 固定周归属，不能按后续合入日期移动，#13642 后续合入也仍属 W41。单 PR 文档可后续复核为最终状态。
 
-**时间范围**: 2026-04-06 ~ 2026-10-15（持续更新）
-**总计**: 615 PRs（W39–W41 已核对完整创建周；W42 日更截至 10-15，状态和规模保留各次复核快照）
+**时间范围**: 2026-04-06 ~ 2026-10-16（持续更新）
+**总计**: 623 PRs（W39–W41 已核对完整创建周；W42 日更截至 10-16，状态和规模保留各次复核快照）
 **代码量**: W15–W22 历史累计 +361,436 / -61,427；后续逐周规模见下表及周目录。文件数为逐 PR changedFiles 累加，不是去重文件数。
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
@@ -43,11 +43,11 @@
 | 2026-09-21 ~ 2026-09-27 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-21_2026-09-27) · [Obsidian](2026-09-21_2026-09-27/README.md)) (W39 最终版) | 37 | 35/0/2 | +112,728/-6,923 | Hosted 控制面与 journal、Workspace 准入/文件/Shell、Runtime 恢复基础 |
 | 2026-09-28 ~ 2026-10-04 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-28_2026-10-04) · [Obsidian](2026-09-28_2026-10-04/README.md)) (W40 最终版) | 25 | 24/0/1 | +100,820/-2,947 | 完整结果投影/退休/清理、W1 恢复迁移、Session 生命周期、CSI 与设置耐久 |
 | 2026-10-05 ~ 2026-10-11 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-05_2026-10-11) · [Obsidian](2026-10-05_2026-10-11/README.md)) (W41 最终版) | 16 | 12/2/2 | +118,387/-3,889 | CSI worker/挂载身份、publication 锁序/异步、Shell 审批、cwd、G3、文件单源读取与 Java CI |
-| 2026-10-12 ~ 2026-10-18 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-12_2026-10-18) · [Obsidian](2026-10-12_2026-10-18/README.md)) (W42 日更) | 25 | 17/6/2 | +95,925/-22,711 | CSI/32 表与静态规则、Runtime 设计/库复用，open 搜索/首页/SSH |
+| 2026-10-12 ~ 2026-10-18 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-12_2026-10-18) · [Obsidian](2026-10-12_2026-10-18/README.md)) (W42 日更) | 33 | 27/4/2 | +112,896/-24,322 | CSI/32 表、统一 Server/托管首页、扩展/审批/常驻文件，open 搜索/SSH/取消恢复 |
 
 ## 类型分布
 
-feat ×313, fix ×221, refactor ×21, other ×7, docs ×18, chore ×8, perf ×17, test ×9, merge ×1
+feat ×316, fix ×223, refactor ×23, other ×7, docs ×18, chore ×8, perf ×17, test ×10, merge ×1
 
 类型按各周明细的类型字段（旧周）或标题前缀（新周）汇总，与逐周统计一致；不在总索引另行重分类。W23 的 revert 计入 other。
 

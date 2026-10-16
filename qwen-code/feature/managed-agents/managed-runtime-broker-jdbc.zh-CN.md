@@ -14,7 +14,7 @@
 
 ## 2026-10-15 私有 authority 与新库最终基线
 
-已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `01d97f571a66` 在 canonical V2 之后已有 V3 immutable Session-list keyset。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
+已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `5af87595f346` 当前 canonical V1–V6，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批快照。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
 
 `V2__private_csi_authority.sql` 只扩展 request key/generated csi_guard/index、first activation revision 和 native authorization，业务表仍 32。旧 V68/V69 与 CSI branch V69–V72 是 legacy/历史分支编号，不用于当前 32 表 V1/V2 部署；已验证 V1 无 history 的 Broker 初始化与 application Flyway V2 迁移分开。历史编号冲突不替代当前 catalog/check/锁序验收。
 
@@ -28,9 +28,15 @@ open [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081
 
 ### SSH 的当前 open 原资源边界
 
-[#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) `796ea1907d1d` 从受信 SSH_LOCAL storage 选择 ssh-process，RoutingRuntimeProvisioner 后续按原 kind/seed/handle 分派，未知身份拒绝而不回退 local-process。SSH 双向转发只重解 HTTP 发送地址，持久化远端 endpoint/lease 不变；bootstrap intent 在 SQL handle 前，启动模糊不再 spawn，观察只接原 worker。
+[#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) `d9e44aaf030f` 从受信 SSH_LOCAL storage 选择 ssh-process。独立 workspaces/register、V7 接 main V6，沿数据库毫秒/gmt 与统一 physicalKey；claim 前事务外 probe cwd/marker，确定拒绝不占 holder，claim 后未知仍保留。路由按原 kind/seed/handle 不回退本地，SSH 转发只改发送地址不改原 lease。原子 no-overwrite launch/never-start claim、worker 自报 PID 与 startup-close pending 区分确定 spawn 前失败和模糊启动，均不授权替换。
 
-严格 stop 验证原 generation/provisionRequest/incarnation/lease/retirement cleanProof 和进程消失，再写 RuntimeDrainReceipt；原 not_started/capture:null publication/ACK 有限恢复不扩展 UNKNOWN 重放。V4__ssh_workspace_registration.sql 与 open #14316 的 V4 冲突，集成必须重编号并验证 checksum/组合升级。默认关闭、仅 /1 文件/前台 Shell；本次未执行 SSH/MySQL/远端 publication，PR 的 macOS loopback/组件报告不等于 Linux、跨机器或完整部署验收。
+严格 stop 验证原 generation/provisionRequest/incarnation/lease/retirement cleanProof 和进程消失，再写 RuntimeDrainReceipt；原 not_started/capture:null publication/ACK 有限恢复不扩展 UNKNOWN 重放。旧 V4 冲突已由当前 V7 编号解决，不是 repair 已应用历史；仍需 checksum/组合升级门禁。默认关闭、仅 /1 文件/前台 Shell；本次未执行 SSH/MySQL/远端 publication，PR 的 macOS loopback/组件报告不等于 Linux、跨机器或完整部署验收。
+
+### 已合入共享归属与常驻文件增量，2026-10-17
+
+已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 local managed binding 按持久 Runtime Session/execution 的真实 Harness owner，而非 binding isolation key 核验。storage/physical fence、Session drain 保留，缺共享 Session 不能创清理 tombstone。普通 local-process 仍 session-only；这不是任意 provider 共享或 idle retirement。
+
+已合入 [#14340](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14340.md) 独立显式 resident CSI/files 映射：一个未完成 public Session、一个可撤销 Read/Write/Edit 上下文使用原 Pod/PVC。Workspace 行锁拒绝重叠，逻辑 close 结清原工作并释放精确 owner，保留 READY binding/generation/RESERVED 物理存储；释放未知阻止交接，丢失/替换/重启 Pod 保持不可用。没有物理 release/卷复用/collector/Shell/MCP/Hook/自动替换。H2/boot-2 同 JVM fixture 及旧 ACK 证据不为当前 CSI 部署授予资格，本次未运行源码/部署门禁。#14277 合入后 Java 源码/测试位于 packages/managed-agent-server，SDK 仍 sdk-java/qwencode。
 
 ## 历史基础切片
 

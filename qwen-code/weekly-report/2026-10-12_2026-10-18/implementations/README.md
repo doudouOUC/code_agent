@@ -20,12 +20,20 @@
 | [#14214](https://github.com/QwenLM/qwen-code/pull/14214) | ✅ merged | docs(runtime-broker): design Workspace-resident Managed Tool Runtime | [pr-14214.md](pr-14214.md) |
 | [#14254](https://github.com/QwenLM/qwen-code/pull/14254) | ✅ merged | refactor(runtime-broker): name the local-process kind and Workspace isolation policy | [pr-14254.md](pr-14254.md) |
 | [#14270](https://github.com/QwenLM/qwen-code/pull/14270) | ✅ merged | docs(design): drop stray conflict markers from the actor-roles design | [pr-14270.md](pr-14270.md) |
-| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | 🟡 open | refactor(managed-agent): Consolidate server and broker sources | [pr-14277.md](pr-14277.md) |
+| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | ✅ merged | refactor(managed-agent): Consolidate server and broker sources | [pr-14277.md](pr-14277.md) |
 | [#14280](https://github.com/QwenLM/qwen-code/pull/14280) | ✅ merged | refactor(managed-agent): Reuse Apache Commons utilities | [pr-14280.md](pr-14280.md) |
 | [#14290](https://github.com/QwenLM/qwen-code/pull/14290) | 🟡 open | feat(managed-agent): Add bounded Workspace search tools | [pr-14290.md](pr-14290.md) |
-| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | 🟡 open | fix(managed-agent): Align hosted prompts with declared tools | [pr-14306.md](pr-14306.md) |
+| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | ✅ merged | fix(managed-agent): Align hosted prompts with declared tools | [pr-14306.md](pr-14306.md) |
 | [#14307](https://github.com/QwenLM/qwen-code/pull/14307) | ✅ merged | refactor(managed-agent): Reuse text and byte-range utilities | [pr-14307.md](pr-14307.md) |
-| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | 🟡 open | feat(web-shell): integrate Managed sessions into the home workflow | [pr-14316.md](pr-14316.md) |
+| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | ✅ merged | feat(web-shell): integrate Managed sessions into the home workflow | [pr-14316.md](pr-14316.md) |
 | [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 🟡 open | feat(managed-agent): Add SSH Tool Runtime support | [pr-14318.md](pr-14318.md) |
+| [#14319](https://github.com/QwenLM/qwen-code/pull/14319) | ✅ merged | feat(managed-agent): Wire static Skills and extension configuration | [pr-14319.md](pr-14319.md) |
+| [#14323](https://github.com/QwenLM/qwen-code/pull/14323) | ✅ merged | feat(managed-agent): add Shell Full Access and session approval switching | [pr-14323.md](pr-14323.md) |
+| [#14339](https://github.com/QwenLM/qwen-code/pull/14339) | ✅ merged | refactor(runtime-broker): key Harness ownership on shared Workspace bindings by Runtime Session | [pr-14339.md](pr-14339.md) |
+| [#14340](https://github.com/QwenLM/qwen-code/pull/14340) | ✅ merged | feat(runtime): add resident Workspace file sessions | [pr-14340.md](pr-14340.md) |
+| [#14357](https://github.com/QwenLM/qwen-code/pull/14357) | ✅ merged | test(managed-agent): Add real extension process acceptance | [pr-14357.md](pr-14357.md) |
+| [#14364](https://github.com/QwenLM/qwen-code/pull/14364) | ✅ merged | fix(managed-agent): Fix publication grants and background close | [pr-14364.md](pr-14364.md) |
+| [#14370](https://github.com/QwenLM/qwen-code/pull/14370) | ✅ merged | refactor(managed-agent): Decouple tool publication storage from OSS | [pr-14370.md](pr-14370.md) |
+| [#14377](https://github.com/QwenLM/qwen-code/pull/14377) | 🟡 open | fix(managed): Recover cancellation after process restarts | [pr-14377.md](pr-14377.md) |
 
-_按个人 PR 口径更新于 2026-10-16_
+_按个人 PR 口径更新于 2026-10-17_

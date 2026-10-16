@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-16 实施快照（主干 `01d97f571a66`）：** [#13936](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13936.md) child_agent 面板、[#13973](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13973.md) 标准 UI 和 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 私有 SQL authority 已合入；[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) 与下列搜索、prompt、首页/模型及 SSH 增量仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
+> **2026-10-17 实施快照（主干 `5af87595f346`）：** child_agent 面板、标准 UI、私有 SQL authority 及下列 #14306 prompt、#14316 首页/模型、#14319 静态扩展、#14323 空闲审批切换已合入。#14081 私有文本、#14290 搜索、#14318 SSH 仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -24,11 +24,17 @@
 
 [#14290](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14290.md) 当前 /3 profile 新增受限 glob/grep_search/list_directory，开关默认关闭且只影响内置新会话。名称准入、只读原生审批、恢复和生命周期显式扩展，不能授权同名 MCP；worker 在五秒、目录 ownership、48 KiB 编码预算内运行，持久结果后才继续模型。/1、/2 与既有 Session 不被部署开关重写。
 
-[#14306](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14306.md) 在 Hosted fresh model request 之前由实际声明名称设 prompt snapshot，空集表示无工具；agent 只有实际声明才可达。名称集合或 Workspace context 变化合并一次 refresh，schema/描述继续更新 tools；preparedRecovery 沿原请求不重绘。不是过滤用户/AgentDefinition/Workspace 自带文本中的全部工具名称。
+已合入 [#14306](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14306.md)，在 Hosted fresh model request 之前由实际声明名称设 prompt snapshot，空集表示无工具；agent 只有实际声明才可达。名称集合或 Workspace context 变化合并一次 refresh，schema/描述继续更新 tools；preparedRecovery 沿原请求不重绘。不是过滤用户/AgentDefinition/Workspace 自带文本中的全部工具名称。
 
-[#14316](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md) 当前 diff 把托管导航以 portal 放进原 sidebar，App 持久化本地/托管 URL，隐藏状态保留但不捕获键盘，Java ID 不进入 daemon；草稿和原未确认请求不跨后端。服务端 options 驱动审批选择，当前 Session 固定；只有已配置目录和空闲/expected revision 允许换模型。原意图发出前持久化、响应后读回确认，Turn/model-admission 固定模型快照；最近成功 usage 才显示上下文，缺失保持未知。工作区创建使用受控根目录与原 actor receipt，不接受浏览器宿主路径。V4/V5 与 #14318 V4 冲突见[存储](managed-agent-storage-event-architecture.md)，不能当成纯前端改动或生产已验收。
+已合入 [#14316](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md)，托管导航以 portal 放进原 sidebar，App 持久化本地/托管 URL，隐藏状态保留但不捕获键盘，Java ID 不进入 daemon；草稿和原未确认请求不跨后端。服务端 options 驱动初始审批；只有已配置模型目录和空闲/expected revision 允许换模型。原意图发出前持久化、响应后读回确认，Turn/model-admission 固定模型快照；最近成功 usage 才显示上下文，缺失保持未知。工作区创建使用受控根目录与原 actor receipt，不接受浏览器宿主路径。V4/V5 已进入 main，SSH head 改为 V7，非旧 V4 冲突；不能当成纯前端改动或生产已验收。
 
-open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) 的 SSH 登记 UI 只展示授权静态节点，检查目录不授予登记权限，原 operation/幂等键读回后选工作区；默认关闭，仅 files/1 和 foreground shell/1，拒绝后台/Monitor/MCP/Hook/child Workspace。已合入 [#14307](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 Artifact 单 Range 在旧 ASCII/错误门禁后复用 HttpRange，不扩权限。以上源码、浏览器、物理重启及远端完整链路本次均未执行。
+后续已合入 [#14323](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14323.md)：内置 public bound qwen-code Session 可显式 Shell yolo，原 owner 且当前 OPERATOR 在空闲状态按 expected revision 改下一 Turn 策略；固定定义不 override。V6 保存当前 override/原 Turn 快照，SDK/Harness 的 approval-selection/1 仅非零 revision 发送在线字段；恢复不读会话当前策略。UI 原键/意图先落盘，读回 revision 才解锁，旧摘要不回退。部署默认仍非 Full Access，Hook deny/ask 保留；本次未复验进程/浏览器，原 whole-Java warm 超时报告不算通过。
+
+已合入 [#14319](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14319.md) 将静态 Skill 正文/ref 和管理员 MCP/独立 Hook pin 固定在定义及 Session；不发现宿主 Skill、执行其脚本或读取最新定义。Skill 独立批次，混合工具先拒绝；恢复沿原 Hook deny/effective input，无 marker 记未执行拒绝，已有 marker 无结算则 blocked，不重跑。缺失/损坏 ref 拒绝；历史无 pin MCP Session 须独立审计，不能假设不存在。
+
+已合入 [#14357](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14357.md) 的 Linux/MySQL HostedExtensionsIT，用真实 stdio MCP/command Hook 和受控模型核验 pin、Harness 替换、取消/close 及一次效果 UNKNOWN 不重放；本次未运行。它不增加生产能力、不支持 SSH MCP/Hook，也不证明真实模型/凭证或跨机器验收。
+
+open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) head `d9e44aaf030f` 的 SSH 登记 UI 只展示授权静态节点，检查目录不授予登记权限；独立 workspaces/register 沿原 operation/幂等键读回后选工作区，本地 workspaces/create 不复用。默认关闭，仅 files/1 和 foreground shell/1，拒绝后台/Monitor/MCP/Hook/child Workspace。已合入 [#14307](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 Artifact 单 Range 在旧 ASCII/错误门禁后复用 HttpRange，不扩权限。以上源码、浏览器、物理重启及远端完整链路本次均未执行。
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

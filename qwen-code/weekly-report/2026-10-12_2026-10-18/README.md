@@ -1,14 +1,14 @@
 # qwen-code PRs · 2026-10-12 ~ 2026-10-18 (W42 日更)
 
-> 本文件已整理北京时间 2026-10-12 至 2026-10-15 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-11T16:00:00Z, 2026-10-15T16:00:00Z)`。按 author/createdAt 归属，不按更新、关闭或合入日期补收。当前周尚未结束；本次快照取 2026-10-16，主干 `01d97f571a66`。open 仅当前 diff，closed 未合入仅历史观察；前一周后续合入的 PR 仍留 W41。规模逐 PR 累加，不是去重后的 main 增量。#14186 已合入，旧语法错误仅属历史 head，本次 main 两文件 parser 为零错误；不等于完整源码测试通过。
+> 本文件已整理北京时间 2026-10-12 至 2026-10-16 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-11T16:00:00Z, 2026-10-16T16:00:00Z)`。按 author/createdAt 归属，不按更新、关闭或合入日期补收。当前周尚未结束；本次快照取北京时间 2026-10-17，主干 `5af87595f346`。open 仅当前 diff，closed 未合入仅历史观察；前一周后续合入的 PR 仍留 W41。规模逐 PR 累加，不是去重后的 main 增量。前次 #14186 两文件 parser 零错误仅对应当时主干，本次未运行源码门禁。
 
-**主题**: L4/UI/私有 CSI 与 32 表、capture/静态门禁、Runtime 设计与库复用，以及 open 搜索、托管首页和 SSH
+**主题**: L4/私有 CSI 与 32 表、统一 Server、托管首页与审批、静态扩展、常驻文件会话及 publication；open 搜索、SSH 和取消恢复
 
-**PR 统计**: 25 PRs - 17 merged / 6 open / 2 closed
-**当前已合并 PR 代码量**: +71,056 / -20,836，1329 个文件变更
-**全量代码量**: +95,925 / -22,711，2466 个文件变更
-**类型分布**: feat ×9, fix ×8, test ×1, chore ×1, docs ×2, refactor ×4
-**范围 (scope)**: managed-agent ×13, web-shell ×3, sdk-java ×2, serve ×2, core ×1, none ×1, runtime-broker ×2, design ×1
+**PR 统计**: 33 PRs - 27 merged / 4 open / 2 closed
+**当前已合并 PR 代码量**: +93,985 / -23,457，2513 个文件变更
+**全量代码量**: +112,896 / -24,322，2744 个文件变更
+**类型分布**: feat ×12, fix ×10, test ×2, chore ×1, docs ×2, refactor ×6
+**范围 (scope)**: managed-agent ×18, web-shell ×3, sdk-java ×2, serve ×2, core ×1, none ×1, runtime-broker ×3, design ×1, runtime ×1, managed ×1
 
 ---
 
@@ -34,13 +34,21 @@
 | [#14214](https://github.com/QwenLM/qwen-code/pull/14214) | ✅ merged | @doudouOUC | docs(runtime-broker): design Workspace-resident Managed Tool Runtime | +743/-0 | 2 | 10-14 16:18 | 10-15 03:48 |
 | [#14254](https://github.com/QwenLM/qwen-code/pull/14254) | ✅ merged | @doudouOUC | refactor(runtime-broker): name the local-process kind and Workspace isolation policy | +617/-388 | 15 | 10-15 05:04 | 10-15 09:33 |
 | [#14270](https://github.com/QwenLM/qwen-code/pull/14270) | ✅ merged | @doudouOUC | docs(design): drop stray conflict markers from the actor-roles design | +0/-3 | 2 | 10-15 07:11 | 10-15 09:41 |
-| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | 🟡 open | @doudouOUC | refactor(managed-agent): Consolidate server and broker sources | +1059/-1002 | 858 | 10-15 08:44 | - |
+| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | ✅ merged | @doudouOUC | refactor(managed-agent): Consolidate server and broker sources | +1180/-1093 | 878 | 10-15 08:44 | 10-16 00:28 |
 | [#14280](https://github.com/QwenLM/qwen-code/pull/14280) | ✅ merged | @doudouOUC | refactor(managed-agent): Reuse Apache Commons utilities | +519/-338 | 69 | 10-15 08:53 | 10-15 12:21 |
 | [#14290](https://github.com/QwenLM/qwen-code/pull/14290) | 🟡 open | @doudouOUC | feat(managed-agent): Add bounded Workspace search tools | +2027/-171 | 54 | 10-15 10:13 | - |
-| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | 🟡 open | @doudouOUC | fix(managed-agent): Align hosted prompts with declared tools | +551/-22 | 5 | 10-15 15:03 | - |
+| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | ✅ merged | @doudouOUC | fix(managed-agent): Align hosted prompts with declared tools | +551/-22 | 5 | 10-15 15:03 | 10-15 17:19 |
 | [#14307](https://github.com/QwenLM/qwen-code/pull/14307) | ✅ merged | @doudouOUC | refactor(managed-agent): Reuse text and byte-range utilities | +83/-30 | 8 | 10-15 15:12 | 10-15 16:40 |
-| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | 🟡 open | @doudouOUC | feat(web-shell): integrate Managed sessions into the home workflow | +9031/-367 | 86 | 10-15 15:46 | - |
-| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 🟡 open | @doudouOUC | feat(managed-agent): Add SSH Tool Runtime support | +10258/-281 | 103 | 10-15 15:54 | - |
+| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | ✅ merged | @doudouOUC | feat(web-shell): integrate Managed sessions into the home workflow | +9332/-387 | 91 | 10-15 15:46 | 10-16 06:12 |
+| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 🟡 open | @doudouOUC | feat(managed-agent): Add SSH Tool Runtime support | +11839/-518 | 118 | 10-15 15:54 | - |
+| [#14319](https://github.com/QwenLM/qwen-code/pull/14319) | ✅ merged | @doudouOUC | feat(managed-agent): Wire static Skills and extension configuration | +3066/-130 | 45 | 10-15 16:18 | 10-16 02:40 |
+| [#14323](https://github.com/QwenLM/qwen-code/pull/14323) | ✅ merged | @doudouOUC | feat(managed-agent): add Shell Full Access and session approval switching | +3032/-167 | 59 | 10-15 17:35 | 10-16 09:21 |
+| [#14339](https://github.com/QwenLM/qwen-code/pull/14339) | ✅ merged | @doudouOUC | refactor(runtime-broker): key Harness ownership on shared Workspace bindings by Runtime Session | +929/-610 | 14 | 10-16 02:47 | 10-16 03:54 |
+| [#14340](https://github.com/QwenLM/qwen-code/pull/14340) | ✅ merged | @doudouOUC | feat(runtime): add resident Workspace file sessions | +3349/-65 | 50 | 10-16 02:56 | 10-16 08:34 |
+| [#14357](https://github.com/QwenLM/qwen-code/pull/14357) | ✅ merged | @doudouOUC | test(managed-agent): Add real extension process acceptance | +886/-0 | 5 | 10-16 04:48 | 10-16 09:27 |
+| [#14364](https://github.com/QwenLM/qwen-code/pull/14364) | ✅ merged | @doudouOUC | fix(managed-agent): Fix publication grants and background close | +86/-14 | 4 | 10-16 06:28 | 10-16 06:57 |
+| [#14370](https://github.com/QwenLM/qwen-code/pull/14370) | ✅ merged | @doudouOUC | refactor(managed-agent): Decouple tool publication storage from OSS | +518/-133 | 33 | 10-16 09:36 | 10-16 11:46 |
+| [#14377](https://github.com/QwenLM/qwen-code/pull/14377) | 🟡 open | @doudouOUC | fix(managed): Recover cancellation after process restarts | +3102/-144 | 28 | 10-16 11:33 | - |
 
 ---
 
@@ -62,28 +70,36 @@
 | [#14174](https://github.com/QwenLM/qwen-code/pull/14174) | 已初始化 V2 catalog 的 baseline witness 仍预期版本 1。 | closed 未合入，仅一行 expected 1→2，32 业务表+history 的断言保留；不新增生产 DDL 或迁移。 | 存储与总览记录有限 witness；完整观察见 [implementations/pr-14174.md](implementations/pr-14174.md)。 |
 | [#14180](https://github.com/QwenLM/qwen-code/pull/14180) | HTTP adapter 遗漏 private preparation refs，SQL 同事务 candidate 不闭合。 | 已合入精确 schema2/profile preparation 遍历；prepared 通过 intentRef 重纳 predecessor，不泛化遍历顶层旧引用；有限真实 SQL/worker fixture 不证明原生 CSI。 | 更新存储、JDBC 双语与总览；完整实现见 [implementations/pr-14180.md](implementations/pr-14180.md)。 |
 | [#14185](https://github.com/QwenLM/qwen-code/pull/14185) | 混合 SQL 时间/driver 类型和 SELECT * 使 lease/分页/映射难核验。 | 已合入 V1/V3 epoch-ms/UNSIGNED/gmt 和 typed projection，保留 actor 字节/immutable 列表 keyset，终态 collector 用安全整数 NEVER_DUE；没有旧 catalog 版本化升级。 | 更新存储、JDBC 双语与总览；完整实现见 [implementations/pr-14185.md](implementations/pr-14185.md)。 |
-| [#14186](https://github.com/QwenLM/qwen-code/pull/14186) | server 静态规则不统一，测试源码缺少低成本独立 Checkstyle 门禁。 | 已合入规则、server pom/test 和 Ubuntu/Java21 workflow 步骤；最终两文件仅 import 调整，本次 main parser 零错误，旧错误不再列当前阻塞。 | SDK 与总览更新 merged/有限验证；完整实现见 [implementations/pr-14186.md](implementations/pr-14186.md)。 |
+| [#14186](https://github.com/QwenLM/qwen-code/pull/14186) | server 静态规则不统一，测试源码缺少低成本独立 Checkstyle 门禁。 | 已合入规则、server pom/test 和 Ubuntu/Java21 workflow 步骤；最终两文件仅 import 调整，前次原 revision parser 零错误，本次未复跑。 | SDK 与总览保留 merged/有限验证边界；完整实现见 [implementations/pr-14186.md](implementations/pr-14186.md)。 |
 | [#14214](https://github.com/QwenLM/qwen-code/pull/14214) | 共享常驻 worker 的 owner、容量和停止证据没有分层方案。 | 已合入双语设计；最新 main 修订为身份策略→idle→硬预算共享→创建预热，keep-warm 推后；设计合入不等于运行能力已实现。 | 恢复与总览区分设计/实现；完整实现见 [implementations/pr-14214.md](implementations/pr-14214.md)。 |
-| [#14254](https://github.com/QwenLM/qwen-code/pull/14254) | local-process 字面量和 Session 隔离规则多点重复，易漏改归属。 | 已合入公开 KIND 和 admitsIsolationClass，统一配置/解析/stop/release，仍严格只许 session，不开放共享或空闲退役。 | 更新恢复与总览；完整实现见 [implementations/pr-14254.md](implementations/pr-14254.md)。 |
+| [#14254](https://github.com/QwenLM/qwen-code/pull/14254) | local-process 字面量和 Session 隔离规则多点重复，易漏改归属。 | 已合入公开 KIND 和统一策略；普通 local-process 仍 session-only，后续独立 owner/resident profile 见 #14339/#14340，非 idle 交付。 | 更新恢复与总览；完整实现见 [implementations/pr-14254.md](implementations/pr-14254.md)。 |
 | [#14270](https://github.com/QwenLM/qwen-code/pull/14270) | actor roles 双语设计残留冲突标记。 | 已合入两文件三行删除，仅清标记，不改 ACL 或运行代码。 | 总览记录文档维护，不新增权限技术方案；完整实现见 [implementations/pr-14270.md](implementations/pr-14270.md)。 |
-| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | 仅服务端消费的独立 Broker 模块增加构建和 classpath 维护成本。 | 当前 diff 合并到 packages/managed-agent-server，保留包名/资源/测试和双规则检查，迁移 CI/Docker/合约 rename guard；main 仍旧目录。 | 增补 SDK、存储与总览；完整观察见 [implementations/pr-14277.md](implementations/pr-14277.md)。 |
+| [#14277](https://github.com/QwenLM/qwen-code/pull/14277) | 仅服务端消费的独立 Broker 模块增加构建和 classpath 维护成本。 | 已合入 packages/managed-agent-server，保留包名/资源/测试和双规则检查，迁移 CI/Docker/合约 rename guard；SDK 目录不变。 | 更新 SDK、存储与总览及当前周验证路径；完整实现见 [implementations/pr-14277.md](implementations/pr-14277.md)。 |
 | [#14280](https://github.com/QwenLM/qwen-code/pull/14280) | 重复字符串/摘要/HMAC/mapper 实现增加维护并易改持久字节。 | 已合入直接 Commons 依赖和固定组件复用，保留 UTF-16/Unicode 专用规则、canonical JSON、hash 编码/流限制/异常分类。 | 更新 SDK 与总览；完整实现见 [implementations/pr-14280.md](implementations/pr-14280.md)。 |
 | [#14290](https://github.com/QwenLM/qwen-code/pull/14290) | 普通 grep/ls 缺 Session ownership、进程取消与硬结果预算。 | 当前 diff 默认关闭 /3 profile，随包 rg/worker 五秒期限，扫描前查嵌套 owner，1 MiB 原始/48 KiB wire/64 KiB outcome；恢复只观察原执行。 | 增补客户端、恢复与总览；完整观察见 [implementations/pr-14290.md](implementations/pr-14290.md)。 |
-| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | Hosted tools 已替换，但 prompt 仍指导不可用工具。 | 当前 diff 以实际声明名称集合和 context 同步 fresh prompt，空集明确无工具；prepared replay 保留原请求，失败不发推理。 | 增补客户端与总览；完整观察见 [implementations/pr-14306.md](implementations/pr-14306.md)。 |
+| [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | Hosted tools 已替换，但 prompt 仍指导不可用工具。 | 已合入实际声明名称集合和 context 同步 fresh prompt，空集明确无工具；prepared replay 保留原请求，失败不发推理。 | 更新客户端与总览；完整实现见 [implementations/pr-14306.md](implementations/pr-14306.md)。 |
 | [#14307](https://github.com/QwenLM/qwen-code/pull/14307) | 手写 escape、LF 切分和 Range 运算重复且替换易放松协议。 | 已合入 replaceEach/split/HttpRange，保留三字符语义和旧 ASCII/逗号/错误分类门禁，不开放多 range。 | 更新 SDK、客户端与总览；完整实现见 [implementations/pr-14307.md](implementations/pr-14307.md)。 |
-| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | 托管首页割裂、工作区只读发现、审批和模型/上下文无真实控制。 | 当前 diff 单 sidebar/独立后端归属，actor 回执两阶段建目录，固定审批、Turn 模型快照和成功 usage 投影；含 V4/V5，非纯 UI。 | 增补客户端、存储、SDK 与总览；完整观察见 [implementations/pr-14316.md](implementations/pr-14316.md)。 |
-| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 远端目录工具缺原 worker 唯一启动、重连和严格退役证据。 | 当前 diff 默认关闭 ssh-process，固定 intent/handle、双向转发、原 lease/clean proof；仅 /1 文件及前台 Shell，不重放 UNKNOWN。 | 增补恢复、客户端、JDBC 双语与总览；完整观察见 [implementations/pr-14318.md](implementations/pr-14318.md)。 |
+| [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | 托管首页割裂、工作区只读发现、审批和模型/上下文无真实控制。 | 已合入单 sidebar/独立后端归属、actor 回执两阶段建目录、Turn 模型快照及成功 usage；V4/V5 已在 main，审批后续见 #14323。 | 更新客户端、存储、SDK 与总览；完整实现见 [implementations/pr-14316.md](implementations/pr-14316.md)。 |
+| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 远端目录工具缺原 worker 唯一启动、重连和严格退役证据。 | 当前 diff V7/独立 register、claim 前 probe、原子 launch/never-start 与 startup-close pending；仅 /1 文件和前台 Shell，UNKNOWN 不重放。 | 更新恢复、客户端、JDBC 双语与总览；完整观察见 [implementations/pr-14318.md](implementations/pr-14318.md)。 |
+| [#14319](https://github.com/QwenLM/qwen-code/pull/14319) | 保存的扩展不能稳定进入 Session，恢复可能改变指令与权限。 | 已合入静态 Skill 字节/ref 与 MCP/Hook pin；独立批次、原 Hook 决策恢复和嵌套资源闭包，不发现宿主 Skill。 | 更新客户端与总览；完整实现见 [implementations/pr-14319.md](implementations/pr-14319.md)。 |
+| [#14323](https://github.com/QwenLM/qwen-code/pull/14323) | Shell 缺显式 Full Access，空闲审批切换会改变在途策略。 | 已合入 owner+OPERATOR 幂等改策、V6 Session override/Turn 快照、revision 0 wire 兼容与 UI 读回；默认不改 yolo。 | 更新客户端、存储、SDK 与总览；完整实现见 [implementations/pr-14323.md](implementations/pr-14323.md)。 |
+| [#14339](https://github.com/QwenLM/qwen-code/pull/14339) | 共享 binding 的 isolation key 不能证明 Harness 归属。 | 已合入精确共享条件和 Runtime Session/execution owner；缺原 owner 不创清理 tombstone，storage/drain fence 保留。 | 更新恢复、JDBC 双语与总览；完整实现见 [implementations/pr-14339.md](implementations/pr-14339.md)。 |
+| [#14340](https://github.com/QwenLM/qwen-code/pull/14340) | 保留 Pod 不能保证公开 Session 交接及原上下文撤销。 | 已合入显式 CSI/files 单未完成 Session，逻辑 close 留原 Pod/PVC/reservation；未知拒绝下一 Session，不物理释放/重建。 | 更新恢复、JDBC 双语与总览；完整实现见 [implementations/pr-14340.md](implementations/pr-14340.md)。 |
+| [#14357](https://github.com/QwenLM/qwen-code/pull/14357) | 配置/模拟响应不能证明真实扩展执行、不重放和清理。 | 已合入 Linux/MySQL MCP/Hook 真进程与受控模型门禁，替换 Harness、取消/close、UNKNOWN 一次效果负向对照。 | 更新客户端、恢复与总览；完整实现见 [implementations/pr-14357.md](implementations/pr-14357.md)。 |
+| [#14364](https://github.com/QwenLM/qwen-code/pull/14364) | RR 旧快照误拒 publication，后台 close 误要前台 receipt。 | 已合入局部 READ_COMMITTED；精确 child/monitor 调用免前台 receipt，仍核验原输出/物理停止。 | 更新完整结果双语、恢复与总览；完整实现见 [implementations/pr-14364.md](implementations/pr-14364.md)。 |
+| [#14370](https://github.com/QwenLM/qwen-code/pull/14370) | 自定义字节存储仍被强制 OSS 装配及异常类型耦合。 | 已合入通用配置/错误与有条件 OSS 默认 Bean；保留 immutable/guard/delete，换 Bean 不迁移旧对象。 | 更新完整结果双语、SDK 与总览；完整实现见 [implementations/pr-14370.md](implementations/pr-14370.md)。 |
+| [#14377](https://github.com/QwenLM/qwen-code/pull/14377) | 续租停止、丢 admission 及 parked 取消缺原生结算回执。 | 当前 diff 原 grant 有效内重试、锁内未接纳证明、原取消接管及先写唯一 Shell receipt；物理未知仍阻塞，不重放。 | 增补恢复、完整结果双语与总览；完整观察见 [implementations/pr-14377.md](implementations/pr-14377.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [Managed Agents](../../feature/managed-agents/README.md) | #13931(merged), #13936(merged), #13973(merged), #13996(merged), #14039(merged), #14045(merged), #14059(merged), #14069(merged), #14081(open), #14124(merged), #14141(closed), #14174(closed), #14180(merged), #14185(merged), #14186(merged), #14214(merged), #14254(merged), #14270(merged), #14277(open), #14280(merged), #14290(open), #14306(open), #14307(merged), #14316(open), #14318(open) | 同步最终/设计/观察范围与未运行门禁；不移动创建周。 |
-| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #13931(merged), #14039(merged), #14045(merged), #14059(merged), #14141(closed), #14214(merged), #14254(merged), #14290(open), #14318(open) | 原资源停止、设计提案和开放搜索/SSH 恢复分开。 |
-| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #13936(merged), #13973(merged), #13996(merged), #14081(open), #14290(open), #14306(open), #14307(merged), #14316(open), #14318(open) | 已合入 UI 与 open 首页、声明、模型、SSH 接口分开。 |
-| [存储、事件与会话恢复](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #14069(merged), #14174(closed), #14180(merged), #14185(merged), #14277(open), #14316(open) | 已合入 V3/gmt 时间与资源闭包；open 目录、V4/V5 及兼容边界。 |
-| [Runtime Broker JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #13996(merged), #14069(merged), #14081(open), #14180(merged), #14185(merged), #14318(open) | 原 authority、prepared predecessor、终态时间与 SSH 原资源证据。 |
-| [完整工具结果中文](../../feature/managed-agents/managed-agent-tool-result-artifacts.zh-CN.md) / [English](../../feature/managed-agents/managed-agent-tool-result-artifacts.md) | #14124(merged) | captureBytes create/load、预算与真实云验收区分。 |
-| [SDK](../../feature/sdk.md) | #14124(merged), #14186(merged), #14277(open), #14280(merged), #14307(merged), #14316(open) | capture、已合入静态规则/库复用与开放目录/模型协议分开。 |
+| [Managed Agents](../../feature/managed-agents/README.md) | #13931(merged), #13936(merged), #13973(merged), #13996(merged), #14039(merged), #14045(merged), #14059(merged), #14069(merged), #14081(open), #14124(merged), #14141(closed), #14174(closed), #14180(merged), #14185(merged), #14186(merged), #14214(merged), #14254(merged), #14270(merged), #14277(merged), #14280(merged), #14290(open), #14306(merged), #14307(merged), #14316(merged), #14318(open), #14319(merged), #14323(merged), #14339(merged), #14340(merged), #14357(merged), #14364(merged), #14370(merged), #14377(open) | 同步最终/设计/观察范围与未运行门禁；不移动创建周。 |
+| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #13931(merged), #14039(merged), #14045(merged), #14059(merged), #14141(closed), #14214(merged), #14254(merged), #14290(open), #14318(open), #14339(merged), #14340(merged), #14357(merged), #14364(merged), #14377(open) | 原资源、窄常驻交接、真实扩展门禁与 open 取消分开。 |
+| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #13936(merged), #13973(merged), #13996(merged), #14081(open), #14290(open), #14306(merged), #14307(merged), #14316(merged), #14318(open), #14319(merged), #14323(merged), #14357(merged) | 已合入首页/模型/声明、固定扩展和空闲审批；SSH 仍 open。 |
+| [存储、事件与会话恢复](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #14069(merged), #14174(closed), #14180(merged), #14185(merged), #14277(merged), #14316(merged), #14323(merged) | 统一目录及 V4/V5/V6 已合入；SSH 当前 V7 非旧冲突。 |
+| [Runtime Broker JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #13996(merged), #14069(merged), #14081(open), #14180(merged), #14185(merged), #14318(open), #14339(merged), #14340(merged) | 原 authority、共享 owner、逻辑 resident close 与 SSH 证明分开。 |
+| [完整工具结果中文](../../feature/managed-agents/managed-agent-tool-result-artifacts.zh-CN.md) / [English](../../feature/managed-agents/managed-agent-tool-result-artifacts.md) | #14124(merged), #14364(merged), #14370(merged), #14377(open) | capture 预算、发布事务/后台证明、存储接口与 open 原生回执。 |
+| [SDK](../../feature/sdk.md) | #14124(merged), #14186(merged), #14277(merged), #14280(merged), #14307(merged), #14316(merged), #14323(merged), #14370(merged) | 统一 server 构建、原模型/审批快照与后端无关接口边界。 |
 
-_按个人 PR 口径更新于 2026-10-16_
+_按个人 PR 口径更新于 2026-10-17；本次仅执行文档审计，源码、浏览器、MySQL/OSS/CSI/SSH 及部署门禁未运行。_

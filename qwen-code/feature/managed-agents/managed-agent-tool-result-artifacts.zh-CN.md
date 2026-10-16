@@ -18,7 +18,15 @@
 
 源码记录的历史真实 bucket 验收与 rebase 后本地不可变对象装置分开；本次只核对代码/caller/回归入口，没有复跑真实 OSS、Linux cuts、Monitor/background cgroup 或负载/跨主机门禁。代码合入不等于这些验收已通过。
 
-此前 V68 async / V69 retention 是 legacy 迁移历史；当前 main 已采用 32 表 canonical V1/V2，不能沿旧编号部署。全部 server/writer、原锁序与独立 default-off 开启门槛仍需验证，不因文档或合入自动启用。
+此前 V68 async / V69 retention 是 legacy 迁移历史；当前 main 已采用 32 表 canonical V1–V6，不能沿旧编号部署。全部 server/writer、原锁序与独立 default-off 开启门槛仍需验证，不因文档或合入自动启用。
+
+### 2026-10-17 发布、存储与取消回执增量
+
+main `5af87595f346` 已合入 [#14364](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14364.md)：ToolPublicationStore 局部 READ_COMMITTED 防止 placement discovery 后锁 head 却沿旧 RR 快照读取 journal/activation。精确 child_run shell/monitor_run 调用只免前台 receipt，仍须原后台记录、物理停止、manifest/seal 或已知失败输出；删证据的负向检查保留。
+
+已合入 [#14370](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14370.md)：ToolPublicationObjectStore 的 validateConfiguration 与 ACCESS_DENIED/FAILURE 不依赖 OSS；默认 OSS 移至延后自动配置，发布开启且无自定义 Bean 才初始化，maintenance-only/关闭不触发。guard 每次读取/重试前检查，原子 no-overwrite create 不自动重放，精确物理 delete 即使 GC 关闭也必需。SQL 仍是唯一身份账本；同 SQL 实例共享同存储/原 key，换 Bean 不迁移旧对象。未实现 S3/MinIO/生产文件系统，服务仍打包 OSS SDK，独立维护启动器仍 OSS 专用。随代码报告的 113 项专项和独立静态检查不替代其全量 verify 基线错误，本次未运行源码/真实 bucket。
+
+open [#14377](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14377.md) `3787cdd4fd23` 仅在原前台 aborted/PID/POSIX 进程组 gone 时保留 publisher 丢失的 cancelled；finalize 丢失标 unavailable/producer_lost/null manifest/blocked，accept 丢失保留原 manifest。原 sink 同对象本地 ACK 不声称 durable outcome；当前 writer 须核验 Broker 原结算结果、checkpoint/intent/activation、manifest/seal/digest，持久唯一原生 receipt 后才解除等待。capture 丢失 resultRef 为空，不关联产物；物理停止和普通 history 不能替代 receipt，close 不放宽。此观察不属于 main，源码/进程/部署门禁本次未运行。
 
 | 核实的来源                                                                                                                   | 已有行为                                                                                                                                                | 缺少的边界                                                                     |
 | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
