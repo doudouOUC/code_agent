@@ -1,6 +1,6 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-> **2026-10-17 新库最终基线（主干 `5af87595f346`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表已合入，[#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 增加 canonical V2 私有 authority；当前目录 V1–V6，新增 Workspace 创建、模型与审批快照见下文。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
+> **2026-10-18 新库最终基线（主干 `0ed9895ae9aa`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表已合入，[#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 增加 canonical V2 私有 authority；当前目录 V1–V9，V7 SSH 登记、V8 Turn command operation 与 V9 原 Harness 索引均在 main。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
 
 ## 新库 32 表的最终实现
 
@@ -14,7 +14,7 @@
 
 最终 snapshot 返回/publish 前再验 lease；read-only view 的 checkReadView 只检查已提交 lease，不在只读事务伪续租，必须在原期限内完成。
 
-V3__session_list_created_at.sql 为 immutable 创建时间/session_id 建索引，最初列名为 created_at，当前 main 随 #14185 改为 gmt_create；列表不随事件追加的修改时间移动。业务表仍 32；closed #14174 的 V2 witness 仅是当时历史，不能作为当前 V1–V6 目录版本断言。
+V3__session_list_created_at.sql 为 immutable 创建时间/session_id 建索引，最初列名为 created_at，当前 main 随 #14185 改为 gmt_create；列表不随事件追加的修改时间移动。业务表仍 32；closed #14174 的 V2 witness 仅是当时历史，不能作为当前 V1–V9 目录版本断言。
 
 切换策略是保留旧数据库/历史 endpoint，新 Session 进入新环境，回滚也保全新库已接受数据。DataAgent 的 da_qwen_session_* 不在此范围。真实 MySQL 的 journal 原子性、旧 writer、receipt、snapshot/GC/read lease 竞争及 load/query budget、OSS/CSI 与生产流量门禁本次均未执行；命令与测试入口见单 PR 观察。
 
@@ -30,7 +30,15 @@ V3__session_list_created_at.sql 为 immutable 创建时间/session_id 建索引�
 
 已合入 [#14316](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md)，actor WORKSPACE_CREATE 回执持久化 pending 身份，事务外建受控目录/注册，最后事务原子写 Workspace/OWNER/completed；执行映射只信 completed，重试不恢复撤权。主模型成功 usage 投影复用 ma_session_record/ref，scope/digest/大小核验后有界读取；模型变更清 latest projection，Turn 固定原选择。V4 扩 receipt namespace，V5 扩 Session/Turn 模型快照，最终对齐 typed receipt/gmt 毫秒列。
 
-已合入 [#14323](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14323.md) 的 V6：原 approval_mode 不改，Session nullable selected_approval_mode/approval_revision 与 Turn 原快照分开。锁内 expected revision、actor+session 回执及事件同事务，只有原 owner+OPERATOR 且空闲可改；恢复不得读取 mutable Session 策略。open #14318 当前 V7 已接 V6，旧 V4 冲突不再成立。真实 MySQL 逐版本升级/checksum、恢复与浏览器本次未运行；直接改过的旧 V1/V3 仍需新库或独立迁移，不授权 repair 绕过。
+已合入 [#14323](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14323.md) 的 V6：原 approval_mode 不改，Session nullable selected_approval_mode/approval_revision 与 Turn 原快照分开。锁内 expected revision、actor+session 回执及事件同事务，只有原 owner+OPERATOR 且空闲可改；恢复不得读取 mutable Session 策略。#14318 的 V7 已合入接 V6，旧 V4 冲突不再成立。真实 MySQL 逐版本升级/checksum、恢复与浏览器本次未运行；直接改过的旧 V1/V3 仍需新库或独立迁移，不授权 repair 绕过。
+
+### 目录 receipt、共享索引与定义改策，2026-10-18
+
+已合入 [#14405](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14405.md) 复用 WORKSPACE_CREATE actor receipt，固定原 sourceWorkspaceId/generation/storage/cwd 与名称，pending/最终事务复核原授权和 storage；只建逻辑 Workspace/OWNER，不复制或注册另一物理目录。completed receipt 还提供 defaultCwdRelative，重放不恢复撤权。该增量无新迁移，授权目录浏览与空目录创建分别广告。
+
+已合入 [#14435](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14435.md) 的 V9 单列 harness_session_id 索引支持按 tenant+原 Harness、有序 keyset 分批释放共享 Runtime Session；不使用超过 InnoDB 键长的双 VARBINARY(2048) 索引。当前 V8__turn_command_operations.sql 扩现有 operation kind 的 SUBMIT_INPUT/CANCEL 检查，V9 不新增业务表。
+
+open [#14484](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14484.md) `078e540799b2` 复用 V6 为合资格保存定义的用户 Turn 冻结策略，无新 migration；原定义/初始策略/旧零 revision wire 不改，正 revision 缺快照拒绝。全部旧 Java/Broker writer 必须隔离升级，schema 不变不能检测其忽略自定义快照的风险。本次未执行源码、数据库或部署验收。
 
 ## 历史存储与事件设计
 

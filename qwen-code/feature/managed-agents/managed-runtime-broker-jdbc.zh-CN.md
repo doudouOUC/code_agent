@@ -14,11 +14,11 @@
 
 ## 2026-10-15 私有 authority 与新库最终基线
 
-已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `5af87595f346` 当前 canonical V1–V6，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批快照。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
+已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `0ed9895ae9aa` 当前 canonical V1–V9，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批、SSH/Turn operation/共享索引。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
 
 `V2__private_csi_authority.sql` 只扩展 request key/generated csi_guard/index、first activation revision 和 native authorization，业务表仍 32。旧 V68/V69 与 CSI branch V69–V72 是 legacy/历史分支编号，不用于当前 32 表 V1/V2 部署；已验证 V1 无 history 的 Broker 初始化与 application Flyway V2 迁移分开。历史编号冲突不替代当前 catalog/check/锁序验收。
 
-open [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `2748e0bd28bc` 已面向 main，继承已合入 authority/catalog；旧 stacked baseline 的验证不自动资格化当前 head。私有 attach/text/history 固定原 UUID/writer/activation，fresh admission 后生产纯文本；失租阻塞，stopLocal 不 seal/release。不安装 file toolTurn/finalization/public selector/冷替换写者，进程内去重不证明跨 boot replay。
+已合入 [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md)，最终 head `d4ee6e1dbdba` 继承已合入 authority/catalog；旧 stacked baseline 的验证不自动资格化最终集成版。私有 attach/text/history 固定原 UUID/writer/activation，fresh admission 后生产纯文本；失租阻塞，stopLocal 不 seal/release。不安装 file toolTurn/finalization/public selector/冷替换写者，进程内去重不证明跨 boot replay。
 
 已合入 [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 fresh database 32 表基线，DDL 前拒绝 system/missing catalog、要求 MariaDB CHECK enforcement，验证 catalog/列/键/索引/check/FK 后 baseline/migrate。typed receipt/work 不合并 Runtime generation、Session head、operation claim/read lease。snapshot 只读 view 不伪续租，分页/GC/切换见[存储、事件方案](managed-agent-storage-event-architecture.md)。本次未跑组件、MySQL、OSS/CSI 或部署门禁。
 
@@ -26,17 +26,23 @@ open [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081
 
 已合入 [#14185](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14185.md)，最终 `010664ddba0e` 改 V1/V3 为 epoch-ms/UNSIGNED/gmt 字段，接 typed Time/Rows/Projection，保留 actor 字节和 immutable gmt_create 列表 keyset；终态 collector 用 NEVER_DUE_MILLIS=9007199254740991，避免零/负值到期或 signedness 错误。main 已采用新形状，但没有现存 DATETIME catalog 的版本化升级；不可 repair 历史规避 checksum/shape 拒绝。旧 open SQL fixture 及其它分支必须对齐新形状再验收，不能据已合入推断兼容迁移或原数据库测试已通过。
 
-### SSH 的当前 open 原资源边界
+### SSH 的最终原资源边界
 
-[#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) `d9e44aaf030f` 从受信 SSH_LOCAL storage 选择 ssh-process。独立 workspaces/register、V7 接 main V6，沿数据库毫秒/gmt 与统一 physicalKey；claim 前事务外 probe cwd/marker，确定拒绝不占 holder，claim 后未知仍保留。路由按原 kind/seed/handle 不回退本地，SSH 转发只改发送地址不改原 lease。原子 no-overwrite launch/never-start claim、worker 自报 PID 与 startup-close pending 区分确定 spawn 前失败和模糊启动，均不授权替换。
+已合入 [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md)，最终 `1a32fe4dbc47` 从受信 SSH_LOCAL storage 选择 ssh-process。独立 workspaces/register、V7 接 V6，沿数据库毫秒/gmt 与统一 physicalKey；claim 前事务外 probe cwd/marker，确定拒绝不占 holder，claim 后未知仍保留。路由按原 kind/seed/handle 不回退本地，SSH 转发只改发送地址不改原 lease。原子 no-overwrite launch/never-start claim、worker 自报 PID 与 startup-close pending 区分确定 spawn 前失败和模糊启动，均不授权替换。
 
 严格 stop 验证原 generation/provisionRequest/incarnation/lease/retirement cleanProof 和进程消失，再写 RuntimeDrainReceipt；原 not_started/capture:null publication/ACK 有限恢复不扩展 UNKNOWN 重放。旧 V4 冲突已由当前 V7 编号解决，不是 repair 已应用历史；仍需 checksum/组合升级门禁。默认关闭、仅 /1 文件/前台 Shell；本次未执行 SSH/MySQL/远端 publication，PR 的 macOS loopback/组件报告不等于 Linux、跨机器或完整部署验收。
 
 ### 已合入共享归属与常驻文件增量，2026-10-17
 
-已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 local managed binding 按持久 Runtime Session/execution 的真实 Harness owner，而非 binding isolation key 核验。storage/physical fence、Session drain 保留，缺共享 Session 不能创清理 tombstone。普通 local-process 仍 session-only；这不是任意 provider 共享或 idle retirement。
+已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 local managed binding 按持久 Runtime Session/execution 的真实 Harness owner，而非 binding isolation key 核验。storage/physical fence、Session drain 保留，缺共享 Session 不能创清理 tombstone。本切片没有开启共享；后续 #14435 单独增加显式配置，并非任意 provider 共享或 idle retirement。
 
 已合入 [#14340](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14340.md) 独立显式 resident CSI/files 映射：一个未完成 public Session、一个可撤销 Read/Write/Edit 上下文使用原 Pod/PVC。Workspace 行锁拒绝重叠，逻辑 close 结清原工作并释放精确 owner，保留 READY binding/generation/RESERVED 物理存储；释放未知阻止交接，丢失/替换/重启 Pod 保持不可用。没有物理 release/卷复用/collector/Shell/MCP/Hook/自动替换。H2/boot-2 同 JVM fixture 及旧 ACK 证据不为当前 CSI 部署授予资格，本次未运行源码/部署门禁。#14277 合入后 Java 源码/测试位于 packages/managed-agent-server，SDK 仍 sdk-java/qwencode。
+
+### 公开 Workspace 常驻与 macOS，2026-10-18
+
+已合入 [#14435](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14435.md)：bound-session-isolation-class 默认 session，显式 workspace 要求 durable local-process 且排斥 child Workspaces。Session 授权 placement 与共享 binding 空 isolation key 分开，原 Runtime Session owner/claim fence 覆盖执行/Hook/cleanup。两个 close 协议按原 Harness keyset 每批 100 个只释放自身 Runtime Session/holder，binding/worker 留 READY；丢 worker/未知仍阻塞，v2 never-initialized 不漏共享记录。仅 storage-fenced retirement 可物理 drain/stop，retention 保护真实 owner 的未结算 child run。V9 单列 harness_session_id 索引避免双 VARBINARY 键过长，tenant 在查询过滤；未交付创建 warm、idle/硬预算、keep-warm。源单元/H2/变异报告不替代真实 Linux/MySQL 多 Session 进程资格。
+
+已合入 [#14442](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14442.md)：macOS hardware UUID/boot UUID/纳秒 birth 与 dev/inode/原 marker 联合核验 LOCAL storage 和 worker，原生探测有五秒/64 KiB 限制。同 host/boot 可接原 durable worker，macOS trusted-local-reboot-recovery 必须 false；换 boot/host 仍 UNKNOWN，不 adopt/attest/stop 原 worker，不借 Linux reboot 证明自动清理。不增加 Linux cgroup/CSI/跨机器资格。本次未执行原生、源码、数据库或部署门禁。
 
 ## 历史基础切片
 

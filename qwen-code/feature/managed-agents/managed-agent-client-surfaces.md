@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-17 实施快照（主干 `5af87595f346`）：** child_agent 面板、标准 UI、私有 SQL authority 及下列 #14306 prompt、#14316 首页/模型、#14319 静态扩展、#14323 空闲审批切换已合入。#14081 私有文本、#14290 搜索、#14318 SSH 仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
+> **2026-10-18 实施快照（主干 `0ed9895ae9aa`）：** child_agent 面板、标准 UI、私有 SQL authority、prompt/首页/扩展/内置审批，以及 #14081 私有文本、#14318 SSH、#14405 目录/进度、#14436 输出提示和 #14442 macOS 身份均已合入。#14290 搜索、#14484 已保存定义审批仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -14,9 +14,9 @@
 
 放弃未知创建恢复原 initial input、清本地 pending/commit callback，并由 `WorkspaceBindingCreator:onAbandoned` 刷新 Session 列表，允许重新发现服务器已创建但响应丢失的 Session。仅 pending 且不 busy 显示恢复行；含初始输入与空创建分别提示风险，不能凭放弃断言原输入未执行。
 
-### 私有 CSI 文本的当前 open 方案
+### 私有 CSI 文本的最终实现
 
-[#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md) head `2748e0bd28bc` 已从旧 stacked base 改为 main，继承已合入 #13996/#14069，不复制 schema 或沿用旧基线测试资格。Hosted-only `QWEN_HOSTED_CSI_SESSION_STORE_URL` 使认证 primary listener 提供 private attach/text/history；固定原 canonical Session UUID、writer/binding generation 1、activation epoch 1，text/history 前 fresh acquire 核验原准入。只生产纯文本与已结算 history，不安装 file toolTurn 或生命周期，也不是标准 UI/public CSI selector。
+已合入 [#14081](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14081.md)，最终 head `d4ee6e1dbdba`，继承已合入 #13996/#14069，不复制 schema 或沿用旧 stacked 测试资格。Hosted-only `QWEN_HOSTED_CSI_SESSION_STORE_URL` 使认证 primary listener 提供 private attach/text/history；固定原 canonical Session UUID、writer/binding generation 1、activation epoch 1，text/history 前 fresh acquire 核验原准入。只生产纯文本与已结算 history，不安装 file toolTurn 或生命周期，也不是标准 UI/public CSI selector。
 
 `hosted-csi-session.ts` 续租失效阻塞 owner 并 abort 原 prompt；`http-managed-session-store.ts:stopLocal` 停本地续租/写入而不 seal authority，shutdown 不 release Runtime。普通 route 拒绝私有 owner 的大小写变体，原 prompt/相同文本只在本进程复用原结果，不承诺跨 boot exactly-once。真实模型、SQL/CSI 正向链路与部署仍须独立验收。
 
@@ -26,7 +26,7 @@
 
 已合入 [#14306](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14306.md)，在 Hosted fresh model request 之前由实际声明名称设 prompt snapshot，空集表示无工具；agent 只有实际声明才可达。名称集合或 Workspace context 变化合并一次 refresh，schema/描述继续更新 tools；preparedRecovery 沿原请求不重绘。不是过滤用户/AgentDefinition/Workspace 自带文本中的全部工具名称。
 
-已合入 [#14316](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md)，托管导航以 portal 放进原 sidebar，App 持久化本地/托管 URL，隐藏状态保留但不捕获键盘，Java ID 不进入 daemon；草稿和原未确认请求不跨后端。服务端 options 驱动初始审批；只有已配置模型目录和空闲/expected revision 允许换模型。原意图发出前持久化、响应后读回确认，Turn/model-admission 固定模型快照；最近成功 usage 才显示上下文，缺失保持未知。工作区创建使用受控根目录与原 actor receipt，不接受浏览器宿主路径。V4/V5 已进入 main，SSH head 改为 V7，非旧 V4 冲突；不能当成纯前端改动或生产已验收。
+已合入 [#14316](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md)，托管导航以 portal 放进原 sidebar，App 持久化本地/托管 URL，隐藏状态保留但不捕获键盘，Java ID 不进入 daemon；草稿和原未确认请求不跨后端。服务端 options 驱动初始审批；只有已配置模型目录和空闲/expected revision 允许换模型。原意图发出前持久化、响应后读回确认，Turn/model-admission 固定模型快照；最近成功 usage 才显示上下文，缺失保持未知。工作区创建使用受控根目录与原 actor receipt，不接受浏览器宿主路径。V4/V5 已进入 main，SSH V7 也已合入，非旧 V4 冲突；不能当成纯前端改动或生产已验收。
 
 后续已合入 [#14323](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14323.md)：内置 public bound qwen-code Session 可显式 Shell yolo，原 owner 且当前 OPERATOR 在空闲状态按 expected revision 改下一 Turn 策略；固定定义不 override。V6 保存当前 override/原 Turn 快照，SDK/Harness 的 approval-selection/1 仅非零 revision 发送在线字段；恢复不读会话当前策略。UI 原键/意图先落盘，读回 revision 才解锁，旧摘要不回退。部署默认仍非 Full Access，Hook deny/ask 保留；本次未复验进程/浏览器，原 whole-Java warm 超时报告不算通过。
 
@@ -34,7 +34,15 @@
 
 已合入 [#14357](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14357.md) 的 Linux/MySQL HostedExtensionsIT，用真实 stdio MCP/command Hook 和受控模型核验 pin、Harness 替换、取消/close 及一次效果 UNKNOWN 不重放；本次未运行。它不增加生产能力、不支持 SSH MCP/Hook，也不证明真实模型/凭证或跨机器验收。
 
-open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) head `d9e44aaf030f` 的 SSH 登记 UI 只展示授权静态节点，检查目录不授予登记权限；独立 workspaces/register 沿原 operation/幂等键读回后选工作区，本地 workspaces/create 不复用。默认关闭，仅 files/1 和 foreground shell/1，拒绝后台/Monitor/MCP/Hook/child Workspace。已合入 [#14307](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 Artifact 单 Range 在旧 ASCII/错误门禁后复用 HttpRange，不扩权限。以上源码、浏览器、物理重启及远端完整链路本次均未执行。
+已合入 [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md)，最终 head `1a32fe4dbc47` 的 SSH 登记 UI 只展示授权静态节点，检查目录不授予登记权限；独立 workspaces/register 沿原 operation/幂等键读回后选工作区，本地 workspaces/create 不复用。默认关闭，仅 files/1 和 foreground shell/1，拒绝后台/Monitor/MCP/Hook/child Workspace。已合入 [#14307](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 Artifact 单 Range 在旧 ASCII/错误门禁后复用 HttpRange，不扩权限。以上源码、浏览器、物理重启及远端完整链路本次均未执行。
+
+### 目录、进度与审批后续，2026-10-18
+
+已合入 [#14405](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14405.md)：只对 OWNER 的 ACTIVE ROOT、原已验证 LOCAL storage 枚举真实直接子目录，扫描最多 1024 项/返回 100 项，排除 symlink/保留目录；授权 route 可返回执行宿主根路径。原 actor receipt 固定源 generation/storage/cwd，pending 与最终提交再验；只建共享原 storage 的逻辑别名，默认 cwd 从 completed receipt 恢复，不提供子目录隔离。WebShell 保留原键/目录/草稿和选择，放弃不证明服务端未创建。后续 [#14442](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14442.md) 扩到 macOS native identity，但不开放 SSH/CSI 目录浏览或任意客户端路径。
+
+#14405 的 hosted-tool-progress.ts 从原 intent/receipt/已提交结果按 batch/ordinal 映射原 call，投影状态不泄露参数或输出；重放保留 startTime，完成时对齐 assistant 时间。轮数读配置而非固定 16，正上限才触发 hosted_turn_limit_exceeded。已合入 [#14436](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14436.md) 把 raw/content 都不存在与真实空字符串分开，活动状态继续等待；提示不增加结果或停止证明。
+
+open [#14484](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14484.md) head `078e540799b2` 扩已有已保存定义会话的下一用户 Turn 审批覆盖：精确 files/1、shell/1,/2，owner+当前 OPERATOR、原空闲/CAS/回执和 V6 快照。固定定义/创建初始策略不改，正 revision 执行同时要求 approval-selection/1 与 agent-definition-approval-selection/1；缺能力拒绝，不回退初始策略。读回/已授权回执与取消清理保留，旧 Java writer 必须隔离升级，不能因无 schema 变化认为兼容。本次未执行源码/浏览器/数据库验收。
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

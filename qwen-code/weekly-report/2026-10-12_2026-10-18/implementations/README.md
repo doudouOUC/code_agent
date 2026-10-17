@@ -10,7 +10,7 @@
 | [#14045](https://github.com/QwenLM/qwen-code/pull/14045) | ✅ merged | fix(managed-agent): close shell profiles after native file calls | [pr-14045.md](pr-14045.md) |
 | [#14059](https://github.com/QwenLM/qwen-code/pull/14059) | ✅ merged | fix(serve): resume committed file results after runtime retirement | [pr-14059.md](pr-14059.md) |
 | [#14069](https://github.com/QwenLM/qwen-code/pull/14069) | ✅ merged | feat(managed-agent): consolidate persistence into a 32-table baseline | [pr-14069.md](pr-14069.md) |
-| [#14081](https://github.com/QwenLM/qwen-code/pull/14081) | 🟡 open | feat(serve): attach private CSI Sessions to Hosted text turns | [pr-14081.md](pr-14081.md) |
+| [#14081](https://github.com/QwenLM/qwen-code/pull/14081) | ✅ merged | feat(serve): attach private CSI Sessions to Hosted text turns | [pr-14081.md](pr-14081.md) |
 | [#14124](https://github.com/QwenLM/qwen-code/pull/14124) | ✅ merged | fix(managed-agent): Wire OSS capture budgets into Hosted sessions | [pr-14124.md](pr-14124.md) |
 | [#14141](https://github.com/QwenLM/qwen-code/pull/14141) | 🔴 closed | fix(sdk-java): repair Hosted owner probes and mount fixtures | [pr-14141.md](pr-14141.md) |
 | [#14174](https://github.com/QwenLM/qwen-code/pull/14174) | 🔴 closed | test(managed-agent): align the baseline witness with canonical V2 | [pr-14174.md](pr-14174.md) |
@@ -26,7 +26,7 @@
 | [#14306](https://github.com/QwenLM/qwen-code/pull/14306) | ✅ merged | fix(managed-agent): Align hosted prompts with declared tools | [pr-14306.md](pr-14306.md) |
 | [#14307](https://github.com/QwenLM/qwen-code/pull/14307) | ✅ merged | refactor(managed-agent): Reuse text and byte-range utilities | [pr-14307.md](pr-14307.md) |
 | [#14316](https://github.com/QwenLM/qwen-code/pull/14316) | ✅ merged | feat(web-shell): integrate Managed sessions into the home workflow | [pr-14316.md](pr-14316.md) |
-| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | 🟡 open | feat(managed-agent): Add SSH Tool Runtime support | [pr-14318.md](pr-14318.md) |
+| [#14318](https://github.com/QwenLM/qwen-code/pull/14318) | ✅ merged | feat(managed-agent): Add SSH Tool Runtime support | [pr-14318.md](pr-14318.md) |
 | [#14319](https://github.com/QwenLM/qwen-code/pull/14319) | ✅ merged | feat(managed-agent): Wire static Skills and extension configuration | [pr-14319.md](pr-14319.md) |
 | [#14323](https://github.com/QwenLM/qwen-code/pull/14323) | ✅ merged | feat(managed-agent): add Shell Full Access and session approval switching | [pr-14323.md](pr-14323.md) |
 | [#14339](https://github.com/QwenLM/qwen-code/pull/14339) | ✅ merged | refactor(runtime-broker): key Harness ownership on shared Workspace bindings by Runtime Session | [pr-14339.md](pr-14339.md) |
@@ -34,6 +34,11 @@
 | [#14357](https://github.com/QwenLM/qwen-code/pull/14357) | ✅ merged | test(managed-agent): Add real extension process acceptance | [pr-14357.md](pr-14357.md) |
 | [#14364](https://github.com/QwenLM/qwen-code/pull/14364) | ✅ merged | fix(managed-agent): Fix publication grants and background close | [pr-14364.md](pr-14364.md) |
 | [#14370](https://github.com/QwenLM/qwen-code/pull/14370) | ✅ merged | refactor(managed-agent): Decouple tool publication storage from OSS | [pr-14370.md](pr-14370.md) |
-| [#14377](https://github.com/QwenLM/qwen-code/pull/14377) | 🟡 open | fix(managed): Recover cancellation after process restarts | [pr-14377.md](pr-14377.md) |
+| [#14377](https://github.com/QwenLM/qwen-code/pull/14377) | ✅ merged | fix(managed): Recover cancellation after process restarts | [pr-14377.md](pr-14377.md) |
+| [#14405](https://github.com/QwenLM/qwen-code/pull/14405) | ✅ merged | feat(managed-agent): Improve workspace selection and tool progress | [pr-14405.md](pr-14405.md) |
+| [#14435](https://github.com/QwenLM/qwen-code/pull/14435) | ✅ merged | feat(runtime-broker): Workspace-resident Tool Runtime for bound Sessions | [pr-14435.md](pr-14435.md) |
+| [#14436](https://github.com/QwenLM/qwen-code/pull/14436) | ✅ merged | fix(web-shell): Distinguish unavailable shell output | [pr-14436.md](pr-14436.md) |
+| [#14442](https://github.com/QwenLM/qwen-code/pull/14442) | ✅ merged | feat(managed-agent): support native macOS workspace runtime | [pr-14442.md](pr-14442.md) |
+| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | 🟡 open | feat(managed-agent): allow approval changes in stored agent sessions | [pr-14484.md](pr-14484.md) |
 
-_按个人 PR 口径更新于 2026-10-17_
+_按个人 PR 口径更新于 2026-10-18_

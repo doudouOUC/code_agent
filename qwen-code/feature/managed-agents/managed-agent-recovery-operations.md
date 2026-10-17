@@ -32,13 +32,13 @@ L4 的原 cleanup writer seal 仍核验 head 的原 token/generation 与有效 c
 
 ### 常驻设计、搜索与 SSH 的增量边界
 
-截至 2026-10-17 main `5af87595f346`，[#14214](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14214.md) 是常驻设计，[#14254](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14254.md) 的普通 local-process 准入仍 session-only。后续已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 binding 的 admission/recovery/release 按 Runtime Session/execution 真 Harness owner，而非 binding isolation key；缺原 Session 不能创清理 tombstone，storage/drain fence 仍保留。它不是打开任意 provider 共享的开关。
+截至 2026-10-18 main `0ed9895ae9aa`，[#14214](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14214.md) 是常驻设计，[#14254](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14254.md) 最初保留 session-only；后续 #14435 才增加显式绑定 Session 共享。已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 binding 的 admission/recovery/release 按 Runtime Session/execution 真 Harness owner，而非 binding isolation key；缺原 Session 不能创清理 tombstone，storage/drain fence 仍保留。它不是打开任意 provider 共享的开关。
 
 已合入 [#14340](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14340.md) 的独立 resident CSI/files profile：管理员精确映射一 Workspace/原 Pod/PVC，锁内只许一个未完成 public Session 和活动上下文，Read/Write/Edit 后逻辑 close 撤销上下文并保留原 binding/reservation。释放未知阻止下一 Session；丢 Pod/重启/身份不符不自动重建，物理 release 明确拒绝。无 Shell/MCP/Hook/子环境共享/会话内 cwd 变更；Pod 关闭后仍计费。旧 ACK 证据和 H2/boot-2 同 JVM fixture 不证明当前真实 CSI/进程崩溃资格。通用 idle retirement、硬预算调度、创建预热和 keep-warm 仍未交付，不能把窄常驻路径写成 #13526 累计方案全部完成。
 
 open [#14290](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14290.md) 搜索沿原 execution 的 prepare/status/cancel/结果持久化恢复，取消/期限必须停止真实 rg/枚举 worker，不能只返回超时；未知或持久写入失败继续 blocked，不能重搜补回执。
 
-open [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md) head `d9e44aaf030f` 已跟随统一 server 目录和 V7；独立 register、claim 前事务外 cwd/marker probe，确定拒绝不占 holder，claim 后未知保留。bootstrap launch=false intent 在 SQL handle 前，launch=true 后模糊不再 spawn；原子 no-overwrite launch/never-start claim 和 worker 自报同 PID 区分确定 spawn 前 FAILED 与已启动未知。startup-close 未决只 pending，不抢写 stop fence。双向 SSH 重连只接原 generation/lease，严格 host key/OS 锁限定同控制面主机接管；死亡/reboot/身份冲突继续 blocked。
+已合入 [#14318](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14318.md)，最终 head `1a32fe4dbc47`，统一 server 目录和 V7；独立 register、claim 前事务外 cwd/marker probe，确定拒绝不占 holder，claim 后未知保留。bootstrap launch=false intent 在 SQL handle 前，launch=true 后模糊不再 spawn；原子 no-overwrite launch/never-start claim 和 worker 自报同 PID 区分确定 spawn 前 FAILED 与已启动未知。startup-close 未决只 pending，不抢写 stop fence。双向 SSH 重连只接原 generation/lease，严格 host key/OS 锁限定同控制面主机接管；死亡/reboot/身份冲突继续 blocked。
 
 SSH close 必须结清原结果/ACK、Runtime Session 和原进程组，再以匹配 cleanProof+进程消失生成 drain receipt；not_started/capture:null 先 close_not_started 原 publication，再重试原 direct/deferred ACK。ledger 失败或进程组退出证据失败取消 clean proof 资格，空 holder/kill/超时不算停止证明；不保证 setsid 逃逸的任意 daemon。开关关闭只拒绝新 SSH 准入，原 operation/关闭仍需保留节点配置。仅 /1 文件和前台 Shell，无后台/MCP/Hook/child/池/idle/自动替换。
 
@@ -50,7 +50,13 @@ PR 设计记载 macOS 本地和 loopback SSH 的分层验证，其中 publicatio
 
 已合入 [#14364](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14364.md)：publication 局部 READ_COMMITTED 修复 discovery 后 head 锁读取旧 journal；只对原 child_run shell/monitor_run 的精确调用免前台 receipt，后台原记录、物理停止及输出闭包仍要核验。
 
-open [#14377](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14377.md) head `3787cdd4fd23`：原有效 grant 内重排瞬态续租，activation 沿同事务重试，不复活过期 writer。未 admission 取消须持 dispatch claim 并锁定 fenced head、完整 idle journal 和无原 input.accepted；恢复失败先以原 checkpoint/activation 取消接管，不覆盖并发用户取消。UNKNOWN Runtime 仅尝试原 cancel；前台 publisher 丢失只有原 aborted/PID/POSIX 组 gone 才保留 cancelled/blocked capture。当前 writer 先验原已结算 Shell 结果并持久唯一原生 receipt，再解除等待；物理停止或普通历史不替代 receipt，不放松 requireIdleJournal。此 diff 未合入，本次未跑 Linux/数据库/whole-JVM 验收。
+已合入 [#14377](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14377.md)，最终 head `9d29555ed5c9`：原有效 grant 内重排瞬态续租，activation 沿同事务重试，不复活过期 writer。未 admission 取消在 fenced head 锁下复用完整 idle journal 扫描返回的 accepted 集合，避免 RR 旧快照二次读；原 profile 的 monitor 规则保留。恢复失败先做原取消接管，不覆盖并发用户取消，工作区未结算保留重试。UNKNOWN Runtime 仅尝试原 cancel；仅 ECONNREFUSED 且原 aborted/PID/POSIX 组 gone 才保留 cancelled/blocked capture。只对原 cancelled/blocked 结算核验并持久唯一原生 receipt，再解除等待；精确 404、legacy 无 capture 不补造 receipt。物理停止或普通历史不替代回执，不放松 close。本次未跑 Linux/数据库/whole-JVM 验收。
+
+### 公开常驻与 macOS 的最终边界，2026-10-18
+
+已合入 [#14435](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14435.md)：bound-session-isolation-class 默认 session，显式 workspace 需 durable local-process 且不可结合 child Workspaces。placement 用原 Session 授权，共享请求不存单一 owner；执行/Hook/cleanup 按原 Runtime Session owner/claim fence。两套 close 都每批最多 100 个只释放原 Harness 的 Runtime Session/holder，binding/worker 留 READY，v2 never-initialized 不漏共享 Session。丢 worker、未知或释放失败阻塞；物理 stop 只属于 storage-fenced retirement。V9 单列索引，原 storage 串行保留；不同于 #14340 CSI，且不交付创建 warm、idle/硬预算或 keep-warm。源报告仅单元/H2/变异，真实 Linux/MySQL 多 Session 进程链路未由本次验证。
+
+已合入 [#14442](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14442.md)：macOS 用 ioreg hardware UUID、sysctl bootsessionuuid 与 stat dev/inode/纳秒 birth 核对原 mount/worker；同 host/boot 可接回原 durable worker。trusted-local-reboot-recovery 必须 false，macOS reboot/host 改变保持 UNKNOWN，不以 Linux trusted reboot 证明代替或碰原 worker；不增加 cgroup、CSI、跨机器替换资格。原生探测、进程和部署门禁本次均未运行。
 
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具另须完成[补充验收 S01～S08](managed-agent-ordinary-tools-integration.md#9-补充验收与实施顺序)。干净 idle 回收后的新 binding 可挂回原持久存储；started/unknown 的故障恢复仍阻塞，不能混用两条路径。
 
