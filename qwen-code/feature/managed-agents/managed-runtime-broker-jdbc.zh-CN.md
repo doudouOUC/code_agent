@@ -14,7 +14,7 @@
 
 ## 2026-10-15 私有 authority 与新库最终基线
 
-已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `0ed9895ae9aa` 当前 canonical V1–V9，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批、SSH/Turn operation/共享索引。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
+已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `b6debf84a3fd` 当前 canonical V1–V10，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批、SSH/Turn operation/共享索引。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
 
 `V2__private_csi_authority.sql` 只扩展 request key/generated csi_guard/index、first activation revision 和 native authorization，业务表仍 32。旧 V68/V69 与 CSI branch V69–V72 是 legacy/历史分支编号，不用于当前 32 表 V1/V2 部署；已验证 V1 无 history 的 Broker 初始化与 application Flyway V2 迁移分开。历史编号冲突不替代当前 catalog/check/锁序验收。
 
@@ -43,6 +43,12 @@
 已合入 [#14435](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14435.md)：bound-session-isolation-class 默认 session，显式 workspace 要求 durable local-process 且排斥 child Workspaces。Session 授权 placement 与共享 binding 空 isolation key 分开，原 Runtime Session owner/claim fence 覆盖执行/Hook/cleanup。两个 close 协议按原 Harness keyset 每批 100 个只释放自身 Runtime Session/holder，binding/worker 留 READY；丢 worker/未知仍阻塞，v2 never-initialized 不漏共享记录。仅 storage-fenced retirement 可物理 drain/stop，retention 保护真实 owner 的未结算 child run。V9 单列 harness_session_id 索引避免双 VARBINARY 键过长，tenant 在查询过滤；未交付创建 warm、idle/硬预算、keep-warm。源单元/H2/变异报告不替代真实 Linux/MySQL 多 Session 进程资格。
 
 已合入 [#14442](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14442.md)：macOS hardware UUID/boot UUID/纳秒 birth 与 dev/inode/原 marker 联合核验 LOCAL storage 和 worker，原生探测有五秒/64 KiB 限制。同 host/boot 可接原 durable worker，macOS trusted-local-reboot-recovery 必须 false；换 boot/host 仍 UNKNOWN，不 adopt/attest/stop 原 worker，不借 Linux reboot 证明自动清理。不增加 Linux cgroup/CSI/跨机器资格。本次未执行原生、源码、数据库或部署门禁。
+
+### 私有文件 Turn 与回执完整恢复的 open 观察，2026-10-19
+
+open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `fb6a68b73382` 仅接原 read_file/write_file/edit，writer generation 1/activation epoch 1 不变。完整原批次 reservation、修改 intent/原备份准备后才提交 intent/checkpoint，保存完整 outcome/receipt 与闭合 history 后供模型消费；拒绝按原调用验证，已准入工作仍必须有原生 receipt。最终 assistant 与成功模型 attempt 原子提交；不是冷恢复、物理 finalize/release 或公共 CSI 选择，尚未合入。
+
+open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` stacked 于 codex/csi-hosted-files，统计包含前置文件 Turn。同连接 native admission 只接受单原无 deadline 输入/批次、全部 SETTLED 完整 receipt，数据库时间确认 writer/activation 双 lease 过期。递增 writer 与恰好下一 activation 保留原 READY worker/history；整批原结果/消息前缀预检后只补缺失原消息与 checkpoint，再继续模型，修复不分配/执行文件操作。pending batch 已清、最终输出、活 owner、缺回执、取消或 UNKNOWN 拒绝冷准入。main 仍只有较窄的已合入文本入口，本次未运行完整 K2、OS 崩溃或部署 CSI 门禁。
 
 ## 历史基础切片
 

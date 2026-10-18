@@ -1,6 +1,6 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-18 实施快照（主干 `0ed9895ae9aa`）：** child_agent 面板、标准 UI、私有 SQL authority、prompt/首页/扩展/内置审批，以及 #14081 私有文本、#14318 SSH、#14405 目录/进度、#14436 输出提示和 #14442 macOS 身份均已合入。#14290 搜索、#14484 已保存定义审批仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
+> **2026-10-19 实施快照（主干 `b6debf84a3fd`）：** 既有客户端能力保持；#14484 已保存定义审批、#14526 单次自动化取消、#14531 Plan/内联附件现已合入。#14290 搜索、#14487 私有 CSI 文件、#14523 回执完整恢复及 #14599 创建预热仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -13,6 +13,8 @@
 #13973 最终合入 `72316e6608d7`，复用 WelcomeHeader/MessageList/ChatEditor 和 frame/theme；model presets 是宿主发布的 AgentDefinition ID，仅新建时选择，不热改现有 Session。初始 input_text 与原 Workspace/cwd/key 一次创建并核验 admission，未确认重试原 payload/key；拿到 sessionId 后读回失败仅重读。受理确认才 commit，按原 provider/Session 和原 draftText 精确清草稿，跨 Session 重试和较新不同草稿不丢失；empty-only provider 保持兼容。Managed 明确禁用 Shell mode、附件、slash commands 和 daemon Workspace 特性，!/? 保留字面语义。标准视觉组件不能扩大执行权限，现有 cwd/进度/审批/取消屏障仍保留。
 
 放弃未知创建恢复原 initial input、清本地 pending/commit callback，并由 `WorkspaceBindingCreator:onAbandoned` 刷新 Session 列表，允许重新发现服务器已创建但响应丢失的 Session。仅 pending 且不 busy 显示恢复行；含初始输入与空创建分别提示风险，不能凭放弃断言原输入未执行。
+
+上述 #13973 禁用附件、#14323 最初不覆盖固定定义是各自合入范围；当前 main 已由 #14484/#14531 分别扩展，不能作为当前一律拒绝附件/定义改策的结论。
 
 ### 私有 CSI 文本的最终实现
 
@@ -42,7 +44,19 @@
 
 #14405 的 hosted-tool-progress.ts 从原 intent/receipt/已提交结果按 batch/ordinal 映射原 call，投影状态不泄露参数或输出；重放保留 startTime，完成时对齐 assistant 时间。轮数读配置而非固定 16，正上限才触发 hosted_turn_limit_exceeded。已合入 [#14436](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14436.md) 把 raw/content 都不存在与真实空字符串分开，活动状态继续等待；提示不增加结果或停止证明。
 
-open [#14484](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14484.md) head `078e540799b2` 扩已有已保存定义会话的下一用户 Turn 审批覆盖：精确 files/1、shell/1,/2，owner+当前 OPERATOR、原空闲/CAS/回执和 V6 快照。固定定义/创建初始策略不改，正 revision 执行同时要求 approval-selection/1 与 agent-definition-approval-selection/1；缺能力拒绝，不回退初始策略。读回/已授权回执与取消清理保留，旧 Java writer 必须隔离升级，不能因无 schema 变化认为兼容。本次未执行源码/浏览器/数据库验收。
+已合入 [#14484](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14484.md)，最终 head `078e540799b2` 扩已有已保存定义会话的下一用户 Turn 审批覆盖：精确 files/1、shell/1,/2，owner+当前 OPERATOR、原空闲/CAS/回执和 V6 快照。固定定义/创建初始策略不改，正 revision 执行同时要求 approval-selection/1 与 agent-definition-approval-selection/1；缺能力拒绝，不回退初始策略。读回/已授权回执与取消清理保留，旧 Java writer 必须隔离升级，不能因本 PR 无 schema 变化认为兼容。本次未执行源码/浏览器/数据库验收。
+
+### Plan、附件与单 run 取消，2026-10-19
+
+已合入 [#14531](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14531.md)：Plan 是独立布尔值，保留 default/auto-edit/yolo 和原 Turn 快照。仅合资格无 Hook 的根 public files/1、shell/1,/2；规划只读 read_file/glob，exit_plan_mode 必须单独批次且有非空有界 Markdown，yolo 也须原 owner+当前 OPERATOR 批准。原 Action/continuation 核验后，同 Turn 沿原执行权限继续；Java 按匹配 revision 关闭 Session Plan 并递增 revision，不改写在途快照。无批准或拒绝不解除只读，MCP/CSI/child 不由此开放。
+
+#14531 的 input-attachments/1 支持 UTF-8 文本及签名匹配的 canonical base64 PNG/JPEG/WebP，含附件的完整规范化 input 编码限 48 KiB/最多 100 blocks。Java/Hosted 双端验证，拒绝 URL/宿主路径和 PDF/Office/音视频，不写 Workspace 文件。原 input resource、请求 digest、Item 与 pending 键保留附件；重载恢复原字节且不覆盖较新草稿，图片模型无 image 能力明确失败。plan-mode/1 与附件能力分别协商；本次未运行组件、浏览器或真实模型。
+
+已合入 [#14526](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14526.md)：automation_run 进入既有任务取消接口，schedule/occurrence/run ID 精确对应，稳定 cancel_run 只取消原 wake Turn；intent 直接结算、排队在模型执行前保存 cancelled，运行中仅匹配原 active prompt 才 abort。不退休 schedule、不取消其它 run，取消 ACK 不证明完成；此类 operation 必须观察原 run cancelled 终态，区别于其它任务仅接受停止请求的结果。
+
+### 私有 CSI 文件入口的 open 观察
+
+open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `fb6a68b73382` 才接原 read_file/write_file/edit：首代 writer/activation、完整原批次/修改备份准备/receipt/history 和最终输出原子提交；不提供公共选择器或冷恢复。open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) 是 stacked 的回执完整冷恢复，严格限定原单输入/单批次、全部 settled receipt 与双 lease 到期；只补原消息/checkpoint，不重跑工具。主干仍只有 #14081 的私有纯文本范围，本次未执行其源码/MySQL/CSI 验收。
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

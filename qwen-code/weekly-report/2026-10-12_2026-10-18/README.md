@@ -1,14 +1,14 @@
-# qwen-code PRs · 2026-10-12 ~ 2026-10-18 (W42 日更)
+# qwen-code PRs · 2026-10-12 ~ 2026-10-18 (W42 日更收尾)
 
-> 本文件已整理北京时间 2026-10-12 至 2026-10-17 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-11T16:00:00Z, 2026-10-17T16:00:00Z)`。按 author/createdAt 归属，不按更新、关闭或合入日期补收。当前周尚未结束；本次快照取北京时间 2026-10-18，主干 `0ed9895ae9aa`。open 仅当前 diff，closed 未合入仅历史观察；前一周后续合入的 PR 仍留 W41。规模逐 PR 累加，不是去重后的 main 增量。前次 #14186 两文件 parser 零错误仅对应当时主干，本次未运行源码门禁。
+> 本文件已整理北京时间 2026-10-12 至 2026-10-18 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-11T16:00:00Z, 2026-10-18T16:00:00Z)`。按 author/createdAt 归属，不按更新、关闭或合入日期补收。本次为日更收尾、已覆盖完整创建周，快照取北京时间 2026-10-19，主干 `b6debf84a3fd`；周一 10:10 周更仍单独复核。open 仅当前 diff，closed 未合入仅历史观察；前一周后续合入的 PR 仍留 W41。规模逐 PR 累加，含 stacked diff，不是去重后的 main 增量。前次 #14186 两文件 parser 零错误仅对应当时主干，本次未运行源码门禁。
 
-**主题**: L4/私有 CSI 与 32 表、统一 Server、目录选择与持久进度、静态扩展、SSH/macOS、Workspace 常驻及取消恢复；open 搜索与已保存定义审批
+**主题**: L4/私有 CSI 与 32 表/V10、统一 Server、目录与工具进度、静态扩展、SSH/macOS、共享 Workspace、定义改策、Plan/附件及单 run 取消；open 搜索、CSI 文件/恢复与创建预热
 
-**PR 统计**: 38 PRs - 34 merged / 2 open / 2 closed
-**当前已合并 PR 代码量**: +115,335 / -24,636，2790 个文件变更
-**全量代码量**: +118,757 / -24,996，2881 个文件变更
-**类型分布**: feat ×16, fix ×11, test ×2, chore ×1, docs ×2, refactor ×6
-**范围 (scope)**: managed-agent ×21, web-shell ×4, sdk-java ×2, serve ×2, core ×1, none ×1, runtime-broker ×4, design ×1, runtime ×1, managed ×1
+**PR 统计**: 43 PRs - 37 merged / 4 open / 2 closed
+**当前已合并 PR 代码量**: +120,404 / -25,104，2897 个文件变更
+**全量代码量**: +131,826 / -26,009，3037 个文件变更
+**类型分布**: feat ×21, fix ×11, test ×2, chore ×1, docs ×2, refactor ×6
+**范围 (scope)**: managed-agent ×23, web-shell ×4, sdk-java ×2, serve ×4, core ×1, none ×1, runtime-broker ×5, design ×1, runtime ×1, managed ×1
 
 ---
 
@@ -53,7 +53,12 @@
 | [#14435](https://github.com/QwenLM/qwen-code/pull/14435) | ✅ merged | @doudouOUC | feat(runtime-broker): Workspace-resident Tool Runtime for bound Sessions | +970/-156 | 31 | 10-17 04:31 | 10-17 11:02 |
 | [#14436](https://github.com/QwenLM/qwen-code/pull/14436) | ✅ merged | @doudouOUC | fix(web-shell): Distinguish unavailable shell output | +42/-2 | 3 | 10-17 04:42 | 10-17 06:06 |
 | [#14442](https://github.com/QwenLM/qwen-code/pull/14442) | ✅ merged | @doudouOUC | feat(managed-agent): support native macOS workspace runtime | +447/-26 | 13 | 10-17 06:05 | 10-17 06:35 |
-| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | 🟡 open | @doudouOUC | feat(managed-agent): allow approval changes in stored agent sessions | +1285/-173 | 26 | 10-17 15:58 | - |
+| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | ✅ merged | @doudouOUC | feat(managed-agent): allow approval changes in stored agent sessions | +1285/-173 | 26 | 10-17 15:58 | 10-18 00:54 |
+| [#14487](https://github.com/QwenLM/qwen-code/pull/14487) | 🟡 open | @doudouOUC | feat(serve): run private CSI file turns through Hosted Harness | +3838/-309 | 30 | 10-17 16:26 | - |
+| [#14523](https://github.com/QwenLM/qwen-code/pull/14523) | 🟡 open | @doudouOUC | feat(serve): recover receipt-complete private CSI file turns | +5143/-376 | 37 | 10-18 03:32 | - |
+| [#14526](https://github.com/QwenLM/qwen-code/pull/14526) | ✅ merged | @doudouOUC | feat(managed-agent): Support per-run automation cancellation | +999/-64 | 21 | 10-18 04:14 | 10-18 14:07 |
+| [#14531](https://github.com/QwenLM/qwen-code/pull/14531) | ✅ merged | @doudouOUC | feat(managed-agent): support Plan mode and inline attachments | +2785/-231 | 60 | 10-18 04:59 | 10-18 08:58 |
+| [#14599](https://github.com/QwenLM/qwen-code/pull/14599) | 🟡 open | @doudouOUC | feat(runtime-broker): Session-create warm for Workspace-isolated bound Sessions | +304/-33 | 8 | 10-18 15:34 | - |
 
 ---
 
@@ -98,18 +103,23 @@
 | [#14435](https://github.com/QwenLM/qwen-code/pull/14435) | 共享 worker 下 close 会漏释放自身或误停其它 Session。 | 已合入独立 default-session 配置、真实 owner fence、逐 Session 有界释放；binding 留 READY，物理退役只属 storage fence，V9 索引。 | 增补恢复、JDBC 双语、存储与总览；完整实现见 [implementations/pr-14435.md](implementations/pr-14435.md)。 |
 | [#14436](https://github.com/QwenLM/qwen-code/pull/14436) | Shell 无法取回输出被误显示为真实空 stdout。 | 已合入 raw/content 存在性判定、活动等待和两种模式不可获取提示；不改变执行或 capture 事实。 | 增补客户端、完整结果双语与总览；完整实现见 [implementations/pr-14436.md](implementations/pr-14436.md)。 |
 | [#14442](https://github.com/QwenLM/qwen-code/pull/14442) | macOS 缺可靠 storage/worker 原生身份，不能安全重接。 | 已合入 hardware UUID、boot UUID、dev/inode/纳秒 birth 校验；同 boot 接原 worker，拒绝 macOS trusted reboot。 | 增补恢复、JDBC 双语、客户端与总览；完整实现见 [implementations/pr-14442.md](implementations/pr-14442.md)。 |
-| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | 已保存定义会话不能改下一 Turn 策略，单放菜单破坏恢复。 | 当前 diff 精确 profile、owner+OPERATOR、V6 原快照及双 Harness 能力；初始定义不改，旧 Java writer 须隔离升级。 | 增补客户端、存储、SDK 与总览的 open 边界；完整观察见 [implementations/pr-14484.md](implementations/pr-14484.md)。 |
+| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | 已保存定义会话不能改下一 Turn 策略，单放菜单破坏恢复。 | 已合入精确 profile、owner+OPERATOR、V6 原快照及双 Harness 能力；初始定义不改，旧 Java writer 须隔离升级。 | 更新客户端、存储、SDK 与总览的最终边界；完整实现见 [implementations/pr-14484.md](implementations/pr-14484.md)。 |
+| [#14487](https://github.com/QwenLM/qwen-code/pull/14487) | 私有文本入口未接原 CSI 文件工具，普通挂接会绕过原批次与备份。 | 当前 diff 固定首代身份，完整 reservation/备份准备/receipt/历史闭合后继续模型，最终 assistant/attempt 原子提交；未知不重放。 | 增补客户端、JDBC 双语与总览的 open 观察；完整观察见 [implementations/pr-14487.md](implementations/pr-14487.md)。 |
+| [#14523](https://github.com/QwenLM/qwen-code/pull/14523) | 已有完整效果回执但 Hosted 退出，首代 writer 规则阻止安全消费。 | 当前 stacked diff 仅双租约到期、单原批次全 settled/有 receipt 时接管；预检后补原消息/checkpoint，不再执行文件工具。 | 增补恢复、JDBC 双语与总览；完整观察见 [implementations/pr-14523.md](implementations/pr-14523.md)。 |
+| [#14526](https://github.com/QwenLM/qwen-code/pull/14526) | 自动化任务缺单次停止，取消 Session/schedule 会波及其它运行。 | 已合入稳定 cancel_run 与精确 Turn 取消；排队先落 cancelled，原 run 终态而非 ACK 才证明取消结果。 | 增补客户端、恢复与总览；完整实现见 [implementations/pr-14526.md](implementations/pr-14526.md)。 |
+| [#14531](https://github.com/QwenLM/qwen-code/pull/14531) | 托管输入缺 Plan/附件的持久审批、原权限与恢复保证。 | 已合入 V10 独立 Plan/Turn 快照、只读与单 exit 审批、48 KiB 内联文本/图片及双端验证，恢复原输入字节。 | 增补客户端、存储、SDK 与总览；完整实现见 [implementations/pr-14531.md](implementations/pr-14531.md)。 |
+| [#14599](https://github.com/QwenLM/qwen-code/pull/14599) | 空会话等首 Turn 才 warm，错误隔离下预热会多占 worker/破坏 close。 | 当前 diff 默认关闭，只对无输入且 workspace isolation/no SSH 的创建异步 placement-only warm；不 acquire 或承诺已 READY。 | 增补恢复与总览的 open 方案；完整观察见 [implementations/pr-14599.md](implementations/pr-14599.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [Managed Agents](../../feature/managed-agents/README.md) | #13931(merged), #13936(merged), #13973(merged), #13996(merged), #14039(merged), #14045(merged), #14059(merged), #14069(merged), #14081(merged), #14124(merged), #14141(closed), #14174(closed), #14180(merged), #14185(merged), #14186(merged), #14214(merged), #14254(merged), #14270(merged), #14277(merged), #14280(merged), #14290(open), #14306(merged), #14307(merged), #14316(merged), #14318(merged), #14319(merged), #14323(merged), #14339(merged), #14340(merged), #14357(merged), #14364(merged), #14370(merged), #14377(merged), #14405(merged), #14435(merged), #14436(merged), #14442(merged), #14484(open) | 同步最终/设计/观察范围与未运行门禁；不移动创建周。 |
-| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #13931(merged), #14039(merged), #14045(merged), #14059(merged), #14141(closed), #14214(merged), #14254(merged), #14290(open), #14318(merged), #14339(merged), #14340(merged), #14357(merged), #14364(merged), #14377(merged), #14435(merged), #14442(merged) | 原取消回执、公开共享 worker、窄 CSI 与 macOS 同 boot 恢复分别限定。 |
-| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #13936(merged), #13973(merged), #13996(merged), #14081(merged), #14290(open), #14306(merged), #14307(merged), #14316(merged), #14318(merged), #14319(merged), #14323(merged), #14357(merged), #14405(merged), #14436(merged), #14442(merged), #14484(open) | 目录/进度、SSH/macOS 已合入；保存定义审批仍 open。 |
-| [存储、事件与会话恢复](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #14069(merged), #14174(closed), #14180(merged), #14185(merged), #14277(merged), #14316(merged), #14323(merged), #14405(merged), #14435(merged), #14484(open) | 当前 V1–V9；原目录 receipt、单列索引和未合入无 schema 改策分开。 |
-| [Runtime Broker JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #13996(merged), #14069(merged), #14081(merged), #14180(merged), #14185(merged), #14318(merged), #14339(merged), #14340(merged), #14435(merged), #14442(merged) | 原 authority、逐 Session close、storage 物理退役与平台身份分开。 |
+| [Managed Agents](../../feature/managed-agents/README.md) | #13931(merged), #13936(merged), #13973(merged), #13996(merged), #14039(merged), #14045(merged), #14059(merged), #14069(merged), #14081(merged), #14124(merged), #14141(closed), #14174(closed), #14180(merged), #14185(merged), #14186(merged), #14214(merged), #14254(merged), #14270(merged), #14277(merged), #14280(merged), #14290(open), #14306(merged), #14307(merged), #14316(merged), #14318(merged), #14319(merged), #14323(merged), #14339(merged), #14340(merged), #14357(merged), #14364(merged), #14370(merged), #14377(merged), #14405(merged), #14435(merged), #14436(merged), #14442(merged), #14484(merged), #14487(open), #14523(open), #14526(merged), #14531(merged), #14599(open) | 同步最终/设计/观察范围与未运行门禁；不移动创建周。 |
+| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #13931(merged), #14039(merged), #14045(merged), #14059(merged), #14141(closed), #14214(merged), #14254(merged), #14290(open), #14318(merged), #14339(merged), #14340(merged), #14357(merged), #14364(merged), #14377(merged), #14435(merged), #14442(merged), #14523(open), #14526(merged), #14599(open) | 原取消回执、公开共享 worker、窄 CSI 与 macOS 同 boot 恢复分别限定。 |
+| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #13936(merged), #13973(merged), #13996(merged), #14081(merged), #14290(open), #14306(merged), #14307(merged), #14316(merged), #14318(merged), #14319(merged), #14323(merged), #14357(merged), #14405(merged), #14436(merged), #14442(merged), #14484(merged), #14487(open), #14523(open), #14526(merged), #14531(merged) | 定义改策、Plan/附件、单 run 取消已合入；私有 CSI 文件仍 open。 |
+| [存储、事件与会话恢复](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #14069(merged), #14174(closed), #14180(merged), #14185(merged), #14277(merged), #14316(merged), #14323(merged), #14405(merged), #14435(merged), #14484(merged), #14531(merged) | 当前 V1–V10；Plan/Turn 快照与原输入附件分别持久化。 |
+| [Runtime Broker JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #13996(merged), #14069(merged), #14081(merged), #14180(merged), #14185(merged), #14318(merged), #14339(merged), #14340(merged), #14435(merged), #14442(merged), #14487(open), #14523(open) | 原 authority、逐 Session close、storage 物理退役与平台身份分开。 |
 | [完整工具结果中文](../../feature/managed-agents/managed-agent-tool-result-artifacts.zh-CN.md) / [English](../../feature/managed-agents/managed-agent-tool-result-artifacts.md) | #14124(merged), #14364(merged), #14370(merged), #14377(merged), #14436(merged) | 最终连接拒绝/原停止回执边界，输出缺失显示不等于真实空 stdout。 |
-| [SDK](../../feature/sdk.md) | #14124(merged), #14186(merged), #14277(merged), #14280(merged), #14307(merged), #14316(merged), #14323(merged), #14370(merged), #14484(open) | 已合入协议保留；保存定义双能力/旧 writer 兼容仍为 open。 |
+| [SDK](../../feature/sdk.md) | #14124(merged), #14186(merged), #14277(merged), #14280(merged), #14307(merged), #14316(merged), #14323(merged), #14370(merged), #14484(merged), #14531(merged) | 已合入定义双能力、Plan/附件协商；旧 writer 不可静默降级。 |
 
-_按个人 PR 口径更新于 2026-10-18；本次仅执行文档审计，源码、浏览器、MySQL/OSS/CSI/SSH/macOS 原生进程及部署门禁未运行。_
+_按个人 PR 口径更新于 2026-10-19；本次仅执行文档审计，源码、浏览器、MySQL/OSS/CSI/SSH/macOS 原生进程及部署门禁未运行。_

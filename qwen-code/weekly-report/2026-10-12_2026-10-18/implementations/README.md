@@ -39,6 +39,11 @@
 | [#14435](https://github.com/QwenLM/qwen-code/pull/14435) | ✅ merged | feat(runtime-broker): Workspace-resident Tool Runtime for bound Sessions | [pr-14435.md](pr-14435.md) |
 | [#14436](https://github.com/QwenLM/qwen-code/pull/14436) | ✅ merged | fix(web-shell): Distinguish unavailable shell output | [pr-14436.md](pr-14436.md) |
 | [#14442](https://github.com/QwenLM/qwen-code/pull/14442) | ✅ merged | feat(managed-agent): support native macOS workspace runtime | [pr-14442.md](pr-14442.md) |
-| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | 🟡 open | feat(managed-agent): allow approval changes in stored agent sessions | [pr-14484.md](pr-14484.md) |
+| [#14484](https://github.com/QwenLM/qwen-code/pull/14484) | ✅ merged | feat(managed-agent): allow approval changes in stored agent sessions | [pr-14484.md](pr-14484.md) |
+| [#14487](https://github.com/QwenLM/qwen-code/pull/14487) | 🟡 open | feat(serve): run private CSI file turns through Hosted Harness | [pr-14487.md](pr-14487.md) |
+| [#14523](https://github.com/QwenLM/qwen-code/pull/14523) | 🟡 open | feat(serve): recover receipt-complete private CSI file turns | [pr-14523.md](pr-14523.md) |
+| [#14526](https://github.com/QwenLM/qwen-code/pull/14526) | ✅ merged | feat(managed-agent): Support per-run automation cancellation | [pr-14526.md](pr-14526.md) |
+| [#14531](https://github.com/QwenLM/qwen-code/pull/14531) | ✅ merged | feat(managed-agent): support Plan mode and inline attachments | [pr-14531.md](pr-14531.md) |
+| [#14599](https://github.com/QwenLM/qwen-code/pull/14599) | 🟡 open | feat(runtime-broker): Session-create warm for Workspace-isolated bound Sessions | [pr-14599.md](pr-14599.md) |
 
-_按个人 PR 口径更新于 2026-10-18_
+_按个人 PR 口径更新于 2026-10-19_

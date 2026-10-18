@@ -32,7 +32,7 @@ L4 的原 cleanup writer seal 仍核验 head 的原 token/generation 与有效 c
 
 ### 常驻设计、搜索与 SSH 的增量边界
 
-截至 2026-10-18 main `0ed9895ae9aa`，[#14214](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14214.md) 是常驻设计，[#14254](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14254.md) 最初保留 session-only；后续 #14435 才增加显式绑定 Session 共享。已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 binding 的 admission/recovery/release 按 Runtime Session/execution 真 Harness owner，而非 binding isolation key；缺原 Session 不能创清理 tombstone，storage/drain fence 仍保留。它不是打开任意 provider 共享的开关。
+截至 2026-10-19 main `b6debf84a3fd`，[#14214](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14214.md) 是常驻设计，[#14254](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14254.md) 最初保留 session-only；后续 #14435 才增加显式绑定 Session 共享。已合入 [#14339](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14339.md)：精确共享 binding 的 admission/recovery/release 按 Runtime Session/execution 真 Harness owner，而非 binding isolation key；缺原 Session 不能创清理 tombstone，storage/drain fence 仍保留。它不是打开任意 provider 共享的开关。
 
 已合入 [#14340](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14340.md) 的独立 resident CSI/files profile：管理员精确映射一 Workspace/原 Pod/PVC，锁内只许一个未完成 public Session 和活动上下文，Read/Write/Edit 后逻辑 close 撤销上下文并保留原 binding/reservation。释放未知阻止下一 Session；丢 Pod/重启/身份不符不自动重建，物理 release 明确拒绝。无 Shell/MCP/Hook/子环境共享/会话内 cwd 变更；Pod 关闭后仍计费。旧 ACK 证据和 H2/boot-2 同 JVM fixture 不证明当前真实 CSI/进程崩溃资格。通用 idle retirement、硬预算调度、创建预热和 keep-warm 仍未交付，不能把窄常驻路径写成 #13526 累计方案全部完成。
 
@@ -51,6 +51,14 @@ PR 设计记载 macOS 本地和 loopback SSH 的分层验证，其中 publicatio
 已合入 [#14364](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14364.md)：publication 局部 READ_COMMITTED 修复 discovery 后 head 锁读取旧 journal；只对原 child_run shell/monitor_run 的精确调用免前台 receipt，后台原记录、物理停止及输出闭包仍要核验。
 
 已合入 [#14377](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14377.md)，最终 head `9d29555ed5c9`：原有效 grant 内重排瞬态续租，activation 沿同事务重试，不复活过期 writer。未 admission 取消在 fenced head 锁下复用完整 idle journal 扫描返回的 accepted 集合，避免 RR 旧快照二次读；原 profile 的 monitor 规则保留。恢复失败先做原取消接管，不覆盖并发用户取消，工作区未结算保留重试。UNKNOWN Runtime 仅尝试原 cancel；仅 ECONNREFUSED 且原 aborted/PID/POSIX 组 gone 才保留 cancelled/blocked capture。只对原 cancelled/blocked 结算核验并持久唯一原生 receipt，再解除等待；精确 404、legacy 无 capture 不补造 receipt。物理停止或普通历史不替代回执，不放松 close。本次未跑 Linux/数据库/whole-JVM 验收。
+
+### 2026-10-19 单 run 取消与受限恢复增量
+
+已合入 [#14526](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14526.md)：稳定 cancel_run 写原 Turn cancel.requested，排队 wake 不执行模型就持久结算，正在运行仅 abort 相同 automationInputId。Java 经原 committed-stop attachment 授权，原 run 的 cancelled 终态才使取消 operation 完成；ACK、schedule retirement、其它 Turn 和资源物理停止不是同一事实。清理/UNKNOWN 仍按原 proof，本次未运行 Hosted/MySQL。
+
+open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` 依赖 open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) 的文件 Turn。只在原 writer/activation 双 lease 到期、单无 deadline 输入/单文件批次全 settled 且 receipt 完整时，按原事务锁序取得后继 writer 并安装下一 activation；先预检整个原批次再补消息/checkpoint，原 worker/history 不换，修复不派发工具。原 pending batch 已清除、最终模型输出已提交、缺 receipt/取消/UNKNOWN 均不在冷准入范围；stacked 代码量含前置实现，不代表 main 或完整 K2。源码/真实 CSI/OS 进程崩溃本次未执行。
+
+open [#14599](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14599.md) `2739d57dfcd2` 是创建 warm 的独立方案：默认关闭，要求 workspace isolation/no SSH，仅无输入创建在原提交后投递既有 executor，复用授权 resolver 做 placement-only warm。不开 Runtime Session/context、不执行工具、不新增公开事件，不保证创建返回时 READY；首 Turn 保留原 warm。不是 Session 隔离预热、idle/硬预算/keep-warm 或已合入能力，真实进程复用门禁未由本次运行。
 
 ### 公开常驻与 macOS 的最终边界，2026-10-18
 

@@ -1,6 +1,6 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-> **2026-10-18 新库最终基线（主干 `0ed9895ae9aa`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表已合入，[#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 增加 canonical V2 私有 authority；当前目录 V1–V9，V7 SSH 登记、V8 Turn command operation 与 V9 原 Harness 索引均在 main。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
+> **2026-10-19 新库最终基线（主干 `b6debf84a3fd`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表与 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) canonical V2 私有 authority 保持；当前目录 V1–V10，V10 增加独立 Plan/Turn 快照，不新增业务表。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
 
 ## 新库 32 表的最终实现
 
@@ -14,7 +14,7 @@
 
 最终 snapshot 返回/publish 前再验 lease；read-only view 的 checkReadView 只检查已提交 lease，不在只读事务伪续租，必须在原期限内完成。
 
-V3__session_list_created_at.sql 为 immutable 创建时间/session_id 建索引，最初列名为 created_at，当前 main 随 #14185 改为 gmt_create；列表不随事件追加的修改时间移动。业务表仍 32；closed #14174 的 V2 witness 仅是当时历史，不能作为当前 V1–V9 目录版本断言。
+V3__session_list_created_at.sql 为 immutable 创建时间/session_id 建索引，最初列名为 created_at，当前 main 随 #14185 改为 gmt_create；列表不随事件追加的修改时间移动。业务表仍 32；closed #14174 的 V2 witness 仅是当时历史，不能作为当前 V1–V10 目录版本断言。
 
 切换策略是保留旧数据库/历史 endpoint，新 Session 进入新环境，回滚也保全新库已接受数据。DataAgent 的 da_qwen_session_* 不在此范围。真实 MySQL 的 journal 原子性、旧 writer、receipt、snapshot/GC/read lease 竞争及 load/query budget、OSS/CSI 与生产流量门禁本次均未执行；命令与测试入口见单 PR 观察。
 
@@ -38,7 +38,13 @@ V3__session_list_created_at.sql 为 immutable 创建时间/session_id 建索引�
 
 已合入 [#14435](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14435.md) 的 V9 单列 harness_session_id 索引支持按 tenant+原 Harness、有序 keyset 分批释放共享 Runtime Session；不使用超过 InnoDB 键长的双 VARBINARY(2048) 索引。当前 V8__turn_command_operations.sql 扩现有 operation kind 的 SUBMIT_INPUT/CANCEL 检查，V9 不新增业务表。
 
-open [#14484](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14484.md) `078e540799b2` 复用 V6 为合资格保存定义的用户 Turn 冻结策略，无新 migration；原定义/初始策略/旧零 revision wire 不改，正 revision 缺快照拒绝。全部旧 Java/Broker writer 必须隔离升级，schema 不变不能检测其忽略自定义快照的风险。本次未执行源码、数据库或部署验收。
+已合入 [#14484](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14484.md) `078e540799b2` 复用 V6 为合资格保存定义的用户 Turn 冻结策略，本切片无新 migration；原定义/初始策略/旧零 revision wire 不改，正 revision 缺快照拒绝。全部旧 Java/Broker writer 必须隔离升级，schema 不变不能检测其忽略自定义快照的风险。本次未执行源码、数据库或部署验收。
+
+### Plan 与原输入的持久快照，2026-10-19
+
+已合入 [#14531](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14531.md)，V10__session_plan_mode.sql 给 ma_session 加非空默认 false、ma_turn 加 nullable plan_enabled；CHECK 要求开启时有原审批模式和正 revision。用户 Turn 准入同事务冻结审批与 Plan；旧 null/零快照保持兼容。批准原 exit_plan_mode 的 v3 Action 时，先核原 input/continuation/call，再只对匹配 Turn revision 的 Session 清 Plan 并递增 revision，不改既有 Turn。当前 baseline witness 为 10，32 业务表加 Flyway history 仍为 33；closed #14174 不因此变 merged。
+
+附件直接进入原有 managed-input resource、Turn input_json/请求摘要和公开 Item 的 inputAttachments metadata，含附件的全部规范化输入限 48 KiB。恢复读原 accepted input 而非当前文件/草稿；不增加上传表、宿主文件引用或对象存储权限。真实 MySQL 的 V10/锁序/审批竞争及字节恢复本次未运行，V1/V3 历史 DATETIME 库仍须新库或独立迁移。
 
 ## 历史存储与事件设计
 
