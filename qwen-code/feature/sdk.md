@@ -8,7 +8,7 @@
 
 已合入 [#14280](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14280.md) 直接声明 Commons Lang/Codec 并复用固定 mapper/摘要组件，保留 canonical JSON、UTF-8/hex、流式长度前缀、HMAC 恒定比较及异常映射。专用标题空白与 ASCII-only 协议不改成通用判断；不产生新的 SDK 用户能力。
 
-已合入 [#14307](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 XML 三字符替换、LF 去空行及 HttpRange，保留旧 ASCII/逗号/错误门禁；这是独立于 #14280 的后续最终 diff。已合入 [#14277](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14277.md)，main `b6debf84a3fd` 的 server/Broker 源码、资源和测试位于 packages/managed-agent-server，不再先安装独立 Broker 产物。进入该目录先执行 `mvn -f ../sdk-java/qwencode/pom.xml -DskipTests -Dgpg.skip=true install`，再跑 verify/对应双 Checkstyle/故障 profile；SDK package 和 Java 包名保留。
+已合入 [#14307](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14307.md) 的 XML 三字符替换、LF 去空行及 HttpRange，保留旧 ASCII/逗号/错误门禁；这是独立于 #14280 的后续最终 diff。已合入 [#14277](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14277.md)，main `79362c2ecc21` 的 server/Broker 源码、资源和测试位于 packages/managed-agent-server，不再先安装独立 Broker 产物。进入该目录先执行 `mvn -f ../sdk-java/qwencode/pom.xml -DskipTests -Dgpg.skip=true install`，再跑 verify/对应双 Checkstyle/故障 profile；SDK package 和 Java 包名保留。
 
 已合入 [#14316](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14316.md)，通过 `model-selection/1` 将可选模型 ID/revision 固定进 Hosted admission 和每 Turn 快照；模型凭证留服务端，原 prepared request 不改写。V4/V5 已落地；后续已合入 [#14323](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14323.md) 的 V6/`approval-selection/1`，Session override 与不可变 Turn 策略分开，revision 0 省略在线字段保持原请求 digest；非零变更缺能力拒绝执行，但取消/cleanup 保留。没有改成全局默认 yolo。
 

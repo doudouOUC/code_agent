@@ -1,10 +1,12 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-> **2026-10-19 新库最终基线（主干 `b6debf84a3fd`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表与 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) canonical V2 私有 authority 保持；当前目录 V1–V10，V10 增加独立 Plan/Turn 快照，不新增业务表。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
+> **2026-10-19 新库最终基线（主干 `79362c2ecc21`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表与 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) canonical V2 私有 authority 保持；当前目录 V1–V10，V10 增加独立 Plan/Turn 快照，不新增业务表。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
 
 ## 新库 32 表的最终实现
 
 `managedschema/ManagedSchemaContract.java` 固定 32 张 ma_* 业务表及封闭 operation/receipt/work/owner/delivery/head/guard 类型，Broker 与 Spring 共用 `db/managed-schema/V1__managed_schema.sql`。`ManagedSchemaCatalog.validate` 拒绝缺表/额外表/view，核验 InnoDB、列/生成列、键/索引/check/FK；空 catalog 初始化，已有 canonical catalog 先验证再 baseline/migrate，history-only catalog 拒绝。旧 Flyway SQL 移至非 classpath archive，没有原地转换 legacy 数据。
+
+周更 main `79362c2ecc21` 的后续 catalog 校验先将 CHECK 表达式的裸 TRUE/FALSE 规范为 1/0，再比较布尔结构，以兼容 MariaDB 与 MySQL 的等价表示；不是忽略 CHECK enforcement 或新增 migration。ManagedSchemaCatalogTest 的对应断言已核对，本次未执行真实数据库门禁。
 
 最终 catalog 在 DDL 前拒绝 MySQL/MariaDB system/缺失 application 库，并要求 MariaDB global/session CHECK enforcement；不只信任 driver product name。当前 `V2__private_csi_authority.sql` 仅扩展原 request/generated guard、first activation 和 native authorization，resource read 使用 typed receipt/read lease，仍为 32 张业务表。已验证 V1 无 history 的 Broker 初始化与有 history 的 application Flyway V2 分开；closed [#14174](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14174.md) 只观察 baseline witness 1→2，main 同类断言不算它合入。
 

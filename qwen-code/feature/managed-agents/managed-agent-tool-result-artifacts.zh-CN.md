@@ -22,7 +22,7 @@
 
 ### 2026-10-19 发布、存储与取消回执增量
 
-main `b6debf84a3fd` 已合入 [#14364](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14364.md)：ToolPublicationStore 局部 READ_COMMITTED 防止 placement discovery 后锁 head 却沿旧 RR 快照读取 journal/activation。精确 child_run shell/monitor_run 调用只免前台 receipt，仍须原后台记录、物理停止、manifest/seal 或已知失败输出；删证据的负向检查保留。
+main `79362c2ecc21` 已合入 [#14364](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14364.md)：ToolPublicationStore 局部 READ_COMMITTED 防止 placement discovery 后锁 head 却沿旧 RR 快照读取 journal/activation。精确 child_run shell/monitor_run 调用只免前台 receipt，仍须原后台记录、物理停止、manifest/seal 或已知失败输出；删证据的负向检查保留。
 
 已合入 [#14370](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14370.md)：ToolPublicationObjectStore 的 validateConfiguration 与 ACCESS_DENIED/FAILURE 不依赖 OSS；默认 OSS 移至延后自动配置，发布开启且无自定义 Bean 才初始化，maintenance-only/关闭不触发。guard 每次读取/重试前检查，原子 no-overwrite create 不自动重放，精确物理 delete 即使 GC 关闭也必需。SQL 仍是唯一身份账本；同 SQL 实例共享同存储/原 key，换 Bean 不迁移旧对象。未实现 S3/MinIO/生产文件系统，服务仍打包 OSS SDK，独立维护启动器仍 OSS 专用。随代码报告的 113 项专项和独立静态检查不替代其全量 verify 基线错误，本次未运行源码/真实 bucket。
 

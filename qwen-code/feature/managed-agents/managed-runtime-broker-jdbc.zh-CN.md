@@ -14,7 +14,7 @@
 
 ## 2026-10-15 私有 authority 与新库最终基线
 
-已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `b6debf84a3fd` 当前 canonical V1–V10，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批、SSH/Turn operation/共享索引。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
+已合入 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) 最终 SQL/native authority，main `79362c2ecc21` 当前 canonical V1–V10，包含 V3 immutable Session-list keyset 及后续 Workspace/模型/审批、SSH/Turn operation/共享索引。`WorkspaceCsiRuntimeAccess` 在同源新事务按 placement/retention 锁原 Session/binding，核验 registration、READY、原 generation/lease/seed/handle/context；native 认证同时校验 seed/lease token，comparison reference 来自原生读回。`ManagedSessionStore` 在 journal 事务核验 genesis/首 writer/activation/有限批次/结果，资源 read 意图在 ma_request_receipt、交付 lease 在 ma_read_lease，结算前再验 identity/bytes。generic 私有 cancel/close/delete 与 release/finalization 不开放，正向 SQL→worker→retained history 和真实 CSI 仍需验收。
 
 `V2__private_csi_authority.sql` 只扩展 request key/generated csi_guard/index、first activation revision 和 native authorization，业务表仍 32。旧 V68/V69 与 CSI branch V69–V72 是 legacy/历史分支编号，不用于当前 32 表 V1/V2 部署；已验证 V1 无 history 的 Broker 初始化与 application Flyway V2 迁移分开。历史编号冲突不替代当前 catalog/check/锁序验收。
 
@@ -46,9 +46,13 @@
 
 ### 私有文件 Turn 与回执完整恢复的 open 观察，2026-10-19
 
-open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `fb6a68b73382` 仅接原 read_file/write_file/edit，writer generation 1/activation epoch 1 不变。完整原批次 reservation、修改 intent/原备份准备后才提交 intent/checkpoint，保存完整 outcome/receipt 与闭合 history 后供模型消费；拒绝按原调用验证，已准入工作仍必须有原生 receipt。最终 assistant 与成功模型 attempt 原子提交；不是冷恢复、物理 finalize/release 或公共 CSI 选择，尚未合入。
+open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `76902629d1d9` 仅接原 read_file/write_file/edit，writer generation 1/activation epoch 1 不变。完整原批次 reservation、修改 intent/原备份准备后才提交 intent/checkpoint，保存完整 outcome/receipt 与闭合 history 后供模型消费；拒绝按原调用验证，已准入工作仍必须有原生 receipt。最终 assistant 与成功模型 attempt 原子提交；不是冷恢复、物理 finalize/release 或公共 CSI 选择，尚未合入。
 
 open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` stacked 于 codex/csi-hosted-files，统计包含前置文件 Turn。同连接 native admission 只接受单原无 deadline 输入/批次、全部 SETTLED 完整 receipt，数据库时间确认 writer/activation 双 lease 过期。递增 writer 与恰好下一 activation 保留原 READY worker/history；整批原结果/消息前缀预检后只补缺失原消息与 checkpoint，再继续模型，修复不分配/执行文件操作。pending batch 已清、最终输出、活 owner、缺回执、取消或 UNKNOWN 拒绝冷准入。main 仍只有较窄的已合入文本入口，本次未运行完整 K2、OS 崩溃或部署 CSI 门禁。
+
+### 周更复核边界，2026-10-19
+
+周更补充：#14487 新 head 的 prepare 异常只做一次独立、五秒有界的成员回读，失败保留原错误；发布 receipt 前严格校验结果/error/text/media 的封闭 schema 与原 function 身份，非法结果保留原待结算工作。#14523 仍基于 `57c3a24470e7`，不自动继承新的前置 head。当前 main 的后续 storage 退役只在原关闭 drain、持久匹配停止 receipt、无活跃 Session/execution 的条件下，经 releaseRetired 清精确 holder；普通 release 失败或网络丢响应不授权物理 stop 或清占用，成功应答的原逻辑释放仍走既有路径。见[恢复与运维](managed-agent-recovery-operations.md)。这些源码/数据库门禁本次未运行。
 
 ## 历史基础切片
 
