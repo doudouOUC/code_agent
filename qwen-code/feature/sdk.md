@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+### W43 当前协议与 Java 包边界，2026-10-20
+
+main `725bf4c6b8aa` 已合入 [#14628](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md)：含附件的完整编码输入 8 MiB、hosted-model-request 32 MiB，普通 inline resource 仍 64 KiB；仅内部 commit DTO mapper 放宽 base64 字符串。[#14704](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 GIF 签名与 image/jpg→image/jpeg，保留原 bytes/digest、图片模型能力和不支持类型拒绝。下方 48 KiB/V10/OpenAPI 1.65.0 是 W42 快照，不是当前上限/版本。
+
+[#14710](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 不拆 artifact 或部署：共享请求模型/异常离开 HTTP api，SQL 聚合在 persistence，业务职责包与 Broker provisioning/transport/security 分层；pom/launcher/测试和文档路径同步更新。按源 AGENTS 安装当前 sdk-java/qwencode 后使用 packages/managed-agent-server 的 JDK 21 Maven gate，原生测试先构建 Core/CLI。本次未运行源码、JAR、数据库或浏览器验收，源设计的验证报告不挪用到本次快照。
+
 > **2026-10-15 Java Hosted 增量：** merged [#14124](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14124.md) 的 `CreateHarnessSession.Builder:captureBytes` 是可选 `[1, 2^41]` 字段，旧请求省略它；Java Connector 只在 publication enabled 的原 Shell/1、Shell/2、内部 team-lead create 传既有 execution-bytes，load 恢复原预算，不携带新部署值或云凭证。raw capture 与 Session/tenant 额外开销分开，publication/原始 Artifact/GC 独立开关保持不变，详见[完整工具结果](managed-agents/managed-agent-tool-result-artifacts.zh-CN.md)。本次未执行 SDK/真实云门禁。
 
 > **2026-10-16 静态规则最终实现：** [#14186](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14186.md) 已 merged，server 使用 qwencode/qwen-code-checks.xml、纳入测试源码；SDK/Broker 不因此全量切换规则。最终 workflow 新增 Ubuntu/Java21 独立 server Checkstyle 步骤，不依赖 MySQL/host lock；workflow 仍按 schedule/dispatch 触发。历史 head `89aa735ba955` 的错误不在最终两文件 diff 中；前次在 main `01d97f571a66` 对 BrokerSecurity/SessionLifecycleCoordinator 做 JDK 21 parse，零 syntax errors。本次没有复跑；仅两文件语法证据，不代表完整 Maven/Checkstyle/行为测试或 CI 已验证。

@@ -1,6 +1,14 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-> **2026-10-19 新库最终基线（主干 `79362c2ecc21`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表与 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) canonical V2 私有 authority 保持；当前目录 V1–V10，V10 增加独立 Plan/Turn 快照，不新增业务表。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
+## W43 当前存储基线，2026-10-20
+
+main `725bf4c6b8aa` 为 canonical V1–V11、32 业务表。[#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md) 的 V11 只扩 ma_session_head：wake_pending/wake_head_revision/wake_retry_at、生成 wake_scan_pending 及索引；提交 wake 与提示同事务，完整同 revision 证明才能清提示。扫描按 Session→head 锁序，公共失租/未压缩资格和持久退避不替代工具终态证明；V10/witness 10 的下方段落是 W42 基线。
+
+[#14628](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md) 按资源 kind 保留 managed-input 8 MiB、hosted-model-request 32 MiB、其它 inline 64 KiB；Java inline transaction 40 MiB、恢复快照总计 128 MiB，仅内部 commit DTO 放宽对应 JSON 字符串。完整附件输入仍含文本/base64 开销，恢复读取原 accepted 字节。[#14710](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 将 SQL 聚合移到 managedagent.persistence，保留包内锁/事务与同一 Maven/部署，不改 DDL/OpenAPI 资源。
+
+[#14698](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 的 V12 仍 open，只拟在原 ma_operation 加阶段/版本/frozen/cut/receipt 及唯一目标约束；不能按它升级当前 main。库存 4096 行/32 MiB、schema drift/引用闭包均为拒绝边界。旧 DATETIME catalog 仍需新库或独立迁移，不能 repair 绕过验证。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
+> **2026-10-19 W42 新库基线归档（主干 `79362c2ecc21`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表与 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) canonical V2 私有 authority 保持；当前目录 V1–V10，V10 增加独立 Plan/Turn 快照，不新增业务表。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
 
 ## 新库 32 表的最终实现
 

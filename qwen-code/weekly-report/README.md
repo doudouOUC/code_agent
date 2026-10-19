@@ -4,8 +4,8 @@
 
 > 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 周更完整集合已核验，2026-10-13 完成整理并刷新后续合入状态；W42 于 2026-10-19 周一上午完成周更，复核北京时间 10-12 至 10-18 完整创建集合及最新状态/实现。PR 按 createdAt 固定周归属，不能按后续合入日期移动，#13642 后续合入也仍属 W41。单 PR 文档可后续复核为最终状态。
 
-**时间范围**: 2026-04-06 ~ 2026-10-18（持续更新）
-**总计**: 633 PRs（W39–W42 已覆盖完整创建周，状态和规模保留各次复核快照）
+**时间范围**: 2026-04-06 ~ 2026-10-19（持续更新）
+**总计**: 643 PRs（W39–W42 保留完整创建周归档快照，W43 日更至 10-19）
 **代码量**: W15–W22 历史累计 +361,436 / -61,427；后续逐周规模见下表及周目录。文件数为逐 PR changedFiles 累加，不是去重文件数。
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
@@ -44,10 +44,11 @@
 | 2026-09-28 ~ 2026-10-04 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-09-28_2026-10-04) · [Obsidian](2026-09-28_2026-10-04/README.md)) (W40 最终版) | 25 | 24/0/1 | +100,820/-2,947 | 完整结果投影/退休/清理、W1 恢复迁移、Session 生命周期、CSI 与设置耐久 |
 | 2026-10-05 ~ 2026-10-11 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-05_2026-10-11) · [Obsidian](2026-10-05_2026-10-11/README.md)) (W41 最终版) | 16 | 12/2/2 | +118,387/-3,889 | CSI worker/挂载身份、publication 锁序/异步、Shell 审批、cwd、G3、文件单源读取与 Java CI |
 | 2026-10-12 ~ 2026-10-18 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-12_2026-10-18) · [Obsidian](2026-10-12_2026-10-18/README.md)) (W42 周更) | 43 | 37/4/2 | +132,152/-26,011 | 32 表/V10、统一 Server、共享 Workspace/SSH、Plan/附件/单 run 取消，open 搜索/CSI 文件恢复/创建 warm |
+| 2026-10-19 ~ 2026-10-25 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-19_2026-10-25) · [Obsidian](2026-10-19_2026-10-25/README.md)) (W43 日更至 10-19) | 10 | 9/1/0 | +32,633/-5,609 | Skills、wake 恢复/续接、工具详情、8 MiB 附件/文件引用、CSI 冷恢复、Java 包边界；应用退役 open |
 
 ## 类型分布
 
-feat ×325, fix ×224, refactor ×23, other ×7, docs ×18, chore ×8, perf ×17, test ×10, merge ×1
+feat ×330, fix ×228, refactor ×24, other ×7, docs ×18, chore ×8, perf ×17, test ×10, merge ×1
 
 类型按各周明细的类型字段（旧周）或标题前缀（新周）汇总，与逐周统计一致；不在总索引另行重分类。W23 的 revert 计入 other。
 

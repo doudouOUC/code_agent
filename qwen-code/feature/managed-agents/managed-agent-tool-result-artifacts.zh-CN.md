@@ -1,5 +1,11 @@
 # Managed Agent 完整工具结果与持久产物
 
+## W43 已存工具详情，2026-10-20
+
+main `725bf4c6b8aa` 已合入 [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md)：Read/Shell 展开详情从原 ma_message→Turn/prompt/call、journal source sequence 和 committed message resource 读取，不重新执行工具。前后可读权限、digest/原消息身份验证，最多 512 页和 8 MiB；参数与 output/shell_result 有界返回并保留截断/outcome，不是完整 Artifact 下载替代。
+
+前端只为展开的终态且缺字段的工具加载，loader/call/status/revision 限定缓存与迟到结果，保留实际空输出和不可获取的区别。原 publication、capture、原生 receipt 与物理停止闭包不因展示详情而放松。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
 [English](managed-agent-tool-result-artifacts.md) | [简体中文](managed-agent-tool-result-artifacts.zh-CN.md)
 
 状态：目标设计，已合入切片见下方实施快照；文档本身不实现运行能力。调研日期：2026-09-21。核实源码基线：`feature/managed-agent-p2-delivery` 的 `72e215c1e5047b5291430b3dd4c1862c9439f0f6`。本文补齐现有本地工具结果存储、Session authority、Java 公共投影与 WebShell 之间的交付契约，细化已有普通工具回执及资源设计，不建立第二份执行权威。下文仓库路径均对应此基线。

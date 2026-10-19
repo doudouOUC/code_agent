@@ -1,5 +1,9 @@
 # qwen-code feature 技术方案
 
+> **W43 日更（2026-10-20，main `725bf4c6b8aa`）：** 北京时间 10-19 新建 10 个个人 PR，9 merged/1 open，见 [W43](../weekly-report/2026-10-19_2026-10-25/README.md)。[#14602](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14602.md) Skills、[#14603](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md)/[#14679](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14679.md) wake、[#14604](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md) 工具详情、[#14628](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md)/[#14704](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 8 MiB/图片、[#14639](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14639.md) LOCAL/SSH 文件引用、[#14695](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14695.md) CSI 冷恢复及 [#14710](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) Java 包边界均已合入；[#14698](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 应用退役仍 open，V12/boot6 不是 main 能力。main 为 32 表/V11。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
+> **归档说明：** 下方 W42 的状态/规模是周更时的历史快照；#14487/#14523/#14599 现已 merged，仍归 W42，不重复计入 W43。其旧 open head/验证不能代替最终版本。
+
 按 **@doudouOUC 个人 PR** 口径汇总 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 的重点实现（2026-04 ~ 10），并结合代码整理详细技术方案。每篇含：背景动机 / 整体架构 / 子系统详解（带 `file:symbol` 锚点）/ 关键流程（mermaid 时序图、调用链、状态机）/ 设计决策与权衡 / 涉及 PR / 已知限制。
 
 > 配套：逐 PR 的描述↔实现一致性 + 正确性审查见 [`../weekly-report/`](../weekly-report/README.md)。
@@ -60,7 +64,7 @@
 
 > **W39–W42 历史补录（2026-10-13）：** Managed Agents 的 Hosted 控制面、Workspace/W1/生命周期、完整工具结果和实验 CSI 状态见 [当前总览](managed-agents/README.md)。当时 #13526/#13642 open；当前 #13642 已 merged，仍归 W41。#13654 异步 verifier 已合入但默认关闭，#13673 原 Hook 退休恢复和 #13674 强制审批的公开前台 Shell 已合入。#12783 中文设置文案、#12784 提示词去重及 #13119/#13140/#13293 settings staging/恢复身份/权限与 sandbox flush 为既有可靠性修复，逐条路径和验证见 [周报](../weekly-report/README.md)。
 
-> **W42 周更（2026-10-19，主干 `79362c2ecc21`）：** 完整创建周共 43 PR（37 merged/4 open/2 closed）。既有实现保持，#14484 保存定义审批、#14526 单 run 取消、#14531 Plan/内联附件已 merged；#14290 搜索、#14487 私有 CSI 文件、#14523 回执完整恢复和 #14599 创建预热仍 open。#14141/#14174 closed 未合入。当前 V1–V10 不表示旧 DATETIME 库兼容升级；显式共享仍不等于 idle/硬预算/keep-warm 已交付，macOS 不支持可信整机 reboot。见 [Managed Agents](managed-agents/README.md)、[存储](managed-agents/managed-agent-storage-event-architecture.md)、[JDBC 中文](managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-agents/managed-runtime-broker-jdbc.md)、[客户端](managed-agents/managed-agent-client-surfaces.md)、[恢复](managed-agents/managed-agent-recovery-operations.md)、[完整结果](managed-agents/managed-agent-tool-result-artifacts.zh-CN.md)和 [SDK](sdk.md)。本次仅文档审计，未运行源码、浏览器、MySQL/OSS/CSI/SSH/macOS 原生或部署门禁；前次 parser 结果保留原 revision，不挪用至新 main。
+> **W42 周更归档（2026-10-19，主干 `79362c2ecc21`）：** 完整创建周共 43 PR（37 merged/4 open/2 closed）。既有实现保持，#14484 保存定义审批、#14526 单 run 取消、#14531 Plan/内联附件已 merged；#14290 搜索、#14487 私有 CSI 文件、#14523 回执完整恢复和 #14599 创建预热仍 open。#14141/#14174 closed 未合入。当前 V1–V10 不表示旧 DATETIME 库兼容升级；显式共享仍不等于 idle/硬预算/keep-warm 已交付，macOS 不支持可信整机 reboot。见 [Managed Agents](managed-agents/README.md)、[存储](managed-agents/managed-agent-storage-event-architecture.md)、[JDBC 中文](managed-agents/managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-agents/managed-runtime-broker-jdbc.md)、[客户端](managed-agents/managed-agent-client-surfaces.md)、[恢复](managed-agents/managed-agent-recovery-operations.md)、[完整结果](managed-agents/managed-agent-tool-result-artifacts.zh-CN.md)和 [SDK](sdk.md)。本次仅文档审计，未运行源码、浏览器、MySQL/OSS/CSI/SSH/macOS 原生或部署门禁；前次 parser 结果保留原 revision，不挪用至新 main。
 
 ## 使用口径
 

@@ -1,5 +1,11 @@
 # Managed Runtime Broker JDBC 持久化
 
+## W43 当前原生恢复与布局，2026-10-20
+
+main `725bf4c6b8aa` 已合入此前 #14487/#14523/#14599；下方 W42 open head 仅保留当时观察，不是当前状态。[#14695](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14695.md) 补齐原单无 deadline 输入/单批次的冷恢复：新 owner 受当前 writer/activation fence，SQL 在同源事务证明全部原 SETTLED 成员、grant/intent/checkpoint/input/definition 与结果。每份 input/definition/result/authorization 字节资源分别限 64 KiB、响应 8 MiB；整批预检后补原 receipt/message，不派发工具。最终 output_committed/assistant/route/history/results_ready 完整闭合时只消费，不重复模型。
+
+[#14710](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 保持同 Maven/部署；原 managedagent.store SQL 聚合移至 persistence，业务分别归 session/workspace/runtime/artifact/catalog/event，model/exception 脱离 api；Broker provisioning/transport/security 分开。当前 main 为 V1–V11，[#14698](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 的 V12/boot6、SETTLING→FROZEN→CUT→DRAINED 仍未合入。其原库存/worker 观察/持久 CUT 与独立 worker-authority 不证明物理 Pod/PVC 删除，旧 legacy catalog 不可直接升级或 repair。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
 > **2026-10-13 历史增量（当前状态见下方 2026-10-15）：** #12692 Spring/Flyway、#12865 持久本机/boot/process 与 #12869/#12977 可信 reboot/人工清理已合入，#13289 实验 CSI/持久 ACK 已合入。该快照的 #13642 retention 为 open，head `5832d8824a31` 顺延 V69，maxAge 按 DAYS、scanDelay 按 MILLIS，maxAge 至少 1ms，并保护未结算 background_shell 的原 process 行。当时主干 V68 async 已合入，旧编号冲突已解决，但writer 锁协议及独立 Hosted cleanup 释放证明均验证前 cleanup 仍关闭。#13673 原 drain/stop/holder Hook 恢复已合入。下方 2026-09-27 记录保留为历史，不作当前 owned-map-only 结论。
 
 > **私有 CSI 边界：** closed [#13893](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13893.md) 在 create/adopt/register/observe/confirm/release/operator 路径拒绝私有文件 profile 误入 local-process，不能当作已合入支持；同类 guard 位于 merged [#13899](../../weekly-report/2026-10-05_2026-10-11/implementations/pr-13899.md)。后者提供独立 v5 文件 worker 与原输入/readback/history 身份校验，但 drain 始终 BLOCKED，保留 backup。不能据 worker diff 推断完整 Java/Hosted native/readback 接线、生产 CSI 删除或跨 owner 恢复已交付。
@@ -46,9 +52,9 @@
 
 ### 私有文件 Turn 与回执完整恢复的 open 观察，2026-10-19
 
-open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `76902629d1d9` 仅接原 read_file/write_file/edit，writer generation 1/activation epoch 1 不变。完整原批次 reservation、修改 intent/原备份准备后才提交 intent/checkpoint，保存完整 outcome/receipt 与闭合 history 后供模型消费；拒绝按原调用验证，已准入工作仍必须有原生 receipt。最终 assistant 与成功模型 attempt 原子提交；不是冷恢复、物理 finalize/release 或公共 CSI 选择，尚未合入。
+W42 历史 open 观察（当前已合入；最终边界见本文 W43 增量）：open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `76902629d1d9` 仅接原 read_file/write_file/edit，writer generation 1/activation epoch 1 不变。完整原批次 reservation、修改 intent/原备份准备后才提交 intent/checkpoint，保存完整 outcome/receipt 与闭合 history 后供模型消费；拒绝按原调用验证，已准入工作仍必须有原生 receipt。最终 assistant 与成功模型 attempt 原子提交；不是冷恢复、物理 finalize/release 或公共 CSI 选择，尚未合入。
 
-open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` stacked 于 codex/csi-hosted-files，统计包含前置文件 Turn。同连接 native admission 只接受单原无 deadline 输入/批次、全部 SETTLED 完整 receipt，数据库时间确认 writer/activation 双 lease 过期。递增 writer 与恰好下一 activation 保留原 READY worker/history；整批原结果/消息前缀预检后只补缺失原消息与 checkpoint，再继续模型，修复不分配/执行文件操作。pending batch 已清、最终输出、活 owner、缺回执、取消或 UNKNOWN 拒绝冷准入。main 仍只有较窄的已合入文本入口，本次未运行完整 K2、OS 崩溃或部署 CSI 门禁。
+W42 历史 open 观察（当前已合入；最终边界见本文 W43 增量）：open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` stacked 于 codex/csi-hosted-files，统计包含前置文件 Turn。同连接 native admission 只接受单原无 deadline 输入/批次、全部 SETTLED 完整 receipt，数据库时间确认 writer/activation 双 lease 过期。递增 writer 与恰好下一 activation 保留原 READY worker/history；整批原结果/消息前缀预检后只补缺失原消息与 checkpoint，再继续模型，修复不分配/执行文件操作。pending batch 已清、最终输出、活 owner、缺回执、取消或 UNKNOWN 拒绝冷准入。main 仍只有较窄的已合入文本入口，本次未运行完整 K2、OS 崩溃或部署 CSI 门禁。
 
 ### 周更复核边界，2026-10-19
 

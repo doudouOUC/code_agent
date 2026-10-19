@@ -1,6 +1,16 @@
 # Managed 普通客户端、交互与事件投影
 
-> **2026-10-19 实施快照（主干 `79362c2ecc21`）：** 既有客户端能力保持；#14484 已保存定义审批、#14526 单次自动化取消、#14531 Plan/内联附件现已合入。#14290 搜索、#14487 私有 CSI 文件、#14523 回执完整恢复及 #14599 创建预热仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
+## W43 当前客户端增量，2026-10-20
+
+main `725bf4c6b8aa` 已合入 [#14602](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14602.md)：目录来自可读 Session 的 pinned definition，菜单懒加载；前导有效 /skill 通过原工具 Turn 在首次模型请求前加载，恢复不重复，静态加载允许 Plan。[#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md) 的 Read/Shell 详情展开后才请求，按原 item/Turn/call 追溯持久 journal/resource，读取前后授权，8 MiB/512 页硬预算；loader/call/status/revision 隔离迟到响应，返回有界预览与结构化 Shell outcome，不伪造全文。
+
+[#14628](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md) 将含附件的完整规范化编码输入提升到 8 MiB（不是单文件原始大小），大 pending 先保存 IndexedDB，sessionStorage 留原 key 的引用，保存失败不换键发送。[#14704](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 Java/Hosted/WebShell 接受 GIF87a/GIF89a 并把 image/jpg 规范为 image/jpeg；canonical base64/签名、模型 image 能力和原输入摘要保留，不增加 URL/任意宿主文件访问。
+
+[#14639](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14639.md) 从授权 LOCAL/SSH_LOCAL Workspace/cwd 选择最多 24 KiB 的非空 UTF-8 文本快照，scope revision 和 SHA-256 随草稿保存；发送前复核，读未完成禁止提交，切换 scope 拒绝旧引用，不按路径静默重读。查询有 4096 扫描项/50 返回项/32 深度/约 2 秒预算，拒绝 symlink/保留目录，不支持 CSI/二进制浏览。
+
+#14487/#14523 现已 merged，当前私有文件及冷恢复以 [#14695](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14695.md) 为准；下方旧 open head 和 48 KiB 限制仅是 W42 历史观察，不是当前行为。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
+> **2026-10-19 W42 归档快照（主干 `79362c2ecc21`）：** 既有客户端能力保持；#14484 已保存定义审批、#14526 单次自动化取消、#14531 Plan/内联附件现已合入。#14290 搜索、#14487 私有 CSI 文件、#14523 回执完整恢复及 #14599 创建预热仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 
 ### 已合入的子 Agent 任务面板
 
@@ -56,7 +66,7 @@
 
 ### 私有 CSI 文件入口的 open 观察
 
-open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `76902629d1d9` 才接原 read_file/write_file/edit：首代 writer/activation、完整原批次/修改备份准备/receipt/history 和最终输出原子提交；prepare 丢响应后独立回读一次、限 5 秒，保留原错误，结果先经封闭 schema 校验，拒绝外部 function 身份再发布 receipt。不提供公共选择器或冷恢复。open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) 是 stacked 的回执完整冷恢复，严格限定原单输入/单批次、全部 settled receipt 与双 lease 到期；只补原消息/checkpoint，不重跑工具。它仍基于 `57c3a24470e7`，不能自动继承 #14487 的最新 head。本次未执行源码/MySQL/CSI 验收，主干仍只有 #14081 的私有纯文本范围。
+W42 历史 open 观察（当前已合入；最终边界见本文 W43 增量）：open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) `76902629d1d9` 才接原 read_file/write_file/edit：首代 writer/activation、完整原批次/修改备份准备/receipt/history 和最终输出原子提交；prepare 丢响应后独立回读一次、限 5 秒，保留原错误，结果先经封闭 schema 校验，拒绝外部 function 身份再发布 receipt。不提供公共选择器或冷恢复。open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) 是 stacked 的回执完整冷恢复，严格限定原单输入/单批次、全部 settled receipt 与双 lease 到期；只补原消息/checkpoint，不重跑工具。它仍基于 `57c3a24470e7`，不能自动继承 #14487 的最新 head。本次未执行源码/MySQL/CSI 验收，主干仍只有 #14081 的私有纯文本范围。
 
 > **HTML 对齐（2026-09-18）：** 托管前端继续访问 Java 产品 REST/SSE；Java 内部复用 qwen serve Session/Prompt/Load/Resume/SSE，普通 /session + executionEngines 保留。HTML 未冻结 JavaAgentProvider 类名，也不要求 Java 暴露全部 daemon 管理路由；公共 API 和投影在 D 实现。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 

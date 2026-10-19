@@ -1,5 +1,15 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## W43 当前恢复边界，2026-10-20
+
+main `725bf4c6b8aa` 已合入 [#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md)：V11 在原 head 保存 wake 提示/退避，独立 scheduler 默认 2 秒扫描最多 8 个公共 ACTIVE、失租且未压缩的 Session，按 Session→head 锁序领取，数据库时间退避 30 秒。完整 journal 前缀校验六类 wake 的未结算 Turn，部分证明不可清提示；私有 CSI/活 writer 不参与，子会话检查 parent run。被动 load 与 boot/ref fencing 不启动无关前台工作，MQ watermark 不是恢复证明。
+
+[#14679](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14679.md) 只为 monitor/child_agent/workflow 崩溃后结算的通知，先以固定摘要键持久入队后继 continuation，再 settle 旧 Turn；恢复原通知/结果，成功后按原 notification ID 消费 child，不重放原副作用。不扩展 channel/automation/session_message 的后继政策。
+
+[#14695](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14695.md) 在原已安装新 writer/activation 下回读 SETTLED 原批次，补缺失 receipt；严格证明最终 assistant/attempt/history 已闭合时直接消费并结算，不重复模型或工具。此前 #14487/#14523/#14599 已合入但仍归 W42；创建 warm 仍默认关闭、workspace/no SSH、placement-only，不保证返回 READY。下方其 open 描述保留 W42 观察，不代表当前状态。
+
+[#14698](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 应用退役仍 open：V12/boot6、原库存/观察冻结、事务 CUT、原 worker 独立验 CUT 后关闭文件 fd 并返回 DRAINED。库存漂移、未知、超限或缺证明均阻塞；不是 Pod/PVC 已删除/可复用或完整 K2。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
 > **2026-10-12 实施快照：** #12839/#12869 已合入原终态/holder fence 与可信同宿主 reboot 清理；#12977 的离线 inspect/prepare/complete 固定原 generation/holder，记录操作员 stop evidence 和 producer_lost，不恢复原回合。#13088 的 W1a 核验原 storage marker/身份与资源闭合；#13138 W1b 导出和验证离线 bundle；#13260 W1c 以 storage fence、原 request 和历史证据分阶段迁移，#13655 成功迁移清除旧诊断。#13135/#13194/#13354 以持久 lifecycle authority 排空、关闭、保留和删除 Session。#13673 已合入原 Hook 退休恢复：按保存的 drain receipt、stop evidence 和 exact holder 在同事务确认 stopped release，不替换 Hook 或重放未知效果。所有路径继续要求原资源证据，UNKNOWN 不换 Runtime 重放；本文未执行物理 reboot、迁移或部署故障门禁。
 
 关键实现：`WorkspaceOperatorRecoveryStore.java:prepare`、`WorkspaceStorageGuard.java:inspect`、`workspace-recovery-bundle.ts`、`WorkspaceMigrationStore.java:retire`、`WorkspaceLifecycleStore.java:requireClaim`、`RuntimeBrokerService.java:drainHarnessSession`。逐 PR 与验证入口见 [W40 实现索引](../../weekly-report/2026-09-28_2026-10-04/implementations/README.md) 和 [W41 实现索引](../../weekly-report/2026-10-05_2026-10-11/implementations/README.md)。
@@ -56,9 +66,9 @@ PR 设计记载 macOS 本地和 loopback SSH 的分层验证，其中 publicatio
 
 已合入 [#14526](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14526.md)：稳定 cancel_run 写原 Turn cancel.requested，排队 wake 不执行模型就持久结算，正在运行仅 abort 相同 automationInputId。Java 经原 committed-stop attachment 授权，原 run 的 cancelled 终态才使取消 operation 完成；ACK、schedule retirement、其它 Turn 和资源物理停止不是同一事实。清理/UNKNOWN 仍按原 proof，本次未运行 Hosted/MySQL。
 
-open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` 依赖 open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) 的文件 Turn。只在原 writer/activation 双 lease 到期、单无 deadline 输入/单文件批次全 settled 且 receipt 完整时，按原事务锁序取得后继 writer 并安装下一 activation；先预检整个原批次再补消息/checkpoint，原 worker/history 不换，修复不派发工具。原 pending batch 已清除、最终模型输出已提交、缺 receipt/取消/UNKNOWN 均不在冷准入范围；stacked 代码量含前置实现，不代表 main 或完整 K2。源码/真实 CSI/OS 进程崩溃本次未执行。
+W42 历史 open 观察（当前已合入；最终边界见本文 W43 增量）：open [#14523](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14523.md) `5adfab798f62` 依赖 open [#14487](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14487.md) 的文件 Turn。只在原 writer/activation 双 lease 到期、单无 deadline 输入/单文件批次全 settled 且 receipt 完整时，按原事务锁序取得后继 writer 并安装下一 activation；先预检整个原批次再补消息/checkpoint，原 worker/history 不换，修复不派发工具。原 pending batch 已清除、最终模型输出已提交、缺 receipt/取消/UNKNOWN 均不在冷准入范围；stacked 代码量含前置实现，不代表 main 或完整 K2。源码/真实 CSI/OS 进程崩溃本次未执行。
 
-open [#14599](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14599.md) `ad3d0f68d833` 是创建 warm 的独立方案：默认关闭，要求 workspace isolation/no SSH，仅无输入创建在原提交后投递既有 executor，复用授权 resolver 做 placement-only warm。不开 Runtime Session/context、不执行工具、不新增公开事件，不保证创建返回时 READY；首 Turn 保留原 warm。不是 Session 隔离预热、idle/硬预算/keep-warm 或已合入能力，真实进程复用门禁未由本次运行。
+W42 历史 open 观察（当前已合入；最终边界见本文 W43 增量）：open [#14599](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14599.md) `ad3d0f68d833` 是创建 warm 的独立方案：默认关闭，要求 workspace isolation/no SSH，仅无输入创建在原提交后投递既有 executor，复用授权 resolver 做 placement-only warm。不开 Runtime Session/context、不执行工具、不新增公开事件，不保证创建返回时 READY；首 Turn 保留原 warm。不是 Session 隔离预热、idle/硬预算/keep-warm 或已合入能力，真实进程复用门禁未由本次运行。
 
 ### 公开常驻与 macOS 的最终边界，2026-10-18
 
