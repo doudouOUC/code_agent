@@ -1,10 +1,14 @@
 # Managed Agent 完整工具结果与持久产物
 
-## W43 已存工具详情，2026-10-20
+## W43 已存工具详情，2026-10-21
 
-main `725bf4c6b8aa` 已合入 [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md)：Read/Shell 展开详情从原 ma_message→Turn/prompt/call、journal source sequence 和 committed message resource 读取，不重新执行工具。前后可读权限、digest/原消息身份验证，最多 512 页和 8 MiB；参数与 output/shell_result 有界返回并保留截断/outcome，不是完整 Artifact 下载替代。
+main `6e6598e35c3c` 已合入 [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md)：Read/Shell 展开详情从原 ma_message→Turn/prompt/call、journal source sequence 和 committed message resource 读取，不重新执行工具。前后可读权限、digest/原消息身份验证，最多 512 页和 8 MiB；参数与 output/shell_result 有界返回并保留截断/outcome，不是完整 Artifact 下载替代。
 
 前端只为展开的终态且缺字段的工具加载，loader/call/status/revision 限定缓存与迟到结果，保留实际空输出和不可获取的区别。原 publication、capture、原生 receipt 与物理停止闭包不因展示详情而放松。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
+[#14762](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14762.md)/[#14766](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14766.md) 只新增测试/文档，不改生产 GC。MCP 目录/参数/结果在连接释放后仍保留；原生媒体用实际 Hosted 结果/history/checkpoint 路径和受控 Broker 生成。seal 不等于退役，默认 GC 关闭，reader/recovery/foreign ref 保护原字节；跨 Session 同摘要仍有不同 scoped resource key。收集留 tombstone、字节账本幂等，手工 foreign pin 仅防御性验证，不是公开共享生产者。
+
+[#14764](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14764.md) 的 V13 以 HOSTED_CLEANUP 保护原 descriptor/binding/generation，只有同源 confirmed 才移除；旧 head 历史未覆盖时保守保护原 Runtime。Session close 或 lease 过期不等于 cleanup 完成。本次未运行这些用例、真实 MCP/媒体解码、MySQL/OSS 或部署门禁。
 
 [English](managed-agent-tool-result-artifacts.md) | [简体中文](managed-agent-tool-result-artifacts.zh-CN.md)
 

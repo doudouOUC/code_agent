@@ -1,10 +1,12 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### W43 当前协议与 Java 包边界，2026-10-20
+### W43 当前协议与 Java 包边界，2026-10-21
 
-main `725bf4c6b8aa` 已合入 [#14628](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md)：含附件的完整编码输入 8 MiB、hosted-model-request 32 MiB，普通 inline resource 仍 64 KiB；仅内部 commit DTO mapper 放宽 base64 字符串。[#14704](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 GIF 签名与 image/jpg→image/jpeg，保留原 bytes/digest、图片模型能力和不支持类型拒绝。下方 48 KiB/V10/OpenAPI 1.65.0 是 W42 快照，不是当前上限/版本。
+main `6e6598e35c3c` 已合入 [#14628](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md)：含附件的完整编码输入 8 MiB、hosted-model-request 32 MiB，普通 inline resource 仍 64 KiB；仅内部 commit DTO mapper 放宽 base64 字符串。[#14704](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 GIF 签名与 image/jpg→image/jpeg，保留原 bytes/digest、图片模型能力和不支持类型拒绝。下方 48 KiB/V10/OpenAPI 1.65.0 是 W42 快照，不是当前上限/版本。
 
 [#14710](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 不拆 artifact 或部署：共享请求模型/异常离开 HTTP api，SQL 聚合在 persistence，业务职责包与 Broker provisioning/transport/security 分层；pom/launcher/测试和文档路径同步更新。按源 AGENTS 安装当前 sdk-java/qwencode 后使用 packages/managed-agent-server 的 JDK 21 Maven gate，原生测试先构建 Core/CLI。本次未运行源码、JAR、数据库或浏览器验收，源设计的验证报告不挪用到本次快照。
+
+[#14916](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14916.md) 在 WebShell provider/client 增 mcp.list 与 actor 保护 POST session-mcp/query，返回保存目录而非直接连接，生成 types/契约同步。[#14920](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 增 liveSupported 与 live-approval-selection/1（且要求 approval-selection/1）；内部 approval:query 使用原 writer token/generation，返回 mode/revision 或不适用 null。消费方串行检查单调 revision，不以新模式重写旧 Turn/Hook；Plan/模型仍空闲、旧 host 缺能力保留原行为。当前服务目录 V1–V14、32 业务表，公共 SDK 身份/原 receipt 权威不变。本次未运行 SDK、跨语言契约或浏览器门禁。
 
 > **2026-10-15 Java Hosted 增量：** merged [#14124](../weekly-report/2026-10-12_2026-10-18/implementations/pr-14124.md) 的 `CreateHarnessSession.Builder:captureBytes` 是可选 `[1, 2^41]` 字段，旧请求省略它；Java Connector 只在 publication enabled 的原 Shell/1、Shell/2、内部 team-lead create 传既有 execution-bytes，load 恢复原预算，不携带新部署值或云凭证。raw capture 与 Session/tenant 额外开销分开，publication/原始 Artifact/GC 独立开关保持不变，详见[完整工具结果](managed-agents/managed-agent-tool-result-artifacts.zh-CN.md)。本次未执行 SDK/真实云门禁。
 

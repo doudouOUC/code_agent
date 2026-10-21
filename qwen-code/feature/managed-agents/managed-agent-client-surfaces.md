@@ -1,12 +1,16 @@
 # Managed 普通客户端、交互与事件投影
 
-## W43 当前客户端增量，2026-10-20
+## W43 当前客户端增量，2026-10-21
 
-main `725bf4c6b8aa` 已合入 [#14602](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14602.md)：目录来自可读 Session 的 pinned definition，菜单懒加载；前导有效 /skill 通过原工具 Turn 在首次模型请求前加载，恢复不重复，静态加载允许 Plan。[#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md) 的 Read/Shell 详情展开后才请求，按原 item/Turn/call 追溯持久 journal/resource，读取前后授权，8 MiB/512 页硬预算；loader/call/status/revision 隔离迟到响应，返回有界预览与结构化 Shell outcome，不伪造全文。
+main `6e6598e35c3c` 已合入 [#14602](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14602.md)：目录来自可读 Session 的 pinned definition，菜单懒加载；前导有效 /skill 通过原工具 Turn 在首次模型请求前加载，恢复不重复，静态加载允许 Plan。[#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md) 的 Read/Shell 详情展开后才请求，按原 item/Turn/call 追溯持久 journal/resource，读取前后授权，8 MiB/512 页硬预算；loader/call/status/revision 隔离迟到响应，返回有界预览与结构化 Shell outcome，不伪造全文。
 
 [#14628](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md) 将含附件的完整规范化编码输入提升到 8 MiB（不是单文件原始大小），大 pending 先保存 IndexedDB，sessionStorage 留原 key 的引用，保存失败不换键发送。[#14704](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 Java/Hosted/WebShell 接受 GIF87a/GIF89a 并把 image/jpg 规范为 image/jpeg；canonical base64/签名、模型 image 能力和原输入摘要保留，不增加 URL/任意宿主文件访问。
 
 [#14639](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14639.md) 从授权 LOCAL/SSH_LOCAL Workspace/cwd 选择最多 24 KiB 的非空 UTF-8 文本快照，scope revision 和 SHA-256 随草稿保存；发送前复核，读未完成禁止提交，切换 scope 拒绝旧引用，不按路径静默重读。查询有 4096 扫描项/50 返回项/32 深度/约 2 秒预算，拒绝 symlink/保留目录，不支持 CSI/二进制浏览。
+
+[#14916](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14916.md) 新增 actor 保护的 session-mcp/query，复用持久 Session catalog；菜单列三类能力计数和 complete/partial/failed/stale，不重连/刷新或执行 MCP。provider/client/Session scope 与 abort 防迟到结果污染，已释放连接不冒充 live；partial tool 描述携带 JSON 转义原 server/tool 身份，执行名字/schema 不变。
+
+[#14920](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 仅在 approval-selection/1 + live-approval-selection/1 下允许公开 bound files/1、shell/1、shell/2 在运行/等待中切 default/auto-edit/yolo，保留 OWNER/OPERATOR、expected revision、原键与回执；关闭/取消/恢复阻塞拒绝。Plan 与模型仍要求空闲。Hosted 后续工具/Hook 检查读单调 revision，缺失/回退拒绝；普通策略等待在当前不需询问时经原 Action allow，明确 Hook ask/exit_plan_mode 不自动通过。已执行工具不撤回，原 Turn/Hook 审计字节不重写。[#14763](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14763.md) 让停放取消只从原 prompt 终态恢复已取消/未取消，停止请求或未知证据不显示成功。
 
 #14487/#14523 现已 merged，当前私有文件及冷恢复以 [#14695](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14695.md) 为准；下方旧 open head 和 48 KiB 限制仅是 W42 历史观察，不是当前行为。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
 

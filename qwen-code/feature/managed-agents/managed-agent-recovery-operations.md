@@ -1,14 +1,20 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## W43 当前恢复边界，2026-10-20
+## W43 当前恢复边界，2026-10-21
 
-main `725bf4c6b8aa` 已合入 [#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md)：V11 在原 head 保存 wake 提示/退避，独立 scheduler 默认 2 秒扫描最多 8 个公共 ACTIVE、失租且未压缩的 Session，按 Session→head 锁序领取，数据库时间退避 30 秒。完整 journal 前缀校验六类 wake 的未结算 Turn，部分证明不可清提示；私有 CSI/活 writer 不参与，子会话检查 parent run。被动 load 与 boot/ref fencing 不启动无关前台工作，MQ watermark 不是恢复证明。
+main `6e6598e35c3c` 已合入 [#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md)：V11 在原 head 保存 wake 提示/退避，独立 scheduler 默认 2 秒扫描最多 8 个公共 ACTIVE、失租且未压缩的 Session，按 Session→head 锁序领取，数据库时间退避 30 秒。完整 journal 前缀校验六类 wake 的未结算 Turn，部分证明不可清提示；私有 CSI/活 writer 不参与，子会话检查 parent run。被动 load 与 boot/ref fencing 不启动无关前台工作，MQ watermark 不是恢复证明。
 
 [#14679](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14679.md) 只为 monitor/child_agent/workflow 崩溃后结算的通知，先以固定摘要键持久入队后继 continuation，再 settle 旧 Turn；恢复原通知/结果，成功后按原 notification ID 消费 child，不重放原副作用。不扩展 channel/automation/session_message 的后继政策。
 
 [#14695](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14695.md) 在原已安装新 writer/activation 下回读 SETTLED 原批次，补缺失 receipt；严格证明最终 assistant/attempt/history 已闭合时直接消费并结算，不重复模型或工具。此前 #14487/#14523/#14599 已合入但仍归 W42；创建 warm 仍默认关闭、workspace/no SSH、placement-only，不保证返回 READY。下方其 open 描述保留 W42 观察，不代表当前状态。
 
-[#14698](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 应用退役仍 open：V12/boot6、原库存/观察冻结、事务 CUT、原 worker 独立验 CUT 后关闭文件 fd 并返回 DRAINED。库存漂移、未知、超限或缺证明均阻塞；不是 Pod/PVC 已删除/可复用或完整 K2。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+[#14698](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 应用退役已合入：V12/boot6、原库存/观察冻结、事务 CUT、原 worker 独立验 CUT 后关闭文件 fd 并返回 DRAINED。库存漂移、未知、超限或缺证明均阻塞；不是 Pod/PVC 已删除/可复用或完整 K2。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
+
+[#14758](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14758.md) 固定常驻路径的可信平台、ACK Disk CSI/RWOP/ext4 及原运行身份，撤出节点证据候选；[#14761](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14761.md) 安装/冷启动仅保留 closed 未合入观察。[#14765](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14765.md) 最终维护入口只接受已授权 OWNER 的空闲 Workspace：原 READY 共享 binding/slot/registration/RESERVED owner、无活 Session/writer/Runtime Session/未结算执行；原子保存计划并 seal 为 DRAINING。删除前复核原 Pod/container/spec/Ready node/protection，先存 UNKNOWN 再按 UID/resourceVersion 发 DELETE；每 resourceVersion 至多一次、最多 8 次，丢答不重发。HTTP 成功/404/对象消失不产生 DRAINED/RELEASED，不清 reservation 或允许替换/复用；与 #14698 的私有应用退役分开。
+
+[#14763](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14763.md) 对 cancel_unconfirmed 只查原 operation/Turn/prompt/完整 scope 的保留 settleTurn：cancelled 完成，completed/error 明确失败，只有停止请求、缺失/损坏/不可读仍不成功，不能重发取消。[#14764](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14764.md) 在原提交中持久 HOSTED_CLEANUP 引用，confirmed 仅移除相同 descriptor/binding/generation；旧 cleanup_head_revision 不覆盖当前 journal 时保守保留原 Runtime，不因 close/租约过期免债。
+
+[#14760](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14760.md) v2 状态快照保留原 epoch/lease/消息/幂等身份和单调序号，替换或 sync 失败停止当前 writer；不是裁剪恢复证据。[#14920](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 新检查读单调 live 模式、旧 Hook 按保存字段恢复，查询失败/倒退不执行；明确 Hook ask/Plan 退出不自动放行。[#14875](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14875.md) 的自动清 ma_* 只在 disposable MySQL Hosted IT profile 的类边界运行，不是生产维护命令；单 fork 禁并行，保留 Flyway/结构。主干 V1–V14，旧目录须按 canonical 校验迁移；本次未执行上述源码/数据库/原生/部署门禁。
 
 > **2026-10-12 实施快照：** #12839/#12869 已合入原终态/holder fence 与可信同宿主 reboot 清理；#12977 的离线 inspect/prepare/complete 固定原 generation/holder，记录操作员 stop evidence 和 producer_lost，不恢复原回合。#13088 的 W1a 核验原 storage marker/身份与资源闭合；#13138 W1b 导出和验证离线 bundle；#13260 W1c 以 storage fence、原 request 和历史证据分阶段迁移，#13655 成功迁移清除旧诊断。#13135/#13194/#13354 以持久 lifecycle authority 排空、关闭、保留和删除 Session。#13673 已合入原 Hook 退休恢复：按保存的 drain receipt、stop evidence 和 exact holder 在同事务确认 stopped release，不替换 Hook 或重放未知效果。所有路径继续要求原资源证据，UNKNOWN 不换 Runtime 重放；本文未执行物理 reboot、迁移或部署故障门禁。
 
