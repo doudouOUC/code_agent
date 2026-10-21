@@ -1,8 +1,8 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## W43 当前恢复边界，2026-10-21
+## W43 当前恢复边界，2026-10-22
 
-main `6e6598e35c3c` 已合入 [#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md)：V11 在原 head 保存 wake 提示/退避，独立 scheduler 默认 2 秒扫描最多 8 个公共 ACTIVE、失租且未压缩的 Session，按 Session→head 锁序领取，数据库时间退避 30 秒。完整 journal 前缀校验六类 wake 的未结算 Turn，部分证明不可清提示；私有 CSI/活 writer 不参与，子会话检查 parent run。被动 load 与 boot/ref fencing 不启动无关前台工作，MQ watermark 不是恢复证明。
+main `fbeb188b160b` 已合入 [#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md)：V11 在原 head 保存 wake 提示/退避，独立 scheduler 默认 2 秒扫描最多 8 个公共 ACTIVE、失租且未压缩的 Session，按 Session→head 锁序领取，数据库时间退避 30 秒。完整 journal 前缀校验六类 wake 的未结算 Turn，部分证明不可清提示；私有 CSI/活 writer 不参与，子会话检查 parent run。被动 load 与 boot/ref fencing 不启动无关前台工作，MQ watermark 不是恢复证明。
 
 [#14679](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14679.md) 只为 monitor/child_agent/workflow 崩溃后结算的通知，先以固定摘要键持久入队后继 continuation，再 settle 旧 Turn；恢复原通知/结果，成功后按原 notification ID 消费 child，不重放原副作用。不扩展 channel/automation/session_message 的后继政策。
 
@@ -14,7 +14,13 @@ main `6e6598e35c3c` 已合入 [#14603](../../weekly-report/2026-10-19_2026-10-25
 
 [#14763](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14763.md) 对 cancel_unconfirmed 只查原 operation/Turn/prompt/完整 scope 的保留 settleTurn：cancelled 完成，completed/error 明确失败，只有停止请求、缺失/损坏/不可读仍不成功，不能重发取消。[#14764](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14764.md) 在原提交中持久 HOSTED_CLEANUP 引用，confirmed 仅移除相同 descriptor/binding/generation；旧 cleanup_head_revision 不覆盖当前 journal 时保守保留原 Runtime，不因 close/租约过期免债。
 
-[#14760](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14760.md) v2 状态快照保留原 epoch/lease/消息/幂等身份和单调序号，替换或 sync 失败停止当前 writer；不是裁剪恢复证据。[#14920](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 新检查读单调 live 模式、旧 Hook 按保存字段恢复，查询失败/倒退不执行；明确 Hook ask/Plan 退出不自动放行。[#14875](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14875.md) 的自动清 ma_* 只在 disposable MySQL Hosted IT profile 的类边界运行，不是生产维护命令；单 fork 禁并行，保留 Flyway/结构。主干 V1–V14，旧目录须按 canonical 校验迁移；本次未执行上述源码/数据库/原生/部署门禁。
+[#14760](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14760.md) v2 状态快照保留原 epoch/lease/消息/幂等身份和单调序号，替换或 sync 失败停止当前 writer；不是裁剪恢复证据。[#14920](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 新检查读单调 live 模式、旧 Hook 按保存字段恢复，查询失败/倒退不执行；明确 Hook ask/Plan 退出不自动放行。[#14875](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14875.md) 的自动清 ma_* 只在 disposable MySQL Hosted IT profile 的类边界运行，不是生产维护命令；单 fork 禁并行，保留 Flyway/结构。主干 V1–V15，旧目录须按 canonical 校验迁移；本次未执行上述源码/数据库/原生/部署门禁。
+
+[#14930](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14930.md) 将创建时 Skills 快照写入原 actor receipt 和资源，load/lifecycle/recovery 沿同一 sessionSkillsRef/digest，缺能力、来源变化或损坏拒绝，不重新发现宿主。[#14970](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14970.md) 的本地导入要求 OPEN/loopback/trusted actor 及 durable/verified recovery，固定原项目 native identity 和 actor key；两阶段重验/已授权根复用，不允许原键换路径或重放恢复撤权。
+
+[#15026](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15026.md) 普通 LOCAL/SSH_LOCAL 的 UNKNOWN 保留原 Runtime Session membership、不重放，但 READY binding 不因此排斥其它普通 Session。undo 只在无其它成员时置 exclusive，错误/未知保留并阻断后续执行/释放；原 binding stopped/lost 清理需原 operation/lease/fence、无未结算工作，只清原成员。operator recovery 仍要求唯一精确原 LOCAL 成员，歧义拒绝；存储维护必须全部 drain，cleanup debt 不因并发免除。CSI/resident 仍沿原单 Session/reservation。V15 部署必须先用旧 build 停新准入、完成/恢复并释放普通 holder，再停所有 writer/worker、验空 holder 后升级匹配版本，不自动转换未知 owner 或滚动混用。
+
+[#14928](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14928.md) 仅 open 候选：版本/摘要下载、worktree 外私有状态、signed loopback 前门与 H2 file 服务监督不证明生产/物理恢复。[#15040](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15040.md) daemon 前门/boot/信号集成已 closed 未合入，不能从后续纯 UI 推断已交付。[#15066](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15066.md) 故障门禁拟校验 V15 原成员、只等待 Broker owned/starting 原进程树并让无关 fixture 存活；[#15072](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15072.md) 拟以本地 stdio MCP/真实 worker/MySQL、受控模型证明两轮原连接复用与公开 close 后原进程退出，限 session-isolated fixture，不推广到共享/CSI。两者均 open，本次未运行。
 
 > **2026-10-12 实施快照：** #12839/#12869 已合入原终态/holder fence 与可信同宿主 reboot 清理；#12977 的离线 inspect/prepare/complete 固定原 generation/holder，记录操作员 stop evidence 和 producer_lost，不恢复原回合。#13088 的 W1a 核验原 storage marker/身份与资源闭合；#13138 W1b 导出和验证离线 bundle；#13260 W1c 以 storage fence、原 request 和历史证据分阶段迁移，#13655 成功迁移清除旧诊断。#13135/#13194/#13354 以持久 lifecycle authority 排空、关闭、保留和删除 Session。#13673 已合入原 Hook 退休恢复：按保存的 drain receipt、stop evidence 和 exact holder 在同事务确认 stopped release，不替换 Hook 或重放未知效果。所有路径继续要求原资源证据，UNKNOWN 不换 Runtime 重放；本文未执行物理 reboot、迁移或部署故障门禁。
 

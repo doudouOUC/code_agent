@@ -1,14 +1,14 @@
-# qwen-code PRs · 2026-10-19 ~ 2026-10-25 (W43 日更至 10-20)
+# qwen-code PRs · 2026-10-19 ~ 2026-10-25 (W43 日更至 10-21)
 
-> 本文件收录北京时间 2026-10-19 至 10-20 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-18T16:00:00Z, 2026-10-20T16:00:00Z)`，后续日更在本创建周累积。快照取北京时间 2026-10-21，主干 `6e6598e35c3c`。只按 author/createdAt，不因更新、关闭或合入时间补收；W42 后续合入条目仍归 W42，不计本周新增。merged 记录最终实现、closed 未合入只保留历史观察；PR 规模逐项累加且包含 rename/stacked 依赖，不是去重后的主干增量。本次仅文档核验，未运行源码或环境门禁。
+> 本文件收录北京时间 2026-10-19 至 10-21 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-18T16:00:00Z, 2026-10-21T16:00:00Z)`，后续日更在本创建周累积。快照取北京时间 2026-10-22，主干 `fbeb188b160b`。只按 author/createdAt，不因更新、关闭或合入时间补收；W42 后续合入条目仍归 W42，不计本周新增。merged 记录最终实现、closed 未合入只保留历史观察；PR 规模逐项累加且包含 rename/stacked 依赖，不是去重后的主干增量。本次仅文档核验，未运行源码或环境门禁。
 
-**主题**: Skills/MCP、wake 与取消/cleanup 恢复、工具详情与媒体保留、8 MiB 附件/文件引用、CSI 应用与空闲常驻退役、日志压缩/查询和 Java/CI 边界；节点安装方案关闭未合入
+**主题**: Skills/MCP、wake/取消/cleanup、附件保留与 CSI 退役、日志/CI；创建 Skills/项目导入/改名/统一导航与 V15 并发已合入，启动器与故障/MCP 门禁仍 open，集成候选关闭未合入
 
-**PR 统计**: 23 PRs - 22 merged / 0 open / 1 closed
-**当前已合并 PR 代码量**: +42,265 / -6,483，1171 个文件变更
-**全量代码量**: +47,995 / -6,576，1207 个文件变更
-**类型分布**: feat ×9, fix ×8, refactor ×2, docs ×1, test ×2, perf ×1
-**范围 (scope)**: managed-agent ×14, hosted ×1, runtime ×5, core ×2, ci ×1
+**PR 统计**: 32 PRs - 27 merged / 3 open / 2 closed
+**当前已合并 PR 代码量**: +52,316 / -7,576，1365 个文件变更
+**全量代码量**: +68,386 / -8,157，1502 个文件变更
+**类型分布**: feat ×16, fix ×8, refactor ×2, docs ×1, test ×4, perf ×1
+**范围 (scope)**: managed-agent ×21, hosted ×1, runtime ×5, core ×2, ci ×1, web-shell ×2
 
 ---
 
@@ -39,6 +39,15 @@
 | [#14875](https://github.com/QwenLM/qwen-code/pull/14875) | ✅ merged | @doudouOUC | fix(ci): isolate hosted MySQL integration test classes | +476/-16 | 11 | 10-20 08:47 | 10-20 23:33 |
 | [#14916](https://github.com/QwenLM/qwen-code/pull/14916) | ✅ merged | @doudouOUC | feat(managed-agent): expose session MCP catalog in WebShell | +924/-21 | 24 | 10-20 14:33 | 10-20 17:09 |
 | [#14920](https://github.com/QwenLM/qwen-code/pull/14920) | ✅ merged | @doudouOUC | feat(managed-agent): Support approval changes during a turn | +1788/-127 | 51 | 10-20 14:56 | 10-20 23:28 |
+| [#14928](https://github.com/QwenLM/qwen-code/pull/14928) | open | @doudouOUC | feat(managed-agent): add local serve with on-demand server download | +5959/-33 | 44 | 10-20 16:20 | - |
+| [#14930](https://github.com/QwenLM/qwen-code/pull/14930) | ✅ merged | @doudouOUC | feat(managed-agent): import enabled skills at session creation | +2554/-156 | 69 | 10-20 16:28 | 10-21 04:16 |
+| [#14970](https://github.com/QwenLM/qwen-code/pull/14970) | ✅ merged | @doudouOUC | feat(managed-agent): simplify existing local project onboarding | +1580/-187 | 28 | 10-21 00:20 | 10-21 01:29 |
+| [#14987](https://github.com/QwenLM/qwen-code/pull/14987) | ✅ merged | @doudouOUC | feat(web-shell): support managed session rename | +1789/-149 | 28 | 10-21 04:06 | 10-21 06:22 |
+| [#15026](https://github.com/QwenLM/qwen-code/pull/15026) | ✅ merged | @doudouOUC | feat(managed-agent): allow concurrent sessions on shared workspace storage | +993/-417 | 46 | 10-21 09:17 | 10-21 12:27 |
+| [#15040](https://github.com/QwenLM/qwen-code/pull/15040) | 🔴 closed | @doudouOUC | feat(managed-agent): unify daemon and managed workspace workflows | +4000/-413 | 50 | 10-21 11:04 | 10-21 12:53 |
+| [#15061](https://github.com/QwenLM/qwen-code/pull/15061) | ✅ merged | @doudouOUC | feat(web-shell): unify daemon and managed workspace navigation | +3135/-184 | 23 | 10-21 12:48 | 10-21 14:23 |
+| [#15066](https://github.com/QwenLM/qwen-code/pull/15066) | open | @doudouOUC | test(managed-agent): align Hosted fault gates with shared ownership | +64/-42 | 3 | 10-21 13:30 | - |
+| [#15072](https://github.com/QwenLM/qwen-code/pull/15072) | open | @doudouOUC | test(managed-agent): cover local MCP reuse and close | +317/-0 | 4 | 10-21 14:46 | - |
 
 ---
 
@@ -46,7 +55,7 @@
 
 | PR | 解决了什么问题 | 最终怎么实现（open/closed 只登记当前观察） | 对应 feature 文档 |
 |---|---|---|---|
-| [#14602](https://github.com/QwenLM/qwen-code/pull/14602) | Managed 输入框没有已发布 Skill 列表，用户输入 /skill 也不能保证先加载原定义中的指令。 | 已合入：可读会话按 pinned definition 返回目录；首轮解析前导 /skill，经原工具 Turn 加载后再调用模型，恢复不重新加载。 | 更新客户端与事件及总览；完整实现见 [implementations/pr-14602.md](implementations/pr-14602.md)。 |
+| [#14602](https://github.com/QwenLM/qwen-code/pull/14602) | Managed 输入框没有已发布 Skill 列表，用户输入 /skill 也不能保证先加载原定义中的指令。 | 已合入：原切片从 pinned definition 读目录，前导 /skill 经原工具 Turn 先加载；后续 #14930 优先原创建时不可变 Skills 快照，保留调用来源/恢复/预算，不运行时重扫宿主。 | 更新客户端与事件及总览；完整实现见 [implementations/pr-14602.md](implementations/pr-14602.md)。 |
 | [#14603](https://github.com/QwenLM/qwen-code/pull/14603) | wake 已提交或 MQ notice 已认领后 writer 退出，源 relay 不再重复通知，导致持久输入长期无人消费。 | 已合入：V11 为 head 增加提示/退避索引，独立扫描失租的公共 Session，验证完整 journal 前缀后被动重接；保留原工具恢复。 | 更新恢复与运维、存储与事件及总览；完整实现见 [implementations/pr-14603.md](implementations/pr-14603.md)。 |
 | [#14604](https://github.com/QwenLM/qwen-code/pull/14604) | 公开投影只保留工具摘要，刷新后展开 Read/Shell 缺参数或输出，空展示被误解为执行没有输出。 | 已合入：按 item/Session 授权，从原 journal/resource 有界回读 Read/Shell 详情，展开才请求，按版本隔离迟到结果。 | 更新客户端与事件、完整工具结果及总览；完整实现见 [implementations/pr-14604.md](implementations/pr-14604.md)。 |
 | [#14628](https://github.com/QwenLM/qwen-code/pull/14628) | 48 KiB 的附件输入预算容不下常见截图；只改上传校验会在持久化、模型请求、恢复或浏览器 pending 存储处再次失败。 | 已合入：分 kind 同步输入/模型请求/快照预算，并仅为 commit DTO 放宽 JSON；大 pending 写 IndexedDB 后保留原重试键。 | 更新客户端与事件、存储与事件、SDK及总览；完整实现见 [implementations/pr-14628.md](implementations/pr-14628.md)。 |
@@ -69,20 +78,29 @@
 | [#14875](https://github.com/QwenLM/qwen-code/pull/14875) | Hosted IT 在同一 fork 中共享 MySQL，前一个类留下 ma_* 行会让后续用例读到外来身份/状态并产生不稳定故障。 | 已合入：仅 hosted-harness-mysql 的 Failsafe 配置启用 JUnit extension 自动发现和 qwen.hosted.mysql.isolation，单 fork、禁并行。BeforeAll 只处理顶层类，强制 disposable mysql.url/user、校验 application catalog，再在同一连接暂关 FK、TRUNCATE 全部 ma_* 基表并 finally 恢复；不删除 Flyway history/表结构或其它表。 | 增量更新 恢复与运维、存储与事件及总览；完整实现见 [implementations/pr-14875.md](implementations/pr-14875.md)。 |
 | [#14916](https://github.com/QwenLM/qwen-code/pull/14916) | Managed 输入框无 Session MCP 菜单，用户看不到持久 catalog 的服务与发现状态；直接复用 daemon 目录又可能跨服务端或 Session 读到别的配置。 | 已合入：新增 WebShell POST session-mcp/query，强制当前 actor，复用可读 Session 的 ManagedMcpCatalogService 与持久 mcp_configuration/catalogRef，而非现场发现。结果展示 tools/resources/prompts 数量及 complete/partial/failed/stale，已释放连接仍按 stale，空状态不冒充连接成功。 | 增量更新 客户端与事件、SDK及总览；完整实现见 [implementations/pr-14916.md](implementations/pr-14916.md)。 |
 | [#14920](https://github.com/QwenLM/qwen-code/pull/14920) | 运行中或等待审批时只能先结束 Turn 才能改 default/auto-edit/yolo，且简单读取 mutable Session 模式会改变原 Hook/恢复的审计证据。 | 已合入：只有同时支持 approval-selection/1 与 live-approval-selection/1 的公开 bound files/1、shell/1、shell/2 可运行中改模式；原 owner/OPERATOR、expected revision、幂等 receipt 和 SQL 锁保留。Plan 切换及模型切换仍要求空闲；关闭、取消、恢复阻塞和冲突 operation 拒绝。用户 Turn 的原审批/Plan 快照不重写。 | 增量更新 客户端与事件、恢复与运维、存储与事件、SDK及总览；完整实现见 [implementations/pr-14920.md](implementations/pr-14920.md)。 |
+| [#14928](https://github.com/QwenLM/qwen-code/pull/14928) | 现有 Managed 部署要分别准备 Java、Harness、数据库和前端，个人本机试用缺少版本匹配、持久状态、受保护入口和统一退出的启动流程。 | open：显式 --managed 按 CLI 版本/平台下载校验包，私有状态锁与 signed loopback 前门监督 Harness/Java/H2；发行 workflow 未运行，不等于 main 或本地导入已可用。 | 更新Feature 总览、Managed Agents、客户端与事件、恢复与运维；完整观察见 [implementations/pr-14928.md](implementations/pr-14928.md)。 |
+| [#14930](https://github.com/QwenLM/qwen-code/pull/14930) | Managed 输入框原来只能使用已发布定义里的 Skills，用户当前 daemon Workspace 已启用的 Skills 无法带入新 Session；若运行时重扫宿主，又会让重试和恢复读到不同指令。 | 已合入：从所选可信 daemon Workspace 冻结启用 Skill 正文，原创建 receipt/ref/digest 与 pending 键贯穿 create/load/恢复；分别约束模型/用户调用和结果预算，不复制宿主 assets。 | 更新Feature 总览、Managed Agents、客户端与事件、存储与事件、恢复与运维、SDK；完整实现见 [implementations/pr-14930.md](implementations/pr-14930.md)。 |
+| [#14970](https://github.com/QwenLM/qwen-code/pull/14970) | 首页只能新建受控目录或复用已登记 Workspace，本机已有项目需要人工注册；直接接受客户端绝对路径则可能暴露服务端私有状态、重复登记或让重试指向另一目录。 | 已合入：默认关闭的 OPEN/loopback 单用户导入复核 actor、canonical 路径与 native identity；仓库外登记根，复用原授权 LOCAL，receipt 重试不复制项目或恢复撤权。 | 更新Feature 总览、Managed Agents、客户端与事件、恢复与运维；完整实现见 [implementations/pr-14970.md](implementations/pr-14970.md)。 |
+| [#14987](https://github.com/QwenLM/qwen-code/pull/14987) | 服务端已有受 fencing 保护的改名命令，WebShell 却没有入口或能力标记；仅改列表文案会在刷新后丢失，并可能让迟到响应污染别的会话。 | 已合入：WebShell adapter 复用原 fenced rename 命令；canRename、256 上限/IME、原标题重试键与 provider/Session lifetime 隔离，成功使用存储标题。 | 更新Feature 总览、Managed Agents、客户端与事件、SDK；完整实现见 [implementations/pr-14987.md](implementations/pr-14987.md)。 |
+| [#15026](https://github.com/QwenLM/qwen-code/pull/15026) | 普通 LOCAL/SSH_LOCAL 的单 holder 将整个存储串行化，一个 UNKNOWN 工具就阻塞其它独立 Session；简单去掉锁又会让释放、undo、维护和恢复误清别人的执行权。 | 已合入：V15 以原 Runtime Session 保存普通 LOCAL/SSH_LOCAL 并发成员；释放只清自身，undo 暂占独占且未知不解锁，维护仍需 drain。CSI 不扩并发，旧部署必须停写排空切换。 | 更新Feature 总览、Managed Agents、存储与事件、恢复与运维、JDBC 中文、JDBC English；完整实现见 [implementations/pr-15026.md](implementations/pr-15026.md)。 |
+| [#15040](https://github.com/QwenLM/qwen-code/pull/15040) | 单独 Managed 试用前门与普通 daemon UI 割裂，用户要切换执行模式和 Workspace；一次把启动器、签名前门、本地导入与 UI 导航合入又扩大集成和审计边界。 | 关闭未合入：stacked 于本地启动器，将 signed 前门挂普通 daemon 并统一 boot/信号/UI；后续 #15061 只合入独立 UI，不能将整个集成方案记为主干能力。 | 更新Feature 总览、Managed Agents、客户端与事件、恢复与运维；完整观察见 [implementations/pr-15040.md](implementations/pr-15040.md)。 |
+| [#15061](https://github.com/QwenLM/qwen-code/pull/15061) | 全局 Local/Managed tab 隐藏另一条链路，打开项目和新建任务时容易丢当前 Workspace 或落到默认目标；共享 UI 若不隔离 pending，还可能将未知请求转到另一后端。 | 已合入：侧栏同时显示 daemon/Managed Workspace，按原 provider/来源分组与分页；显式目标 get/权限复核，pending/dirty cwd 阻止误切，关闭对话框迟到创建不强制导航。无启动器集成。 | 更新Feature 总览、Managed Agents、客户端与事件；完整实现见 [implementations/pr-15061.md](implementations/pr-15061.md)。 |
+| [#15066](https://github.com/QwenLM/qwen-code/pull/15066) | V15 后普通执行权已在 Runtime Session 成员上，故障测试仍读单 storage holder 会得出错误结论；按整个 JVM 的 descendants 等待退出又会误伤并发测试的其它 worker。 | open：故障 probe 改验 V15 原成员；Broker close 仅等待 owned/starting 原进程树并断言无关 fixture 存活，不新增生产清理权限或宣称整 lane 已通过。 | 更新Feature 总览、Managed Agents、恢复与运维、存储与事件；完整观察见 [implementations/pr-15066.md](implementations/pr-15066.md)。 |
+| [#15072](https://github.com/QwenLM/qwen-code/pull/15072) | 已有 MCP stream/fault gate 缺少经公开发布定义、连续两个 Turn 复用原本地连接，再公开关闭并核对原进程/SQL 的完整正常路径，容易把请求返回当作实际释放。 | open：真实本地 stdio MCP/worker/MySQL、受控模型驱动两 Turn，验证原连接/结果/物理效果后公开 close 并核原进程退出；仅 session-isolated fixture，非 shared/CSI 验收。 | 更新Feature 总览、Managed Agents、恢复与运维；完整观察见 [implementations/pr-15072.md](implementations/pr-15072.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [Feature 总览](../../feature/README.md) | #14602(merged), #14603(merged), #14604(merged), #14628(merged), #14639(merged), #14679(merged), #14695(merged), #14698(merged), #14704(merged), #14710(merged), #14758(merged), #14760(merged), #14761(closed), #14762(merged), #14763(merged), #14764(merged), #14765(merged), #14766(merged), #14767(merged), #14816(merged), #14875(merged), #14916(merged), #14920(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #14602(merged), #14604(merged), #14628(merged), #14639(merged), #14695(merged), #14704(merged), #14763(merged), #14916(merged), #14920(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [Managed Agents](../../feature/managed-agents/README.md) | #14602(merged), #14603(merged), #14604(merged), #14628(merged), #14639(merged), #14679(merged), #14695(merged), #14698(merged), #14704(merged), #14710(merged), #14758(merged), #14760(merged), #14761(closed), #14762(merged), #14763(merged), #14764(merged), #14765(merged), #14766(merged), #14767(merged), #14816(merged), #14875(merged), #14916(merged), #14920(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #14603(merged), #14679(merged), #14695(merged), #14698(merged), #14758(merged), #14760(merged), #14761(closed), #14763(merged), #14764(merged), #14765(merged), #14875(merged), #14920(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [存储与事件](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #14603(merged), #14628(merged), #14698(merged), #14710(merged), #14760(merged), #14762(merged), #14764(merged), #14765(merged), #14766(merged), #14767(merged), #14816(merged), #14875(merged), #14920(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [Feature 总览](../../feature/README.md) | #14602(merged), #14603(merged), #14604(merged), #14628(merged), #14639(merged), #14679(merged), #14695(merged), #14698(merged), #14704(merged), #14710(merged), #14758(merged), #14760(merged), #14761(closed), #14762(merged), #14763(merged), #14764(merged), #14765(merged), #14766(merged), #14767(merged), #14816(merged), #14875(merged), #14916(merged), #14920(merged), #14928(open), #14930(merged), #14970(merged), #14987(merged), #15026(merged), #15040(closed), #15061(merged), #15066(open), #15072(open) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #14602(merged), #14604(merged), #14628(merged), #14639(merged), #14695(merged), #14704(merged), #14763(merged), #14916(merged), #14920(merged), #14928(open), #14930(merged), #14970(merged), #14987(merged), #15040(closed), #15061(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [Managed Agents](../../feature/managed-agents/README.md) | #14602(merged), #14603(merged), #14604(merged), #14628(merged), #14639(merged), #14679(merged), #14695(merged), #14698(merged), #14704(merged), #14710(merged), #14758(merged), #14760(merged), #14761(closed), #14762(merged), #14763(merged), #14764(merged), #14765(merged), #14766(merged), #14767(merged), #14816(merged), #14875(merged), #14916(merged), #14920(merged), #14928(open), #14930(merged), #14970(merged), #14987(merged), #15026(merged), #15040(closed), #15061(merged), #15066(open), #15072(open) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #14603(merged), #14679(merged), #14695(merged), #14698(merged), #14758(merged), #14760(merged), #14761(closed), #14763(merged), #14764(merged), #14765(merged), #14875(merged), #14920(merged), #14928(open), #14930(merged), #14970(merged), #15026(merged), #15040(closed), #15066(open), #15072(open) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [存储与事件](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #14603(merged), #14628(merged), #14698(merged), #14710(merged), #14760(merged), #14762(merged), #14764(merged), #14765(merged), #14766(merged), #14767(merged), #14816(merged), #14875(merged), #14920(merged), #14930(merged), #15026(merged), #15066(open) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
 | [完整工具结果 English](../../feature/managed-agents/managed-agent-tool-result-artifacts.md) | #14604(merged), #14762(merged), #14764(merged), #14766(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
 | [完整工具结果](../../feature/managed-agents/managed-agent-tool-result-artifacts.zh-CN.md) | #14604(merged), #14762(merged), #14764(merged), #14766(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [SDK](../../feature/sdk.md) | #14628(merged), #14704(merged), #14710(merged), #14916(merged), #14920(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #14695(merged), #14698(merged), #14710(merged), #14758(merged), #14761(closed), #14764(merged), #14765(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
-| [JDBC English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #14695(merged), #14698(merged), #14710(merged), #14758(merged), #14761(closed), #14764(merged), #14765(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [SDK](../../feature/sdk.md) | #14628(merged), #14704(merged), #14710(merged), #14916(merged), #14920(merged), #14930(merged), #14987(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #14695(merged), #14698(merged), #14710(merged), #14758(merged), #14761(closed), #14764(merged), #14765(merged), #15026(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
+| [JDBC English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #14695(merged), #14698(merged), #14710(merged), #14758(merged), #14761(closed), #14764(merged), #14765(merged), #15026(merged) | 同步最终实现/关闭观察及原验证边界；保留创建周与有效历史方案。 |
 
-_按个人 PR 口径更新于 2026-10-21；文档审计不替代源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型及部署验收。_
+_按个人 PR 口径更新于 2026-10-22；文档审计不替代源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型及部署验收。_
