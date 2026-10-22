@@ -1,8 +1,12 @@
 # Managed Agent Tool Results and Durable Artifacts
 
-## Saved Tool Details, 2026-10-21
+## Saved Tool Details, 2026-10-23
 
-Main `6e6598e35c3c` includes [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md). Expanded Read/Shell details trace the original item/Turn/prompt/call, journal source sequence and committed message resources without re-executing tools. Authorization is checked before and after the read; digests and message identities are verified. The scan is bounded to 512 pages and 8 MiB, and returns bounded arguments/output or structured shell_result with truncation/outcome, not an unlimited artifact download.
+[#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) aligns managed-checkpoint publication/ref/native readback at 1 MiB; ordinary refs stay at 64 KiB. [#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) archives only the settled, consumed prefix: root≤1 MiB, page≤48 KiB/32 entries, chain≤4096 pages/64 MiB. Identity, digest and committed JOURNAL closure are mandatory; blob existence is not commit proof and uncertain commits never advance the cache. Recovery references remain protected, with no new GC or unlimited read guarantee.
+
+[#15100](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15100.md) reading exports contain a fixed-watermark public transcript and tool previews, not arguments, private full artifacts or secrets. The 32 MiB collection/render cap and safe HTML/image policy remain. Exports are not backup/restore packages; complete results still require the authorized reader.
+
+Main `c61044fae46c` includes [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md). Expanded Read/Shell details trace the original item/Turn/prompt/call, journal source sequence and committed message resources without re-executing tools. Authorization is checked before and after the read; digests and message identities are verified. The scan is bounded to 512 pages and 8 MiB, and returns bounded arguments/output or structured shell_result with truncation/outcome, not an unlimited artifact download.
 
 Only expanded terminal tools with missing fields trigger loading. Loader/call/status/revision fence cached and late results; actual empty output remains distinct from unavailable output. Publication, native receipts and physical-stop proofs are unchanged. This documentation run did not execute source, browser, database or deployment acceptance gates.
 
@@ -28,7 +32,7 @@ Status: target design with merged slices described above; this document does not
 
 The source records distinguish historical real-bucket acceptance from rebased local immutable-object fixtures. This run inspected code/callers/tests without rerunning real OSS, Linux cuts, enabled Monitor/background cgroups, load or cross-host gates. Merged code does not establish those acceptance results.
 
-V68 async/V69 retention are legacy migration history; current main uses the 32-table canonical V1–V10 catalog, not those old deployment numbers. All-server/writer, original lock-order and independent default-off qualification still apply; a document or merge does not enable admission/cleanup.
+V68 async/V69 retention are legacy migration history; current main uses the 32-table canonical V1–V17 catalog, not those old deployment numbers. All-server/writer, original lock-order and independent default-off qualification still apply; a document or merge does not enable admission/cleanup.
 
 ### Publication, Storage and Cancellation Receipts, 2026-10-19
 

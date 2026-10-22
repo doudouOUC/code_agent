@@ -1,12 +1,16 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### W43 当前协议与 Java 包边界，2026-10-22
+### W43 当前协议与 Java 包边界，2026-10-23
 
-main `fbeb188b160b` 已合入 [#14628](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md)：含附件的完整编码输入 8 MiB、hosted-model-request 32 MiB，普通 inline resource 仍 64 KiB；仅内部 commit DTO mapper 放宽 base64 字符串。[#14704](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 GIF 签名与 image/jpg→image/jpeg，保留原 bytes/digest、图片模型能力和不支持类型拒绝。下方 48 KiB/V10/OpenAPI 1.65.0 是 W42 快照，不是当前上限/版本。
+[#15100](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15100.md) WebShell lifecycle/provider 与 reading export 复用原 operation/snapshot 权威；[#15104](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15104.md) 增显式压缩提交/查询及 Hosted client DTO，expectedCompactionRevision 与原 idempotencyKey 不可省略，压缩完成须回读 summary revision。[#15119](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15119.md) MCP 管理闭合请求/响应只传管理员 pin 与原 command/revision，不传配置秘密；[#15131](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15131.md) 增 recovery status/recheck、精确 target 和 recoveryCleanupOnly，不能把只清理 load 当普通执行。
+
+[#15171](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15171.md) Java create/load 与 TS 原 admission 传 publicChildAgentsVersion，V17 旧行默认0，新 root 资格由服务端决定。子 launch 固定实际 prepared model/auth/endpoint/provider pin、当前批准模式/revision、原 Skills ref，缺 pin 或版本不匹配拒绝，子不可手动改配置。新增协议消费者必须匹配升级，保留取消/cleanup 原权威；没有本次跨语言运行验证。
+
+main `c61044fae46c` 已合入 [#14628](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md)：含附件的完整编码输入 8 MiB、hosted-model-request 32 MiB，普通 inline resource 仍 64 KiB；仅内部 commit DTO mapper 放宽 base64 字符串。[#14704](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 GIF 签名与 image/jpg→image/jpeg，保留原 bytes/digest、图片模型能力和不支持类型拒绝。下方 48 KiB/V10/OpenAPI 1.65.0 是 W42 快照，不是当前上限/版本。
 
 [#14710](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 不拆 artifact 或部署：共享请求模型/异常离开 HTTP api，SQL 聚合在 persistence，业务职责包与 Broker provisioning/transport/security 分层；pom/launcher/测试和文档路径同步更新。按源 AGENTS 安装当前 sdk-java/qwencode 后使用 packages/managed-agent-server 的 JDK 21 Maven gate，原生测试先构建 Core/CLI。本次未运行源码、JAR、数据库或浏览器验收，源设计的验证报告不挪用到本次快照。
 
-[#14916](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14916.md) 在 WebShell provider/client 增 mcp.list 与 actor 保护 POST session-mcp/query，返回保存目录而非直接连接，生成 types/契约同步。[#14920](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 增 liveSupported 与 live-approval-selection/1（且要求 approval-selection/1）；内部 approval:query 使用原 writer token/generation，返回 mode/revision 或不适用 null。消费方串行检查单调 revision，不以新模式重写旧 Turn/Hook；Plan/模型仍空闲、旧 host 缺能力保留原行为。当前服务目录 V1–V15、32 业务表，公共 SDK 身份/原 receipt 权威不变。本次未运行 SDK、跨语言契约或浏览器门禁。
+[#14916](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14916.md) 在 WebShell provider/client 增 mcp.list 与 actor 保护 POST session-mcp/query，返回保存目录而非直接连接，生成 types/契约同步。[#14920](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14920.md) 增 liveSupported 与 live-approval-selection/1（且要求 approval-selection/1）；内部 approval:query 使用原 writer token/generation，返回 mode/revision 或不适用 null。消费方串行检查单调 revision，不以新模式重写旧 Turn/Hook；Plan/模型仍空闲、旧 host 缺能力保留原行为。当前服务目录 V1–V17、32 业务表，公共 SDK 身份/原 receipt 权威不变。本次未运行 SDK、跨语言契约或浏览器门禁。
 
 [#14930](../weekly-report/2026-10-19_2026-10-25/implementations/pr-14930.md) 在 Java CreateHarnessSession/LoadHarnessSession 与 TypeScript daemon 请求增加可选 sessionSkillsRef，Workspace-qualified workspaceSkillsSnapshot 只从可信 active generation 导出启用正文。Java receipt/资源固定创建快照，Hosted session-skills/2 缺能力拒绝；不重扫最新宿主或把 assets/base_directory 当作可执行迁移。model_invocable/user_invocable 与 clientInitiatedSkills 保持原调用来源，模型结果预算在保存与恢复共用。
 

@@ -1,10 +1,18 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## W43 当前存储基线，2026-10-22
+## W43 当前存储基线，2026-10-23
 
-main `fbeb188b160b` 为 canonical V1–V15、32 业务表。[#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md) 的 V11 只扩 ma_session_head：wake_pending/wake_head_revision/wake_retry_at、生成 wake_scan_pending 及索引；提交 wake 与提示同事务，完整同 revision 证明才能清提示。扫描按 Session→head 锁序，公共失租/未压缩资格和持久退避不替代工具终态证明；V10/witness 10 的下方段落是 W42 基线。
+[#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) 将 managed-checkpoint 根/ref/native readback 对齐 1 MiB；普通资源 64 KiB、input 8 MiB、Skills 2 MiB、model-request 32 MiB 独立。[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) managed-checkpoint-paged/1 保持逻辑 v1，已 settled+consumed 连续前缀按 32 项归档，页≤48 KiB、链≤4096 页/64 MiB，根≤1 MiB；未结算不归档。页先发布、journal 确认后才推进 cache，旧页必须有同 scope/digest 且 revision≤ceiling 的已提交 JOURNAL 引用。全链 hydrate 不是常数内存，无新 GC 或 DDL。
 
-[#14628](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md) 按资源 kind 保留 managed-input 8 MiB、hosted-model-request 32 MiB、其它 inline 64 KiB；Java inline transaction 40 MiB、恢复快照总计 128 MiB，仅内部 commit DTO 放宽对应 JSON 字符串。完整附件输入仍含文本/base64 开销，恢复读取原 accepted 字节。[#14710](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 将 SQL 聚合移到 managedagent.persistence，保留包内锁/事务与同一 Maven/部署，不改 DDL/OpenAPI 资源。
+[#15104](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15104.md) V16 只扩 CONTEXT_COMPRESSION operation kind；history_maintenance 保存 frozen input/pin、candidate、Hook 与最终 context.compacted/summary ref，公开 transcript/原 journal 不删。[#15171](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15171.md) V17 仅增 ma_session.public_child_agents_version 默认 0/约束 0..1，旧会话不 retro-enable，仍 32 业务表；原 childRun input 引用保存 publicLaunch/Skills，取消 fence 先于 abort。
+
+[#15119](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15119.md) 无新表：config_install 的 hosted-mcp-settings 保存 revision+1/previousRecordRef/完整原命令，32 个选择/16 enabled，先持久选择再物理连接变化。原 catalog/operation/结果引用保留。[#15131](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15131.md) recovery readiness 以连续原 journal/稳定 head/同一 committedSequence 证明，不能因无 SQL Turn 或已终态删 cleanup 债务。[#15100](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15100.md) 阅读导出复用不可变 snapshot/lease，固定 watermark 并拒绝分页漂移，非数据库备份。
+
+[#15200](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15200.md) 仅测试/CI：mysql-integration 默认 1 fork，CI 两 fork 各用独立 server，而不是同 server 分 schema；packet≥128 MiB，URL 在 launcher 早期路由，始终清两个 owned 容器。
+
+main `c61044fae46c` 为 canonical V1–V17、32 业务表。[#14603](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14603.md) 的 V11 只扩 ma_session_head：wake_pending/wake_head_revision/wake_retry_at、生成 wake_scan_pending 及索引；提交 wake 与提示同事务，完整同 revision 证明才能清提示。扫描按 Session→head 锁序，公共失租/未压缩资格和持久退避不替代工具终态证明；V10/witness 10 的下方段落是 W42 基线。
+
+[#14628](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md) 按资源 kind 保留 managed-input 8 MiB、hosted-model-request 32 MiB、checkpoint 1 MiB、其它普通 inline 64 KiB；Java inline transaction 40 MiB、恢复快照总计 128 MiB，仅内部 commit DTO 放宽对应 JSON 字符串。完整附件输入仍含文本/base64 开销，恢复读取原 accepted 字节。[#14710](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14710.md) 将 SQL 聚合移到 managedagent.persistence，保留包内锁/事务与同一 Maven/部署，不改 DDL/OpenAPI 资源。
 
 [#14698](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14698.md) 的 V12 已合入，在原 ma_operation 加阶段/版本/frozen/cut/receipt 及唯一目标约束；当前升级仍须先验证 canonical catalog。库存 4096 行/32 MiB、schema drift/引用闭包均为拒绝边界。旧 DATETIME catalog 仍需新库或独立迁移，不能 repair 绕过验证。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
 
@@ -18,7 +26,7 @@ main `fbeb188b160b` 为 canonical V1–V15、32 业务表。[#14603](../../weekl
 
 [#15026](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15026.md) 的 V15__workspace_execution_members.sql 只扩 ma_runtime_session.execution_storage_key/execution_exclusive 和索引，仍 32 业务表。普通 LOCAL/SSH_LOCAL 以原 binding/generation/Runtime Session 保存多个共享执行成员，release 只清自身；无 legacy holder/maintenance 才准入。undo 要求其它当前成员先释放，置自身 exclusive 后排斥新 acquire；失败/未知保留独占并拒绝 execute/release，不靠租约到期抹去。注册/fence/迁移/maintenance/child 准入仍需成员排空；CSI 原 RESERVED/single unfinished Session 不变且库存要求新字段 null/false。
 
-canonical V1–V14 升 V15 必须 drained cutover，不能混版本滚动：旧 build 停新 Turn、恢复/释放普通 holder，再停 Server/Broker/Harness/worker/外部 writer，验证非维护 LOCAL/SSH holder_key 全空后迁移并启匹配版本。未知 writer 保留旧环境，不手清 ownership；无 singleton 转换/回退 authority。[#15066](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15066.md) 测试仍 open，拟将故障账本改为原成员断言而非 singleton holder，不能把其测试报告算作主干门禁已通过。
+canonical V1–V14 升 V15 必须 drained cutover，不能混版本滚动：旧 build 停新 Turn、恢复/释放普通 holder，再停 Server/Broker/Harness/worker/外部 writer，验证非维护 LOCAL/SSH holder_key 全空后迁移并启匹配版本。未知 writer 保留旧环境，不手清 ownership；无 singleton 转换/回退 authority。[#15066](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15066.md) 测试已合入，故障账本按原成员断言而非 singleton holder；未在本次运行，不能把测试存在算作门禁已通过。
 
 > **2026-10-19 W42 新库基线归档（主干 `79362c2ecc21`）：** [#14069](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-14069.md) 的 32 表与 [#13996](../../weekly-report/2026-10-12_2026-10-18/implementations/pr-13996.md) canonical V2 私有 authority 保持；当前目录 V1–V10，V10 增加独立 Plan/Turn 快照，不新增业务表。以下 2026-09-20/21 分支演进保留为历史；fresh database 基线不证明 legacy 迁移、恢复全链路或生产切换完成。
 

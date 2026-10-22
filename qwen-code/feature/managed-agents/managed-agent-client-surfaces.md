@@ -1,8 +1,14 @@
 # Managed 普通客户端、交互与事件投影
 
-## W43 当前客户端增量，2026-10-22
+## W43 当前客户端增量，2026-10-23
 
-main `fbeb188b160b` 已合入 [#14602](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14602.md)：原切片目录来自可读 Session 的 pinned definition（当前优先创建快照，见后续增量），菜单懒加载；前导有效 /skill 通过原工具 Turn 在首次模型请求前加载，恢复不重复，静态加载允许 Plan。[#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md) 的 Read/Shell 详情展开后才请求，按原 item/Turn/call 追溯持久 journal/resource，读取前后授权，8 MiB/512 页硬预算；loader/call/status/revision 隔离迟到响应，返回有界预览与结构化 Shell outcome，不伪造全文。
+[#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) 恢复阻塞时保留取消、禁新输入；[#15131](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15131.md) 查询 recovering/awaiting_evidence/cleanup_pending/ready/operator_required，可见时 5 秒观察精确原 Turn，切换 abort，recheck 不允许换 prompt 或重放未知工具。不可恢复时只生成有界、可审阅文字 handoff，不自动执行或迁移 checkpoint。[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) 统一运行反馈，完成后停止 spinner，不改变执行权威。
+
+[#15100](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15100.md) 生命周期操作发送前存原意图，未知响应沿原键/operationId；close_archive 先确认 close，再走独立 archive，202 不算完成。archive filter 在 SQL keyset 固定；阅读导出固定 lastSequence/watermark，拒绝跨 scope/重复分页，32 MiB 上限及安全 HTML/图片策略保留。它不是备份或工具全文导出。[#15104](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15104.md) 手动压缩保存原 expectedCompactionRevision/key，未知结果不换键；完成后需 summary revision 追齐才解除 pending，noop/失败明确反馈。
+
+[#15119](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15119.md) 在 #14916 只读目录之上增加独立管理页，空闲 OPERATOR 可 add/edit/remove/enable/disable/reload/restart 管理员已发布 pin，不输入 command/env/secrets；原命令按 provider/client/Workspace/Session 保存并验证 action/server/revision，恢复只继续原操作。[#15171](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15171.md) 新合资格 root 可一层委派，任务详情/父级审批携带实际 childSessionId、stopRequested、approvalMode，activeChildCount 来自 SQL；子视图只读，委派执行仍可经原授权工具修改共享文件，但不能独立发 Turn 或改模型/审批/Plan/cwd，stopRequested 不代表已停。
+
+main `c61044fae46c` 已合入 [#14602](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14602.md)：原切片目录来自可读 Session 的 pinned definition（当前优先创建快照，见后续增量），菜单懒加载；前导有效 /skill 通过原工具 Turn 在首次模型请求前加载，恢复不重复，静态加载允许 Plan。[#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md) 的 Read/Shell 详情展开后才请求，按原 item/Turn/call 追溯持久 journal/resource，读取前后授权，8 MiB/512 页硬预算；loader/call/status/revision 隔离迟到响应，返回有界预览与结构化 Shell outcome，不伪造全文。
 
 [#14628](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14628.md) 将含附件的完整规范化编码输入提升到 8 MiB（不是单文件原始大小），大 pending 先保存 IndexedDB，sessionStorage 留原 key 的引用，保存失败不换键发送。[#14704](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14704.md) 同步 Java/Hosted/WebShell 接受 GIF87a/GIF89a 并把 image/jpg 规范为 image/jpeg；canonical base64/签名、模型 image 能力和原输入摘要保留，不增加 URL/任意宿主文件访问。
 
@@ -16,9 +22,9 @@ main `fbeb188b160b` 已合入 [#14602](../../weekly-report/2026-10-19_2026-10-25
 
 [#14930](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14930.md) 扩展 #14602：新建时从显式选择的可信 daemon/Workspace 取启用 Skills 正文，正式提交重新快照，原 pending key/body 固定相同来源字节；存入 SESSION_CREATE_ACTOR receipt，并用 session-skills/2 的原 sessionSkillsRef 沿 create/load/恢复。现有会话不随宿主配置变化，无快照才读原定义。model_invocable/user_invocable 分别约束模型与用户；不复制脚本/assets/宿主路径，原 Hook/Skill 独立批次和模型结果预算保留。
 
-[#14970](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14970.md) 默认关闭、仅 OPEN/loopback/trusted actor 的单用户 LOCAL 导入；绝对路径 canonical 校验及原 native identity 两次复核，仓库外根登记/原授权根复用，不复制项目。[#14987](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14987.md) 改名 adapter 复用既有 creator/OPERATOR、receipt/revision/fenced title delivery，ACTIVE + title 能力才广告 canRename；UI 256 上限/IME/busy，未知结果重试同标题原键，切 provider/Session 隔离迟到响应。
+[#14970](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14970.md) 默认关闭、原切片仅 OPEN/loopback/trusted actor 的单用户 LOCAL 导入（当前 #14928 也允许 signed loopback）；绝对路径 canonical 校验及原 native identity 两次复核，仓库外根登记/原授权根复用，不复制项目。[#14987](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14987.md) 改名 adapter 复用既有 creator/OPERATOR、receipt/revision/fenced title delivery，ACTIVE + title 能力才广告 canRename；UI 256 上限/IME/busy，未知结果重试同标题原键，切 provider/Session 隔离迟到响应。
 
-[#15061](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15061.md) 最终只是 WebShell：同 sidebar 展示 daemon 与 Managed 分组，按 provider.storageKey/Workspace 分页/搜索/展开；显式目标必须 get 并验证原 ID/canCreateSession，失败不静默默认。dirty cwd/pending/编码/未知创建阻止误切；已有会话只开创建对话框，关闭后的迟到成功不强制导航。执行选择不统一后端权限或主机路径。[#14928](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14928.md) 的 signed 本机 launcher 仍 open；[#15040](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15040.md) 统一前门/boot/信号集成已 closed 未合入，不能由导航已合入推断整条部署已存在。
+[#15061](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15061.md) 最终只是 WebShell：同 sidebar 展示 daemon 与 Managed 分组，按 provider.storageKey/Workspace 分页/搜索/展开；显式目标必须 get 并验证原 ID/canCreateSession，失败不静默默认。dirty cwd/pending/编码/未知创建阻止误切；已有会话只开创建对话框，关闭后的迟到成功不强制导航。执行选择不统一后端权限或主机路径。[#14928](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14928.md) 现已合入同一普通 daemon 前门/boot/延迟 ACP、安全模型目录与 signed loopback 导入，部署仍需精确资产/Java21/私有状态。[#15040](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15040.md) 仅保留关闭历史，不将 UI 或最终启动器交付记到该 closed PR。
 
 > **2026-10-19 W42 归档快照（主干 `79362c2ecc21`）：** 既有客户端能力保持；#14484 已保存定义审批、#14526 单次自动化取消、#14531 Plan/内联附件现已合入。#14290 搜索、#14487 私有 CSI 文件、#14523 回执完整恢复及 #14599 创建预热仍 open。以下历史设计不表示全部交付；本次未运行组件/浏览器或真实宿主门禁。
 

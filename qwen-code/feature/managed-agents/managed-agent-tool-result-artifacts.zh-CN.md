@@ -1,8 +1,12 @@
 # Managed Agent 完整工具结果与持久产物
 
-## W43 已存工具详情，2026-10-21
+## W43 已存工具详情，2026-10-23
 
-main `6e6598e35c3c` 已合入 [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md)：Read/Shell 展开详情从原 ma_message→Turn/prompt/call、journal source sequence 和 committed message resource 读取，不重新执行工具。前后可读权限、digest/原消息身份验证，最多 512 页和 8 MiB；参数与 output/shell_result 有界返回并保留截断/outcome，不是完整 Artifact 下载替代。
+[#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) managed-checkpoint 与 publication/ref/native readback 对齐 1 MiB，普通 ref 仍 64 KiB；[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) 物理分页只归档已结算消费前缀，根≤1 MiB、页≤48 KiB/32项、链≤4096页/64 MiB，验证完整身份/摘要及已提交 JOURNAL 闭包。页存在不是提交证据，未知提交不推进 cache；保留所有恢复引用，不是 GC 或无限读取。
+
+[#15100](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15100.md) reading export 只输出固定水位公开 transcript 与工具 preview，不含参数、完整私有 Artifact 或秘密；32 MiB 收集/渲染上限和安全 HTML/图片策略保留。它不是备份或恢复包，完整结果仍经原授权 reader。
+
+main `c61044fae46c` 已合入 [#14604](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-14604.md)：Read/Shell 展开详情从原 ma_message→Turn/prompt/call、journal source sequence 和 committed message resource 读取，不重新执行工具。前后可读权限、digest/原消息身份验证，最多 512 页和 8 MiB；参数与 output/shell_result 有界返回并保留截断/outcome，不是完整 Artifact 下载替代。
 
 前端只为展开的终态且缺字段的工具加载，loader/call/status/revision 限定缓存与迟到结果，保留实际空输出和不可获取的区别。原 publication、capture、原生 receipt 与物理停止闭包不因展示详情而放松。本次仅独立核对 diff、changed files、关键调用与主干，未运行源码、浏览器、真实 MySQL/OSS/CSI/SSH/模型或部署验收。
 
@@ -28,7 +32,7 @@ main `6e6598e35c3c` 已合入 [#14604](../../weekly-report/2026-10-19_2026-10-25
 
 源码记录的历史真实 bucket 验收与 rebase 后本地不可变对象装置分开；本次只核对代码/caller/回归入口，没有复跑真实 OSS、Linux cuts、Monitor/background cgroup 或负载/跨主机门禁。代码合入不等于这些验收已通过。
 
-此前 V68 async / V69 retention 是 legacy 迁移历史；当前 main 已采用 32 表 canonical V1–V10，不能沿旧编号部署。全部 server/writer、原锁序与独立 default-off 开启门槛仍需验证，不因文档或合入自动启用。
+此前 V68 async / V69 retention 是 legacy 迁移历史；当前 main 已采用 32 表 canonical V1–V17，不能沿旧编号部署。全部 server/writer、原锁序与独立 default-off 开启门槛仍需验证，不因文档或合入自动启用。
 
 ### 2026-10-19 发布、存储与取消回执增量
 

@@ -25,14 +25,22 @@
 | [#14875](https://github.com/QwenLM/qwen-code/pull/14875) | ✅ merged | fix(ci): isolate hosted MySQL integration test classes | [pr-14875.md](pr-14875.md) |
 | [#14916](https://github.com/QwenLM/qwen-code/pull/14916) | ✅ merged | feat(managed-agent): expose session MCP catalog in WebShell | [pr-14916.md](pr-14916.md) |
 | [#14920](https://github.com/QwenLM/qwen-code/pull/14920) | ✅ merged | feat(managed-agent): Support approval changes during a turn | [pr-14920.md](pr-14920.md) |
-| [#14928](https://github.com/QwenLM/qwen-code/pull/14928) | open | feat(managed-agent): add local serve with on-demand server download | [pr-14928.md](pr-14928.md) |
+| [#14928](https://github.com/QwenLM/qwen-code/pull/14928) | ✅ merged | feat(managed-agent): Start daemon and Managed locally with one command | [pr-14928.md](pr-14928.md) |
 | [#14930](https://github.com/QwenLM/qwen-code/pull/14930) | ✅ merged | feat(managed-agent): import enabled skills at session creation | [pr-14930.md](pr-14930.md) |
 | [#14970](https://github.com/QwenLM/qwen-code/pull/14970) | ✅ merged | feat(managed-agent): simplify existing local project onboarding | [pr-14970.md](pr-14970.md) |
 | [#14987](https://github.com/QwenLM/qwen-code/pull/14987) | ✅ merged | feat(web-shell): support managed session rename | [pr-14987.md](pr-14987.md) |
 | [#15026](https://github.com/QwenLM/qwen-code/pull/15026) | ✅ merged | feat(managed-agent): allow concurrent sessions on shared workspace storage | [pr-15026.md](pr-15026.md) |
 | [#15040](https://github.com/QwenLM/qwen-code/pull/15040) | 🔴 closed | feat(managed-agent): unify daemon and managed workspace workflows | [pr-15040.md](pr-15040.md) |
 | [#15061](https://github.com/QwenLM/qwen-code/pull/15061) | ✅ merged | feat(web-shell): unify daemon and managed workspace navigation | [pr-15061.md](pr-15061.md) |
-| [#15066](https://github.com/QwenLM/qwen-code/pull/15066) | open | test(managed-agent): align Hosted fault gates with shared ownership | [pr-15066.md](pr-15066.md) |
+| [#15066](https://github.com/QwenLM/qwen-code/pull/15066) | ✅ merged | test(managed-agent): align Hosted fault gates with shared ownership | [pr-15066.md](pr-15066.md) |
 | [#15072](https://github.com/QwenLM/qwen-code/pull/15072) | open | test(managed-agent): cover local MCP reuse and close | [pr-15072.md](pr-15072.md) |
+| [#15094](https://github.com/QwenLM/qwen-code/pull/15094) | ✅ merged | fix(managed): Align checkpoint budgets and surface recovery blocks | [pr-15094.md](pr-15094.md) |
+| [#15100](https://github.com/QwenLM/qwen-code/pull/15100) | ✅ merged | feat(managed-agent): Add session lifecycle UI and reading exports | [pr-15100.md](pr-15100.md) |
+| [#15104](https://github.com/QwenLM/qwen-code/pull/15104) | ✅ merged | feat(managed-agent): Add durable manual context compression | [pr-15104.md](pr-15104.md) |
+| [#15119](https://github.com/QwenLM/qwen-code/pull/15119) | ✅ merged | feat(managed-agent): manage MCP servers without recreating sessions | [pr-15119.md](pr-15119.md) |
+| [#15131](https://github.com/QwenLM/qwen-code/pull/15131) | ✅ merged | feat(managed-agent): Safely settle recovery and continue sessions | [pr-15131.md](pr-15131.md) |
+| [#15170](https://github.com/QwenLM/qwen-code/pull/15170) | ✅ merged | feat(managed-agent): Page checkpoint history and improve session feedback | [pr-15170.md](pr-15170.md) |
+| [#15171](https://github.com/QwenLM/qwen-code/pull/15171) | ✅ merged | feat(managed-agent): Enable public subagent delegation by default | [pr-15171.md](pr-15171.md) |
+| [#15200](https://github.com/QwenLM/qwen-code/pull/15200) | ✅ merged | perf(ci): Parallelize database integration tests and remove redundant work | [pr-15200.md](pr-15200.md) |
 
-_按个人 PR 口径更新于 2026-10-22_
+_按个人 PR 口径更新于 2026-10-23_
