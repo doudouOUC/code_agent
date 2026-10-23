@@ -1,6 +1,14 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## W43 当前恢复边界，2026-10-23
+## 当前兼容收敛与池候选，2026-10-24
+
+main `eeb853048aa3` 的 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 强制 journal authority handle、checkpoint nullable wait/lock 字段、原 operation 取消查询和原 head/activation 发布授权，不再用 legacy 扫描/回填或无 drain receipt 的 MCP release 降级。数据库为唯一 V1/32 表，旧开发 catalog 重建而非逐 V2–V17 升级；旧部署先停止 writer/保全原运行与 cleanup 证据，未知不手清 owner，所有 consumer 匹配切换。
+
+[#15330](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15330.md) 默认公开 Shell/1 lifecycle v2；开始操作仅有限延长仍活的原 writer，绑定原 operation/head，过期 owner 不复活。归档不是物理停止，unarchive 不重新打开；旧 Shell/2 不自动转换。
+
+[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 为 open diff，main 尚无池：发现固定 Service/Pod UID，RPC 粘原 instance/boot/epoch。接管必须 SQL 时间证明原 writer+activation 失效且 head 已知，或原 seal+release receipt；NotReady/HTTP 错误不够。QUIESCING 拒新工作但保留完成/cleanup，未知 opening、活 Hook/MCP/monitor/child、undo/cleanup 债务阻止 DRAINED。原 receipt/head/epoch 原子 seal 后才脱离 attachment，lost reply 只读原 receipt。preStop/Pod grace 不能代替 shutdown recovery、多进程 MySQL 和真实 Kubernetes 门禁；本次均未运行。下面各旧日期段落保留历史语境，不是升级承诺。
+
+## W43 先前快照恢复边界，2026-10-23 (历史对照)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) 无新事件时按原 cached attachment/boot/eventEpoch 观察 recoveryBlocked，停放原 Turn、不耗重试预算、不再 submit；[#15131](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15131.md) 则独立证明原 journal/inputSettled/continuationReady，ready 必须无 pending 执行、Hook/MCP/file undo 或 cleanup 债务。终态失败先取消原 prompt，再结算/退休 driver；cleanup-only 不跑模型/工具，不支持的冷 Hook/MCP 拒绝。初始无 Turn 也验完整 genesis/head，不只看 SQL 空行。未知工具不重放，handoff 仅文字草稿。
 

@@ -1,6 +1,14 @@
 # Managed 普通客户端、交互与事件投影
 
-## W43 当前客户端增量，2026-10-23
+## 当前客户端协议与导航，2026-10-24
+
+main `eeb853048aa3` 已合入 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md)：submit/cancel 总是持久 operation，客户端必须核对原 Session/Turn/operationId，取消依 queryCancelOperation 终态清 pending。移除 admissionProfile/durable_operations、environmentId/workspaceCwd 旧别名、日期字符串回退和无 itemId 工具投影。列表只接受绑定 archiveState/titleQuery 的 v3 cursor；旧 cursor 不静默适配。下面旧日期协议描述不作为现行兼容保证。
+
+[#15330](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15330.md) 只接受 Shell/1，glob 与默认 lifecycle v2 已接通，显式空列表仍禁用，旧 Shell/2 明确拒绝。close/活动 delete 走原 stop，archive/unarchive 要求原关闭证明且 unarchive 仍 CLOSED；活前台 Turn/取消/待批不越过屏障。[#15313](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15313.md) 的 web_fetch 在 default/auto-edit 请求出站批准，GitHub raw 规范发生在审批前；真实执行仍在 Runtime，逐跳仅同 origin/公网 HTTPS，无宿主 cache/辅助模型/文件写入，各返回 16 KiB 预算。
+
+[#15331](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15331.md) 的 ManagedSessionNavigationRow 复用 daemon 布局、tooltip、ID 复制与键盘行为，保留操作宽度，tooltip 不造 connection/client 数。ManagedArchivedSessions 按 archived/50/cursor 独立加载、ID 去重并取消失效请求；统一底部 Archived 只合并呈现与已加载计数，各后端权限/动作仍隔离，错误不假装空列表。本次仅核对代码，没有组件/浏览器/网络验证。
+
+## W43 先前快照客户端增量，2026-10-23 (历史对照)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) 恢复阻塞时保留取消、禁新输入；[#15131](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15131.md) 查询 recovering/awaiting_evidence/cleanup_pending/ready/operator_required，可见时 5 秒观察精确原 Turn，切换 abort，recheck 不允许换 prompt 或重放未知工具。不可恢复时只生成有界、可审阅文字 handoff，不自动执行或迁移 checkpoint。[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) 统一运行反馈，完成后停止 spinner，不改变执行权威。
 

@@ -1,6 +1,14 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## W43 当前存储基线，2026-10-23
+## 唯一 V1 基线与强协议，2026-10-24
+
+main `eeb853048aa3` 已合入 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md)：ManagedSchema.ddl 只读 V1__managed_schema.sql，schemaVersion=1，V2–V17 有效列/索引/CHECK 折叠进 V1，仍 32 业务表。已填充 catalog 必须精确校验，history-only 拒绝；首个正式版本前只维护新基线，开发库重建，不再保留版本化升级链或 backfill witness。下方 V11–V17、逐版本 cutover/witness 均是原 PR 历史，不是当前 migration 命令；不能 repair history 让旧目录看似兼容。
+
+统一持久 submit/cancel 的原 operationId/admissionStage/deliveryState，移除 admission profile/旧字段别名。checkpoint 必须显式含 agentWait/commandWait/commandLock（null 也写），authority 必须持 journal handle；旧 writer 不能混跑。工具发布必须原 journal head revision/activation/租约授权，不再 legacy walk/backfill；O3 backfill 列移除不等于删除原 GC/read lease/retention 证据。
+
+[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 仅 open 候选在 V1 的 ma_session 增 instance/boot/placementEpoch/state 与 owner 索引，仍 32 表；并非 main 当前 catalog。分配/接管/释放事务绑定原 head/activation/epoch，原 release record/resource 与 seal 同事务才允许脱离，发现结果不能代替持久 owner。本次未运行源码、MySQL 或 Kubernetes 门禁。
+
+## W43 先前快照存储基线，2026-10-23 (历史对照)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) 将 managed-checkpoint 根/ref/native readback 对齐 1 MiB；普通资源 64 KiB、input 8 MiB、Skills 2 MiB、model-request 32 MiB 独立。[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) managed-checkpoint-paged/1 保持逻辑 v1，已 settled+consumed 连续前缀按 32 项归档，页≤48 KiB、链≤4096 页/64 MiB，根≤1 MiB；未结算不归档。页先发布、journal 确认后才推进 cache，旧页必须有同 scope/digest 且 revision≤ceiling 的已提交 JOURNAL 引用。全链 hydrate 不是常数内存，无新 GC 或 DDL。
 

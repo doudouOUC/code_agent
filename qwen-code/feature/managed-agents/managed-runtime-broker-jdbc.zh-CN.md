@@ -1,6 +1,12 @@
 # Managed Runtime Broker JDBC 持久化
 
-## W43 当前原生恢复与布局，2026-10-23
+## 当前新库与发布授权，2026-10-24
+
+main `eeb853048aa3` 的 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 将有效 V2–V17 字段/索引/CHECK 折叠为唯一 V1/32 业务表，ManagedSchema 版本固定 1 并校验实际 catalog。首个正式版本前重建开发目录，不维护旧升级链；下方 V12–V17、旧 catalog 独立迁移/逐版本 cutover 是历史说明，不能作为当前部署命令或兼容承诺。
+
+ToolPublicationStore 只能依原 journal head/activation revision、身份与有效租约授权，不再 legacy walk/head backfill；MCP 释放必须原 drain receipt。O3 backfill 列删除不撤销原 retention/read lease/GC 与 cleanup debt。统一持久 operation、强 checkpoint 字段和 journal handle 要求整套 consumer/外部 writer 匹配，未知旧 owner 应保留证据并隔离，不能手清后重建。未执行源码、MySQL、多进程、CSI 或部署门禁。
+
+## W43 先前快照原生恢复与布局，2026-10-23 (历史对照)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) checkpoint/native readback 上限统一 1 MiB；[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) 将已结算消费历史按原页链 hydrate，48 KiB/32 项页、4096 页/64 MiB 链与 1 MiB 根共同约束。旧页必须来自同 scope/digest、已提交且 revision 不越界的 JOURNAL 引用；更新所有相关 TS/Java/CSI 消费方后才启新分页写入，旧 inline 仍可读。
 

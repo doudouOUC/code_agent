@@ -1,6 +1,12 @@
 # Managed Agent 完整工具结果与持久产物
 
-## W43 已存工具详情，2026-10-23
+## 当前发布授权与网页结果，2026-10-24
+
+main `eeb853048aa3` 的 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 强制原 journal head/activation revision/身份/租约，删除 legacy 扫描/回填开关与 O3 backfill 列；不取消原 retention/reader/cleanup 保护。当前只有 V1/32 表，旧 V2–V17 编号按日期保留历史，不是部署升级链，旧 writer 必须隔离匹配升级。
+
+[#15313](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15313.md) 经 Runtime/原 Turn 审批与 receipt 返回 web_fetch；仅公网 HTTPS、逐跳 DNS 固定与同 origin redirect，不写文件/宿主 cache/辅助模型。llmContent/returnDisplay/错误各按 JSON 字符串限 16 KiB 并标截断，10 MiB 网络响应不是全文 Artifact 留存承诺；既有 Shell capture/持久 Artifact 的独立资格不扩大。本次未运行源码、网络或云门禁。
+
+## W43 已存工具详情，2026-10-23 (历史对照)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) managed-checkpoint 与 publication/ref/native readback 对齐 1 MiB，普通 ref 仍 64 KiB；[#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) 物理分页只归档已结算消费前缀，根≤1 MiB、页≤48 KiB/32项、链≤4096页/64 MiB，验证完整身份/摘要及已提交 JOURNAL 闭包。页存在不是提交证据，未知提交不推进 cache；保留所有恢复引用，不是 GC 或无限读取。
 

@@ -42,5 +42,10 @@
 | [#15170](https://github.com/QwenLM/qwen-code/pull/15170) | ✅ merged | feat(managed-agent): Page checkpoint history and improve session feedback | [pr-15170.md](pr-15170.md) |
 | [#15171](https://github.com/QwenLM/qwen-code/pull/15171) | ✅ merged | feat(managed-agent): Enable public subagent delegation by default | [pr-15171.md](pr-15171.md) |
 | [#15200](https://github.com/QwenLM/qwen-code/pull/15200) | ✅ merged | perf(ci): Parallelize database integration tests and remove redundant work | [pr-15200.md](pr-15200.md) |
+| [#15255](https://github.com/QwenLM/qwen-code/pull/15255) | open | feat(managed-agent): Add a shared Harness pool for Kubernetes | [pr-15255.md](pr-15255.md) |
+| [#15263](https://github.com/QwenLM/qwen-code/pull/15263) | ✅ merged | refactor(managed-agent): Remove pre-release compatibility paths | [pr-15263.md](pr-15263.md) |
+| [#15313](https://github.com/QwenLM/qwen-code/pull/15313) | ✅ merged | feat(managed-agent): Add web_fetch to Workspace Sessions | [pr-15313.md](pr-15313.md) |
+| [#15330](https://github.com/QwenLM/qwen-code/pull/15330) | ✅ merged | feat(managed-agent): Enable unified Shell session lifecycle | [pr-15330.md](pr-15330.md) |
+| [#15331](https://github.com/QwenLM/qwen-code/pull/15331) | ✅ merged | fix(web-shell): Align Managed sidebar with daemon navigation | [pr-15331.md](pr-15331.md) |
 
-_按个人 PR 口径更新于 2026-10-23_
+_按个人 PR 口径更新于 2026-10-24_

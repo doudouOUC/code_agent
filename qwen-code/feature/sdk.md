@@ -1,6 +1,12 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### W43 当前协议与 Java 包边界，2026-10-23
+### 当前 Managed 强协议，2026-10-24
+
+main `eeb853048aa3` 的 [#15263](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 移除 admissionProfile/durable_operations 与旧字段别名；submit/cancel 统一原 operation，取消查询是必要能力，itemId/epoch-ms/v3 cursor 与显式 nullable checkpoint 字段不能缺省。独立 ManagedRuntimeBrokerClient 保留执行身份、8 MiB 响应和同键 prepare 有限重试；不等于其他控制 RPC 可盲重放。Server/Broker/Harness/SDK/外部 writer 必须匹配切换，V1/32 表开发目录重建，没有旧目录自动升级/回滚保证。
+
+[#15330](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15330.md) 只接受 Shell/1，含 glob 并默认广告 lifecycle v2；自定义列表全量替代、显式空禁用，local launcher 继承同 contract。旧 Shell/2 create/load/definition 明确拒绝，不是静默别名；原 close/receipt 与活 Turn 屏障保持。下方 Shell/2、V17 或旧双 admission 的日期段落仅是演进历史。本次未运行 SDK/跨语言或部署验证。
+
+### W43 先前快照协议与 Java 包边界，2026-10-23 (历史对照)
 
 [#15100](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15100.md) WebShell lifecycle/provider 与 reading export 复用原 operation/snapshot 权威；[#15104](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15104.md) 增显式压缩提交/查询及 Hosted client DTO，expectedCompactionRevision 与原 idempotencyKey 不可省略，压缩完成须回读 summary revision。[#15119](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15119.md) MCP 管理闭合请求/响应只传管理员 pin 与原 command/revision，不传配置秘密；[#15131](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15131.md) 增 recovery status/recheck、精确 target 和 recoveryCleanupOnly，不能把只清理 load 当普通执行。
 

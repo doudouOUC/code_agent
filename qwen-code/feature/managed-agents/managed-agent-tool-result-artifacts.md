@@ -1,6 +1,12 @@
 # Managed Agent Tool Results and Durable Artifacts
 
-## Saved Tool Details, 2026-10-23
+## Current Publication Authority and Web Results, 2026-10-24
+
+Main `eeb853048aa3` includes [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md): publication requires the original journal head/activation revision, identity and live lease. Legacy scan/backfill switches and O3 backfill columns are removed, not retention/reader/cleanup protection. The catalog is sole V1/32 tables; dated V2–V17 entries below are history, not an upgrade chain. Isolate old writers and upgrade matched consumers.
+
+[#15313](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15313.md) returns web_fetch through the Runtime and original Turn approval/receipt. It permits public HTTPS only, pins DNS per hop and follows same-origin redirects, without file writes, host cache or an auxiliary model. Each JSON-encoded llmContent/returnDisplay/error is capped at 16 KiB with truncation markers. A 10 MiB network response budget is not a complete durable Artifact promise and does not broaden Shell capture/artifact qualification. No source, network or cloud gates ran here.
+
+## Saved Tool Details, 2026-10-23 (Historical)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) aligns managed-checkpoint publication/ref/native readback at 1 MiB; ordinary refs stay at 64 KiB. [#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) archives only the settled, consumed prefix: root≤1 MiB, page≤48 KiB/32 entries, chain≤4096 pages/64 MiB. Identity, digest and committed JOURNAL closure are mandatory; blob existence is not commit proof and uncertain commits never advance the cache. Recovery references remain protected, with no new GC or unlimited read guarantee.
 

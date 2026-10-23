@@ -1,6 +1,12 @@
 # Managed Runtime Broker JDBC Persistence
 
-## Current Native Recovery and Layout, 2026-10-23
+## Current Baseline and Publication Authority, 2026-10-24
+
+Main `eeb853048aa3` includes [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md): effective V2–V17 columns/indexes/checks are folded into the sole V1, with 32 business tables. ManagedSchema fixes version 1 and validates the actual catalog. Before the first formal release, recreate development catalogs; no old upgrade chain is maintained. The dated V12–V17, migration and sequential-cutover descriptions below are historical, not current deployment commands or compatibility guarantees.
+
+ToolPublicationStore requires the original journal head/activation revision, identity and live lease, without legacy walks/head backfill. MCP release requires the original drain receipt. Removing O3 backfill columns does not remove retention/read leases/GC or cleanup debt. Durable operations, explicit nullable checkpoint fields and mandatory journal handles require matched consumers and external writers. Preserve and isolate unknown old owners instead of clearing them to rebuild. No source, MySQL, multiprocess, CSI or deployment gates ran here.
+
+## Previous Snapshot: Native Recovery and Layout, 2026-10-23 (Historical)
 
 [#15094](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15094.md) aligns checkpoint/native readback at 1 MiB. [#15170](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15170.md) hydrates settled, consumed history through the original page chain: 48 KiB/32-entry pages, at most 4096 pages/64 MiB and a 1 MiB root. Historical pages require matching scope/digest and a committed JOURNAL reference within the revision ceiling. Upgrade all relevant TS/Java/CSI consumers before new paged writes; old inline checkpoints remain readable.
 
