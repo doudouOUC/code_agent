@@ -1,5 +1,13 @@
 # Managed 普通客户端、交互与事件投影
 
+## Session 规则与队列候选，2026-10-25
+
+main `395c7a820a47` 的 [#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 分别协商 permission-rules/1、auto-approval/1；WebShell 三类规则编辑/清空、stale revision 重载、原键 pending 与回读确认，忙/待批/未结算 Session 禁改规则。省略保留、显式空清除，CAS/actor/OPERATOR 不变；模式切换仍按原 live 能力，不改原 Turn 快照。
+
+规则 deny→ask→allow 优先，再走原 profile/模式或 Auto；规则 ask、Hook ask、exit_plan_mode 持久 requiresHumanDecision，切 yolo 也不自动批准。Auto 用原用户 bytes/模型工具调用，不用工具输出或 Agent 消息授权，MCP 不分类、缺证据/unavailable 转人工；allow 不突破工具/Plan/Runtime 资格。web_fetch 也受规则和 Auto 控制，先前 default/auto-edit 出站 ask 描述是没有显式规则时的默认，不是所有策略下强制询问。
+
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 仅 open：忙时文字/文本文件通过原 key 入队，最多 32 项，queued 可 CAS 编辑/撤回、claimed 不可改，恢复阻塞不自行重发；每秒查询按 provider/Session/序号隔离迟到结果。图片仍空闲提交。消息在模型轮次边界先经 Hook/耐久 user record，再投影 consumed；排队或 claimed 不等于模型已看到，也不是取消在途工具。当前 main 未包含该 UI/协议，候选基于较早 main，需另核 Auto/池组合。本次未执行组件、浏览器、模型或数据库门禁。
+
 ## 当前客户端协议与导航，2026-10-24
 
 main `eeb853048aa3` 已合入 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md)：submit/cancel 总是持久 operation，客户端必须核对原 Session/Turn/operationId，取消依 queryCancelOperation 终态清 pending。移除 admissionProfile/durable_operations、environmentId/workspaceCwd 旧别名、日期字符串回退和无 itemId 工具投影。列表只接受绑定 archiveState/titleQuery 的 v3 cursor；旧 cursor 不静默适配。下面旧日期协议描述不作为现行兼容保证。

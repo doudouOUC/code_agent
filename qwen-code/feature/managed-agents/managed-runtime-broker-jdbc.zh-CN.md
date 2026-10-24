@@ -1,5 +1,13 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 常驻范围调整候选，2026-10-25
+
+最新 open head `d1b4639e4cb0` 还记录 S1 pin 2c0c9fa8dc4a 的原生失败：同 tenant 一个 binding DRAINING 后，不同注册盘/存储的新 Workspace 也可能因共同 /workspace canonical path 被 runtime_placement_recovery_required 拒绝。已有独立 binding 可用或另一 tenant 验收不能冲销冷准入阻塞，S1 需先解决并验证。本次只核对候选报告及主干围栏代码，没有复跑原生现场。
+
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 仍 open，六份双语文档提出把完整 CSI 审计移出首版前置，不改 Java/SQL/测试，也不新增平台回收 authority。既有同原 Pod/PVC handoff 保留 binding READY/owner RESERVED；显式 idle retirement 保留 DRAINING/slot/owner/history，RETURNED 仅完整 DELETE 响应（含非 2xx），UNKNOWN 不释放，不删 PVC/PV/Secret/保护对象，资源继续计费。
+
+后续 S2 必须定义正常平台完成、失节点/强删隔离、原身份 readback、数据与跨 Workspace 策略，再由 S3 在同事务重验代数并释放；Pod 缺失/VolumeAttachment 消失或单一云盘状态都非单独完成证明。候选 S1 pin 2c0c9fa8dc4a 与旧撤出/ACK 基准分开，不能据范围决定宣布新源码或完整 K2 验收。本次只核对候选 diff 与 main `395c7a820a47` 的既有边界，未运行源码/MySQL/原生 ACK。
+
 ## 当前新库与发布授权，2026-10-24
 
 main `eeb853048aa3` 的 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 将有效 V2–V17 字段/索引/CHECK 折叠为唯一 V1/32 业务表，ManagedSchema 版本固定 1 并校验实际 catalog。首个正式版本前重建开发目录，不维护旧升级链；下方 V12–V17、旧 catalog 独立迁移/逐版本 cutover 是历史说明，不能作为当前部署命令或兼容承诺。

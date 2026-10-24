@@ -1,5 +1,13 @@
 # Managed Runtime Broker JDBC Persistence
 
+## Resident Scope Candidate, 2026-10-25
+
+Latest open head `d1b4639e4cb0` also records a native failure at S1 pin 2c0c9fa8dc4a: after one same-tenant binding enters DRAINING, a new Workspace on a different registered disk/storage can be refused with runtime_placement_recovery_required because the fence also matches the common /workspace canonical path. An existing independent binding or qualification in another tenant does not clear this cold-admission blocker. Resolve and verify it before S1 acceptance. This task checked the candidate report and main fence code, without rerunning the native scenario.
+
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) remains open. Six bilingual documents propose removing complete CSI auditing from first-release prerequisites, without Java/SQL/test changes or new reclamation authority. Existing same-Pod/PVC handoff retains READY binding/RESERVED ownership. Explicit idle retirement retains DRAINING, slot, owner and history. RETURNED means a complete DELETE response, including non-2xx, not completed termination; UNKNOWN never releases. PVC/PV/Secrets/protection remain and retained resources continue to incur costs.
+
+S2 must define normal platform completion, node-loss/forced-delete isolation, original-identity readback and data/cross-Workspace policy before S3 atomically revalidates generations and releases ownership. Pod absence, VolumeAttachment disappearance or one disk status alone is insufficient. Candidate S1 pin 2c0c9fa8dc4a is distinct from historical withdrawal/ACK revisions; a scope change does not qualify new source or complete K2. This task compared the candidate diff with existing boundaries in main `395c7a820a47`, without source/MySQL/native ACK execution.
+
 ## Current Baseline and Publication Authority, 2026-10-24
 
 Main `eeb853048aa3` includes [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md): effective V2–V17 columns/indexes/checks are folded into the sole V1, with 32 business tables. ManagedSchema fixes version 1 and validates the actual catalog. Before the first formal release, recreate development catalogs; no old upgrade chain is maintained. The dated V12–V17, migration and sequential-cutover descriptions below are historical, not current deployment commands or compatibility guarantees.

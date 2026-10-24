@@ -1,12 +1,20 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 当前规则快照与队列候选，2026-10-25
+
+main `395c7a820a47` 保持唯一 V1/32 表。[#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 在 ma_session/ma_turn 加 permission_rules_json、8192 bytes/正 revision CHECK 与 auto 模式，原 receipt/CAS/Turn 准入同事务，原快照不被规则编辑改写；Action options 的 requiresHumanDecision 只允许 true，恢复保留人工下限。当前开发 catalog 重建、整套 writer 匹配升级，不新增 V2 migration。
+
+[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) placement/release 现已合入；ma_session 原 instance/boot/epoch 与 writer/head/activation 同源，seal/release record/resource 原子保存后才允许脱离，仍非物理 Runtime/卷释放。
+
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 仅 open 在 V1 增三表 ma_user_message_queue/message/command（候选共 35 表，不是 main）。保存 actor+key 摘要、sequence/revision/context、原 Turn/prompt 和 paused；原 writer claim 与已提交 message.committed 消费分开，失响应沿同原身份读回。context 漂移/未消费原 claimed 进入 blocked，失败/取消暂停，普通新 submit 不可越过队列。新表保留/GC 与跨进程组合仍待验收，本次没有运行源码/MySQL。
+
 ## 唯一 V1 基线与强协议，2026-10-24
 
 main `eeb853048aa3` 已合入 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md)：ManagedSchema.ddl 只读 V1__managed_schema.sql，schemaVersion=1，V2–V17 有效列/索引/CHECK 折叠进 V1，仍 32 业务表。已填充 catalog 必须精确校验，history-only 拒绝；首个正式版本前只维护新基线，开发库重建，不再保留版本化升级链或 backfill witness。下方 V11–V17、逐版本 cutover/witness 均是原 PR 历史，不是当前 migration 命令；不能 repair history 让旧目录看似兼容。
 
 统一持久 submit/cancel 的原 operationId/admissionStage/deliveryState，移除 admission profile/旧字段别名。checkpoint 必须显式含 agentWait/commandWait/commandLock（null 也写），authority 必须持 journal handle；旧 writer 不能混跑。工具发布必须原 journal head revision/activation/租约授权，不再 legacy walk/backfill；O3 backfill 列移除不等于删除原 GC/read lease/retention 证据。
 
-[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 仅 open 候选在 V1 的 ma_session 增 instance/boot/placementEpoch/state 与 owner 索引，仍 32 表；并非 main 当前 catalog。分配/接管/释放事务绑定原 head/activation/epoch，原 release record/resource 与 seal 同事务才允许脱离，发现结果不能代替持久 owner。本次未运行源码、MySQL 或 Kubernetes 门禁。
+[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 现已 merged，在 V1 的 ma_session 增 instance/boot/placementEpoch/state 与 owner 索引，仍 32 表，已进入 main 当前 catalog。分配/接管/释放事务绑定原 head/activation/epoch，原 release record/resource 与 seal 同事务才允许脱离，发现结果不能代替持久 owner。本次未运行源码、MySQL 或 Kubernetes 门禁。
 
 ## W43 先前快照存储基线，2026-10-23 (历史对照)
 

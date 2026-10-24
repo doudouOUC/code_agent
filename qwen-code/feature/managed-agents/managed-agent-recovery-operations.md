@@ -1,12 +1,24 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 当前池与策略恢复、候选边界，2026-10-25
+
+常驻范围 open 文档 #15457 的最新 head `d1b4639e4cb0` 记录 S1 pin 2c0c9fa8dc4a 的同 tenant 放置阻塞：原 binding DRAINING 后，不同注册盘的新 Workspace 仍可能因共同 /workspace canonical path 被拒冷准入。当前 JdbcRuntimeBindingRepository 的 storage/canonicalCwd/Workspace OR 围栏与该风险吻合；本次未复跑原生现场。已有独立 binding 可用或另一个 tenant 的通过不能冲销，S1 未解决前不推进 S2 验收结论。
+
+main `395c7a820a47` 已合入 [#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md)，失租双证明或原 seal/release receipt 才接管，discovery/HTTP 错误不能释放；真实 Kubernetes/多进程 shutdown 尚需独立验收。[#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 原 Turn 固定规则、Action 保存人工下限，live mode 不绕过 ask；能力缺失/规则倒退拒绝，Auto unavailable 转人工，不重放未知工具。
+
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 仅 open：queued/claimed/原提交消费分开，恢复 prepared model request 时不改原请求，失败/取消/未知消费/context 改变暂停或 blocked；不靠重发/新 Turn 消除未知。候选 35 表不是当前目录，需重核当前策略/池组合。
+
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 仅范围文档候选，拟撤完整 CSI 审计首版前置，保留同原 Pod/PVC handoff 与有界 DELETE/DRAINING；RETURNED 包括非 2xx，只证明收到完整响应，不证明 stop/unmount/物理 owner 释放，资源保留仍计费。S2 平台完成/异常隔离/数据策略与 S3 原子回收尚未实现，旧 ACK pin 不转为新源码资格。
+
+[#15459](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15459.md) 已 merged，把原 registration.processAbsent 放到 ProcessHandle 判定前，zombie 及时 RETIRED/不可重试且不替换；原 loss 不等于 escaped writer stop。真实 Linux zombie 测试与缺身份拒绝分开，macOS 或 skip 不证明生产成功。[#15460](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15460.md) 已 merged，仅增加本地 worker 错版本/伪 context/未安装 activation 的 409、无文件副作用与同源正向对照，不改生产代码。本次均未运行源码、浏览器、模型、Linux/ACK/MySQL 或部署门禁。
+
 ## 当前兼容收敛与池候选，2026-10-24
 
 main `eeb853048aa3` 的 [#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 强制 journal authority handle、checkpoint nullable wait/lock 字段、原 operation 取消查询和原 head/activation 发布授权，不再用 legacy 扫描/回填或无 drain receipt 的 MCP release 降级。数据库为唯一 V1/32 表，旧开发 catalog 重建而非逐 V2–V17 升级；旧部署先停止 writer/保全原运行与 cleanup 证据，未知不手清 owner，所有 consumer 匹配切换。
 
 [#15330](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15330.md) 默认公开 Shell/1 lifecycle v2；开始操作仅有限延长仍活的原 writer，绑定原 operation/head，过期 owner 不复活。归档不是物理停止，unarchive 不重新打开；旧 Shell/2 不自动转换。
 
-[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 为 open diff，main 尚无池：发现固定 Service/Pod UID，RPC 粘原 instance/boot/epoch。接管必须 SQL 时间证明原 writer+activation 失效且 head 已知，或原 seal+release receipt；NotReady/HTTP 错误不够。QUIESCING 拒新工作但保留完成/cleanup，未知 opening、活 Hook/MCP/monitor/child、undo/cleanup 债务阻止 DRAINED。原 receipt/head/epoch 原子 seal 后才脱离 attachment，lost reply 只读原 receipt。preStop/Pod grace 不能代替 shutdown recovery、多进程 MySQL 和真实 Kubernetes 门禁；本次均未运行。下面各旧日期段落保留历史语境，不是升级承诺。
+[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 现已 merged，原归属边界保持：发现固定 Service/Pod UID，RPC 粘原 instance/boot/epoch。接管必须 SQL 时间证明原 writer+activation 失效且 head 已知，或原 seal+release receipt；NotReady/HTTP 错误不够。QUIESCING 拒新工作但保留完成/cleanup，未知 opening、活 Hook/MCP/monitor/child、undo/cleanup 债务阻止 DRAINED。原 receipt/head/epoch 原子 seal 后才脱离 attachment，lost reply 只读原 receipt。preStop/Pod grace 不能代替 shutdown recovery、多进程 MySQL 和真实 Kubernetes 门禁；本次均未运行。下面各旧日期段落保留历史语境，不是升级承诺。
 
 ## W43 先前快照恢复边界，2026-10-23 (历史对照)
 

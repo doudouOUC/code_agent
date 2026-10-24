@@ -42,10 +42,15 @@
 | [#15170](https://github.com/QwenLM/qwen-code/pull/15170) | ✅ merged | feat(managed-agent): Page checkpoint history and improve session feedback | [pr-15170.md](pr-15170.md) |
 | [#15171](https://github.com/QwenLM/qwen-code/pull/15171) | ✅ merged | feat(managed-agent): Enable public subagent delegation by default | [pr-15171.md](pr-15171.md) |
 | [#15200](https://github.com/QwenLM/qwen-code/pull/15200) | ✅ merged | perf(ci): Parallelize database integration tests and remove redundant work | [pr-15200.md](pr-15200.md) |
-| [#15255](https://github.com/QwenLM/qwen-code/pull/15255) | open | feat(managed-agent): Add a shared Harness pool for Kubernetes | [pr-15255.md](pr-15255.md) |
+| [#15255](https://github.com/QwenLM/qwen-code/pull/15255) | ✅ merged | feat(managed-agent): Add a shared Harness pool for Kubernetes | [pr-15255.md](pr-15255.md) |
 | [#15263](https://github.com/QwenLM/qwen-code/pull/15263) | ✅ merged | refactor(managed-agent): Remove pre-release compatibility paths | [pr-15263.md](pr-15263.md) |
 | [#15313](https://github.com/QwenLM/qwen-code/pull/15313) | ✅ merged | feat(managed-agent): Add web_fetch to Workspace Sessions | [pr-15313.md](pr-15313.md) |
 | [#15330](https://github.com/QwenLM/qwen-code/pull/15330) | ✅ merged | feat(managed-agent): Enable unified Shell session lifecycle | [pr-15330.md](pr-15330.md) |
 | [#15331](https://github.com/QwenLM/qwen-code/pull/15331) | ✅ merged | fix(web-shell): Align Managed sidebar with daemon navigation | [pr-15331.md](pr-15331.md) |
+| [#15448](https://github.com/QwenLM/qwen-code/pull/15448) | ✅ merged | feat(managed): add session permission rules and Auto approval | [pr-15448.md](pr-15448.md) |
+| [#15449](https://github.com/QwenLM/qwen-code/pull/15449) | open | feat(managed): add durable mid-turn user message queue | [pr-15449.md](pr-15449.md) |
+| [#15457](https://github.com/QwenLM/qwen-code/pull/15457) | open | docs(runtime): revise resident Workspace delivery scope | [pr-15457.md](pr-15457.md) |
+| [#15459](https://github.com/QwenLM/qwen-code/pull/15459) | ✅ merged | fix(managed-agent): retire registered zombies before startup waits | [pr-15459.md](pr-15459.md) |
+| [#15460](https://github.com/QwenLM/qwen-code/pull/15460) | ✅ merged | test(cli): cover remaining Managed Workspace activation refusals | [pr-15460.md](pr-15460.md) |
 
-_按个人 PR 口径更新于 2026-10-24_
+_按个人 PR 口径更新于 2026-10-25_

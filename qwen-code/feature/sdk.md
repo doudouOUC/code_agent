@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+### Session 规则与 Auto wire，2026-10-25
+
+main `395c7a820a47` 的 [#15448](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 在 approval-selection/1 上分别广告 permission-rules/1、auto-approval/1。Java HostedPermissionRules、SubmitHarnessTurn/Hosted client、TS HTTP store 和 WebShell 同步封闭 allow/ask/deny：每类≤32、合计≤64、单条 UTF-8≤512 bytes、对象≤8192 bytes；仅工具/Shell/Web domain/MCP pattern，不支持宿主文件路径。准入负载和读响应省略全空规则；更新请求省略规则则保留原值，显式三个空列表才清除。原 Session/Turn 快照、正 revision、receipt/CAS 与 capability 检查必须匹配。
+
+规则编辑空闲；live 只切模式且规则不变，requiresHumanDecision=true 的 Action 不因 yolo 自动放行。公开子 launch 将 auto 收窄为 default，不把父规则加入既有八字段快照。当前唯一 V1/32 表原地增规则列，开发库重建，不提供混版本 consumer/外部 writer 兼容保证。本次未运行 SDK/跨语言、模型或数据库验收。
+
 ### 当前 Managed 强协议，2026-10-24
 
 main `eeb853048aa3` 的 [#15263](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 移除 admissionProfile/durable_operations 与旧字段别名；submit/cancel 统一原 operation，取消查询是必要能力，itemId/epoch-ms/v3 cursor 与显式 nullable checkpoint 字段不能缺省。独立 ManagedRuntimeBrokerClient 保留执行身份、8 MiB 响应和同键 prepare 有限重试；不等于其他控制 RPC 可盲重放。Server/Broker/Harness/SDK/外部 writer 必须匹配切换，V1/32 表开发目录重建，没有旧目录自动升级/回滚保证。
