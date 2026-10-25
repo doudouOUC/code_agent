@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+### 固定扩展包客户端候选，2026-10-26
+
+[#15490](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 为 open head `099f5f46621d`，Java ManagedExtensionsClient、Hosted create/load 和 TS DaemonClient 同步包发布/精确 pin、加密 settings 修订、Session query/apply/continue/recover-previous。上传签名覆盖真实 archive bytes；不能用包显示版本代替 digest/packageRevision/settingsRevision。确定 revision 拒绝可刷新，未知继续原 key/operation；普通查询不自动提交配置。初始选择只允许已协商 lifecycle 的 Shell/MCP，包 agent 扩展原 launch snapshot 仍须核对原 bundle/工具/模型，不泛化为当前 main 兼容。
+
+main `b3ab3ec64c81` 已包含 [#15449](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 的 HTTP store user-message-queue/1，原 writer claim 与消费回执分开，V1 为 35 表；包候选另加三表共 38 表，不因 schemaVersion=1 可混跑。下面 10-25 的八字段/32 表描述是当时主干，不含候选包 agent 变体。整套 Server/SDK/Harness/外部 writer 匹配升级，开发 catalog 重建；本次未运行 SDK/跨语言或真实环境门禁。
+
 ### Session 规则与 Auto wire，2026-10-25
 
 main `395c7a820a47` 的 [#15448](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 在 approval-selection/1 上分别广告 permission-rules/1、auto-approval/1。Java HostedPermissionRules、SubmitHarnessTurn/Hosted client、TS HTTP store 和 WebShell 同步封闭 allow/ask/deny：每类≤32、合计≤64、单条 UTF-8≤512 bytes、对象≤8192 bytes；仅工具/Shell/Web domain/MCP pattern，不支持宿主文件路径。准入负载和读响应省略全空规则；更新请求省略规则则保留原值，显式三个空列表才清除。原 Session/Turn 快照、正 revision、receipt/CAS 与 capability 检查必须匹配。

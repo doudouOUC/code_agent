@@ -1,14 +1,24 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## 当前池与策略恢复、候选边界，2026-10-25
+## 当前队列、resident 修复与资格分层，2026-10-26
 
-常驻范围 open 文档 #15457 的最新 head `d1b4639e4cb0` 记录 S1 pin 2c0c9fa8dc4a 的同 tenant 放置阻塞：原 binding DRAINING 后，不同注册盘的新 Workspace 仍可能因共同 /workspace canonical path 被拒冷准入。当前 JdbcRuntimeBindingRepository 的 storage/canonicalCwd/Workspace OR 围栏与该风险吻合；本次未复跑原生现场。已有独立 binding 可用或另一个 tenant 的通过不能冲销，S1 未解决前不推进 S2 验收结论。
+main `b3ab3ec64c81` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 队列：claim 与已提交消费分开，失败/取消/context 漂移暂停；blocked 显式丢弃保留原 claim 身份、原 revision 和迟到回执入口，不自动重发。已提交原命令在 close 后可回读，新命令仍需 ACTIVE。唯一 V1 已增三队列表成 35 表，旧目录重建。
+
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 已由范围文档演进为两项源码修复：仅双方精确 resident 时豁免相同 cwd，仍拒相同 Workspace/存储或不完整 managed context；原 Harness scope 查询不创建物理资源，只在旧路由 404 等待原 warm，其他失败不降级。resident 声明/执行限三文件工具及本地 Plan 退出，原 PREPARED 的不支持调用派发前原子 not_started，已 dispatch/UNKNOWN 不覆盖。旧 S1 失败必须在修复源码重新验，S2/S3 平台回收、异常隔离和 owner 释放仍未交付，RETURNED/Pod 缺失不构成释放证明。
+
+[#15519](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15519.md) 资格工具已合入：不可变源码镜像构建/显式发布、精确两现有业务节点的离线渲染、原 kube-system/控制器/Pod/EndpointSlice 身份只读预检，以及两 tenant/四 actor/八 Session 的公共效果 runner。预检 executionAcceptance=NOT_RUN；公共通过也不证明两真实 Pod/boot 的 placement、writer fence、idle release、故障或容量/HPA。失败保留原 key/ID/资源，成功只关闭 Session，不删除 Workspace/持久卷。
+
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 仍 open：候选 38 表与 config_install/双端 ACK，unknown 保持准入屏障；继续原 Runtime/operation，补偿先要求原 stopped receipt 再用新 revision 恢复，不重放未知命令。Linux cgroup 与 macOS developer process-group、共享耐久 archive 和全套 writer 切换需分别验证。[#15492](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15492.md) 实验单 Pod/固定原 Node 部署与网关仍 open；保留 PVC/原 Secret 不证明替换 host 可恢复，也不是共享池 HA。本次没有运行源码、Docker/kubectl、模型或真实平台门禁。
+
+## 池与策略恢复历史快照，2026-10-25
+
+历史 open head `d1b4639e4cb0` 的 #15457 记录 S1 pin 2c0c9fa8dc4a 的同 tenant 放置阻塞：原 binding DRAINING 后，不同注册盘的新 Workspace 因共同 /workspace canonical path 被旧 OR 围栏拒绝。该记录不因最新源码修复追溯变绿；已有独立 binding 可用或另一个 tenant 的通过不能冲销，修复版本需新一轮 S1 证据。本次未复跑原生现场。
 
 main `395c7a820a47` 已合入 [#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md)，失租双证明或原 seal/release receipt 才接管，discovery/HTTP 错误不能释放；真实 Kubernetes/多进程 shutdown 尚需独立验收。[#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 原 Turn 固定规则、Action 保存人工下限，live mode 不绕过 ask；能力缺失/规则倒退拒绝，Auto unavailable 转人工，不重放未知工具。
 
-[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 仅 open：queued/claimed/原提交消费分开，恢复 prepared model request 时不改原请求，失败/取消/未知消费/context 改变暂停或 blocked；不靠重发/新 Turn 消除未知。候选 35 表不是当前目录，需重核当前策略/池组合。
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 在该快照为 open，现已 merged：queued/claimed/原提交消费分开，恢复 prepared model request 时不改原请求，失败/取消/未知消费/context 改变暂停或 blocked；不靠重发/新 Turn 消除未知。35 表已成为当前目录，最终丢弃/迟到回执语义以上文为准。
 
-[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 仅范围文档候选，拟撤完整 CSI 审计首版前置，保留同原 Pod/PVC handoff 与有界 DELETE/DRAINING；RETURNED 包括非 2xx，只证明收到完整响应，不证明 stop/unmount/物理 owner 释放，资源保留仍计费。S2 平台完成/异常隔离/数据策略与 S3 原子回收尚未实现，旧 ACK pin 不转为新源码资格。
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 此时仅为范围文档，现已连同上文修复 merged：完整 CSI 审计不再是首版前置，保留同原 Pod/PVC handoff 与有界 DELETE/DRAINING；RETURNED 包括非 2xx，只证明收到完整响应，不证明 stop/unmount/物理 owner 释放，资源保留仍计费。S2 平台完成/异常隔离/数据策略与 S3 原子回收尚未实现，旧 ACK pin 不转为新源码资格。
 
 [#15459](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15459.md) 已 merged，把原 registration.processAbsent 放到 ProcessHandle 判定前，zombie 及时 RETIRED/不可重试且不替换；原 loss 不等于 escaped writer stop。真实 Linux zombie 测试与缺身份拒绝分开，macOS 或 skip 不证明生产成功。[#15460](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15460.md) 已 merged，仅增加本地 worker 错版本/伪 context/未安装 activation 的 409、无文件副作用与同源正向对照，不改生产代码。本次均未运行源码、浏览器、模型、Linux/ACK/MySQL 或部署门禁。
 

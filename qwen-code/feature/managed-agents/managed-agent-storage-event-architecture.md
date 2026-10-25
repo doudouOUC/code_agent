@@ -1,12 +1,18 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## 当前规则快照与队列候选，2026-10-25
+## 当前 35 表与扩展包候选，2026-10-26
+
+main `b3ab3ec64c81` 的 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 在唯一 V1 增 ma_user_message_queue、ma_user_message、ma_user_message_command，合计 35 表，不是 V2 迁移。原 actor/key/摘要 receipt、context/sequence/revision、原 Turn/prompt 和暂停状态均耐久；先锁 Session 回读已提交命令，close 后原键可重放但拒新修改。blocked 丢弃保留已认领 revision/Turn，原已验证 journal user message.committed 的迟到消费回执仍可结算 withdrawn，不把未知输入再开新 Turn。
+
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) open head `099f5f46621d` 再增 package/settings/operation 三表，候选共 38 表，并未进入 main。原 archive bytes 在耐久存储验摘要/fsync后才能提交 PUBLISHED；settings 原 scope/revision 加密，公开只回键名，发布/settings 的原 operation 固定摘要。Session pin 和 effective bundle 沿唯一 config_install domain 保存两端 ACK/原 Runtime/代数，committed 后未知保持屏障，补偿用新 revision。不能把 Runtime cache、同表数或 schemaVersion=1 当混版本兼容；新基线仍重建开发目录，本次未运行 MySQL/跨进程门禁。
+
+## 规则与队列历史快照，2026-10-25
 
 main `395c7a820a47` 保持唯一 V1/32 表。[#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 在 ma_session/ma_turn 加 permission_rules_json、8192 bytes/正 revision CHECK 与 auto 模式，原 receipt/CAS/Turn 准入同事务，原快照不被规则编辑改写；Action options 的 requiresHumanDecision 只允许 true，恢复保留人工下限。当前开发 catalog 重建、整套 writer 匹配升级，不新增 V2 migration。
 
 [#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) placement/release 现已合入；ma_session 原 instance/boot/epoch 与 writer/head/activation 同源，seal/release record/resource 原子保存后才允许脱离，仍非物理 Runtime/卷释放。
 
-[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 仅 open 在 V1 增三表 ma_user_message_queue/message/command（候选共 35 表，不是 main）。保存 actor+key 摘要、sequence/revision/context、原 Turn/prompt 和 paused；原 writer claim 与已提交 message.committed 消费分开，失响应沿同原身份读回。context 漂移/未消费原 claimed 进入 blocked，失败/取消暂停，普通新 submit 不可越过队列。新表保留/GC 与跨进程组合仍待验收，本次没有运行源码/MySQL。
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 在该快照时为 open，现已 merged，三队列表/35 表已进入 main。保存 actor+key 摘要、sequence/revision/context、原 Turn/prompt 和 paused；原 writer claim 与已提交 message.committed 消费分开，失响应沿同原身份读回。context 漂移/未消费原 claimed 进入 blocked，失败/取消暂停，普通新 submit 不可越过队列。最终迟到回执处理以上文为准，新表保留/GC 与跨进程组合仍待验收，本次没有运行源码/MySQL。
 
 ## 唯一 V1 基线与强协议，2026-10-24
 

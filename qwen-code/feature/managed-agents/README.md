@@ -1,8 +1,14 @@
 # Qwen Code Managed Agents 双链路方案
 
+> **10-25 增量，2026-10-26 main `b3ab3ec64c81`：** W43 为 55 PR（50 merged/3 open/2 closed）。[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 队列已合入，V1 35 表；消费必须原已提交 user record，blocked 显式丢弃保留原 claim 接受迟到回执，不自动重发。[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 已合入精确 resident 的 cwd 豁免、只读 capability scope、三文件工具 catalog 和原 PREPARED 派发前结算，原 UNKNOWN 不改写，物理 owner 不释放。
+
+[#15496](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15496.md) 已分离权限 dialog/composer key；[#15497](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15497.md) 已以 publication/领域 owner/开关统一后台声明与执行。[#15519](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15519.md) 已加入不可变镜像计划、两现有节点渲染、只读预检与公共效果 runner，真实放置/故障/容量仍需另验。
+
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 扩展包管理仍 open：候选 38 表、精确 pin、原 config_install/Runtime 和显式补偿，Linux cgroup 与 macOS developer group 分型；[#15492](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15492.md) 单副本实验部署/认证网关仍 open，不是生产 HA。下面旧日期的 open/32 表均为历史快照，队列和常驻修复的当前状态以上文为准。本次未运行源码或真实环境验收。
+
 > **10-24 增量，2026-10-25 main `395c7a820a47`：** W43 50 PR（45 merged/3 open/2 closed）。[#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 已合入 permission-rules/1 与 auto-approval/1，规则空闲 CAS、原 Turn 快照、能力撤回拒绝；deny/ask 优先，Hook ask/Plan 退出保存 requiresHumanDecision，不随 yolo/live 模式自动通过。分类只用原真实用户文本和模型工具调用，unavailable 转人工，MCP 不交分类器，父 Auto 的公开子 launch 收窄为 default。V1 新增规则列，仍 32 表。[#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md) 已合入池的原 owner/epoch/release 事务，仍需独立 Kubernetes shutdown/多进程验收。
 
-[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 仍 open：候选 35 表，queued/claimed/blocked 与已提交消费分开，模型轮次边界加入文本/文本文件而非中断工具，失败/取消/context 漂移暂停。[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 仅文档候选，提出移除完整 CSI 审计首版前置；保留原 Pod/PVC/owner 与有界 DELETE，不新增物理回收。[#15459](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15459.md) zombie absence 优先、[#15460](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15460.md) 原本地 activation 拒绝回归均已合入，不代表本次运行通过。以下旧日期快照不覆盖当前状态；本次没有源码或真实环境运行验收。
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 在此历史快照为 open，现已 merged：35 表、queued/claimed/blocked 与已提交消费分开，模型轮次边界加入文本/文本文件而非中断工具，失败/取消/context 漂移暂停。[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 当时仅文档候选，现已连同上文准入修复 merged；保留原 Pod/PVC/owner 与有界 DELETE，不新增物理回收。[#15459](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15459.md) zombie absence 优先、[#15460](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15460.md) 原本地 activation 拒绝回归均已合入，不代表本次运行通过。以下旧日期快照不覆盖当前状态；本次没有源码或真实环境运行验收。
 
 > **10-23 增量，2026-10-24 main `eeb853048aa3`：** W43 创建集合现为 45 PR（41 merged/2 open/2 closed）。[#15263](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15263.md) 把旧 V2–V17 折叠到唯一 V1、保留 32 表，并移除 admission profile/旧 cursor/缺字段 checkpoint 与发布回填路径；首个正式版本前重建开发 catalog，不提供旧目录升级链。下面旧日期/V17 段落是演进证据，不可据此部署或混跑旧 writer。
 

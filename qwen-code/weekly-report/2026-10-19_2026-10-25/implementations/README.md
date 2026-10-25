@@ -48,9 +48,14 @@
 | [#15330](https://github.com/QwenLM/qwen-code/pull/15330) | ✅ merged | feat(managed-agent): Enable unified Shell session lifecycle | [pr-15330.md](pr-15330.md) |
 | [#15331](https://github.com/QwenLM/qwen-code/pull/15331) | ✅ merged | fix(web-shell): Align Managed sidebar with daemon navigation | [pr-15331.md](pr-15331.md) |
 | [#15448](https://github.com/QwenLM/qwen-code/pull/15448) | ✅ merged | feat(managed): add session permission rules and Auto approval | [pr-15448.md](pr-15448.md) |
-| [#15449](https://github.com/QwenLM/qwen-code/pull/15449) | open | feat(managed): add durable mid-turn user message queue | [pr-15449.md](pr-15449.md) |
-| [#15457](https://github.com/QwenLM/qwen-code/pull/15457) | open | docs(runtime): revise resident Workspace delivery scope | [pr-15457.md](pr-15457.md) |
+| [#15449](https://github.com/QwenLM/qwen-code/pull/15449) | ✅ merged | feat(managed): add durable mid-turn user message queue | [pr-15449.md](pr-15449.md) |
+| [#15457](https://github.com/QwenLM/qwen-code/pull/15457) | ✅ merged | fix(runtime): unblock independent resident workspaces and tool admission | [pr-15457.md](pr-15457.md) |
 | [#15459](https://github.com/QwenLM/qwen-code/pull/15459) | ✅ merged | fix(managed-agent): retire registered zombies before startup waits | [pr-15459.md](pr-15459.md) |
 | [#15460](https://github.com/QwenLM/qwen-code/pull/15460) | ✅ merged | test(cli): cover remaining Managed Workspace activation refusals | [pr-15460.md](pr-15460.md) |
+| [#15490](https://github.com/QwenLM/qwen-code/pull/15490) | open | feat(managed-agent): add pinned extension package management | [pr-15490.md](pr-15490.md) |
+| [#15492](https://github.com/QwenLM/qwen-code/pull/15492) | open | feat(managed): add experimental Kubernetes deployment | [pr-15492.md](pr-15492.md) |
+| [#15496](https://github.com/QwenLM/qwen-code/pull/15496) | ✅ merged | fix(web-shell): Prevent duplicate Managed composers | [pr-15496.md](pr-15496.md) |
+| [#15497](https://github.com/QwenLM/qwen-code/pull/15497) | ✅ merged | fix(cli): Hide unavailable Managed background tools | [pr-15497.md](pr-15497.md) |
+| [#15519](https://github.com/QwenLM/qwen-code/pull/15519) | ✅ merged | test(managed-agent): Add shared Harness Kubernetes qualification tools | [pr-15519.md](pr-15519.md) |
 
-_按个人 PR 口径更新于 2026-10-25_
+_按个人 PR 口径更新于 2026-10-26_

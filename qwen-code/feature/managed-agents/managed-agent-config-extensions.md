@@ -1,5 +1,15 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 固定扩展包候选，2026-10-26
+
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 为 open head `099f5f46621d`，不是 main `b3ab3ec64c81` 能力。候选从原始 git/npm/release/目录/archive 编译目标 platform/arch 的静态 Skills、commands、agents、context、MCP、Hooks、settings，去私有凭据、验路径/资源类型与预算，拒动态 Skill 权限/Hook/model/path 及 LSP/channel/workflow/executor。不读已安装宿主配置作为 Session authority，不隐式 watcher 热载。
+
+Workspace OPERATOR+部署 allowedActors/开关控制发布，100 MiB archive 以实际 bytes 摘要与签名校验、fsync/不可覆盖文件和 SQL PREPARING→PUBLISHED 保存；settings 原 scope/revision 加密、只返回键名。目录 256 包、Session 32 pins，固定 packageRevision/digest/settingsRevision；候选 V1 增三包表共 38 表，当前 main 的队列基线为 35 表，开发目录重建。
+
+配置沿唯一 config_install 链保存 effective bundle、原 Runtime/root/generation、两端 stage/enable ACK；preparing→prepared→committed→active，提交改变唯一 binding 后再激活/回读。初始化只允许已协商 lifecycle 的 Shell/MCP profile，并在持久创建 receipt 前拒 Files/Read/未协商；后续 apply 需原 Session 空闲、无活 Turn/待批/child。原未知操作保持屏障，显式恢复旧内容要求原停止证明并使用更新 revision，不回退代数或重跑未知执行。普通查询只读已提交记录。
+
+command 文件/Shell 预处理经过原权限/Hook/Action 和耐久 tool_stage；包 agent 的原 bundle/模型/工具快照不能扩权。Linux delegated cgroup 与 macOS developer process-group 明确分型，不将组消失当整机/进程树恢复证明。独立 MCP 未变精确 pin 可保留，其他 Session 不随包更新被全局重置。完整七组件、MySQL/跨进程、Linux/SSH/macOS 故障和多副本 archive 仍需独立验收；本次仅核代码/文档，未运行这些门禁。以下早期全量设计不等于该候选全部支持。
+
 > **v1.10 Workspace 接线：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节冻结 `managed-context/1` 外层 `ContextBinding`，映射 ActivationGrant、InvocationBinding、config_install、两端安装回执及 journal/checkpoint/RestoreBundle。复用既有 `config.bound/domain.committed`，不修改严格 Tool v2 内层或增加另一份配置权威；未协商或 revision/digest/generation 不匹配时不开 gate。
 
 > **阶段 H 统一设计（2026-09-20，HTML v1.7）：** 本文继续作为 MCP/Hooks 的字段级规范；它们与 Channels、自动化、子 Agent、后台 Shell、Monitor 的共同 owner、任务投影、Runtime hold 和恢复规则见[扩展运行时设计](managed-agent-extension-runtime.md)。

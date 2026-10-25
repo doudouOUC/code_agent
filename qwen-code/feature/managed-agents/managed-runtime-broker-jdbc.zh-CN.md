@@ -1,10 +1,16 @@
 # Managed Runtime Broker JDBC 持久化
 
-## 常驻范围调整候选，2026-10-25
+## 队列基线与常驻准入，2026-10-26
 
-最新 open head `d1b4639e4cb0` 还记录 S1 pin 2c0c9fa8dc4a 的原生失败：同 tenant 一个 binding DRAINING 后，不同注册盘/存储的新 Workspace 也可能因共同 /workspace canonical path 被 runtime_placement_recovery_required 拒绝。已有独立 binding 可用或另一 tenant 验收不能冲销冷准入阻塞，S1 需先解决并验证。本次只核对候选报告及主干围栏代码，没有复跑原生现场。
+main `b3ab3ec64c81` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md)：唯一 V1 增队列、消息和命令三表，当前 35 业务表。原 actor/key receipt 在 close 后可回读，新修改仍要求 ACTIVE；丢弃 blocked claim 保留原 revision/Turn/prompt，迟到已提交 user message 回执仍可消费，不重新派发。开发 catalog 重建，不是 V2 迁移或混版本 writer 兼容保证。
 
-[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 仍 open，六份双语文档提出把完整 CSI 审计移出首版前置，不改 Java/SQL/测试，也不新增平台回收 authority。既有同原 Pod/PVC handoff 保留 binding READY/owner RESERVED；显式 idle retirement 保留 DRAINING/slot/owner/history，RETURNED 仅完整 DELETE 响应（含非 2xx），UNKNOWN 不释放，不删 PVC/PV/Secret/保护对象，资源继续计费。
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 已 merged。内存/JDBC 仅双方精确 resident capability、Workspace isolation、kubernetes-workspace 时忽略相同 cwd，相同 Workspace/存储、不完整 managed context 和非 resident 路径仍拒绝。原 Harness scope 能力查询不分配物理资源；仅旧路由 404 等待原 warm。resident 声明限三文件工具及本地 Plan 退出；有效但不支持的原 PREPARED payload 派发前原子 not_started，竞争和已 dispatch/UNKNOWN 保留原证据。S1 需修复版本的新资格记录，S2/S3 物理回收仍单独设计。本次未运行源码、MySQL 或原生 ACK。
+
+## 常驻范围历史候选，2026-10-25
+
+历史 open head `d1b4639e4cb0` 记录 S1 pin 2c0c9fa8dc4a 的原生失败：同 tenant 一个 binding DRAINING 后，不同注册存储的新 Workspace 因旧围栏还匹配 /workspace 而被拒绝。后续源码修复不能追溯清除此失败或原 UNKNOWN，已有 binding/另一 tenant 资格也不足以冲销；需在修复源码复跑 S1。本次未复跑原生现场。
+
+[#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 此时为六份文档候选，现已连同上文源码修复 merged。完整 CSI 审计不再是首版前置，但不新增平台回收 authority。既有同原 Pod/PVC handoff 保留 binding READY/owner RESERVED；显式 idle retirement 保留 DRAINING/slot/owner/history，RETURNED 仅完整 DELETE 响应（含非 2xx），UNKNOWN 不释放，不删 PVC/PV/Secret/保护对象，资源继续计费。
 
 后续 S2 必须定义正常平台完成、失节点/强删隔离、原身份 readback、数据与跨 Workspace 策略，再由 S3 在同事务重验代数并释放；Pod 缺失/VolumeAttachment 消失或单一云盘状态都非单独完成证明。候选 S1 pin 2c0c9fa8dc4a 与旧撤出/ACK 基准分开，不能据范围决定宣布新源码或完整 K2 验收。本次只核对候选 diff 与 main `395c7a820a47` 的既有边界，未运行源码/MySQL/原生 ACK。
 
