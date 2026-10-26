@@ -1,8 +1,14 @@
 # Managed Runtime Broker JDBC Persistence
 
-## Queue Baseline and Resident Admission, 2026-10-26
+## Pinned Package Baseline, October 26 Weekly Review
 
-Main `b3ab3ec64c81` includes [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md): the single V1 now has 35 business tables after adding the queue, message and command tables. Original actor/key receipts remain readable after close; fresh mutations require ACTIVE. A discarded blocked claim retains its original revision/Turn/prompt so a late committed user-message receipt can settle it without redispatch. Recreate development catalogs; this is not a V2 migration or mixed-writer compatibility guarantee.
+Main `49569f16a5a3` includes [#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md), final head `099f5f46621d`, merge `41ce46af24c0`. Package publication/execution remain off by default. Package, encrypted settings and operation tables extend the queue's 35-table baseline to 38 business tables in the sole V1. Actual durable archive bytes, their digest and original operation govern publication; an effective Session bundle commits through the existing config_install domain with both endpoint ACKs, original Runtime identity and generations. Unknown installation retains its barrier; compensation needs original stopped receipts and a new revision, not a blind replay.
+
+Recreate development catalogs and match Server/SDK/Harness/Runtime and external writers. Schema version 1 does not prove mixed-writer or rollback compatibility. The 35-table and older numbered migration sections below are dated snapshots, not the current catalog. This documentation review ran no source, MySQL, independent-process or native platform gates; merge does not qualify them.
+
+## Queue Baseline and Resident Admission, October 26 Midnight Snapshot
+
+At the midnight snapshot, main `b3ab3ec64c81` included [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md): the single V1 had 35 business tables after adding the queue, message and command tables. Original actor/key receipts remain readable after close; fresh mutations require ACTIVE. A discarded blocked claim retains its original revision/Turn/prompt so a late committed user-message receipt can settle it without redispatch. Recreate development catalogs; this is not a V2 migration or mixed-writer compatibility guarantee.
 
 [#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) is merged. The in-memory/JDBC placement fence ignores equal cwd only when both requests select the exact resident capability, Workspace isolation and kubernetes-workspace provisioner. Same Workspace/storage, incomplete managed context and non-resident path fences remain. The authenticated Harness-scope capability query allocates no physical resource; only an old-route 404 waits for the original warm request. Resident declarations allow Read/Write/Edit and local Plan exit. Unsupported valid PREPARED payloads settle atomically as not_started before dispatch; races and existing dispatched/UNKNOWN results retain their original evidence. S1 requires fresh qualification on the fixed revision; S2/S3 physical reclamation remains separate. This documentation task ran no source, MySQL or native ACK checks.
 

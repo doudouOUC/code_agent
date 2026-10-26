@@ -1,10 +1,10 @@
 # Managed Agent 扩展运行时设计
 
-## 当前准入与包执行候选，2026-10-26
+## 当前准入与包执行，2026-10-26 周更
 
-main `b3ab3ec64c81` 已合入 [#15497](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15497.md)：后台 Shell 需要 publication+childRuns+domain 开关，Monitor 需要 publication+monitors+domain 开关；声明与执行同 predicate。未准入不声明 monitor，Shell schema 去 is_background、保留前台和修改无备份警示；不是增加后台清理或恢复 authority。
+main `49569f16a5a3` 已合入 [#15497](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15497.md)：后台 Shell 需要 publication+childRuns+domain 开关，Monitor 需要 publication+monitors+domain 开关；声明与执行同 predicate。未准入不声明 monitor，Shell schema 去 is_background、保留前台和修改无备份警示；不是增加后台清理或恢复 authority。
 
-[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 仍 open，补包级 effective config、原 Runtime 安装/补偿与命令 tool_stage，不取代原 MCP/Hook/child journal。原 Session/configRevision owner 先登记再启动；Linux profile 要求 delegated cgroup 成员/空树证明，macOS developer profile 使用原 ledger/boot 与登记 process-group，未知不删 owner。补偿先核原 operation/代数和 stopped receipts，再以更新 revision 恢复旧 bundle，不能杀较新 owner 或重跑未知命令。包私有资产不暴露宿主路径，Skill/command/agent 仍受原工具/Plan/审批边界；agent 私有 MCP/Hook、LSP/channel/workflow/custom executor 不在该候选范围。完整平台/故障矩阵尚需验证，本次未运行源码或真实环境门禁。
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 已合入，发布/执行默认关闭，补包级 effective config、原 Runtime 安装/补偿与命令 tool_stage，不取代原 MCP/Hook/child journal。原 Session/configRevision owner 先登记再启动；Linux profile 要求 delegated cgroup 成员/空树证明，macOS developer profile 使用原 ledger/boot 与登记 process-group，未知不删 owner。补偿先核原 operation/代数和 stopped receipts，再以更新 revision 恢复旧 bundle，不能杀较新 owner 或重跑未知命令。包私有资产不暴露宿主路径，Skill/command/agent 仍受原工具/Plan/审批边界；agent 私有 MCP/Hook、LSP/channel/workflow/custom executor 不在该切片范围。完整平台/故障矩阵尚需验证，本次未运行源码或真实环境门禁。
 
 > **方案状态（HTML v1.7，2026-09-20）：** 本文收敛阶段 H 的 MCP、Hooks、Channels、自动化、子 Agent、后台 Shell 与 Monitor。它定义目标职责、持久资源、恢复边界和 WebShell 投影，不表示这些能力已经在 Hosted Managed profile 中实现或通过生产验收。首版普通工具范围仍以[首版运行契约](managed-agent-first-runtime.md)为准。
 

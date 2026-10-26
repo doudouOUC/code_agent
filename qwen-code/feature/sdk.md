@@ -1,10 +1,10 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### 固定扩展包客户端候选，2026-10-26
+### 固定扩展包客户端最终实现，2026-10-26 周更
 
-[#15490](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 为 open head `099f5f46621d`，Java ManagedExtensionsClient、Hosted create/load 和 TS DaemonClient 同步包发布/精确 pin、加密 settings 修订、Session query/apply/continue/recover-previous。上传签名覆盖真实 archive bytes；不能用包显示版本代替 digest/packageRevision/settingsRevision。确定 revision 拒绝可刷新，未知继续原 key/operation；普通查询不自动提交配置。初始选择只允许已协商 lifecycle 的 Shell/MCP，包 agent 扩展原 launch snapshot 仍须核对原 bundle/工具/模型，不泛化为当前 main 兼容。
+[#15490](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 已以 head `099f5f46621d`、merge `41ce46af24c0` 合入 main `49569f16a5a3`，发布/执行默认关闭。Java ManagedExtensionsClient、Hosted create/load 和 TS DaemonClient 同步包发布/精确 pin、加密 settings 修订、Session query/apply/continue/recover-previous。上传签名覆盖真实 archive bytes；不能用包显示版本代替 digest/packageRevision/settingsRevision。确定 revision 拒绝可刷新，未知继续原 key/operation；普通查询不自动提交配置。初始选择只允许已协商 lifecycle 的 Shell/MCP；普通 child launch 仍为 v1 八字段，显式包 agent 使用 v2 九字段快照核对原 bundle/工具/模型，不代表任意旧客户端或无约束远端 child 兼容。
 
-main `b3ab3ec64c81` 已包含 [#15449](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 的 HTTP store user-message-queue/1，原 writer claim 与消费回执分开，V1 为 35 表；包候选另加三表共 38 表，不因 schemaVersion=1 可混跑。下面 10-25 的八字段/32 表描述是当时主干，不含候选包 agent 变体。整套 Server/SDK/Harness/外部 writer 匹配升级，开发 catalog 重建；本次未运行 SDK/跨语言或真实环境门禁。
+main `49569f16a5a3` 已包含 [#15449](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 的 HTTP store user-message-queue/1，原 writer claim 与消费回执分开；35 表为队列切片，扩展包另加三表后当前唯一 V1 共 38 表，不因 schemaVersion=1 可混跑。下面 10-25 的八字段/32 表描述是当时主干，不含后续包 agent 变体。整套 Server/SDK/Harness/外部 writer 匹配升级，开发 catalog 重建；本次未运行 SDK/跨语言或真实环境门禁。
 
 ### Session 规则与 Auto wire，2026-10-25
 

@@ -52,7 +52,7 @@
 | [#15457](https://github.com/QwenLM/qwen-code/pull/15457) | ✅ merged | fix(runtime): unblock independent resident workspaces and tool admission | [pr-15457.md](pr-15457.md) |
 | [#15459](https://github.com/QwenLM/qwen-code/pull/15459) | ✅ merged | fix(managed-agent): retire registered zombies before startup waits | [pr-15459.md](pr-15459.md) |
 | [#15460](https://github.com/QwenLM/qwen-code/pull/15460) | ✅ merged | test(cli): cover remaining Managed Workspace activation refusals | [pr-15460.md](pr-15460.md) |
-| [#15490](https://github.com/QwenLM/qwen-code/pull/15490) | open | feat(managed-agent): add pinned extension package management | [pr-15490.md](pr-15490.md) |
+| [#15490](https://github.com/QwenLM/qwen-code/pull/15490) | ✅ merged | feat(managed-agent): add pinned extension package management | [pr-15490.md](pr-15490.md) |
 | [#15492](https://github.com/QwenLM/qwen-code/pull/15492) | open | feat(managed): add experimental Kubernetes deployment | [pr-15492.md](pr-15492.md) |
 | [#15496](https://github.com/QwenLM/qwen-code/pull/15496) | ✅ merged | fix(web-shell): Prevent duplicate Managed composers | [pr-15496.md](pr-15496.md) |
 | [#15497](https://github.com/QwenLM/qwen-code/pull/15497) | ✅ merged | fix(cli): Hide unavailable Managed background tools | [pr-15497.md](pr-15497.md) |

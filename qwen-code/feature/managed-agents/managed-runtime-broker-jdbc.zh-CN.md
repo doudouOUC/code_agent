@@ -1,8 +1,14 @@
 # Managed Runtime Broker JDBC 持久化
 
-## 队列基线与常驻准入，2026-10-26
+## 固定包持久化基线，2026-10-26 周更
 
-main `b3ab3ec64c81` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md)：唯一 V1 增队列、消息和命令三表，当前 35 业务表。原 actor/key receipt 在 close 后可回读，新修改仍要求 ACTIVE；丢弃 blocked claim 保留原 revision/Turn/prompt，迟到已提交 user message 回执仍可消费，不重新派发。开发 catalog 重建，不是 V2 迁移或混版本 writer 兼容保证。
+main `49569f16a5a3` 已合入 [#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md)，最终 head `099f5f46621d`、merge `41ce46af24c0`。包发布/执行仍默认关闭；package、加密 settings 与 operation 三表在队列 35 表上增加，唯一 V1 当前 38 业务表。发布依真实耐久 archive 字节、摘要与原 operation；Session effective bundle 沿既有 config_install domain 保存两端 ACK、原 Runtime 身份与代数。安装未知保留屏障；补偿须原 stopped receipt 和新 revision，不盲重放。
+
+开发 catalog 重建，Server/SDK/Harness/Runtime 与外部 writer 匹配切换；schemaVersion=1 不证明混版本 writer 或回滚兼容。下方 35 表及旧编号 migration 段落是带日期快照，不是当前 catalog。本次文档复核未运行源码、MySQL、独立进程或原生平台门禁，合入不等于这些验收通过。
+
+## 队列基线与常驻准入，2026-10-26 凌晨快照
+
+凌晨快照 main `b3ab3ec64c81` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md)：唯一 V1 增队列、消息和命令三表，当时为 35 业务表。原 actor/key receipt 在 close 后可回读，新修改仍要求 ACTIVE；丢弃 blocked claim 保留原 revision/Turn/prompt，迟到已提交 user message 回执仍可消费，不重新派发。开发 catalog 重建，不是 V2 迁移或混版本 writer 兼容保证。
 
 [#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 已 merged。内存/JDBC 仅双方精确 resident capability、Workspace isolation、kubernetes-workspace 时忽略相同 cwd，相同 Workspace/存储、不完整 managed context 和非 resident 路径仍拒绝。原 Harness scope 能力查询不分配物理资源；仅旧路由 404 等待原 warm。resident 声明限三文件工具及本地 Plan 退出；有效但不支持的原 PREPARED payload 派发前原子 not_started，竞争和已 dispatch/UNKNOWN 保留原证据。S1 需修复版本的新资格记录，S2/S3 物理回收仍单独设计。本次未运行源码、MySQL 或原生 ACK。
 

@@ -2,13 +2,13 @@
 
 ## 当前队列、resident 修复与资格分层，2026-10-26
 
-main `b3ab3ec64c81` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 队列：claim 与已提交消费分开，失败/取消/context 漂移暂停；blocked 显式丢弃保留原 claim 身份、原 revision 和迟到回执入口，不自动重发。已提交原命令在 close 后可回读，新命令仍需 ACTIVE。唯一 V1 已增三队列表成 35 表，旧目录重建。
+main `49569f16a5a3` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 队列：claim 与已提交消费分开，失败/取消/context 漂移暂停；blocked 显式丢弃保留原 claim 身份、原 revision 和迟到回执入口，不自动重发。已提交原命令在 close 后可回读，新命令仍需 ACTIVE。唯一 V1 的队列切片为 35 表，后续扩展包合入使当前共 38 表，旧开发目录重建。
 
 [#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 已由范围文档演进为两项源码修复：仅双方精确 resident 时豁免相同 cwd，仍拒相同 Workspace/存储或不完整 managed context；原 Harness scope 查询不创建物理资源，只在旧路由 404 等待原 warm，其他失败不降级。resident 声明/执行限三文件工具及本地 Plan 退出，原 PREPARED 的不支持调用派发前原子 not_started，已 dispatch/UNKNOWN 不覆盖。旧 S1 失败必须在修复源码重新验，S2/S3 平台回收、异常隔离和 owner 释放仍未交付，RETURNED/Pod 缺失不构成释放证明。
 
 [#15519](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15519.md) 资格工具已合入：不可变源码镜像构建/显式发布、精确两现有业务节点的离线渲染、原 kube-system/控制器/Pod/EndpointSlice 身份只读预检，以及两 tenant/四 actor/八 Session 的公共效果 runner。预检 executionAcceptance=NOT_RUN；公共通过也不证明两真实 Pod/boot 的 placement、writer fence、idle release、故障或容量/HPA。失败保留原 key/ID/资源，成功只关闭 Session，不删除 Workspace/持久卷。
 
-[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 仍 open：候选 38 表与 config_install/双端 ACK，unknown 保持准入屏障；继续原 Runtime/operation，补偿先要求原 stopped receipt 再用新 revision 恢复，不重放未知命令。Linux cgroup 与 macOS developer process-group、共享耐久 archive 和全套 writer 切换需分别验证。[#15492](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15492.md) 实验单 Pod/固定原 Node 部署与网关仍 open；保留 PVC/原 Secret 不证明替换 host 可恢复，也不是共享池 HA。本次没有运行源码、Docker/kubectl、模型或真实平台门禁。
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 已合入、发布/执行默认关闭：38 表与 config_install/双端 ACK，unknown 保持准入屏障；继续原 Runtime/operation，补偿先要求原 stopped receipt 再用新 revision 恢复，不重放未知命令。Linux cgroup 与 macOS developer process-group、共享耐久 archive 和全套 writer 切换需分别验证。[#15492](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15492.md) 实验单 Pod/固定原 Node 部署与网关仍 open；最新 head `2936f4db0f3e` 仅显式禁用 broker Runtime 且两私有路径都为空时跳过路径检查，否则沿原严格目录校验。补数值 tenant/actor 与 Secret 配置断言、长历史 cursor 烟测和导航去重，但本次未执行。保留 PVC/原 Secret 不证明替换 host 可恢复，也不是共享池 HA。本次没有运行源码、Helm/Docker/kubectl、模型或真实平台门禁。
 
 ## 池与策略恢复历史快照，2026-10-25
 
@@ -16,7 +16,7 @@ main `b3ab3ec64c81` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25
 
 main `395c7a820a47` 已合入 [#15255](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15255.md)，失租双证明或原 seal/release receipt 才接管，discovery/HTTP 错误不能释放；真实 Kubernetes/多进程 shutdown 尚需独立验收。[#15448](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15448.md) 原 Turn 固定规则、Action 保存人工下限，live mode 不绕过 ask；能力缺失/规则倒退拒绝，Auto unavailable 转人工，不重放未知工具。
 
-[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 在该快照为 open，现已 merged：queued/claimed/原提交消费分开，恢复 prepared model request 时不改原请求，失败/取消/未知消费/context 改变暂停或 blocked；不靠重发/新 Turn 消除未知。35 表已成为当前目录，最终丢弃/迟到回执语义以上文为准。
+[#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 在该快照为 open，现已 merged：queued/claimed/原提交消费分开，恢复 prepared model request 时不改原请求，失败/取消/未知消费/context 改变暂停或 blocked；不靠重发/新 Turn 消除未知。35 表是扩展包合入前的队列基线，最终丢弃/迟到回执语义以上文为准。
 
 [#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 此时仅为范围文档，现已连同上文修复 merged：完整 CSI 审计不再是首版前置，保留同原 Pod/PVC handoff 与有界 DELETE/DRAINING；RETURNED 包括非 2xx，只证明收到完整响应，不证明 stop/unmount/物理 owner 释放，资源保留仍计费。S2 平台完成/异常隔离/数据策略与 S3 原子回收尚未实现，旧 ACK pin 不转为新源码资格。
 

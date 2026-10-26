@@ -2,11 +2,11 @@
 
 ## 队列、输入框与工具准入，2026-10-26
 
-main `b3ab3ec64c81` 的 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 已支持 user-message-queue/1。忙时文本/文本文件以原 key 入队，queued 可编辑、blocked 可显式丢弃但不重发；已认领原 revision/Turn/prompt 保留，迟到提交回执仍可 consumed。原命令 close 后仍可回读，新的修改要求 ACTIVE；claim 不表示已被模型看到。新表使 V1 合计 35 表。[#15496](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15496.md) 给权限 dialog key 增专用前缀，原 composer 的 DOM/草稿不因规则重渲染重建。
+main `49569f16a5a3` 的 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 已支持 user-message-queue/1。忙时文本/文本文件以原 key 入队，queued 可编辑、blocked 可显式丢弃但不重发；已认领原 revision/Turn/prompt 保留，迟到提交回执仍可 consumed。原命令 close 后仍可回读，新的修改要求 ACTIVE；claim 不表示已被模型看到。队列切片使 V1 成为 35 表，后续扩展包合入后当前为 38 表。[#15496](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15496.md) 给权限 dialog key 增专用前缀，原 composer 的 DOM/草稿不因规则重渲染重建。
 
 [#15457](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15457.md) 原 scope capability 决定 resident 仅声明 Read/Write/Edit（Plan 保留本地退出），伪造调用和旧客户端在派发前被持久拒绝；普通 profile 的 web_fetch 不受该 resident 收窄影响。[#15497](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15497.md) 缺 publication/领域 funnel/开关时隐藏 monitor/is_background，声明与执行同条件，前台说明仍警告 Shell 修改不备份。
 
-[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 仍 open：目录最多 256 包，Session 最多 32 精确 pin；确定 revision 拒绝刷新解锁，未知保留原请求键，初始选择只接已协商 lifecycle 的 Shell/MCP，不能当 main 包管理。[#15492](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15492.md) 仍 open：managed-web-config 网关隔离 daemon，固定 tenant/actor，loopback API、独立 ≥32-byte browser/signing keys，Managed-only 路由只恢复 managedSession。两者均未在本次执行组件/浏览器/部署验收。
+[#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 已合入但发布/执行默认关闭：目录最多 256 包，Session 最多 32 精确 pin；确定 revision 拒绝刷新解锁，未知保留原请求键，初始选择只接已协商 lifecycle 的 Shell/MCP。[#15492](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15492.md) 仍 open：managed-web-config 网关隔离 daemon，固定 tenant/actor，loopback API、独立 ≥32-byte browser/signing keys，Managed-only 路由只恢复 managedSession。最新 head `2936f4db0f3e` 仅在目标 URL 变化时写 history，保留其他 query/hash；烟测沿原编码 cursor 分页查找长历史中的 assistant/本次 marker，不以首页为空判失败。本次未执行组件/浏览器/部署验收。
 
 ## Session 规则与队列历史候选，2026-10-25
 
