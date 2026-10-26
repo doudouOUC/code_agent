@@ -1,5 +1,13 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+### HTTP 恢复与 reader 匹配，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15569](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md)/[#15599](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 在内部 HTTP Managed store 的 restore 请求显式 includeNativeSnapshot，默认响应仍保留原扁平 head；有 descriptor 时严验原 scope/页链/资源/sequence/digest/checkpoint 后接 tail，最后重验 writer/head。无 descriptor 沿原交易路径，已选坏 snapshot 不静默回退；最终两份 diff 重叠，不是两套 wire 协议，也未由本次验证跨语言/数据库资格。
+
+[#15626](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15626.md) 本地 reader 的内部签名改为 options，必须传 runtimeBaseDir/sessionKey 才能解析 snapshot manifest/资源；lock format2 与 minimumReader2 防旧 writer，物理冻结 offset 保留。不要将本地格式等同于 HTTP committed-prefix-v1，或据相同逻辑 v1 推断旧 writer/SDK 可混跑。
+
+[#15616](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15616.md) 删除 Public/WebShell cwd 新提交 API 及 WebShell 的 java-managed-agent-client/provider/type 接线，旧 CWD_CHANGE query/settle 仍可读取。不是宣称 Java SDK 所有历史方法都已删除；旧调用方须停止提交已退役 route。模型/审批/Plan 按独立 context capability，以下旧 cwd 能力描述按原日期保留。本次未执行 SDK、源码或真实环境门禁。
+
 ### 固定扩展包客户端最终实现，2026-10-26 周更
 
 [#15490](../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 已以 head `099f5f46621d`、merge `41ce46af24c0` 合入 main `49569f16a5a3`，发布/执行默认关闭。Java ManagedExtensionsClient、Hosted create/load 和 TS DaemonClient 同步包发布/精确 pin、加密 settings 修订、Session query/apply/continue/recover-previous。上传签名覆盖真实 archive bytes；不能用包显示版本代替 digest/packageRevision/settingsRevision。确定 revision 拒绝可刷新，未知继续原 key/operation；普通查询不自动提交配置。初始选择只允许已协商 lifecycle 的 Shell/MCP；普通 child launch 仍为 v1 八字段，显式包 agent 使用 v2 九字段快照核对原 bundle/工具/模型，不代表任意旧客户端或无约束远端 child 兼容。

@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 上传与管理入口，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15586](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15586.md) 仅在 provider/query 明确返回上传能力时启用 LOCAL/SSH_LOCAL 文件上传，最大 8 MiB。上传绑定原 source/scopeRevision/cwd，网络或 5xx 后只查询原 upload ID，确认相同 path/size/原身份后才生成 Workspace 引用；scope 切换或 abort 不回写旧 composer。该引用不是任意二进制模型附件，不覆盖既有文件或自动创建父目录。[#15588](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15588.md) 只补上传 query 参数、octet-stream、原 ID 和授权错误码 fixture，不是本次上传验收通过。
+
+[#15616](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15616.md) 将改名放入 Session actions，支持未选中 Session 的原目标 ID，结果不套用到当前选中项；扩展/MCP 汇入统一 plugin manager，home 重复 Workspace/control 和创建区管理 Skills 快捷入口移除。cwdChange 固定 false，公开 /sessions/{id}/cwd、WebShell /sessions/cwd/change、client/provider/hook/生成类型的新提交均退役；旧 operation 查询/结算与原 context 协议保留，模型/审批/Plan 仍按独立 context predicate。下方旧 cwd 交互为历史设计，不是当前可用按钮/API；本次未运行组件、浏览器或真实 Runtime。
+
 ## 队列、输入框与工具准入，2026-10-26
 
 main `49569f16a5a3` 的 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 已支持 user-message-queue/1。忙时文本/文本文件以原 key 入队，queued 可编辑、blocked 可显式丢弃但不重发；已认领原 revision/Turn/prompt 保留，迟到提交回执仍可 consumed。原命令 close 后仍可回读，新的修改要求 ACTIVE；claim 不表示已被模型看到。队列切片使 V1 成为 35 表，后续扩展包合入后当前为 38 表。[#15496](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15496.md) 给权限 dialog key 增专用前缀，原 composer 的 DOM/草稿不因规则重渲染重建。

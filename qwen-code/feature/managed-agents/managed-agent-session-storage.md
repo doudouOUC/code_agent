@@ -1,5 +1,13 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 当前快照布局，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15566](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15566.md) 终态索引仅派生自原 activation/inbox journal，不靠索引重建不存在的执行事实。[#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md)/[#15599](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 外置 native qwen-managed-native-session-snapshot/1、committed-prefix-v1 固定原 revision/sequence/digest/checkpoint 与资源 census；每页/单批至多 16 MiB，最多 100 页一批，原 writer/head 和 NATIVE_SNAPSHOT pins 贯穿发布/读取。HTTP 恢复验证 prefix+tail，不使用公共消息 snapshot 代替 native replay。
+
+[#15626](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15626.md) 的 qwen-managed-local-journal-snapshot/1 是另一套本地物理布局，只在 certified sealed resume 完整准入后一次转换；new/static read/未提交尾部不触发，已有 base 不重复轮换。先持久原 bytes 页/manifest/资源闭包，再以 lock schema3/format2 围栏替换为必要 owner 前缀、minimumReader=managed-session/2 header 和紧邻 base。逻辑 UUID、sequence、commit digest 不变；读取将逻辑 prefix+物理 tail 交原 scanner，冻结 maxBytes 与 committed/uncommitted offsets 仍按物理位置换算。
+
+资源只按 schema 声明的 ref 边遍历，opaque input/工具参数/replyContext 不猜引用；页、manifest 和 tail 依赖均核同 scope/bytes/摘要，title/source 用原 anchors 加已提交 tail。no-follow 读同一 generation，追加不等于允许前缀改写；不确定 rename 后保留 fence，旧 writer 不可接管。下方 2026-09 的格式/能力状态是历史设计，不是当前落地清单。本次未执行源码或真实文件系统门禁；完整 prefix 镜像不证明常数内存、历史删除、资源 GC 或跨主机恢复。
+
 > **v1.10 Workspace 接线：** [v1.10 契约收敛](managed-agent-contract-closure.md)第 4 节冻结 `managed-context/1` 外层 `ContextBinding`，映射 ActivationGrant、InvocationBinding、config_install、两端安装回执及 journal/checkpoint/RestoreBundle。复用既有 `config.bound/domain.committed`，不修改严格 Tool v2 内层或增加另一份配置权威；未协商或 revision/digest/generation 不匹配时不开 gate。
 
 > **普通工具接线（2026-09-20，HTML v1.7）：** 普通工具首版的 Bundle、工作区当前文件、稳定 ownerSessionId 的历史备份及 qwen 资源仓库分别按[存储与回收接线](managed-agent-ordinary-tools-integration.md#6-workspace-持久性与空闲环境回收)保存；计算环境回收不删除它们，history 元数据存在不等于备份 bytes 已可恢复。

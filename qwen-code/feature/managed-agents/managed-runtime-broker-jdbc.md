@@ -1,5 +1,15 @@
 # Managed Runtime Broker JDBC Persistence
 
+## Native Snapshot Pins and Upload Ownership, October 27
+
+Main `ca9d5f7ffab9` includes [#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md): native committed-prefix pages/manifest and their original JOURNAL dependency census are pinned by NATIVE_SNAPSHOT. Publication locks the original writer/placement/ACTIVE/READY scope, freezes revision/sequence/digest, protects reads and revalidates the original head before commit. The owner CHECK changes in the sole V1, not a new table or V2 migration. Retirement removes native pins in bounded batches and refuses completion while any remain; snapshot existence does not authorize journal deletion or resource collection.
+
+[#15599](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) selects a native image no newer than the frozen restore head, rechecking original generation, scope and coverage. The HTTP consumer verifies the page/transaction/resource chain and tail before updating its grant. Its focused changes overlap the later final #15569 diff; public message snapshots remain separate and corrupt selected images do not silently fall back.
+
+[#15586](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15586.md) extends the operation CHECK with WORKSPACE_UPLOAD. LOCAL/SSH_LOCAL admission freezes actor, scope, original target and payload digest in ma_operation, acquiring the exact idle physical storage holder. Only a fresh operation sends bytes; reconciliation queries the original upload ID. A confirmed original terminal clears only its holder, while uncertainty retains ownership. No table is added: the catalog still has 38 business tables, with matching consumers and recreated development catalogs required.
+
+[#15585](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15585.md) only updates lifecycle-v2 tool and 38-table acceptance fixtures. This documentation task ran no source, MySQL, independent-process or native platform gates; fixture alignment and merge do not qualify S1, safe reuse or CSI recovery.
+
 ## Pinned Package Baseline, October 26 Weekly Review
 
 Main `49569f16a5a3` includes [#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md), final head `099f5f46621d`, merge `41ce46af24c0`. Package publication/execution remain off by default. Package, encrypted settings and operation tables extend the queue's 35-table baseline to 38 business tables in the sole V1. Actual durable archive bytes, their digest and original operation govern publication; an effective Session bundle commits through the existing config_install domain with both endpoint ACKs, original Runtime identity and generations. Unknown installation retains its barrier; compensation needs original stopped receipts and a new revision, not a blind replay.

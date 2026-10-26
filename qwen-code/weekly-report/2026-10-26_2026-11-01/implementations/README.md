@@ -1,0 +1,15 @@
+# 2026-10-26 ~ 2026-11-01 PR 实现文档
+
+| PR | 状态 | 标题 | 实现文档 |
+|---|---|---|---|
+| [#15566](https://github.com/QwenLM/qwen-code/pull/15566) | ✅ merged | feat(core): Add durable terminal identity lookup | [pr-15566.md](pr-15566.md) |
+| [#15569](https://github.com/QwenLM/qwen-code/pull/15569) | ✅ merged | feat(managed-agent): add native snapshots and HTTP recovery | [pr-15569.md](pr-15569.md) |
+| [#15585](https://github.com/QwenLM/qwen-code/pull/15585) | ✅ merged | test(managed-agent): align S1 acceptance fixtures with runtime contracts | [pr-15585.md](pr-15585.md) |
+| [#15586](https://github.com/QwenLM/qwen-code/pull/15586) | ✅ merged | feat(managed-agent): support Workspace file uploads | [pr-15586.md](pr-15586.md) |
+| [#15588](https://github.com/QwenLM/qwen-code/pull/15588) | ✅ merged | test(managed-agent): Fix workspace upload admission fixtures | [pr-15588.md](pr-15588.md) |
+| [#15599](https://github.com/QwenLM/qwen-code/pull/15599) | ✅ merged | feat(core): restore HTTP managed sessions from native snapshots | [pr-15599.md](pr-15599.md) |
+| [#15608](https://github.com/QwenLM/qwen-code/pull/15608) | ✅ merged | fix(managed-agent): retry read-only attestation after EOF | [pr-15608.md](pr-15608.md) |
+| [#15616](https://github.com/QwenLM/qwen-code/pull/15616) | ✅ merged | fix(managed-agent)!: simplify Web Shell controls and retire cwd submissions | [pr-15616.md](pr-15616.md) |
+| [#15626](https://github.com/QwenLM/qwen-code/pull/15626) | ✅ merged | feat(core): add local managed journal snapshot recovery | [pr-15626.md](pr-15626.md) |
+
+_按个人 PR 口径更新于 2026-10-27_

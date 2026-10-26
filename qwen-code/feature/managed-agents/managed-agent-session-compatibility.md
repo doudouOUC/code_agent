@@ -1,5 +1,11 @@
 # Session 服务：兼容接口与实现串联
 
+## 当前接口与 reader 屏障，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15616](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15616.md) 退役 Public/WebShell cwd 新提交 route、请求类型、provider/control/hook 与新 admission，cwdChange 固定 false；旧 CWD_CHANGE 的 query/协调/结算和原 context 协议保留。mayChangeContext 独立用于模型、审批和 Plan，不能因取消 cwd 同步关闭它们，也不能用下方旧设计/方法表证明当前仍可提交 cwd。
+
+[#15626](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15626.md) 将内部 readManagedSessionLog/LocalJsonl reader 改为含 transcriptPath/runtimeBaseDir/sessionKey/maxBytes 的 options，消费者同步读本地 snapshot prefix+tail。仅认证 sealed resume 提升 lock format2、写 reader2 header/base，旧 writer 不得降级接管；普通 release 不清 format2 屏障，未知替换继续拒写/保留原证据。它不是旧 reader 无条件可读或可回滚保证，部署须匹配全部 writer/reader；不修改 legacy 引擎归属。本次未执行源码、跨进程或故障资格。
+
 > **HTML 对齐（2026-09-18）：** 此清单继续服务 B 的同 daemon 双引擎与 Java→qwen serve 契约复用，保护 Legacy/Core/ACP 原调用者。D 的 Java 公共 API 是独立投影，不要求 Java 实现全部 daemon 方法；HTML 未指定前端 Provider 类名。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。
 
 历史更新日期：2026-09-10。源码基线 `a8360814668b3dfdff72ad3d99cbcaf26dd009a9`；本文细化 daemon 内[三层全局架构](managed-agent-session-harness-runtime.md)第 4、10、12 节，逐方法证据见[兼容映射附录](managed-agent-session-method-map.md)。历史 daemon 实施顺序见[首阶段计划](managed-agent-daemon-default-plan.md)，当前实施顺序以 HTML 的 A～H 为准。

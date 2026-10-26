@@ -1,5 +1,13 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 原 journal、快照与上传占用，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15566](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15566.md) 是 journal 校验的派生 terminal index：lazy fsync/hard-link 发布、同原 bytes 读取，缺失重建而冲突拒绝；终态 mutation 不依赖索引，不做 eviction。[#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md) 的 native snapshot 则保存原 committed prefix 页/manifest/census，用 NATIVE_SNAPSHOT pins 固定原资源；普通资源路径拒保留 snapshot kinds，退休后才有界收集 pins。[#15599](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 将该存储接到 HTTP prefix+tail reader，重验原 writer/head/页链/依赖，不把公共消息 snapshot 当执行权威。两份最终 diff 有重叠，不能累计为两套实现。
+
+[#15626](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15626.md) 本地格式独立：认证 sealed resume 才一次发布原 bytes 的 ≤16 MiB 事务边界页和资源 manifest，随后替换为原 owner 前缀/reader2 header/base/tail。format2 lock、物理 offset、原 UUID/sequence/digest 均保留；未知替换不释放，schema 声明外的 opaque JSON 不猜依赖。仍读取完整逻辑 prefix，不是常量状态或 GC。
+
+[#15586](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15586.md) 上传复用 ma_operation 的 WORKSPACE_UPLOAD 与原 physical holder，冻结原 scope/actor/目标/sha256；新请求一次传 bytes，未知只 status-only，终态原子清自己的 holder。NATIVE_SNAPSHOT owner 与 WORKSPACE_UPLOAD 仅扩唯一 V1 CHECK，当前仍 38 业务表；新开发 catalog 重建，旧 writer 不能凭相同版本混跑。本次未执行源码、MySQL、跨进程或文件系统故障门禁，以上能力不授权删除原 journal/资源或重放未知执行。
+
 ## 当前 38 表与固定扩展包，2026-10-26 周更
 
 main `49569f16a5a3` 包含 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md)：在唯一 V1 增 ma_user_message_queue、ma_user_message、ma_user_message_command，使队列切片合计 35 表，不是 V2 迁移。原 actor/key/摘要 receipt、context/sequence/revision、原 Turn/prompt 和暂停状态均耐久；先锁 Session 回读已提交命令，close 后原键可重放但拒新修改。blocked 丢弃保留已认领 revision/Turn，原已验证 journal user message.committed 的迟到消费回执仍可结算 withdrawn，不把未知输入再开新 Turn。

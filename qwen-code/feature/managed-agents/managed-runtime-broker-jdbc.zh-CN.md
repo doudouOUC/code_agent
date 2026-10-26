@@ -1,5 +1,15 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 原生快照 pins 与上传占用，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md) 将 native committed-prefix 页/manifest 及原 JOURNAL 依赖 census 固定为 NATIVE_SNAPSHOT pins。发布锁定原 writer/placement/ACTIVE/READY scope，冻结 revision/sequence/digest，保护读取并在提交前重验原 head。仅修改唯一 V1 的 owner CHECK，不新增表或 V2 migration。退休按有界批次移除 native pins，遗留时拒绝完成；快照存在不授权删 journal 或收集资源。
+
+[#15599](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 只选冻结 restore head 以内的原生镜像，重验原 generation/scope/覆盖；HTTP consumer 校验页/交易/资源链和 tail 后才更新 grant。其聚焦接线与后来 #15569 最终 diff 重叠，公共消息 snapshot 仍是另一种投影，已选坏镜像不静默回退。
+
+[#15586](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15586.md) 在 operation CHECK 增 WORKSPACE_UPLOAD。LOCAL/SSH_LOCAL 准入将原 actor/scope/目标/载荷摘要存入 ma_operation，取得准确空闲 physical storage 的 holder；只有新操作传 bytes，后续对账只查询原 upload ID。原已确认终态仅清自己的 holder，未知仍保留占用。不加表，当前仍 38 业务表，consumer 匹配并重建开发 catalog。
+
+[#15585](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15585.md) 只对齐 lifecycle v2 工具及 38 表 fixture。本次文档任务未执行源码、MySQL、独立进程或原生平台门禁；fixture 修正与合入不证明 S1、安全复用或 CSI 恢复通过。
+
 ## 固定包持久化基线，2026-10-26 周更
 
 main `49569f16a5a3` 已合入 [#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md)，最终 head `099f5f46621d`、merge `41ce46af24c0`。包发布/执行仍默认关闭；package、加密 settings 与 operation 三表在队列 35 表上增加，唯一 V1 当前 38 业务表。发布依真实耐久 archive 字节、摘要与原 operation；Session effective bundle 沿既有 config_install domain 保存两端 ACK、原 Runtime 身份与代数。安装未知保留屏障；补偿须原 stopped receipt 和新 revision，不盲重放。

@@ -1,5 +1,15 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 原生快照与原身份对账，2026-10-27
+
+main `ca9d5f7ffab9` 的 [#15566](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15566.md) 仅从原 journal 已验证终态物化身份索引，缺失可重建、冲突拒绝，既不重新入队也不淘汰历史。[#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md)/[#15599](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 发布/选择原 writer/head 范围内的 native committed prefix，HTTP 校验 scope、页链、资源闭包与 tail，最终重验原 head；已选损坏快照不静默回退。NATIVE_SNAPSHOT pins 仍参与保留/退休，不因 snapshot 存在允许删除 journal、换 owner 或重放未知工具。
+
+[#15626](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15626.md) 的本地路径只在认证 sealed resume 后一次转换，先持久原 bytes/资源闭包再围栏替换。format2/reader2 和原 proof 不降级；物理冻结 offset 显式换算，未知 rename 保留 active/seal 屏障并拒后续写/释放。它不是 HTTP snapshot 格式、后台周期轮换或资源 GC，仍恢复完整逻辑前缀。
+
+[#15586](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15586.md) 上传先保存原 actor/目标/摘要和 physical holder；新操作只派发一次 bytes，失答、重复和扫描对账仅查原 upload ID。未知进程/存储继续占用，原 receipt 或同原目标检查形成终态才释放自己，不能换 ID/目标重写。[#15608](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15608.md) 另仅只读 attestation 的 EOF 在原剩余 deadline 内重试一次，同原 bytes/lease/incarnation；install 等 mutation 不重试。
+
+[#15585](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15585.md) 只是 lifecycle v2 工具声明/38 表 fixture 对齐，不清除过去的 S1 失败，也不证明 CSI/共享池真实资格。本次只核源码与文档，未运行源码、MySQL、浏览器、SSH/CSI、模型或部署门禁。
+
 ## 当前队列、resident 修复与资格分层，2026-10-26
 
 main `49569f16a5a3` 已合入 [#15449](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15449.md) 队列：claim 与已提交消费分开，失败/取消/context 漂移暂停；blocked 显式丢弃保留原 claim 身份、原 revision 和迟到回执入口，不自动重发。已提交原命令在 close 后可回读，新命令仍需 ACTIVE。唯一 V1 的队列切片为 35 表，后续扩展包合入使当前共 38 表，旧开发目录重建。
