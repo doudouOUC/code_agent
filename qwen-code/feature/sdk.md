@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+### 固定前缀历史接口候选，2026-10-28
+
+main `32f6713ce639` 尚无 [#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `934577e7f62e`）的 bounded history。当前 diff 给内部 restore 增显式 includeNativeHistory/nativeHistory version1，history:query/backfill 继续原 writer token 与 Workspace/Session 范围；固定 journal revision/sequence/digest，未覆盖或坏 view 不能当空。Core journal scan、历史点查/迭代、checkpoint view 及 Hosted/ACP/Goal/recorder 同步迁移为异步消费，不是独立公开 SDK 稳定性承诺。
+
+完整 Managed replay 改可重开 recordHistory，有限 recent/legacy 数组保持原形状；ACP bulk 超限返回 HistoryReplayLimitError，不隐式截短成功。主干快照基础和 reader2 仍按下方已合入边界；候选 V1 40 表与 async consumer 必须配套，不能凭版本相同混跑旧 writer。本次未执行 SDK/源码、规模、MySQL 或平台资格。
+
 ### HTTP 恢复与 reader 匹配，2026-10-27
 
 main `ca9d5f7ffab9` 的 [#15569](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md)/[#15599](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 在内部 HTTP Managed store 的 restore 请求显式 includeNativeSnapshot，默认响应仍保留原扁平 head；有 descriptor 时严验原 scope/页链/资源/sequence/digest/checkpoint 后接 tail，最后重验 writer/head。无 descriptor 沿原交易路径，已选坏 snapshot 不静默回退；最终两份 diff 重叠，不是两套 wire 协议，也未由本次验证跨语言/数据库资格。

@@ -11,5 +11,11 @@
 | [#15608](https://github.com/QwenLM/qwen-code/pull/15608) | ✅ merged | fix(managed-agent): retry read-only attestation after EOF | [pr-15608.md](pr-15608.md) |
 | [#15616](https://github.com/QwenLM/qwen-code/pull/15616) | ✅ merged | fix(managed-agent)!: simplify Web Shell controls and retire cwd submissions | [pr-15616.md](pr-15616.md) |
 | [#15626](https://github.com/QwenLM/qwen-code/pull/15626) | ✅ merged | feat(core): add local managed journal snapshot recovery | [pr-15626.md](pr-15626.md) |
+| [#15670](https://github.com/QwenLM/qwen-code/pull/15670) | ✅ merged | fix(serve): Fix Hosted local state and foreground Shell validation | [pr-15670.md](pr-15670.md) |
+| [#15676](https://github.com/QwenLM/qwen-code/pull/15676) | ✅ merged | fix(ci): Isolate Managed runtime release test classes | [pr-15676.md](pr-15676.md) |
+| [#15696](https://github.com/QwenLM/qwen-code/pull/15696) | open | feat(managed): Add bounded authority history queries | [pr-15696.md](pr-15696.md) |
+| [#15713](https://github.com/QwenLM/qwen-code/pull/15713) | ✅ merged | fix(ci): Preserve canonical artifacts across job retries | [pr-15713.md](pr-15713.md) |
+| [#15715](https://github.com/QwenLM/qwen-code/pull/15715) | ✅ merged | test(managed-agent): initialize the snapshot pool connection synchronously | [pr-15715.md](pr-15715.md) |
+| [#15729](https://github.com/QwenLM/qwen-code/pull/15729) | open | feat(runtime): add resident workspace reclamation and reuse | [pr-15729.md](pr-15729.md) |
 
-_按个人 PR 口径更新于 2026-10-27_
+_按个人 PR 口径更新于 2026-10-28_

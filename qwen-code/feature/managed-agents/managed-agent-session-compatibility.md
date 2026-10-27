@@ -1,5 +1,11 @@
 # Session 服务：兼容接口与实现串联
 
+## 异步历史内部契约候选，2026-10-28
+
+main `32f6713ce639` 尚未合入 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `934577e7f62e`）。当前 diff 将 Core 冷历史、回执、checkpoint/extension 查询变 Promise，journal reader 必须支持 scan(consume)，按原前缀异步迭代；Hosted/ACP/Goal/recorder/恢复消费者需一同升级，不能替换同步方法后仍把 Promise 当布尔值或数组。message-only/history/context 投影分开，终态 UUID 不冒充消息父节点。
+
+restore 显式 includeNativeHistory 才回 nativeHistory version1，新增路由仍原 writer token/Workspace 授权；不改变公共事件类型，也不把内部变更承诺成旧 consumer 无条件兼容。Managed 完整 replay 使用可重开的 recordHistory，ACP bulk 超原 bytes/update 限额显式失败而非短成功。候选 V1/40 表需匹配全部消费者/开发 catalog；main 仍 38 表及下方 reader2 屏障。本次未运行跨语言、源码或恢复资格。
+
 ## 当前接口与 reader 屏障，2026-10-27
 
 main `ca9d5f7ffab9` 的 [#15616](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15616.md) 退役 Public/WebShell cwd 新提交 route、请求类型、provider/control/hook 与新 admission，cwdChange 固定 false；旧 CWD_CHANGE 的 query/协调/结算和原 context 协议保留。mayChangeContext 独立用于模型、审批和 Plan，不能因取消 cwd 同步关闭它们，也不能用下方旧设计/方法表证明当前仍可提交 cwd。

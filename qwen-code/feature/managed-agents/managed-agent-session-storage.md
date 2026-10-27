@@ -1,5 +1,11 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 有界历史读取候选，2026-10-28
+
+main `32f6713ce639` 已有下方四项索引/快照基础，但 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `934577e7f62e`）的有界 authority/restore 尚未合入。该 diff 固定原 scope/committed sequence/digest，HTTP 另固定 revision、文件固定 generation；历史点查和迭代异步，默认事件页 100/上限 256，最近事件至多 1,024 项/8 MiB，历史 cache 至多 2,048 项/4 MiB，活跃状态按生命周期保留。
+
+文件派生查询从本次完整验证的 canonical prefix 重建，64 KiB trie 与目录摘要/源 locator 保留旧 key/版本；SQL 两张新表使候选 V1 为 40 表。原事务验证与完整覆盖才允许 absence，派生缺损可串行重建，canonical 损坏显式阻塞；未知 append 不变成未执行。HTTP、本地 snapshot+tail、activation/inbox v2 snapshot 都改流式 scanner/编码，不删除原记录或资源。scratch 大小、写放大、冷扫描延迟和活跃上下文不是固定；本次未运行源码/规模/数据库验收。
+
 ## 当前快照布局，2026-10-27
 
 main `ca9d5f7ffab9` 的 [#15566](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15566.md) 终态索引仅派生自原 activation/inbox journal，不靠索引重建不存在的执行事实。[#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md)/[#15599](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15599.md) 外置 native qwen-managed-native-session-snapshot/1、committed-prefix-v1 固定原 revision/sequence/digest/checkpoint 与资源 census；每页/单批至多 16 MiB，最多 100 页一批，原 writer/head 和 NATIVE_SNAPSHOT pins 贯穿发布/读取。HTTP 恢复验证 prefix+tail，不使用公共消息 snapshot 代替 native replay。

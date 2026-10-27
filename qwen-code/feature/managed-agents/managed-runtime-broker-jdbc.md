@@ -1,5 +1,13 @@
 # Managed Runtime Broker JDBC Persistence
 
+## Open History and Reclamation Proposals, October 28
+
+Main `32f6713ce639` still has the sole V1 with 38 business tables. [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) is open at `934577e7f62e`: its two generation-qualified history state/fact tables produce a 40-table candidate baseline, not a landed migration. Canonical commits append derived facts in the same transaction; bounded backfill advances continuous coverage, bucket counts and source transaction locators/digests verify answers, and repair uses generation CAS. Query/backfill preserve original writer-token and Workspace/Session authorization. Missing coverage or corrupt views are errors, not absence; canonical corruption is never repaired as an index issue.
+
+[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) is open at `d46b8aa599e2`: it adds only the finalizer-attempt CHECK and durable baseline/cleanup receipts to existing retirement operations. Normal original-container termination, fresh same-boot Node/Lease, unmount and detach evidence precede PLATFORM_CLEANED; only then may finalizer removal and original Pod disappearance precede the fenced RELEASED transaction. Resident odd/even reservation revisions allow same-tenant reuse while retaining data and tenant ownership. Main still lacks this completion path; DELETE success or an early 404 is not a release proof, and exceptional node fencing or cross-tenant reuse is excluded.
+
+Merged [#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) only sets initialSize=1 before initializing the single-connection snapshot test pool, preserving maxWait=500 ms. It does not change production pooling. This task ran no source, scale, MySQL or native platform gates. Neither an unchanged V1 label nor test-fixture alignment proves mixed-version catalog compatibility or release qualification.
+
 ## Native Snapshot Pins and Upload Ownership, October 27
 
 Main `ca9d5f7ffab9` includes [#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md): native committed-prefix pages/manifest and their original JOURNAL dependency census are pinned by NATIVE_SNAPSHOT. Publication locks the original writer/placement/ACTIVE/READY scope, freezes revision/sequence/digest, protects reads and revalidates the original head before commit. The owner CHECK changes in the sole V1, not a new table or V2 migration. Retirement removes native pins in bounded batches and refuses completion while any remain; snapshot existence does not authorize journal deletion or resource collection.

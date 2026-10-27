@@ -1,5 +1,13 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 尚未合入的历史查询与回收方案，2026-10-28
+
+main `32f6713ce639` 仍唯一 V1/38 业务表。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `934577e7f62e` 的两张 generation-qualified history state/fact 表形成 40 表候选，不是已落地迁移。新派生 facts 与 canonical commit 同事务写，旧数据有界连续 backfill，bucket 计数及原事务 locator/digest 核验答案，repair 使用 generation CAS。query/backfill 保留原 writer token 和 Workspace/Session 授权；未覆盖或损坏是错误，不是 absence，canonical 损坏不能按索引问题修写。
+
+[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) open head `d46b8aa599e2` 仅扩 finalizer-attempt CHECK，在既有 retirement operation 保存 baseline/cleanup receipt。原 container 正常终止、同 boot 的新鲜 Node/Lease、卸载与 detach 证据先形成 PLATFORM_CLEANED，才允许移 finalizer、确认原 Pod 消失和 fenced RELEASED 事务。resident 奇偶 reservation revision 支撑同租户保留数据复用，tenant owner 不清；main 尚无此闭环，DELETE 成功/提前 404 不是释放证明，异常节点 fence 和跨租户复用不覆盖。
+
+已合并 [#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 只在 snapshot 单连接测试池 init 前设 initialSize=1，保留 maxWait=500 ms，不改生产池。本次未运行源码、规模、MySQL 或真实平台门禁；相同 V1 标签和 fixture 对齐都不证明混版本 catalog 兼容或发行资格。
+
 ## 原生快照 pins 与上传占用，2026-10-27
 
 main `ca9d5f7ffab9` 的 [#15569](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15569.md) 将 native committed-prefix 页/manifest 及原 JOURNAL 依赖 census 固定为 NATIVE_SNAPSHOT pins。发布锁定原 writer/placement/ACTIVE/READY scope，冻结 revision/sequence/digest，保护读取并在提交前重验原 head。仅修改唯一 V1 的 owner CHECK，不新增表或 V2 migration。退休按有界批次移除 native pins，遗留时拒绝完成；快照存在不授权删 journal 或收集资源。

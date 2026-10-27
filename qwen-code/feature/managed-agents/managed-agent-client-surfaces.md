@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## Hosted 身份与前台参数，2026-10-28
+
+main `32f6713ce639` 已包含 [#15670](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15670.md)：Hosted 文本/Hook/workflow/压缩配置以原 store Session ID、chatRecording=false 和内部 sessionIdGenerated=true 跳过本地 transcript 占用扫描，不改普通用户 ID 的大小写冲突检查。直接/延迟 Hosted profile 不做本地分支 preparation 恢复或 PR timer；普通 daemon 仍保留。
+
+Shell 声明和输入按实际 backgroundShellAdmitted：有能力时显式 false 归一化为 boolean false，缺能力仍拒显式字段，畸形值不误报功能整体不可用。此修复不扩大后台/Monitor 能力、不绕 publisher/领域 owner/原 Broker 准入；本次未运行组件、源码或模型验收。
+
 ## 上传与管理入口，2026-10-27
 
 main `ca9d5f7ffab9` 的 [#15586](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15586.md) 仅在 provider/query 明确返回上传能力时启用 LOCAL/SSH_LOCAL 文件上传，最大 8 MiB。上传绑定原 source/scopeRevision/cwd，网络或 5xx 后只查询原 upload ID，确认相同 path/size/原身份后才生成 Workspace 引用；scope 切换或 abort 不回写旧 composer。该引用不是任意二进制模型附件，不覆盖既有文件或自动创建父目录。[#15588](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15588.md) 只补上传 query 参数、octet-stream、原 ID 和授权错误码 fixture，不是本次上传验收通过。
