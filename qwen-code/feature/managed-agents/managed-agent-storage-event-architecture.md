@@ -1,10 +1,12 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## 查询视图与回收方案仍 open，2026-10-28
+## 查询候选与已合入正常回收，2026-10-29
 
-main `32f6713ce639` 仍为唯一 V1/38 表，已有 snapshot/上传边界不变。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 当前 open head `934577e7f62e` 增两张 generation-qualified history state/fact 表，成为该 diff 的 40 表基线；新 fact 同 canonical commit 事务写，旧数据每批至多 100 事务连续 backfill，256 hash bucket 计数与原 locator/ordinal/digest 证实答案。repair CAS 换派生代、旧行分批清理，不修写 canonical 损坏。文件侧 64 KiB trie 页、固定 root/源 block 与共享 2,048 项/4 MiB cache；恢复逐事务流式扫描，缺 view 不能返回空，未知 append 不由索引结算。
+main `dda006c237ee` 仍为唯一 V1/38 表，已有 snapshot/上传边界不变。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 当前 open head `2fda44212b59` 增两张 generation-qualified history state/fact 表，成为该 diff 的 40 表基线；新 fact 同 canonical commit 事务写，旧数据每批至多 100 事务连续 backfill，256 hash bucket 计数与原 locator/ordinal/digest 证实答案。repair CAS 换派生代、旧行分批清理，不修写 canonical 损坏。文件侧 64 KiB trie 页、固定 root/源 block 与共享 2,048 项/4 MiB cache；恢复逐事务流式扫描，缺 view 不能返回空，未知 append 不由索引结算。
 
-[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 当前 open head `d46b8aa599e2` 只扩 finalizer attempt CHECK，不增表；原 retirement plan/baseline/receipt 和 claim 贯穿正常平台回收，release 同事务释放原 binding/slot/physical owner。resident 奇数 RESERVED/偶数 RELEASED revision 支撑后续 reserve，保留 owner tenant 和原磁盘数据，只同租户管理员交接；普通 CSI revision 不放宽。主干尚无此闭环，不能凭 Pod 消失清 owner 或跨租户复用。本次未运行源码、MySQL、规模或真实 CSI；相同 V1 不是旧 catalog/writer 混跑保证。
+[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 已 merged，只扩 finalizer attempt CHECK、不增表；原 retirement plan/baseline/receipt 和 claim 贯穿正常平台回收，release 同事务释放原 binding/slot/physical owner。resident 奇数 RESERVED/偶数 RELEASED revision 支撑后续 reserve，保留 owner tenant 和原磁盘数据，只同租户管理员交接；普通 CSI revision 不放宽，不能凭 Pod 消失清 owner 或跨租户复用。
+
+新 open [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) head `e8e80328de20` 另增 ma_session_worktree 与 SESSION_WORKTREE operation CHECK，独立候选 V1/39 表，未与 #15696 的 40 表整合。原 Session/create receipt/冻结 commit/target binding 同事务入库，Git completion receipt 和物理维护 hold 保留原身份；共享导入 marker 存服务 stateDirectory，不授权独占 fence/migration/rewind。本次未运行源码、MySQL、规模或真实 CSI；main 仍 38 表，相同 V1 不证明混版本 catalog/writer 兼容。
 
 ## 原 journal、快照与上传占用，2026-10-27
 

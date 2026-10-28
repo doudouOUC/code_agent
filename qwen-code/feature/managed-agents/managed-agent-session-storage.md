@@ -1,10 +1,12 @@
 # Managed Session：记录格式、提交与协议限额
 
-## 有界历史读取候选，2026-10-28
+## 有界历史读取候选，2026-10-29
 
-main `32f6713ce639` 已有下方四项索引/快照基础，但 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `934577e7f62e`）的有界 authority/restore 尚未合入。该 diff 固定原 scope/committed sequence/digest，HTTP 另固定 revision、文件固定 generation；历史点查和迭代异步，默认事件页 100/上限 256，最近事件至多 1,024 项/8 MiB，历史 cache 至多 2,048 项/4 MiB，活跃状态按生命周期保留。
+main `dda006c237ee` 已有下方四项索引/快照基础，但 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `2fda44212b59`）的有界 authority/restore 尚未合入。该 diff 固定原 scope/committed sequence/digest，HTTP 另固定 revision、文件固定 generation；历史点查和迭代异步，默认事件页 100/上限 256，最近事件至多 1,024 项/8 MiB，历史 cache 至多 2,048 项/4 MiB，活跃状态按生命周期保留。
 
 文件派生查询从本次完整验证的 canonical prefix 重建，64 KiB trie 与目录摘要/源 locator 保留旧 key/版本；SQL 两张新表使候选 V1 为 40 表。原事务验证与完整覆盖才允许 absence，派生缺损可串行重建，canonical 损坏显式阻塞；未知 append 不变成未执行。HTTP、本地 snapshot+tail、activation/inbox v2 snapshot 都改流式 scanner/编码，不删除原记录或资源。scratch 大小、写放大、冷扫描延迟和活跃上下文不是固定；本次未运行源码/规模/数据库验收。
+
+本次 #15696 head 增量将来源页大小候选/正文都限定捕获的 head，READ_COMMITTED 并发提交不混入原水位；native 冷读使用仍有效 read grant，不先续普通 writer。未结算追加仍拒视图，恢复状态等待证据而非推断不存在。launcher/scale fork 的 JDK 临时 direct-buffer 缓存参数只限制每个缓存对象至 1 MiB，外部文件 H2 JVM 需同参数；不改 durable bytes、H2 同步持久化或承诺 RSS 上界。
 
 ## 当前快照布局，2026-10-27
 

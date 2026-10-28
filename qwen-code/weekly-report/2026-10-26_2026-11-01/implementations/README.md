@@ -16,6 +16,8 @@
 | [#15696](https://github.com/QwenLM/qwen-code/pull/15696) | open | feat(managed): Add bounded authority history queries | [pr-15696.md](pr-15696.md) |
 | [#15713](https://github.com/QwenLM/qwen-code/pull/15713) | ✅ merged | fix(ci): Preserve canonical artifacts across job retries | [pr-15713.md](pr-15713.md) |
 | [#15715](https://github.com/QwenLM/qwen-code/pull/15715) | ✅ merged | test(managed-agent): initialize the snapshot pool connection synchronously | [pr-15715.md](pr-15715.md) |
-| [#15729](https://github.com/QwenLM/qwen-code/pull/15729) | open | feat(runtime): add resident workspace reclamation and reuse | [pr-15729.md](pr-15729.md) |
+| [#15729](https://github.com/QwenLM/qwen-code/pull/15729) | ✅ merged | feat(runtime): add resident workspace reclamation and reuse | [pr-15729.md](pr-15729.md) |
+| [#15745](https://github.com/QwenLM/qwen-code/pull/15745) | open | feat(managed): add independent worktrees for main sessions | [pr-15745.md](pr-15745.md) |
+| [#15782](https://github.com/QwenLM/qwen-code/pull/15782) | ✅ merged | fix(ci): Decouple managed runtime distribution from Maven Central | [pr-15782.md](pr-15782.md) |
 
-_按个人 PR 口径更新于 2026-10-28_
+_按个人 PR 口径更新于 2026-10-29_

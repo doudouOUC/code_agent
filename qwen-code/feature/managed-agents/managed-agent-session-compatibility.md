@@ -1,10 +1,12 @@
 # Session 服务：兼容接口与实现串联
 
-## 异步历史内部契约候选，2026-10-28
+## 异步历史内部契约候选，2026-10-29
 
-main `32f6713ce639` 尚未合入 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `934577e7f62e`）。当前 diff 将 Core 冷历史、回执、checkpoint/extension 查询变 Promise，journal reader 必须支持 scan(consume)，按原前缀异步迭代；Hosted/ACP/Goal/recorder/恢复消费者需一同升级，不能替换同步方法后仍把 Promise 当布尔值或数组。message-only/history/context 投影分开，终态 UUID 不冒充消息父节点。
+main `dda006c237ee` 尚未合入 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `2fda44212b59`）。当前 diff 将 Core 冷历史、回执、checkpoint/extension 查询变 Promise，journal reader 必须支持 scan(consume)，按原前缀异步迭代；Hosted/ACP/Goal/recorder/恢复消费者需一同升级，不能替换同步方法后仍把 Promise 当布尔值或数组。message-only/history/context 投影分开，终态 UUID 不冒充消息父节点。
 
 restore 显式 includeNativeHistory 才回 nativeHistory version1，新增路由仍原 writer token/Workspace 授权；不改变公共事件类型，也不把内部变更承诺成旧 consumer 无条件兼容。Managed 完整 replay 使用可重开的 recordHistory，ACP bulk 超原 bytes/update 限额显式失败而非短成功。候选 V1/40 表需匹配全部消费者/开发 catalog；main 仍 38 表及下方 reader2 屏障。本次未运行跨语言、源码或恢复资格。
+
+另一个 open [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) head `e8e80328de20` 增可选 worktree 创建字段、Session descriptor 和管理 API；省略保持当前目录，API 空对象选 HEAD，不能回退错误 locator 或把未 READY Session 当可执行。file query/read/upload 恰选 Session 或 Workspace+cwd，可信 sessionFileScope 不作为普通公开字段；生成类型、provider 和 scope revision 必须配套。它独立基线为 39 表，不是 #15696 40 表的合并版本，main 均未支持。
 
 ## 当前接口与 reader 屏障，2026-10-27
 

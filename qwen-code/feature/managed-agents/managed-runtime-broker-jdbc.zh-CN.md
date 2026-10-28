@@ -1,10 +1,14 @@
 # Managed Runtime Broker JDBC 持久化
 
-## 尚未合入的历史查询与回收方案，2026-10-28
+## 历史查询候选与已合入正常回收，2026-10-29
 
-main `32f6713ce639` 仍唯一 V1/38 业务表。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `934577e7f62e` 的两张 generation-qualified history state/fact 表形成 40 表候选，不是已落地迁移。新派生 facts 与 canonical commit 同事务写，旧数据有界连续 backfill，bucket 计数及原事务 locator/digest 核验答案，repair 使用 generation CAS。query/backfill 保留原 writer token 和 Workspace/Session 授权；未覆盖或损坏是错误，不是 absence，canonical 损坏不能按索引问题修写。
+main `dda006c237ee` 仍唯一 V1/38 业务表。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `2fda44212b59` 的两张 generation-qualified history state/fact 表形成 40 表候选，不是已落地迁移。新派生 facts 与 canonical commit 同事务写，旧数据有界连续 backfill，bucket 计数及原事务 locator/digest 核验答案，repair 使用 generation CAS。query/backfill 保留原 writer token 和 Workspace/Session 授权；未覆盖或损坏是错误，不是 absence，canonical 损坏不能按索引问题修写。
 
-[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) open head `d46b8aa599e2` 仅扩 finalizer-attempt CHECK，在既有 retirement operation 保存 baseline/cleanup receipt。原 container 正常终止、同 boot 的新鲜 Node/Lease、卸载与 detach 证据先形成 PLATFORM_CLEANED，才允许移 finalizer、确认原 Pod 消失和 fenced RELEASED 事务。resident 奇偶 reservation revision 支撑同租户保留数据复用，tenant owner 不清；main 尚无此闭环，DELETE 成功/提前 404 不是释放证明，异常节点 fence 和跨租户复用不覆盖。
+[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 已以 `414efe80a78b` 合入，仅扩 finalizer-attempt CHECK，在既有 retirement operation 保存 baseline/cleanup receipt。原 container 正常终止、同 boot 的新鲜 Node/Lease、卸载与 detach 证据先形成 PLATFORM_CLEANED，才允许移 finalizer、确认原 Pod 消失和 fenced RELEASED 事务。resident 奇偶 reservation revision 支撑同租户保留数据复用，tenant owner 不清；DELETE 成功/提前 404 不是释放证明，异常节点 fence、跨租户复用和真实平台资格声明仍不覆盖。
+
+新 open [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) head `e8e80328de20` 独立新增 ma_session_worktree 与 SESSION_WORKTREE operation CHECK，形成 39 表候选，不是与 #15696 的 40 表合并。Session/最终 binding/准备/receipt 原子准入，原 completion identity 与 whole-storage maintenance 保护 Git 操作。共享导入 marker 存服务 stateDirectory，拒排他 recovery/fence/migration/rewind；两个候选都不是 main 能力或旧 catalog 升级路径。
+
+#15696 新增量将 READ_COMMITTED 来源页的长度候选和正文限在捕获 head，只用现有有效 read grant、不先续普通写 authority；未知 append 仍拒历史读。本地 launcher/规模 JVM 限每个临时 direct-buffer 缓存 1 MiB，外部文件 H2 JVM 需同启动参数，不是进程 RSS/direct-memory 上限或同步持久化变化；修正后的规模资格仍需独立证据。
 
 已合并 [#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 只在 snapshot 单连接测试池 init 前设 initialSize=1，保留 maxWait=500 ms，不改生产池。本次未运行源码、规模、MySQL 或真实平台门禁；相同 V1 标签和 fixture 对齐都不证明混版本 catalog 兼容或发行资格。
 

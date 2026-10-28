@@ -1,10 +1,12 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### 固定前缀历史接口候选，2026-10-28
+### 固定前缀历史接口候选，2026-10-29
 
-main `32f6713ce639` 尚无 [#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `934577e7f62e`）的 bounded history。当前 diff 给内部 restore 增显式 includeNativeHistory/nativeHistory version1，history:query/backfill 继续原 writer token 与 Workspace/Session 范围；固定 journal revision/sequence/digest，未覆盖或坏 view 不能当空。Core journal scan、历史点查/迭代、checkpoint view 及 Hosted/ACP/Goal/recorder 同步迁移为异步消费，不是独立公开 SDK 稳定性承诺。
+main `dda006c237ee` 尚无 [#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `2fda44212b59`）的 bounded history。当前 diff 给内部 restore 增显式 includeNativeHistory/nativeHistory version1，history:query/backfill 继续原 writer token 与 Workspace/Session 范围；固定 journal revision/sequence/digest，未覆盖或坏 view 不能当空。Core journal scan、历史点查/迭代、checkpoint view 及 Hosted/ACP/Goal/recorder 同步迁移为异步消费，不是独立公开 SDK 稳定性承诺。
 
 完整 Managed replay 改可重开 recordHistory，有限 recent/legacy 数组保持原形状；ACP bulk 超限返回 HistoryReplayLimitError，不隐式截短成功。主干快照基础和 reader2 仍按下方已合入边界；候选 V1 40 表与 async consumer 必须配套，不能凭版本相同混跑旧 writer。本次未执行 SDK/源码、规模、MySQL 或平台资格。
+
+另一个 open [#15745](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) head `e8e80328de20` 给公共/内部 Session 创建加可选 worktree（base_ref/baseRef）、GET/list descriptor 与 options/query/inspect/cleanup；文件接口互斥 Session 或 Workspace+cwd locator。WebShell 生成类型/client/provider 随变，原 pending key 和 Session target/revision 贯穿恢复；默认省略保持当前目录，未 READY 不执行。API 支持 ref 不等于当前 UI 有任意 ref 选择器，亦不承诺 Java/Python SDK 已提供独立封装或跨版本兼容；该候选 39 表与 #15696 独立，均未进入 main。
 
 ### HTTP 恢复与 reader 匹配，2026-10-27
 

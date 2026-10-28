@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 主 Session worktree 交互仍 open，2026-10-29
+
+main `dda006c237ee` 尚无 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md)（head `e8e80328de20`）的主 Session worktree。当前 WebShell diff 在 composer 内切换当前目录/worktree、显示当前分支、打开 retained worktree 管理；创建 worktree:{} 使用冻结 HEAD，API 的 baseRef 能力不等于界面已有任意 ref 选择器。pending 保存原模式/key，响应核原 Session/Workspace/target，不换身份重试。
+
+创建 composer 选 worktree 时暂停目录引用/上传，普通输入附件仍按原能力可用；创建后的 Session 在 ready 前禁附件和目录访问。ready 后 file locator 只传 Session，由服务端解析原 target 和 worktree revision，不能让 workspace+cwd 浏览私有目录。stale 引用要求重选、文字草稿保留；准备/等待/failed/blocked 和 cleanup blocker 均可见。close/archive/delete 留 checkout，显式管理 cleanup 仍需原 owner/当前权限、终态/排空和 Git 安全检查；不提供 force 或删分支捷径。本次仅核代码/文档，未运行组件、浏览器或 Runtime 验收。
+
 ## Hosted 身份与前台参数，2026-10-28
 
 main `32f6713ce639` 已包含 [#15670](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15670.md)：Hosted 文本/Hook/workflow/压缩配置以原 store Session ID、chatRecording=false 和内部 sessionIdGenerated=true 跳过本地 transcript 占用扫描，不改普通用户 ID 的大小写冲突检查。直接/延迟 Hosted profile 不做本地分支 preparation 恢复或 PR timer；普通 daemon 仍保留。
