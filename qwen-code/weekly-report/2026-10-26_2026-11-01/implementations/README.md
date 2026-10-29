@@ -17,7 +17,13 @@
 | [#15713](https://github.com/QwenLM/qwen-code/pull/15713) | ✅ merged | fix(ci): Preserve canonical artifacts across job retries | [pr-15713.md](pr-15713.md) |
 | [#15715](https://github.com/QwenLM/qwen-code/pull/15715) | ✅ merged | test(managed-agent): initialize the snapshot pool connection synchronously | [pr-15715.md](pr-15715.md) |
 | [#15729](https://github.com/QwenLM/qwen-code/pull/15729) | ✅ merged | feat(runtime): add resident workspace reclamation and reuse | [pr-15729.md](pr-15729.md) |
-| [#15745](https://github.com/QwenLM/qwen-code/pull/15745) | open | feat(managed): add independent worktrees for main sessions | [pr-15745.md](pr-15745.md) |
+| [#15745](https://github.com/QwenLM/qwen-code/pull/15745) | ✅ merged | feat(managed): add independent worktrees for main sessions | [pr-15745.md](pr-15745.md) |
 | [#15782](https://github.com/QwenLM/qwen-code/pull/15782) | ✅ merged | fix(ci): Decouple managed runtime distribution from Maven Central | [pr-15782.md](pr-15782.md) |
+| [#15813](https://github.com/QwenLM/qwen-code/pull/15813) | ✅ merged | perf(managed): Bound activation renewal journal growth | [pr-15813.md](pr-15813.md) |
+| [#15827](https://github.com/QwenLM/qwen-code/pull/15827) | ✅ merged | ci(java): remove MariaDB full integration lane | [pr-15827.md](pr-15827.md) |
+| [#15839](https://github.com/QwenLM/qwen-code/pull/15839) | ✅ merged | feat(managed): Add bounded SQL history queries | [pr-15839.md](pr-15839.md) |
+| [#15865](https://github.com/QwenLM/qwen-code/pull/15865) | ✅ merged | feat(managed): Add live message paging to WebShell | [pr-15865.md](pr-15865.md) |
+| [#15870](https://github.com/QwenLM/qwen-code/pull/15870) | open | refactor(managed): Remove persisted public message snapshots | [pr-15870.md](pr-15870.md) |
+| [#15871](https://github.com/QwenLM/qwen-code/pull/15871) | open | refactor(managed-agent): Split server into Maven modules | [pr-15871.md](pr-15871.md) |
 
-_按个人 PR 口径更新于 2026-10-29_
+_按个人 PR 口径更新于 2026-10-30_

@@ -1,10 +1,16 @@
 # Managed 普通客户端、交互与事件投影
 
-## 主 Session worktree 交互仍 open，2026-10-29
+## 主 Session worktree 已合入，2026-10-30
 
-main `dda006c237ee` 尚无 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md)（head `e8e80328de20`）的主 Session worktree。当前 WebShell diff 在 composer 内切换当前目录/worktree、显示当前分支、打开 retained worktree 管理；创建 worktree:{} 使用冻结 HEAD，API 的 baseRef 能力不等于界面已有任意 ref 选择器。pending 保存原模式/key，响应核原 Session/Workspace/target，不换身份重试。
+main `8457254f75f2` 已包含 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md)（merge `4afe1a28fd84`）的主 Session worktree。WebShell 在 composer 内切换当前目录/worktree、显示当前分支、打开 retained worktree 管理；创建 worktree:{} 使用冻结 HEAD，API 的 baseRef 能力不等于界面已有任意 ref 选择器。pending 保存原模式/key，响应核原 Session/Workspace/target，不换身份重试。未 READY 保留原队列查询/编辑/撤回和取消，拒新入队/resume/rename；已提交 Turn 不能仅因 checkout 受阻改成已失败。
 
 创建 composer 选 worktree 时暂停目录引用/上传，普通输入附件仍按原能力可用；创建后的 Session 在 ready 前禁附件和目录访问。ready 后 file locator 只传 Session，由服务端解析原 target 和 worktree revision，不能让 workspace+cwd 浏览私有目录。stale 引用要求重选、文字草稿保留；准备/等待/failed/blocked 和 cleanup blocker 均可见。close/archive/delete 留 checkout，显式管理 cleanup 仍需原 owner/当前权限、终态/排空和 Git 安全检查；不提供 force 或删分支捷径。本次仅核代码/文档，未运行组件、浏览器或 Runtime 验收。
+
+## 已发布 Item 与实时消息页，2026-10-30
+
+已合入 [#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的 transcript/items/query 默认从保留的已发布快照倒序读，每页按时间正序，签名 cursor 固定原 root/version/projection/expiry；不含 live tail/当前审批任务，覆盖 0 空页也不证明 Session 空。后续已合入 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 messages view 则直接读 ma_message，limit 1–100、元数据先选且合计至多 8 MiB，按 firstSequence/itemId keyset；投影落后/换代拒假空、要求等待或 resync。
+
+Java provider 显式选 messages，以 coveredSequence 接 SSE 并按 itemId 覆盖去重；旧页替换已覆盖的原内容，保留水位之后事件，同序号 Item 用 UTF-8 字节序且不互相覆盖。live 导出固定首序号成员范围，不冻结后续正文，明确标 live；main 仍保留默认公共快照。审批/任务/运行状态不由 Item 页替代，本次未运行组件、浏览器或数据库门禁。
 
 ## Hosted 身份与前台参数，2026-10-28
 

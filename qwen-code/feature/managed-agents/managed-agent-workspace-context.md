@@ -1,10 +1,10 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
-## 主 Session worktree 候选，2026-10-29
+## 主 Session worktree 已合入，2026-10-30
 
-main `dda006c237ee` 尚未合入 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md)（open head `e8e80328de20`）。当前 diff 保留 ROOT Workspace 的 grant/storage，用一对一 Session worktree 固定原 actor、storage/root/Git common identity、commit 和子目录 offset；原 create receipt 先回读，再只读 preflight，一次事务保存最终 target binding、准备 operation、首 Turn 与 receipt。LOCAL/durable session-isolated local-process/非 Windows 条件之外拒绝，不扩大 SSH/CSI 或宿主权限。
+main `8457254f75f2` 已包含 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md)（merge `4afe1a28fd84`）。保留 ROOT Workspace 的 grant/storage，用一对一 Session worktree 固定原 actor、storage/root/Git common identity、commit 和子目录 offset；原 create receipt 先回读，再只读 preflight，一次事务保存最终 target binding、准备 operation、可选首 Turn 与 receipt。LOCAL/durable session-isolated local-process/非 Windows 条件之外拒绝，不扩大 SSH/CSI 或宿主权限。新准备要求源仓库严格位于 storage root 下；根本身为仓库时只拒新建，不影响当前目录或已有 worktree 清理。
 
-claimed Git 准备持 whole-storage maintenance，原 completion receipt 与 checkout/gitdir 身份成立才 READY；缺失/换代 BLOCKED，不回源目录或重置文件。close/archive/delete 保留目录；显式 owner cleanup 需当前权限、终态/排空、无脏/ignored/nested/Git 进行中工作，非 force remove、不删分支。Session 文件 locator 解析原 target/revision，普通 Workspace+cwd 不进入私有目录；共享导入 marker 移服务 stateDirectory，拒排他 fence/recovery/migration/rewind。该候选 V1 39 表，main 38 表；本次未运行源码、MySQL、Git/浏览器或平台验收，下方旧 cwd 契约为历史切片。
+claimed Git 准备持 whole-storage maintenance，原 completion receipt 与 checkout/gitdir 身份成立才 READY；缺失/换代 BLOCKED，不回源目录或重置文件。未就绪仍允许原队列管理和取消，但新入队/resume/rename 拒绝；已提交 Turn 不因 checkout 受阻直接结算失败。close/archive/delete 保留目录；显式 owner cleanup 需当前权限、终态/排空、无脏/ignored/nested/Git 进行中工作，非 force remove、不删分支。Session 文件 locator 解析原 target/revision，两种 locator 都核 Workspace grant/SSH node allowlist，普通 Workspace+cwd 不进入私有目录；共享导入 marker 移服务 stateDirectory，拒排他 fence/recovery/migration/rewind。main V1 现 39 业务表；本次未运行源码、MySQL、Git/浏览器或平台验收，下方旧 cwd 契约为历史切片。
 
 > **2026-10-12 实施状态：** W0 的选择/准入/context/私有执行/恢复 fence 已由 #12709/#12730/#12754/#12797/#12839/#12869 合入。W1a/W1b/W1c 分别由 #13088/#13138/#13260 合入；#13655 已修迁移成功诊断。#13135/#13194/#13354 提供 Workspace Session 生命周期。下文保留原 2026-09-21 目标契约与源码基线；不再用当时全局静态 Workspace 描述当前 Java。#13760 已合入独立 W2 WebShell cwd；W1c 不支持持久 Shell profile，不能据已合入的公开前台 Shell #13674 推断迁移已支持。
 

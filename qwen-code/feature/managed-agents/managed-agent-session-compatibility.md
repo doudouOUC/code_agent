@@ -1,12 +1,14 @@
 # Session 服务：兼容接口与实现串联
 
-## 异步历史内部契约候选，2026-10-29
+## 异步历史内部契约候选，2026-10-30
 
-main `dda006c237ee` 尚未合入 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `2fda44212b59`）。当前 diff 将 Core 冷历史、回执、checkpoint/extension 查询变 Promise，journal reader 必须支持 scan(consume)，按原前缀异步迭代；Hosted/ACP/Goal/recorder/恢复消费者需一同升级，不能替换同步方法后仍把 Promise 当布尔值或数组。message-only/history/context 投影分开，终态 UUID 不冒充消息父节点。
+main `8457254f75f2` 尚未合入 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `194469a54723`）。当前 diff 将 Core 冷历史、回执、checkpoint/extension 查询变 Promise，journal reader 必须支持 scan(consume)，按原前缀异步迭代；Hosted/ACP/Goal/recorder/恢复消费者需一同升级，不能替换同步方法后仍把 Promise 当布尔值或数组。message-only/history/context 投影分开，终态 UUID 不冒充消息父节点。
 
-restore 显式 includeNativeHistory 才回 nativeHistory version1，新增路由仍原 writer token/Workspace 授权；不改变公共事件类型，也不把内部变更承诺成旧 consumer 无条件兼容。Managed 完整 replay 使用可重开的 recordHistory，ACP bulk 超原 bytes/update 限额显式失败而非短成功。候选 V1/40 表需匹配全部消费者/开发 catalog；main 仍 38 表及下方 reader2 屏障。本次未运行跨语言、源码或恢复资格。
+restore 显式 includeNativeHistory 才回 nativeHistory version1，新增路由仍原 writer token/Workspace 授权；不改变公共事件类型，也不把内部变更承诺成旧 consumer 无条件兼容。Managed 完整 replay 使用可重开的 recordHistory，ACP bulk 超原 bytes/update 限额显式失败而非短成功。候选 V1/41 表需匹配全部消费者/开发 catalog；main 仍 39 表及下方 reader2 屏障。本次未运行跨语言、源码或恢复资格。
 
-另一个 open [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) head `e8e80328de20` 增可选 worktree 创建字段、Session descriptor 和管理 API；省略保持当前目录，API 空对象选 HEAD，不能回退错误 locator 或把未 READY Session 当可执行。file query/read/upload 恰选 Session 或 Workspace+cwd，可信 sessionFileScope 不作为普通公开字段；生成类型、provider 和 scope revision 必须配套。它独立基线为 39 表，不是 #15696 40 表的合并版本，main 均未支持。
+已合入 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 增可选 worktree 创建字段、Session descriptor 和管理 API；省略保持当前目录，API 空对象选 HEAD，不能回退错误 locator 或把未 READY Session 当可执行。file query/read/upload 恰选 Session 或 Workspace+cwd，可信 sessionFileScope 不作为普通公开字段；生成类型、provider 和 scope revision 必须配套。其 39 表基线已进入 main，#15696 另扩两表仍未合入。该 open head 还保留冻结 replay 的 certified branch point，all 流按原 record 对象解析、ACP 只在最后可见 chunk 标边界，不把外部 parent 缺失误判链内循环。
+
+已合入 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 用显式 messages view、history=items/coveredSequence 和 live export 保持 Item/stream 去重，默认快照分支尚在；open [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) head `6851d1a8c10c` 才拟删除该分支/view，旧签名快照与数字 cursor 不作为新消息 cursor，旧响应字段名不恢复 as-of 内容承诺。另 open [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) head `221d4e0cb6bf` 的 Maven/包移动只在候选树：verification 报告、server/target 和维护 main-class 必须配套，不能把 main 锚点批量改成候选路径。三项 open 无混版本/部署保证。
 
 ## 当前接口与 reader 屏障，2026-10-27
 
