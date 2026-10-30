@@ -1,18 +1,16 @@
 # Managed Session：记录格式、提交与协议限额
 
-## 有界历史读取候选，2026-10-30
+## 有界历史候选与主干消息投影，2026-10-31
 
-main `8457254f75f2` 已有下方四项索引/快照基础，但 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `194469a54723`）的有界 authority/restore 尚未合入。该 diff 固定原 scope/committed sequence/digest，HTTP 另固定 revision、文件固定 generation；历史点查和迭代异步，默认事件页 100/上限 256，最近事件至多 1,024 项/8 MiB，历史 cache 至多 2,048 项/4 MiB，活跃状态按生命周期保留。
+main `57d9a8fb50f4` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)，删除公共 ma_snapshot/SNAPSHOT owner，默认消息查询/导出转 live keyset；NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获/制品和读 lease 仍保留。floor 由投影 coverage 支撑且保活跃 Turn，自动推进仍 opt-in，不物理删原事件。当前唯一 V1/38 业务表，开发 catalog 重建而非 V2 升级。
 
-文件派生查询从本次完整验证的 canonical prefix 重建，64 KiB trie 与目录摘要/源 locator 保留旧 key/版本；SQL 两张新表使候选 V1 为 41 表。原事务验证与完整覆盖才允许 absence，派生缺损可串行重建，canonical 损坏显式阻塞；未知 append 不变成未执行。HTTP、本地 snapshot+tail、activation/inbox v2 snapshot 都改流式 scanner/编码，不删除原记录或资源。scratch 大小、写放大、冷扫描延迟和活跃上下文不是固定；本次未运行源码/规模/数据库验收。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 仍 open，head `194469a54723`：旧目录候选保留公共 snapshot/worktree 基础和两张查询表，共 41 表，不是当前 main 直接加两表。它固定原 scope/committed sequence/digest，HTTP 另固定 revision、文件固定 generation；历史点查和迭代异步，默认事件页 100/上限 256，最近事件至多 1,024 项/8 MiB，历史 cache 至多 2,048 项/4 MiB。
 
-本次 #15696 head 增量将来源页大小候选/正文都限定捕获的 head，READ_COMMITTED 并发提交不混入原水位；native 冷读使用仍有效 read grant，不先续普通 writer。未结算追加仍拒视图，恢复状态等待证据而非推断不存在。launcher/scale fork 的 JDK 临时 direct-buffer 缓存参数只限制每个缓存对象至 1 MiB，外部文件 H2 JVM 需同参数；不改 durable bytes、H2 同步持久化或承诺 RSS 上界。
+文件派生查询从本次完整验证的 canonical prefix 重建，64 KiB trie 与目录摘要/源 locator 保留旧 key/版本。完整覆盖与原事务核验才允许 absence，派生缺损可串行重建，canonical 损坏显式阻塞；未知 append 不变成未执行。HTTP、本地 snapshot+tail、activation/inbox v2 snapshot 使用流式 scanner/编码；scratch、写放大、冷扫描延迟和活跃上下文不固定。来源候选/正文限捕获 head，READ_COMMITTED 并发提交不混入原水位，冷读只用有效 read grant，不先续普通 writer。
 
-该 open head 已含 worktree 基线并新增冻结 branch point：recent 页保存 assistant UUID 映射，all 流用原 record 对象 WeakMap/resolver；ACP 只缓冲一条有 checkpoint 的 assistant record，把分支标记放最后非空可见 chunk。实际 parent 循环拒绝，投影之外 parent 只结束回溯。
+该候选冻结 recent/all certified branch point：UUID 映射、原 record WeakMap/resolver，ACP 只缓冲一条有 checkpoint 的 assistant record，在最后非空可见 chunk 标边界；外部 parent 结束回溯、实际循环拒绝。launcher/scale fork 的 1 MiB 临时 direct-buffer 缓存参数只限单个缓存对象，外部文件 H2 JVM 需同参数，不是 RSS 上界或持久化变化。
 
-已合入 [#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 将协商支持的 HTTP activation 心跳存原事务 lease 两列和 head expiry，原序号重放不延长、新序号单调更新，journal bytes/revision/digest 不变；未知续租先原序号结算，无能力 store 保留事件式路径。已合入 [#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 用原 token/固定 throughRevision 有界 recent/command lookup，元数据选页后读取核验原正文，不获取 writer。它们不是 #15696 完整常驻方案。
-
-open [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) head `6851d1a8c10c` 拟删公共 ma_snapshot/SNAPSHOT owner，默认查询转 live 消息 keyset、floor 由投影 coverage 支撑，仍保活跃 Turn/读 lease/资源引用；不物理删原事件，不删 NATIVE_SNAPSHOT 或原 journal/checkpoint。候选 38 表，main 39 表，旧公共快照/数字 cursor 不跨实现复用；下方 native snapshot 和 reader2 已合入边界不受该候选删除。
+已合入 [#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 只更新协商 HTTP 原 activation lease 两列及 head expiry，journal bytes/revision/sequence/digest 不变；未知同序号结算，无能力沿事件式路径。[#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 保留原 token/固定 throughRevision 的有界 recent/command lookup，不获取 writer；其公共签名快照页已经被 #15870 替代。这些局部能力不等于 #15696 完整常驻方案。本次未运行源码、规模、数据库或恢复资格；下方旧快照布局仅 native 部分仍适用，公共快照描述以本节为准。
 
 ## 当前快照布局，2026-10-27
 

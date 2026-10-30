@@ -1,16 +1,14 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## 查询候选与已合入正常回收，2026-10-30
+## 已合入公共快照删除与查询候选，2026-10-31
 
-main `8457254f75f2` 仍为唯一 V1/39 表，已有 snapshot/上传边界不变。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 当前 open head `194469a54723` 增两张 generation-qualified history state/fact 表，成为该 diff 的 41 表基线；新 fact 同 canonical commit 事务写，旧数据每批至多 100 事务连续 backfill，256 hash bucket 计数与原 locator/ordinal/digest 证实答案。repair CAS 换派生代、旧行分批清理，不修写 canonical 损坏。文件侧 64 KiB trie 页、固定 root/源 block 与共享 2,048 项/4 MiB cache；恢复逐事务流式扫描，缺 view 不能返回空，未知 append 不由索引结算。
+main `57d9a8fb50f4` 唯一 V1 为 38 业务表：[#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 已删公共 ma_snapshot/SNAPSHOT owner/page metadata，保 NATIVE_SNAPSHOT/JOURNAL/工具捕获/制品和 message-parts 读 lease/原引用回收；projection coverage 支撑 replay floor，受活跃 Turn 限制、自动推进仍 opt-in，不物理删事件。[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已将 DDL/CSI inventory 移 persistence/contracts 分工，不新增表或 migration。下方带日期公共快照布局为历史，native 恢复边界仍保留。
 
-[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 已 merged，只扩 finalizer attempt CHECK、不增表；原 retirement plan/baseline/receipt 和 claim 贯穿正常平台回收，release 同事务释放原 binding/slot/physical owner。resident 奇数 RESERVED/偶数 RELEASED revision 支撑后续 reserve，保留 owner tenant 和原磁盘数据，只同租户管理员交接；普通 CSI revision 不放宽，不能凭 Pod 消失清 owner 或跨租户复用。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `194469a54723` 仍基于旧目录/含公共 snapshot 的 41 表候选，不是最新 38 表直接加两表。generation-qualified history state/fact 与 canonical commit 同事务写，旧数据每批至多 100 事务连续 backfill，256 hash bucket 计数及原 locator/ordinal/digest 证实答案；repair CAS 换派生代、旧行分批清理，不修写 canonical 损坏。文件侧 64 KiB trie/目录摘要和共享 2,048 项/4 MiB cache、逐事务流式恢复仍未成为 main 完整历史能力。
 
-已合入 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 增 ma_session_worktree 与 SESSION_WORKTREE operation CHECK，形成 main 的 39 表基线。原 Session/create receipt/冻结 commit/target binding 同事务入库，Git completion receipt 和物理维护 hold 保留原身份；共享导入 marker 存服务 stateDirectory，不授权独占 fence/migration/rewind。#15696 当前已叠加该基础后另扩两表，仍 open。
+[#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 的 ma_session_worktree 仍在；原 Session/create receipt/冻结 commit/target 原子准入，completion identity/whole-storage hold 保身份，共享导入 marker 在服务 stateDirectory，不授权独占 fence/migration/rewind。[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 正常平台回收保原 plan/baseline/receipt/claim，resident 奇偶 revision 仅同租户保数据复用，Pod 消失不授权释放。
 
-已合入 [#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 只在原 activation 事务保存成对 lease expiry/renewalSeq，原 writer/epoch/CSI 围栏下单调更新并同步 head expiry；journal bytes、revision、sequence、digest 不变，未知先同序号结算。已合入 [#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 分开固定前缀原事务 recent/lookup 和已发布快照签名倒序 Item 页；不新增派生查询表，也不将无快照的空页当空 Session。
-
-open [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) head `6851d1a8c10c` 才拟删公共 ma_snapshot/SNAPSHOT pins/page metadata，V1 成 38 表；仍保 NATIVE_SNAPSHOT、JOURNAL/工具捕获/制品 owner 和 message-parts 读 lease/引用回收。floor 仅投影 coverage 内推进且受活跃 Turn 限制、自动推进仍 opt-in，不物理删原事件。main 仍保公共快照/39 表；本次未运行源码、MySQL、规模或真实 CSI，相同 V1 不证明 catalog/writer 兼容。
+[#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 原 activation lease 两列与 head expiry 单调更新，journal bytes/revision/sequence/digest 不变、未知先同序号结算；[#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的固定前缀原事务 recent/lookup 不新增派生表，其公共签名快照读取已被 #15870 替代。本次未运行源码、MySQL、规模或真实 CSI，相同 V1 不证明旧 writer/catalog 兼容。
 
 ## 原 journal、快照与上传占用，2026-10-27
 

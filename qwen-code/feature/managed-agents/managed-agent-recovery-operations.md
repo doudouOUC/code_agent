@@ -1,22 +1,20 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## 最新恢复与资格分层，2026-10-30
+## 最新恢复与资格分层，2026-10-31
 
-main `8457254f75f2` 的 [#15670](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15670.md) 将 Hosted 原 store ID 与本地 transcript 扫描/分支恢复/PR timer 隔离，Shell 校验与实际后台准入一致；attestation fault fixture 覆盖既有一次 EOF 重试的两个请求，不重试 mutation。[#15676](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15676.md) 发布完整 verify 使用单 fork、不复用测试类；[#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 仅在 snapshot fixture init 前建一个连接，保留 500 ms 借用等待。测试隔离/初始化不证明生产池、Windows 或发布资格。
+main `57d9a8fb50f4` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 公共快照删除：保留 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/stream 覆盖去重，默认 live 页以真实投影 coveredSequence 接 SSE，成员范围不是冻结正文；旧 cursor 需丢弃，projection changed 重载、pending 等待、超大 Item 可无法分页。保 NATIVE_SNAPSHOT/journal/原资源引用、活跃 Turn 和读 lease；floor 自动推进仍 opt-in，不物理删原事件，不授权未知重放或物理释放。
 
-[#15713](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15713.md) 已让 canonical upload 的 artifact ID 作为 job output，由下游按 ID 下载，再保留原 checkout 绑定。只重试下游不再用新 run_attempt 猜上游文件名；artifact 身份、完整验收、匹配 runtime/JAR/checksum 和实际发布仍分开核验。
+[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已合入六生产 Maven 模块与 verification，server/target 放 exec/维护产物，测试报告在 verification/target；测试资源与原 module/CLI 路径显式传入，不代表普通依赖或真实环境验收。open [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 才补响应开始后取消、同仓库/版本的普通与启用宿主 CI，原时间界限/生产取消不变，新检查仍待实际运行。
 
-[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 当前 open head `194469a54723` 用固定 canonical prefix、异步历史与流式 scanner 支撑冷恢复；可重建查询 view 缺失/损坏不是 absence，原 append 未知只能原 settleAppend。设计保留有界完成历史 cache 和活跃状态，不删除 canonical 历史/资源；新增 H2/MySQL 规模 gate 不等于已经通过，main 尚无本项保证。
+open [#15879](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) head `2382bcce7d6b` 的 E2B [执行候选](managed-agent-external-runtime-e2b.md) 持久保存原创建/启动意图，未知不再建或恢复暂停 VM；关闭需 worker 原 bytes/零未结算证明先落 adapter journal，再确认原 sandbox ID 停止，保留 Volume。仅 TTL/GONE 或丢回复不授权释放；Linux 模板/真实 Volume/HTTPS publication/MySQL/Hosted/Cloud 资格均未由本次证明。
 
-[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 已以 merge `414efe80a78b` 合入 main `8457254f75f2`：原 finalizer baseline、terminated container、同 boot 新鲜 Node/Lease、volume 不占用和无 attachment 证据形成 cleanup receipt，再移 finalizer、确认原 Pod 消失、事务释放原 binding/slot/owner。仅正常平台 DRAINING→PLATFORM_CLEANED→RELEASED、数据保留同租户；提前 404/DELETE 成功不是释放证明，节点死亡/强制 fence 不覆盖。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `194469a54723` 保固定 canonical prefix、异步历史、可重建 view、原 read grant 与未知 settleAppend；冻结 branch point/逐记录 ACP 和外部 parent 边界不变。它仍旧目录/公共 snapshot 的 41 表方案，未叠加当前 main 的模块和公共快照删除；1 MiB 临时 direct-buffer 缓存不是进程 RSS 上界，真实规模资格独立。
 
-新 merged [#15782](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15782.md) 删除 runtime 分发的 Central 存在/签名发布/同步等待，保留相同源码 SDK/server 完整 verify、fork 隔离、exec JAR/旧 tag 回退及 OSS/GitHub 原版本 bytes/checksum 核验。profile 独立 Maven 签名发布不再阻塞安装渠道；仍需生产上传和空缓存匹配版本/模型验收。
+[#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 已合入的 worktree 仍需原 completion/identity 才 READY，root 仓库拒新建；原队列管理/取消可用，已提交 Turn 不因 checkout 受阻改失败，未知 Git 停止保留 hold。close/archive/delete 留目录、非 force cleanup/不删分支，无 macOS JVM 被杀的自动资格。[#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 协商 HTTP 原 lease/head expiry 单调更新、未知同序号结算；[#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 原事务读不获取 writer，均不代替执行收据。
 
-[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 保留来源页读 head、合法 read grant 和未知等待证据，1 MiB 临时 direct-buffer 缓存非 RSS 上界；本次又补冻结 branch point/逐记录 ACP 和外部 parent 边界，41 表完整历史仍 open。已 merged 的 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) worktree 原 completion/identity 才 ready，未知 Git 停止保留 hold，已提交 Turn 受阻不改失败；原队列管理/取消允许，root 仓库拒新建，close/archive/delete 留目录、cleanup 不 force/不删分支，仍无 macOS JVM 被杀的自动资格。
+[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 正常平台回收仍需原 finalizer/baseline、同 boot 新鲜 NodeLease/terminated/卸载/detach receipt 后释放，同租户保留数据，提前 404/DELETE 不足。此前 [#15670](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15670.md) Hosted ID/扫描/前台参数隔离、[#15676](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15676.md) 单 fork 不复用、[#15713](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15713.md) canonical artifact ID 与 [#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 首连接 fixture 均保留，不是生产池/发行资格。
 
-新 merged [#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 的协商 HTTP activation 续租只改原 lease 元数据，未知请求先同序号结算再推进，restore/CSI 核原事件身份/单调值，不删 canonical bytes。新 merged [#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的有界原事务查询不获取 writer；签名已发布 Item 页不含 live 控制状态。新 merged [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 消息 view 按覆盖水位接 SSE/替换旧 Item，投影 pending/换代等待或 resync，live 导出不冻结正文；这些读取都不能替代执行/物理释放收据。
-
-新 merged [#15827](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15827.md) 去 MariaDB full CI，只持续承诺 MySQL 8.4 原完整门禁，不改已有方言连接。open [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) head `6851d1a8c10c` 拟删公共快照，仍保 NATIVE_SNAPSHOT/原 journal，低于 floor resync、重建期等待；open [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) head `221d4e0cb6bf` 拟将 exec/维护工具移 server/target、验证移 verification，main 尚未采用候选路径。本次仅核对 diff/源码/文档，未执行源码、规模、发布 CI 或真实 Kubernetes/CSI/MySQL/模型验收。
+[#15782](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15782.md) 分发不要求 Central 发布/GPG，仍需完整 verify、原 tag/JAR/checksum、OSS/GitHub 同 bytes 和真实首装；[#15827](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15827.md) 只去 MariaDB full CI，MySQL 8.4 全量门禁仍保留。本次只核源码/文档，未运行源码、规模、CI、发布或 Kubernetes/CSI/MySQL/Cloud/模型验收；下方旧章节按日期阅读。
 
 ## 原生快照与原身份对账，2026-10-27
 

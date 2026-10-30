@@ -1,20 +1,22 @@
 # Managed Runtime Broker JDBC 持久化
 
-## 历史查询候选与已合入正常回收，2026-10-30
+## 已合入模块与公共快照删除，2026-10-31
 
-main `8457254f75f2` 仍唯一 V1/39 业务表。[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `194469a54723` 的两张 generation-qualified history state/fact 表形成 41 表候选，不是已落地迁移。新派生 facts 与 canonical commit 同事务写，旧数据有界连续 backfill，bucket 计数及原事务 locator/digest 核验答案，repair 使用 generation CAS。query/backfill 保留原 writer token 和 Workspace/Session 授权；未覆盖或损坏是错误，不是 absence，canonical 损坏不能按索引问题修写。
+main `57d9a8fb50f4` 唯一 V1 为 38 业务表。已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 删除公共 ma_snapshot/SNAPSHOT owner 和专用元数据，不删 NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获或制品 owner。消息走 live keyset，仍保读 lease/原资源引用；projection coverage/活跃 Turn 围住 replay floor，自动推进仍 opt-in，不物理删事件。旧签名/十进制 transcript cursor 需重载，limit 1–100，投影换代/落后和页预算错误分开；成员上界不冻结正文。
 
-[#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 已以 `414efe80a78b` 合入，仅扩 finalizer-attempt CHECK，在既有 retirement operation 保存 baseline/cleanup receipt。原 container 正常终止、同 boot 的新鲜 Node/Lease、卸载与 detach 证据先形成 PLATFORM_CLEANED，才允许移 finalizer、确认原 Pod 消失和 fenced RELEASED 事务。resident 奇偶 reservation revision 支撑同租户保留数据复用，tenant owner 不清；DELETE 成功/提前 404 不是释放证明，异常节点 fence、跨租户复用和真实平台资格声明仍不覆盖。
+已合入 [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 拆 contracts/control-plane/runtime-broker/persistence/adapters/server 与 verification。JDBC/schema 在 persistence、SDK/OSS/MQ 在 adapters、Boot 在 server，最终 SQL 仍同一 38 表基线；server/target 放 exec/维护产物，verification/target 放报告，verification 不发布。显式 server 测试资源和原 module/CLI 参数不把默认 application 配置放回生产 library；native 声明只在 contracts，相同 V1 不证明旧 catalog/writer 可混跑。
 
-已合入 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 增 ma_session_worktree 与 SESSION_WORKTREE，使 main 成 39 表。Session/最终 binding/准备/receipt 原子准入，原 completion identity 与 whole-storage maintenance 保护 Git 操作。共享导入 marker 存服务 stateDirectory，拒排他 recovery/fence/migration/rewind。新准备需仓库在 storage root 下；未 READY 允许原队列管理/取消，拒新执行，已提交 Turn 不因 checkout 受阻结算失败。#15696 现已叠加该基础再加两张查询表，仍 open。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 仍 open，head `194469a54723`，旧目录/公共 snapshot 加两张 generation-qualified history state/fact 共 41 表，不是最新 main 直接加两表。facts 与 canonical commit 同事务写，有界连续 backfill、bucket 计数和原 locator/digest 核答案，repair 用 generation CAS；原 token/Workspace/Session 授权不变，view 缺失或损坏不是 absence，canonical 损坏不按索引问题修写。冻结流式 replay 保 certified branch point/外部 parent，managed JDBC/JSON bean 显式限定。
 
-#15696 新增量将 READ_COMMITTED 来源页的长度候选和正文限在捕获 head，只用现有有效 read grant、不先续普通写 authority；未知 append 仍拒历史读。本地 launcher/规模 JVM 限每个临时 direct-buffer 缓存 1 MiB，外部文件 H2 JVM 需同启动参数，不是进程 RSS/direct-memory 上限或同步持久化变化；修正后的规模资格仍需独立证据。
+该候选 READ_COMMITTED 来源页候选/正文限捕获 head，只用有效 read grant、不先续普通 writer；未知 append 仍拒历史读。launcher/规模 JVM 限每个临时 direct-buffer 缓存 1 MiB，外部文件 H2 JVM 需同参数，不是进程 RSS 上界或同步持久化变化，规模资格独立。
 
-已合入 [#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 在原事务保存单调 activation expiry/renewalSeq 并同步 head expiry，原 writer/epoch/CSI 围栏不变、journal bytes、revision、sequence、digest 不变，未知续租先同序号结算。已合入 [#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 在捕获 revision 内先元数据选页再有界读 recent/command 原正文，另有签名保留快照 Item 页。已合入 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 则显式 messages view 读 live ma_message，REPEATABLE_READ 下 1–100 Item/合计 8 MiB 页，keyset 范围不冻结正文；查询不赋 mutation 权限，也不替代当前执行状态证据。
+已合入 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 保 ma_session_worktree 与原 Session/binding/准备/receipt 原子准入；completion identity/whole-storage maintenance 保护 Git，共享导入私有 marker 留服务 stateDirectory，拒独占 recovery/fence/migration/rewind。新准备要求仓库严格低于 storage root；未 READY 允许原队列管理/取消，拒新执行，已提交 Turn 不因 checkout 受阻结算失败。其原 39 表基线后由公共快照删除减为 38 表。
 
-已合入 [#15827](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15827.md) 去 MariaDB full CI，保留 MySQL 8.4 完整 lane、独立 fork 数据库和报告覆盖，不删除既有方言代码。open [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) head `6851d1a8c10c` 拟去公共 ma_snapshot/SNAPSHOT owner 成 38 表，仍保 NATIVE_SNAPSHOT/journal 和按读 lease 的消息资源回收。open [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) head `221d4e0cb6bf` 拟拆六生产 Maven 模块与 verification：JDBC 在 persistence、SDK/OSS/MQ 在 adapters、Boot 装配在 server，SQL bytes 仍 main 的 39 表；均不改变 main 当前路径或证明升级/资格。#15696 还补冻结流式 replay 的 certified branch point，并显式限定 managed JDBC/JSON bean，避免宿主默认对象。
+已合入 [#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 原 activation expiry/renewalSeq 与 head expiry 在 writer/epoch/CSI 围栏下更新，journal bytes/revision/sequence/digest 不变，未知同序号结算。[#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 保元数据先选的 canonical recent/command 读；其签名公共快照页和 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 原显式 messages selector 已由 #15870 替代。live 页仍 REPEATABLE_READ、1–100 Item/合计 8 MiB，不冻结正文、不赋 mutation 权限。
 
-已合并 [#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 只在 snapshot 单连接测试池 init 前设 initialSize=1，保留 maxWait=500 ms，不改生产池。本次未运行源码、规模、MySQL 或真实平台门禁；相同 V1 标签和 fixture 对齐都不证明混版本 catalog 兼容或发行资格。
+已合入 [#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 保原 finalizer/baseline、新鲜同 boot NodeLease、终止/卸载/detach 后才 PLATFORM_CLEANED/fenced RELEASED；resident 奇偶 revision 仅同租户保数据复用，DELETE/提前 404 不授权释放。[#15827](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15827.md) 去 MariaDB full CI 不删原方言，完整 MySQL 8.4 仍需运行；[#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 只改测试首连接。
+
+open [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 才补响应开始后取消见证、同仓库/版本普通与启用宿主 CI，不改生产取消或证明新增运行通过。本次未运行源码、规模、MySQL、宿主、Cloud 或真实平台门禁；下方旧日期布局是历史，公共消息当前语义以上述为准。
 
 ## 原生快照 pins 与上传占用，2026-10-27
 

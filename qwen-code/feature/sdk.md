@@ -1,16 +1,16 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### 固定前缀历史接口候选，2026-10-30
+### 已合入模块/消息接口与 open 候选，2026-10-31
 
-main `8457254f75f2` 尚无 [#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md)（open，head `194469a54723`）的 bounded history。当前 diff 给内部 restore 增显式 includeNativeHistory/nativeHistory version1，history:query/backfill 继续原 writer token 与 Workspace/Session 范围；固定 journal revision/sequence/digest，未覆盖或坏 view 不能当空。Core journal scan、历史点查/迭代、checkpoint view 及 Hosted/ACP/Goal/recorder 同步迁移为异步消费，不是独立公开 SDK 稳定性承诺。
+main `57d9a8fb50f4` 已合入 [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：SDK/OSS/MQ 适配在 adapters，Boot 在 server，verification 不安装/发布，library 不夹默认 application 配置，exec/维护产物在 server/target。配置/CLI 传入测试 fork，单模块旧路径不再是 main 锚点；普通依赖、exec、维护工具、发行和真实运行仍分别验证。
 
-完整 Managed replay 改可重开 recordHistory，有限 recent/legacy 数组保持原形状；ACP bulk 超限返回 HistoryReplayLimitError，不隐式截短成功。主干快照基础和 reader2 仍按下方已合入边界；候选 V1 41 表与 async consumer 必须配套，不能凭版本相同混跑旧 writer。本次未执行 SDK/源码、规模、MySQL 或平台资格。
+已合入 [#15870](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 统一默认 live 消息页/导出，删除公共快照/view，保留 native journal 快照；旧签名/十进制 transcript cursor 不跨实现复用，limit 1–100、投影 pending/changed 与页过大分别处理。原 [#15865](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) provider Item/coveredSequence/SSE 去重保留，成员范围不冻结正文；[#15839](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的 canonical recent/lookup 独立，其旧签名快照分支不再存在。不能宣称所有公开 SDK 已有同等封装。
 
-已合入 [#15745](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 给公共/内部 Session 创建加可选 worktree（base_ref/baseRef）、GET/list descriptor 与 options/query/inspect/cleanup；文件接口互斥 Session 或 Workspace+cwd locator。WebShell 生成类型/client/provider 随变，原 pending key 和 Session target/revision 贯穿恢复；默认省略保持当前目录，未 READY 不执行。API 支持 ref 不等于当前 UI 有任意 ref 选择器，亦不承诺 Java/Python SDK 已提供独立封装或跨版本兼容。#15696 当前还补冻结 recent/all branch point 和逐 record ACP 最后可见 chunk 边界，完整异步历史仍未进入 main。
+[#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 仍 open，head `194469a54723`：旧目录/公共 snapshot 的 41 表候选，不是 38 表多模块 main 的整合版本。内部 includeNativeHistory/nativeHistory version1、原 token/范围、固定 revision/sequence/digest 与 Promise/scan 消费必须配套；冷 view 不可用不是空，recordHistory 可重开，ACP bulk 超限显式失败，冻结 branch point/最后可见 chunk 不能丢。主干 reader2/原 native 恢复仍按下方已合入边界。
 
-已合入 [#15813](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 内部 activationLeaseRenewal 能力，无能力保留原事件式续租；lease overlay 匹配原身份并同步 head expiry，不改变 canonical bytes、revision、sequence、digest。已合入 [#15839](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的原事务 recent/lookup 与签名已发布 Item 页和 [#15865](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的显式 messages view/live export 是不同契约，后者固定成员范围不冻结正文，provider 按 coveredSequence/Item 身份接 stream，不能宣称统一公开 SDK 已封装。
+已合入 [#15745](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 保可选 worktree（base_ref/baseRef）、descriptor/管理和互斥文件 locator，原 key/target/revision 贯穿恢复，未 READY 不执行，不能泛化任意 ref UI 或 Java/Python 独立封装。已合入 [#15813](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) activationLeaseRenewal 无能力沿原事件式路径；原 lease/head expiry 更新不改 journal bytes/revision/sequence/digest。
 
-open [#15870](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) head `6851d1a8c10c` 拟令默认消息查询走 live 并删除公共快照，NATIVE_SNAPSHOT 保留；open [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) head `221d4e0cb6bf` 拟分 Maven/SDK adapter 与 Boot assembly，library 不夹默认 application 配置、exec 路径转 server/target，verification 不发布。main 仍旧单模块和默认公共快照，候选包名/产物变化不保证嵌入或发行兼容。
+open [#15879](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) head `2382bcce7d6b` 给原 Java create/load 与 Hosted 定义 pin fileRewindEnabled=false，恢复重述并拒 rewind，默认省略保持旧语义；E2B Volume/原身份/关闭证明见 [候选专题](managed-agents/managed-agent-external-runtime-e2b.md)，不是当前 main 能力。open [#15927](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 拟用相同 job-local repo/reactor version 分别跑普通/启用宿主，拒空选择；定义不等于实际通过。本次未执行 SDK/源码、规模、MySQL、宿主或平台验收。
 
 ### HTTP 恢复与 reader 匹配，2026-10-27
 
