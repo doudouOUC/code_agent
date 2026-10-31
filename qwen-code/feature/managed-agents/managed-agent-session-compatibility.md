@@ -1,14 +1,14 @@
 # Session 服务：兼容接口与实现串联
 
-## 当前接口演进与 open 候选，2026-10-31
+## 当前接口演进与 open 候选，2026-11-01
 
-main `57d9a8fb50f4` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)/[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：默认消息接口统一 live keyset，旧 view 不再解释，旧签名/十进制 transcript cursor 必须丢弃，limit 收窄为 1–100。400 invalid_message_cursor、409 message_projection_changed、503 message_projection_pending 和 413 message_page_too_large 分别对应拒绝、重载、等待与页预算；单个超大 Item 不能靠 limit=1 返回。[#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/coveredSequence 接 SSE 和 live 导出保留，正文不是 as-of snapshot，NATIVE_SNAPSHOT 不删。
+main `eaafba5d140b` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)/[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：默认消息接口统一 live keyset，旧 view 不再解释，旧签名/十进制 transcript cursor 必须丢弃，limit 收窄为 1–100。400 invalid_message_cursor、409 message_projection_changed、503 message_projection_pending 和 413 message_page_too_large 分别对应拒绝、重载、等待与页预算；单个超大 Item 不能靠 limit=1 返回。[#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/coveredSequence 接 SSE 和 live 导出保留，正文不是 as-of snapshot，NATIVE_SNAPSHOT 不删。
 
 主干 Maven 已是六生产模块与 verification，server/target、维护 main-class 和 verification 报告路径须配套；library 不夹默认 application 配置，verification 的测试资源/原 module/CLI 路径不改变 wire 或 SQL 权威。唯一 V1/38 业务表，相同 schemaVersion 不证明旧 catalog/writer 兼容。[#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) worktree descriptor/互斥 Session 或 Workspace+cwd locator 保留，可信 sessionFileScope 不公开，未 READY 不执行；只有 API 支持 ref，不等于任意 ref UI。
 
-[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `194469a54723` 仍是旧目录/含公共 snapshot 的 41 表异步消费者候选：Core 历史/checkpoint/extension Promise、scan(consume)、restore 显式 includeNativeHistory/nativeHistory version1 必须同 Hosted/ACP/Goal/recorder 升级，不能独立替换同步方法。message/history/context 投影分开，冻结 branch point 按原 record 对象/ACP 最后可见 chunk 保留；bulk 超限失败不短成功。它不是当前 main 模块/公共快照删除的集成 head。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 已关闭未合入，关闭前 head `194469a54723` 是旧目录/含公共 snapshot 的 41 表异步消费者方案：Core 历史/checkpoint/extension Promise、scan(consume)、restore 显式 includeNativeHistory/nativeHistory version1 原拟同 Hosted/ACP/Goal/recorder 升级，不能独立替换同步方法。message/history/context 投影分开，冻结 branch point 按原 record 对象/ACP 最后可见 chunk 保留；bulk 超限失败不短成功。这些仅为历史设计，不是当前 main 模块/公共快照删除的集成 head。
 
-open [#15879](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) 的 E2B 候选另见 [专门边界](managed-agent-external-runtime-e2b.md)，原 SDK fileRewindEnabled=false pin 不能推定 main 已支持。open [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 才补同版本普通/启用宿主双模式 CI及响应开始后取消探针；不改生产取消或证明嵌入验收。本次未运行跨语言、源码、宿主或恢复资格，下方旧接口按日期阅读。
+open [#15879](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) 的 E2B 候选另见 [专门边界](managed-agent-external-runtime-e2b.md)，原 SDK fileRewindEnabled=false pin 不能推定 main 已支持。已合入 [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) 补同版本普通/启用宿主双模式 CI及响应开始后取消探针，最终另保空闲流异常的 HarnessStreamIdleFailure/idleTimeout/原 cause，不改生产 caller-cancel 或证明嵌入验收。已合入 [#15952](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15952.md) 仅共享事件投递循环，Public 秒/WebShell 毫秒、原 SSE ID/type、无 ID resync 和权限复查不变，不改 wire/SQL/创建入口。本次未运行跨语言、源码、宿主或恢复资格，下方旧接口按日期阅读。
 
 ## 当前接口与 reader 屏障，2026-10-27
 

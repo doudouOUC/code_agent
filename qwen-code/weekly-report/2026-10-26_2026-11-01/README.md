@@ -1,18 +1,18 @@
-# qwen-code PRs · 2026-10-26 ~ 2026-11-01 (W44 日更至 10-30)
+# qwen-code PRs · 2026-10-26 ~ 2026-11-01 (W44 日更至 10-31)
 
-> 本文件收录北京时间 2026-10-26 至 10-30 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-25T16:00:00Z, 2026-10-30T16:00:00Z)`；本周尚未结束。本次日更新增 10-30 创建的 2 个，并刷新本周已收录 23 个，#15870/#15871 后续合入不改变创建归属。快照取北京时间 2026-10-31，主干 `57d9a8fb50f4`。只按 author/createdAt 收录，不因更新、关闭或合入时间补收或移动创建周；W43 后续变化不计入 W44 新增。以下 merged 为最终实现，open 只观察当前 diff，不能作为 main 能力承诺。代码规模逐 PR 累加，包含叠加分支/重叠 diff，不是去重 main 增量。本次只核对代码与文档，未运行源码、规模、浏览器、CI 或真实环境门禁。
+> 本文件收录北京时间 2026-10-26 至 10-31 创建的 @doudouOUC 个人 PR，UTC 半开窗口 `[2026-10-25T16:00:00Z, 2026-10-31T16:00:00Z)`；本周尚未结束。本次日更新增 10-31 创建的 1 个，并刷新本周已收录 25 个，#15927 后续合入/#15696 关闭不改变创建归属。快照取北京时间 2026-11-01，主干 `eaafba5d140b`。只按 author/createdAt 收录，不因更新、关闭或合入时间补收或移动创建周；W43 后续变化不计入 W44 新增。以下 merged 为最终实现，open 只观察当前 diff，closed 未合入只保留历史方案，后二者不能作为 main 能力承诺。代码规模逐 PR 累加，包含叠加分支/重叠 diff，不是去重 main 增量。本次只核对代码与文档，未运行源码、规模、浏览器、CI 或真实环境门禁。
 
-**主题**: 公共消息快照移除和 Maven 模块拆分已合入；完整有界历史、E2B Cloud 执行及拆分后验证补口仍 open
+**主题**: 共享事件投递循环、拆分后异常映射/验证补口已合入；完整有界历史关闭未合入，E2B Cloud 执行仍 open
 
-**PR 统计**: 25 PRs - 22 merged / 3 open / 0 closed
-**当前已合并 PR 代码量**: +44,257 / -20,363，1732 个文件变更
-**全量代码量**: +79,547 / -30,664，2083 个文件变更
-**类型分布**: feat ×11, test ×4, fix ×6, perf ×1, other ×1, refactor ×2
-**范围 (scope)**: core ×3, managed-agent ×10, serve ×1, ci ×3, managed ×6, runtime ×1, java ×1
+**PR 统计**: 26 PRs - 24 merged / 1 open / 1 closed
+**当前已合并 PR 代码量**: +44,676 / -20,521，1753 个文件变更
+**全量代码量**: +79,792 / -30,805，2097 个文件变更
+**类型分布**: feat ×11, test ×3, fix ×7, perf ×1, other ×1, refactor ×3
+**范围 (scope)**: core ×3, managed-agent ×11, serve ×1, ci ×3, managed ×6, runtime ×1, java ×1
 
 唯一 V1 当前 38 业务表：#15745 曾新增 worktree 成 39 表，#15870 再删除公共 ma_snapshot，但 NATIVE_SNAPSHOT/journal 仍在；#15871 将资源/DDL 与代码迁入六生产模块和 verification，不新增迁移。开发 catalog 重建，不用相同 schemaVersion 推断混版本兼容。#15599 与 #15569 的 HTTP/native 恢复 diff 有重叠，两项 PR 不是两套 main 恢复；#15616 旧 cwd operation 查询/结算保留。其余续租、上传、retirement 原身份围栏不放宽。
 
-#15696 仍为旧目录/保留公共快照的 41 表完整历史候选，#15879 的 E2B files/tools 同样基于拆分前目录；不视作当前 38 表多模块 main 的整合能力。#15927 只拟补响应开始后取消探针与独立宿主双模式 CI，不改生产取消。main 消息读取已统一 live keyset，旧签名/十进制 transcript cursor 不跨实现复用；canonical 原事务查询和 native 恢复仍独立。#15729/#15782 的合入及本次模块/测试变化均不证明发行、首装、Cloud/MySQL/Hosted 或平台资格。
+#15696 已关闭未合入，旧目录/保留公共快照的 41 表完整历史方案只保历史观察；#15879 的 E2B files/tools 同样基于拆分前目录，仍 open，不视作当前 38 表多模块 main 的整合能力。#15927 最终除响应开始后取消探针与独立宿主双模式 CI，还保留 SDK 空闲流 typed failure/idleTimeout/原异常链及 Broker 内部日志，不改生产 caller-cancel。#15952 最终只共享事件投递循环，原 SSE ID/type、双端时间单位、resync/权限/overflow 边界不变，不包含已由上游提供的 Session 创建入口改造。main 消息读取已统一 live keyset，旧签名/十进制 transcript cursor 不跨实现复用；canonical 原事务查询和 native 恢复仍独立。合入及本次模块/测试变化均不证明发行、首装、Cloud/MySQL/Hosted 或平台资格。
 
 ---
 
@@ -31,7 +31,7 @@
 | [#15626](https://github.com/QwenLM/qwen-code/pull/15626) | ✅ merged | @doudouOUC | feat(core): add local managed journal snapshot recovery | +3940/-764 | 34 | 10-26 07:51 | 10-26 14:47 |
 | [#15670](https://github.com/QwenLM/qwen-code/pull/15670) | ✅ merged | @doudouOUC | fix(serve): Fix Hosted local state and foreground Shell validation | +309/-92 | 16 | 10-26 17:51 | 10-27 07:48 |
 | [#15676](https://github.com/QwenLM/qwen-code/pull/15676) | ✅ merged | @doudouOUC | fix(ci): Isolate Managed runtime release test classes | +14/-1 | 2 | 10-26 19:47 | 10-26 20:09 |
-| [#15696](https://github.com/QwenLM/qwen-code/pull/15696) | open | @doudouOUC | feat(managed): Add bounded authority history queries | +31258/-10101 | 286 | 10-27 04:38 | - |
+| [#15696](https://github.com/QwenLM/qwen-code/pull/15696) | 🔴 closed | @doudouOUC | feat(managed): Add bounded authority history queries | +31258/-10101 | 286 | 10-27 04:38 | 10-31 15:18 |
 | [#15713](https://github.com/QwenLM/qwen-code/pull/15713) | ✅ merged | @doudouOUC | fix(ci): Preserve canonical artifacts across job retries | +12/-5 | 2 | 10-27 09:30 | 10-27 13:10 |
 | [#15715](https://github.com/QwenLM/qwen-code/pull/15715) | ✅ merged | @doudouOUC | test(managed-agent): initialize the snapshot pool connection synchronously | +1/-0 | 1 | 10-27 09:50 | 10-27 10:06 |
 | [#15729](https://github.com/QwenLM/qwen-code/pull/15729) | ✅ merged | @doudouOUC | feat(runtime): add resident workspace reclamation and reuse | +1775/-64 | 32 | 10-27 15:49 | 10-28 05:04 |
@@ -44,7 +44,8 @@
 | [#15870](https://github.com/QwenLM/qwen-code/pull/15870) | ✅ merged | @doudouOUC | refactor(managed): Remove persisted public message snapshots | +1318/-2823 | 61 | 10-29 14:12 | 10-30 00:56 |
 | [#15871](https://github.com/QwenLM/qwen-code/pull/15871) | ✅ merged | @doudouOUC | refactor(managed-agent): Split server into Maven modules | +17816/-12517 | 1231 | 10-29 14:22 | 10-30 14:56 |
 | [#15879](https://github.com/QwenLM/qwen-code/pull/15879) | open | @doudouOUC | feat(managed-agent): add an E2B Cloud runtime provider | +3858/-183 | 58 | 10-29 16:38 | - |
-| [#15927](https://github.com/QwenLM/qwen-code/pull/15927) | open | @doudouOUC | test(managed-agent): close post-split verification gaps | +174/-17 | 7 | 10-30 15:51 | - |
+| [#15927](https://github.com/QwenLM/qwen-code/pull/15927) | ✅ merged | @doudouOUC | fix(managed-agent): close post-split verification gaps | +305/-47 | 17 | 10-30 15:51 | 10-31 10:31 |
+| [#15952](https://github.com/QwenLM/qwen-code/pull/15952) | ✅ merged | @doudouOUC | refactor(managed-agent): Share the session event delivery loop | +114/-111 | 4 | 10-31 00:26 | 10-31 15:05 |
 
 ---
 
@@ -63,7 +64,7 @@
 | [#15626](https://github.com/QwenLM/qwen-code/pull/15626) | 本地 snapshot base+tail 需阻止旧 writer、offset 混用和资源缺失。 | 已合入：仅认证 sealed resume 一次转换，先存原 bytes 页/资源闭包再围栏 rename/读回；format2/minimumReader2、物理 offset 换算、未知替换不释放，不后台轮换/GC。 | 更新总览、Managed、恢复、Session 存储/兼容、存储与事件、SDK；完整实现见 [implementations/pr-15626.md](implementations/pr-15626.md)。 |
 | [#15670](https://github.com/QwenLM/qwen-code/pull/15670) | Hosted 原 store ID 受本地 transcript/恢复扫描干扰，Shell 显式前台参数与能力声明不一致。 | 已合入：Hosted 模型配置跳过本地 ID 占用、按 profile 隔离分支恢复/PR timer；有后台准入才接受显式 false，原 Broker/领域权限不变；Java fixture 修复不改生产。 | 更新总览、Managed、客户端与恢复；完整实现见 [implementations/pr-15670.md](implementations/pr-15670.md)。 |
 | [#15676](https://github.com/QwenLM/qwen-code/pull/15676) | release verify 跨类复用 JVM 导致状态干扰，不能靠过滤测试放行。 | 已合入：原完整 clean verify/central-release 增单 fork、不复用；元测试禁止 skip/过滤/失败忽略或 argLine 覆盖。 | 更新总览、Managed 与恢复的发布边界；完整实现见 [implementations/pr-15676.md](implementations/pr-15676.md)。 |
-| [#15696](https://github.com/QwenLM/qwen-code/pull/15696) | 全历史常驻增长，淘汰破坏原回执，流式 replay 可能丢 certified 分支边界。 | open 当前观察：固定前缀异步 view/read grant/未知结算不变，补冻结 branch point、逐记录 ACP 最后可见 chunk 和外部 parent 边界；旧目录/含公共快照及 worktree 的 41 表候选未叠加当前 38 表模块 main。 | 更新总览、Managed、存储/Session 存储、恢复、兼容、SDK 与 JDBC 双语；完整当前观察见 [implementations/pr-15696.md](implementations/pr-15696.md)。 |
+| [#15696](https://github.com/QwenLM/qwen-code/pull/15696) | 全历史常驻增长，淘汰破坏原回执，流式 replay 可能丢 certified 分支边界。 | closed 未合入历史观察：固定前缀异步 view/read grant/未知结算、冻结 branch point、逐记录 ACP 和外部 parent；旧目录/41 表方案未叠加当前 38 表模块 main，关闭不证明目标完成。 | 更新总览、Managed、存储/Session 存储、恢复、兼容、SDK 与 JDBC 双语；完整关闭观察见 [implementations/pr-15696.md](implementations/pr-15696.md)。 |
 | [#15713](https://github.com/QwenLM/qwen-code/pull/15713) | 仅重试下游 job 时，当前 attempt 名称找不到上游原 canonical artifact。 | 已合入：upload ID 作为 job output，下游按该不可变 ID 下载，再保留 checkout 绑定；不代表产物已发布或验收成功。 | 更新总览、Managed 与恢复的 CI 证据边界；完整实现见 [implementations/pr-15713.md](implementations/pr-15713.md)。 |
 | [#15715](https://github.com/QwenLM/qwen-code/pull/15715) | 单连接 snapshot fixture 异步首连接可能先触发 500 ms 借用超时。 | 测试已合入：init 前设 initialSize=1，保留 maxActive/maxWait；不改生产连接池。 | 更新总览、Managed、恢复与 JDBC 双语；完整实现见 [implementations/pr-15715.md](implementations/pr-15715.md)。 |
 | [#15729](https://github.com/QwenLM/qwen-code/pull/15729) | resident 删除尝试缺正常卸载/detach 后的释放闭环，404/DELETE 不足以安全复用。 | 已合入：原 finalizer/baseline、terminated/新鲜同 boot NodeLease/卸载/detach receipt 推进三阶段，SQL 释放原 owner；resident 奇偶 revision 和保留 tenant 支撑同租户数据保留复用，非异常节点 fence 资格。 | 更新总览、Managed、恢复、存储与 JDBC 双语；完整最终实现见 [implementations/pr-15729.md](implementations/pr-15729.md)。 |
@@ -76,7 +77,8 @@
 | [#15870](https://github.com/QwenLM/qwen-code/pull/15870) | ma_message 之外再发布公共 Item 快照，增加重写/保留/GC 复杂度。 | 已合入：删 ma_snapshot/SNAPSHOT owner，默认 live 页/投影 floor，保活跃 Turn/读 lease/NATIVE_SNAPSHOT，不物理删事件；38 表、limit 1–100、旧 cursor 与 pending/changed/超大页错误明确区分。 | 更新总览、Managed、存储/Session 存储、恢复、兼容、SDK 与 JDBC 双语；完整最终实现见 [implementations/pr-15870.md](implementations/pr-15870.md)。 |
 | [#15871](https://github.com/QwenLM/qwen-code/pull/15871) | 单 Server 模块混合契约/控制面/JDBC/SDK 与 Boot 装配，依赖难约束。 | 已合入：六生产模块沿 contracts/server 允许矩阵，verification 不发布，传原 module/CLI 路径和测试配置；SQL 仍 38 表，1231 文件含 1051 rename，不是微服务化或资格完成。 | 更新总览、Managed、恢复、兼容、SDK 与 JDBC 双语；完整最终实现见 [implementations/pr-15871.md](implementations/pr-15871.md)。 |
 | [#15879](https://github.com/QwenLM/qwen-code/pull/15879) | 云上持久 Workspace 创建/启动失答及关闭不能靠换实例、TTL 或目录名推断。 | open 当前观察：E2B Volume/SQLite 原身份、未知不重建/恢复，operator 原子 Workspace/OWNER，files/tools 前台执行；原 worker proof 先落库再核原 sandbox kill，保留 Volume，未做 Cloud 资格。 | 更新总览、Managed、E2B 专题、恢复、Workspace 双语与 SDK；完整当前观察见 [implementations/pr-15879.md](implementations/pr-15879.md)。 |
-| [#15927](https://github.com/QwenLM/qwen-code/pull/15927) | 取消探针时序不稳定，reactor 检查不等于独立 Maven 宿主装配。 | open 当前观察：首响应 flush 后取消/核 close，保留原时间界限；同 job-local repo/version install 生产依赖，再独立跑普通/启用宿主并拒空选择，不改生产取消或发布。 | 更新总览、Managed、恢复、兼容、SDK 与 JDBC 双语；完整当前观察见 [implementations/pr-15927.md](implementations/pr-15927.md)。 |
+| [#15927](https://github.com/QwenLM/qwen-code/pull/15927) | 取消探针时序不稳定、reactor 不等于独立宿主，SDK 边界还丢失空闲流类型。 | 已合入：首响应后取消、同仓库/版本普通与启用宿主 CI；空闲异常保 HarnessStreamIdleFailure/timeout/cause，限定投影 pending 轮询，Broker 内部日志不改公开 500；不改生产 caller-cancel。 | 更新总览、Managed、恢复、兼容、SDK 与 JDBC 双语；完整最终实现见 [implementations/pr-15927.md](implementations/pr-15927.md)。 |
+| [#15952](https://github.com/QwenLM/qwen-code/pull/15952) | Public/WebShell 重复投递循环易漂移，直接统一 payload 会破坏时间单位。 | 已合入：两个同步授权入口传转换函数到同一私有 replay/live 循环；原 ID/type、秒/毫秒、无 ID resync、权限间隔/心跳/overflow 和删除结束保留，不改创建入口。 | 更新总览、Managed、客户端、恢复与兼容；完整最终实现见 [implementations/pr-15952.md](implementations/pr-15952.md)。 |
 
 ## PR 对应 feature 覆盖
 
@@ -85,15 +87,15 @@
 | [E2B 外部 Runtime](../../feature/managed-agents/managed-agent-external-runtime-e2b.md) | #15879(open) | E2B Volume/原创建与停止证明，未知不重建；真实 Cloud 仍待验收。 |
 | [Workspace 中文](../../feature/managed-agents/managed-agent-workspace-context.md) | #15745(merged), #15879(open) | 保 worktree 身份/ready/清理，另列 E2B 注册/排他执行候选。 |
 | [Workspace English](../../feature/managed-agents/managed-agent-workspace-context.en.md) | #15745(merged), #15879(open) | 与中文同步 worktree 和 E2B，worker 不等于磁盘副本。 |
-| [Feature 总览](../../feature/README.md) | #15566(merged), #15569(merged), #15585(merged), #15586(merged), #15588(merged), #15599(merged), #15608(merged), #15616(merged), #15626(merged), #15670(merged), #15676(merged), #15696(open), #15713(merged), #15715(merged), #15729(merged), #15745(merged), #15782(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(open) | 同步 25 个本人 PR、两项新合入与三个独立 open 候选。 |
-| [Managed Agents](../../feature/managed-agents/README.md) | #15566(merged), #15569(merged), #15585(merged), #15586(merged), #15588(merged), #15599(merged), #15608(merged), #15616(merged), #15626(merged), #15670(merged), #15676(merged), #15696(open), #15713(merged), #15715(merged), #15729(merged), #15745(merged), #15782(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(open) | 38 表多模块 main 与旧 41 表历史/E2B/资格候选分开。 |
-| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #15566(merged), #15569(merged), #15585(merged), #15586(merged), #15599(merged), #15608(merged), #15626(merged), #15670(merged), #15676(merged), #15696(open), #15713(merged), #15715(merged), #15729(merged), #15745(merged), #15782(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(open) | 保 native/未知/物理释放边界，E2B proof 和宿主/取消探针未验收。 |
-| [存储与事件](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #15566(merged), #15569(merged), #15586(merged), #15599(merged), #15626(merged), #15696(open), #15729(merged), #15745(merged), #15813(merged), #15839(merged), #15870(merged), #15871(merged) | 38 表公共快照删除/模块资源已合入，旧历史候选分开，native pins 不删。 |
-| [Session 存储](../../feature/managed-agents/managed-agent-session-storage.md) | #15566(merged), #15569(merged), #15599(merged), #15626(merged), #15696(open), #15813(merged), #15839(merged), #15870(merged) | 保 lease/原事务/流式历史，默认 live 不改变 native 恢复。 |
-| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #15586(merged), #15588(merged), #15616(merged), #15670(merged), #15745(merged), #15839(merged), #15865(merged), #15870(merged) | 默认 live、旧 cursor/limit 升级与 Item/SSE 去重，不再声明保留公共快照。 |
-| [Session 兼容](../../feature/managed-agents/managed-agent-session-compatibility.md) | #15616(merged), #15626(merged), #15696(open), #15745(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(open) | 模块/消息接口已合入，E2B pin/宿主候选不泛化旧 writer/reader 兼容。 |
-| [SDK](../../feature/sdk.md) | #15569(merged), #15599(merged), #15616(merged), #15626(merged), #15696(open), #15745(merged), #15813(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(open) | SDK/adapter 与 Boot 已分层，内部能力和 E2B pin/宿主候选独立核验。 |
-| [JDBC English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #15569(merged), #15585(merged), #15586(merged), #15599(merged), #15696(open), #15715(merged), #15729(merged), #15745(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15927(open) | 38 表/模块路径与原事务/lease/GC 分层，不替代 MySQL/Cloud。 |
-| [JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #15569(merged), #15585(merged), #15586(merged), #15599(merged), #15696(open), #15715(merged), #15729(merged), #15745(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15927(open) | 与英文同步公共快照删除、模块和 open 宿主检查，运行证据独立。 |
+| [Feature 总览](../../feature/README.md) | #15566(merged), #15569(merged), #15585(merged), #15586(merged), #15588(merged), #15599(merged), #15608(merged), #15616(merged), #15626(merged), #15670(merged), #15676(merged), #15696(closed), #15713(merged), #15715(merged), #15729(merged), #15745(merged), #15782(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(merged), #15952(merged) | 同步 26 个本人 PR、事件流/异常映射已合入及 open/关闭边界。 |
+| [Managed Agents](../../feature/managed-agents/README.md) | #15566(merged), #15569(merged), #15585(merged), #15586(merged), #15588(merged), #15599(merged), #15608(merged), #15616(merged), #15626(merged), #15670(merged), #15676(merged), #15696(closed), #15713(merged), #15715(merged), #15729(merged), #15745(merged), #15782(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(merged), #15952(merged) | 38 表多模块 main、已关闭的 41 表历史与 open E2B 分开。 |
+| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #15566(merged), #15569(merged), #15585(merged), #15586(merged), #15599(merged), #15608(merged), #15626(merged), #15670(merged), #15676(merged), #15696(closed), #15713(merged), #15715(merged), #15729(merged), #15745(merged), #15782(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(merged), #15952(merged) | 保 native/未知/释放与 SSE 边界，异常映射/宿主 CI 合入不等于验收。 |
+| [存储与事件](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #15566(merged), #15569(merged), #15586(merged), #15599(merged), #15626(merged), #15696(closed), #15729(merged), #15745(merged), #15813(merged), #15839(merged), #15870(merged), #15871(merged) | 38 表公共快照删除/模块资源已合入，历史方案关闭未合入，native pins 不删。 |
+| [Session 存储](../../feature/managed-agents/managed-agent-session-storage.md) | #15566(merged), #15569(merged), #15599(merged), #15626(merged), #15696(closed), #15813(merged), #15839(merged), #15870(merged) | 保 lease/原事务/native 恢复，完整流式历史为关闭未合入方案。 |
+| [客户端与事件](../../feature/managed-agents/managed-agent-client-surfaces.md) | #15586(merged), #15588(merged), #15616(merged), #15670(merged), #15745(merged), #15839(merged), #15865(merged), #15870(merged), #15952(merged) | 默认 live/Item 去重及双投影共享循环，保原 ID/时间单位/无 ID resync。 |
+| [Session 兼容](../../feature/managed-agents/managed-agent-session-compatibility.md) | #15616(merged), #15626(merged), #15696(closed), #15745(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(merged), #15952(merged) | 模块/消息/共享 SSE 与异常映射已合入，E2B pin/旧 writer 兼容另核。 |
+| [SDK](../../feature/sdk.md) | #15569(merged), #15599(merged), #15616(merged), #15626(merged), #15696(closed), #15745(merged), #15813(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15879(open), #15927(merged) | SDK 空闲异常类型保留，宿主 CI 已补；E2B pin 与运行资格独立核验。 |
+| [JDBC English](../../feature/managed-agents/managed-runtime-broker-jdbc.md) | #15569(merged), #15585(merged), #15586(merged), #15599(merged), #15696(closed), #15715(merged), #15729(merged), #15745(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15927(merged) | 38 表/模块路径与原事务/lease/GC 分层，不替代 MySQL/Cloud。 |
+| [JDBC 中文](../../feature/managed-agents/managed-runtime-broker-jdbc.zh-CN.md) | #15569(merged), #15585(merged), #15586(merged), #15599(merged), #15696(closed), #15715(merged), #15729(merged), #15745(merged), #15813(merged), #15827(merged), #15839(merged), #15865(merged), #15870(merged), #15871(merged), #15927(merged) | 与英文同步公共快照删除、模块和已合入宿主/异常映射，运行证据独立。 |
 
-_按个人 PR 口径更新于 2026-10-31；文档审计不替代源码、规模、浏览器、真实 MySQL/SSH/CSI/模型、CI 及部署验收。_
+_按个人 PR 口径更新于 2026-11-01；文档审计不替代源码、规模、浏览器、真实 MySQL/SSH/CSI/模型、CI 及部署验收。_

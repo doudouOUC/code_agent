@@ -1,14 +1,14 @@
 # Managed Runtime Broker JDBC 持久化
 
-## 已合入模块与公共快照删除，2026-10-31
+## 已合入模块与公共快照删除，2026-11-01
 
-main `57d9a8fb50f4` 唯一 V1 为 38 业务表。已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 删除公共 ma_snapshot/SNAPSHOT owner 和专用元数据，不删 NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获或制品 owner。消息走 live keyset，仍保读 lease/原资源引用；projection coverage/活跃 Turn 围住 replay floor，自动推进仍 opt-in，不物理删事件。旧签名/十进制 transcript cursor 需重载，limit 1–100，投影换代/落后和页预算错误分开；成员上界不冻结正文。
+main `eaafba5d140b` 唯一 V1 为 38 业务表。已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 删除公共 ma_snapshot/SNAPSHOT owner 和专用元数据，不删 NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获或制品 owner。消息走 live keyset，仍保读 lease/原资源引用；projection coverage/活跃 Turn 围住 replay floor，自动推进仍 opt-in，不物理删事件。旧签名/十进制 transcript cursor 需重载，limit 1–100，投影换代/落后和页预算错误分开；成员上界不冻结正文。
 
 已合入 [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 拆 contracts/control-plane/runtime-broker/persistence/adapters/server 与 verification。JDBC/schema 在 persistence、SDK/OSS/MQ 在 adapters、Boot 在 server，最终 SQL 仍同一 38 表基线；server/target 放 exec/维护产物，verification/target 放报告，verification 不发布。显式 server 测试资源和原 module/CLI 参数不把默认 application 配置放回生产 library；native 声明只在 contracts，相同 V1 不证明旧 catalog/writer 可混跑。
 
-[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 仍 open，head `194469a54723`，旧目录/公共 snapshot 加两张 generation-qualified history state/fact 共 41 表，不是最新 main 直接加两表。facts 与 canonical commit 同事务写，有界连续 backfill、bucket 计数和原 locator/digest 核答案，repair 用 generation CAS；原 token/Workspace/Session 授权不变，view 缺失或损坏不是 absence，canonical 损坏不按索引问题修写。冻结流式 replay 保 certified branch point/外部 parent，managed JDBC/JSON bean 显式限定。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 已关闭未合入，关闭前 head `194469a54723`，旧目录/公共 snapshot 加两张 generation-qualified history state/fact 共 41 表，不是最新 main 直接加两表。历史设计中 facts 与 canonical commit 同事务写，有界连续 backfill、bucket 计数和原 locator/digest 核答案，repair 用 generation CAS；原 token/Workspace/Session 授权不变，view 缺失或损坏不是 absence，canonical 损坏不按索引问题修写。冻结流式 replay 保 certified branch point/外部 parent，managed JDBC/JSON bean 显式限定；这些均不证明 main 完整历史目标已实现。
 
-该候选 READ_COMMITTED 来源页候选/正文限捕获 head，只用有效 read grant、不先续普通 writer；未知 append 仍拒历史读。launcher/规模 JVM 限每个临时 direct-buffer 缓存 1 MiB，外部文件 H2 JVM 需同参数，不是进程 RSS 上界或同步持久化变化，规模资格独立。
+该已关闭方案将 READ_COMMITTED 来源页候选/正文限于捕获 head，只用有效 read grant、不先续普通 writer；未知 append 仍拒历史读。其 launcher/规模 JVM 限每个临时 direct-buffer 缓存 1 MiB，外部文件 H2 JVM 原需同参数；这不是进程 RSS 上界或同步持久化变化，不作为当前 main 操作指令或规模资格完成证据。
 
 已合入 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 保 ma_session_worktree 与原 Session/binding/准备/receipt 原子准入；completion identity/whole-storage maintenance 保护 Git，共享导入私有 marker 留服务 stateDirectory，拒独占 recovery/fence/migration/rewind。新准备要求仓库严格低于 storage root；未 READY 允许原队列管理/取消，拒新执行，已提交 Turn 不因 checkout 受阻结算失败。其原 39 表基线后由公共快照删除减为 38 表。
 
@@ -16,7 +16,7 @@ main `57d9a8fb50f4` 唯一 V1 为 38 业务表。已合入 [#15870](../../weekly
 
 已合入 [#15729](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15729.md) 保原 finalizer/baseline、新鲜同 boot NodeLease、终止/卸载/detach 后才 PLATFORM_CLEANED/fenced RELEASED；resident 奇偶 revision 仅同租户保数据复用，DELETE/提前 404 不授权释放。[#15827](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15827.md) 去 MariaDB full CI 不删原方言，完整 MySQL 8.4 仍需运行；[#15715](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15715.md) 只改测试首连接。
 
-open [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 才补响应开始后取消见证、同仓库/版本普通与启用宿主 CI，不改生产取消或证明新增运行通过。本次未运行源码、规模、MySQL、宿主、Cloud 或真实平台门禁；下方旧日期布局是历史，公共消息当前语义以上述为准。
+已合入 [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md)（merge `4cd3372bb669`）补响应开始后取消见证、同仓库/版本普通与启用宿主 CI。最终生产增量还将 SDK 空闲流 reason/timeout/cause 保为 HarnessStreamIdleFailure，包括延迟 stream/observe 读取；Broker 未知失败只增内部日志，不改公开 500，只有消息页轮询 fixture 容忍精确 projection-pending 响应。不改生产 caller-cancel 或证明新增运行通过。本次未运行源码、规模、MySQL、宿主、Cloud 或真实平台门禁；下方旧日期布局是历史，公共消息当前语义以上述为准。
 
 ## 原生快照 pins 与上传占用，2026-10-27
 

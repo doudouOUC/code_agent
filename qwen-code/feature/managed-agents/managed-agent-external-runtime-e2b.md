@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-2026-10-31 对照 main `57d9a8fb50f4`，本人 [#15879](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) 仍 open，head `2382bcce7d6b`。它基于拆分前目录，不是当前 Maven 多模块主干或有界历史候选的整合版本；以下均为当前 diff 观察。真实 E2B、Linux 镜像/Volume、中央 publication ingress、MySQL、Hosted、模型和发行验收未由本次执行。
+2026-11-01 对照 main `eaafba5d140b`，本人 [#15879](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) 仍 open，head `2382bcce7d6b`。它基于拆分前目录，不是当前 Maven 多模块主干或已关闭未合入的完整有界历史方案的整合版本；以下均为当前 diff 观察。真实 E2B、Linux 镜像/Volume、中央 publication ingress、MySQL、Hosted、模型和发行验收未由本次执行。
 
 ## 所有权与准入
 

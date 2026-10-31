@@ -1,16 +1,16 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
-### 已合入模块/消息接口与 open 候选，2026-10-31
+### 已合入模块/消息接口与 open 候选，2026-11-01
 
-main `57d9a8fb50f4` 已合入 [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：SDK/OSS/MQ 适配在 adapters，Boot 在 server，verification 不安装/发布，library 不夹默认 application 配置，exec/维护产物在 server/target。配置/CLI 传入测试 fork，单模块旧路径不再是 main 锚点；普通依赖、exec、维护工具、发行和真实运行仍分别验证。
+main `eaafba5d140b` 已合入 [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：SDK/OSS/MQ 适配在 adapters，Boot 在 server，verification 不安装/发布，library 不夹默认 application 配置，exec/维护产物在 server/target。配置/CLI 传入测试 fork，单模块旧路径不再是 main 锚点；普通依赖、exec、维护工具、发行和真实运行仍分别验证。
 
 已合入 [#15870](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 统一默认 live 消息页/导出，删除公共快照/view，保留 native journal 快照；旧签名/十进制 transcript cursor 不跨实现复用，limit 1–100、投影 pending/changed 与页过大分别处理。原 [#15865](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) provider Item/coveredSequence/SSE 去重保留，成员范围不冻结正文；[#15839](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的 canonical recent/lookup 独立，其旧签名快照分支不再存在。不能宣称所有公开 SDK 已有同等封装。
 
-[#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 仍 open，head `194469a54723`：旧目录/公共 snapshot 的 41 表候选，不是 38 表多模块 main 的整合版本。内部 includeNativeHistory/nativeHistory version1、原 token/范围、固定 revision/sequence/digest 与 Promise/scan 消费必须配套；冷 view 不可用不是空，recordHistory 可重开，ACP bulk 超限显式失败，冻结 branch point/最后可见 chunk 不能丢。主干 reader2/原 native 恢复仍按下方已合入边界。
+[#15696](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 已关闭未合入，关闭前 head `194469a54723`：旧目录/公共 snapshot 的 41 表历史方案，不是 38 表多模块 main 的整合版本。原拟内部 includeNativeHistory/nativeHistory version1、原 token/范围、固定 revision/sequence/digest 与 Promise/scan 消费必须配套；冷 view 不可用不是空，recordHistory 可重开，ACP bulk 超限显式失败，冻结 branch point/最后可见 chunk 不能丢。这些不作为已发布 SDK 承诺；主干 reader2/原 native 恢复仍按下方已合入边界。
 
 已合入 [#15745](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 保可选 worktree（base_ref/baseRef）、descriptor/管理和互斥文件 locator，原 key/target/revision 贯穿恢复，未 READY 不执行，不能泛化任意 ref UI 或 Java/Python 独立封装。已合入 [#15813](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) activationLeaseRenewal 无能力沿原事件式路径；原 lease/head expiry 更新不改 journal bytes/revision/sequence/digest。
 
-open [#15879](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) head `2382bcce7d6b` 给原 Java create/load 与 Hosted 定义 pin fileRewindEnabled=false，恢复重述并拒 rewind，默认省略保持旧语义；E2B Volume/原身份/关闭证明见 [候选专题](managed-agents/managed-agent-external-runtime-e2b.md)，不是当前 main 能力。open [#15927](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 拟用相同 job-local repo/reactor version 分别跑普通/启用宿主，拒空选择；定义不等于实际通过。本次未执行 SDK/源码、规模、MySQL、宿主或平台验收。
+open [#15879](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) head `2382bcce7d6b` 给原 Java create/load 与 Hosted 定义 pin fileRewindEnabled=false，恢复重述并拒 rewind，默认省略保持旧语义；E2B Volume/原身份/关闭证明见 [候选专题](managed-agents/managed-agent-external-runtime-e2b.md)，不是当前 main 能力。已合入 [#15927](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) 用相同 job-local repo/reactor version 分别跑普通/启用宿主，拒空选择；SDK 边界在一般 transport 映射前保空闲流 typed failure/idleTimeout/原异常链，包括延迟 stream/observe next，不把旧 SDK 类型泄漏到控制面。定义/合入不等于实际运行通过，本次未执行 SDK/源码、规模、MySQL、宿主或平台验收。
 
 ### HTTP 恢复与 reader 匹配，2026-10-27
 

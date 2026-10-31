@@ -1,14 +1,16 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## 最新恢复与资格分层，2026-10-31
+## 最新恢复与资格分层，2026-11-01
 
-main `57d9a8fb50f4` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 公共快照删除：保留 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/stream 覆盖去重，默认 live 页以真实投影 coveredSequence 接 SSE，成员范围不是冻结正文；旧 cursor 需丢弃，projection changed 重载、pending 等待、超大 Item 可无法分页。保 NATIVE_SNAPSHOT/journal/原资源引用、活跃 Turn 和读 lease；floor 自动推进仍 opt-in，不物理删原事件，不授权未知重放或物理释放。
+main `eaafba5d140b` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 公共快照删除：保留 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/stream 覆盖去重，默认 live 页以真实投影 coveredSequence 接 SSE，成员范围不是冻结正文；旧 cursor 需丢弃，projection changed 重载、pending 等待、超大 Item 可无法分页。保 NATIVE_SNAPSHOT/journal/原资源引用、活跃 Turn 和读 lease；floor 自动推进仍 opt-in，不物理删原事件，不授权未知重放或物理释放。
 
-[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已合入六生产 Maven 模块与 verification，server/target 放 exec/维护产物，测试报告在 verification/target；测试资源与原 module/CLI 路径显式传入，不代表普通依赖或真实环境验收。open [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md) head `0e045ec457cf` 才补响应开始后取消、同仓库/版本的普通与启用宿主 CI，原时间界限/生产取消不变，新检查仍待实际运行。
+[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已合入六生产 Maven 模块与 verification，server/target 放 exec/维护产物，测试报告在 verification/target；测试资源与原 module/CLI 路径显式传入，不代表普通依赖或真实环境验收。已合入 [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md)（merge `4cd3372bb669`）补响应开始后取消、同仓库/版本普通与启用宿主 CI；最终还将 SDK 空闲流异常映射为 HarnessStreamIdleFailure，保 transport 继承、idleTimeout 和原异常链，延迟 stream/observe 的 next 同样映射。只精确允许消息页轮询的 503/message_projection_pending 等待；Broker 未知错误增内部日志但不改公开 500。原 caller-cancel 算法不变，本次未运行新检查。
+
+已合入 [#15952](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15952.md) 共享 Public/WebShell 的 replay/live 循环，保原 ID/type、双端时间单位、无 ID resync、订阅先行、overflow 补读、心跳及权限复查；没有把 resync/keepalive 变成执行收据，也不改未知执行或 SQL 恢复。最终不含上游已完成的 Session 创建入口改造；本次不复用旧创建/MySQL 测试数字证明新事件流资格。
 
 open [#15879](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15879.md) head `2382bcce7d6b` 的 E2B [执行候选](managed-agent-external-runtime-e2b.md) 持久保存原创建/启动意图，未知不再建或恢复暂停 VM；关闭需 worker 原 bytes/零未结算证明先落 adapter journal，再确认原 sandbox ID 停止，保留 Volume。仅 TTL/GONE 或丢回复不授权释放；Linux 模板/真实 Volume/HTTPS publication/MySQL/Hosted/Cloud 资格均未由本次证明。
 
-[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) open head `194469a54723` 保固定 canonical prefix、异步历史、可重建 view、原 read grant 与未知 settleAppend；冻结 branch point/逐记录 ACP 和外部 parent 边界不变。它仍旧目录/公共 snapshot 的 41 表方案，未叠加当前 main 的模块和公共快照删除；1 MiB 临时 direct-buffer 缓存不是进程 RSS 上界，真实规模资格独立。
+[#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 已关闭未合入，关闭前 head `194469a54723` 的固定 canonical prefix、异步历史、可重建 view、原 read grant/未知 settleAppend、冻结 branch point/逐记录 ACP 和外部 parent 只保留历史观察。它是旧目录/公共 snapshot 的 41 表方案，未叠加当前 main 的模块和公共快照删除；1 MiB 临时 direct-buffer 缓存不是进程 RSS 上界，关闭也不证明完整历史/规模资格完成。
 
 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) 已合入的 worktree 仍需原 completion/identity 才 READY，root 仓库拒新建；原队列管理/取消可用，已提交 Turn 不因 checkout 受阻改失败，未知 Git 停止保留 hold。close/archive/delete 留目录、非 force cleanup/不删分支，无 macOS JVM 被杀的自动资格。[#15813](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15813.md) 协商 HTTP 原 lease/head expiry 单调更新、未知同序号结算；[#15839](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 原事务读不获取 writer，均不代替执行收据。
 
