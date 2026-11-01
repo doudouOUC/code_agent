@@ -1,8 +1,8 @@
 # Managed Session：记录格式、提交与协议限额
 
-## 已关闭历史方案与主干消息投影，2026-11-01
+## 已关闭历史方案与主干消息投影，2026-11-02
 
-main `eaafba5d140b` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)，删除公共 ma_snapshot/SNAPSHOT owner，默认消息查询/导出转 live keyset；NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获/制品和读 lease 仍保留。floor 由投影 coverage 支撑且保活跃 Turn，自动推进仍 opt-in，不物理删原事件。当前唯一 V1/38 业务表，开发 catalog 重建而非 V2 升级。
+main `1bdad7d4b794` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)，删除公共 ma_snapshot/SNAPSHOT owner，默认消息查询/导出转 live keyset；NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获/制品和读 lease 仍保留。floor 由投影 coverage 支撑且保活跃 Turn，自动推进仍 opt-in，不物理删原事件。当前唯一 V1/38 业务表，开发 catalog 重建而非 V2 升级。
 
 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 已关闭未合入，关闭前 head `194469a54723`：旧目录方案保留公共 snapshot/worktree 基础和两张查询表，共 41 表，不是当前 main 直接加两表。以下仅为历史设计：固定原 scope/committed sequence/digest，HTTP 另固定 revision、文件固定 generation；历史点查和迭代异步，默认事件页 100/上限 256，最近事件至多 1,024 项/8 MiB，历史 cache 至多 2,048 项/4 MiB。关闭不证明完整常驻目标已落地。
 

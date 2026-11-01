@@ -1,5 +1,11 @@
 # Managed Agent：Runtime invocation v2
 
+## Broker 执行工作流与派发边界，2026-11-02
+
+main `1bdad7d4b794` 已合入 [#16029](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16029.md)：RuntimeBindingRegistry 只持本进程已核原 generation/lease 的路由与 reservation，SQL 仍是 authority；迟到清理按原 future 比较删除，失效先撤路由再写持久 fence。ExecutionState 管原 owner/identity/authorization CAS，Reconciler 只核原 Runtime/durable publication 的 settled 证据，不重发 UNKNOWN；单 execution 共享 lookup，先 stamp cooldown 再撤 in-flight。Recovery 每页 100 条补原未结算/后台 hold，普通 release 只观察、drain 才 status→stop→status，未证实退出继续占用。Cancellation 保 prepared/UNKNOWN/CSI 边界，facade 仍拥有调度器、provisioner 及派发实现。
+
+open [#16084](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16084.md) head `446838acb8a9` 才拟把 dispatch reservation、真实 invocation membership、续租、v3 publication/status poll 和 SSH ACK 移入独立 dispatcher，并让取消使用同一组件。先从真实 invocation Set 移除再持久结果，失败保 UNKNOWN；v3 保原 publication/claim/window，非重试或未知不重发；借用 facade scheduler/closed/provisioner，取消 reservation future 不停止 transport 或证明物理退出。当前 main 尚无该 dispatcher，不能把内部提取视作协议/SQL、跨进程 exactly-once 或平台资格扩展。本次只核源码/文档，未运行源码、MySQL、SSH/CSI、Hosted 或真实环境门禁；下方 v2 历史切片不替代当前实现。
+
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** Hosted 的具体 control 操作、稳定命令回执、纯查询/未执行取消和文件历史顺序见[普通工具接线](managed-agent-ordinary-tools-integration.md#4-普通工具各阶段与-broker-映射)。原 fileHistory.checkpoint 是轮次起始快照；轮末须另行读取并持久提交 history/backup。
 
 > **HTML 对齐（2026-09-18）：** owned v2 的身份、scope、lease、权限、取消和原调用回执继续复用。B 仍需普通 daemon 双引擎与 selector；Hosted 工具链路为 Harness→Java Broker→Runtime。目标接口和现有 v2 wire 分开记录，R/D 只作历史切片索引。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。

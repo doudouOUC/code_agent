@@ -1,8 +1,14 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## 最新恢复与资格分层，2026-11-01
+## Broker 工作流拆分与原证据恢复，2026-11-02
 
-main `eaafba5d140b` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 公共快照删除：保留 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/stream 覆盖去重，默认 live 页以真实投影 coveredSequence 接 SSE，成员范围不是冻结正文；旧 cursor 需丢弃，projection changed 重载、pending 等待、超大 Item 可无法分页。保 NATIVE_SNAPSHOT/journal/原资源引用、活跃 Turn 和读 lease；floor 自动推进仍 opt-in，不物理删原事件，不授权未知重放或物理释放。
+main `1bdad7d4b794` 已包含 [#16029](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16029.md)。本地 registry 只路由原 generation/完整 lease，持久 READY 不能绕过 adoption；失效先撤本地路由，持久 claim/CAS 失败也不恢复，释放只用原 operation generation。State/Reconciler/Recovery/Cancellation 分工仍由原 Repository 决定身份与租约；UNKNOWN 不按不存在/异常变 not_started，后台 hold 只因原 owner exited 证据结算，普通 release 不发 stop，drain 才做 status→stop→status。保有界扫描、并发 lookup/cooldown 顺序和 facade 关闭资源所有权，同 JVM 拆分不是新恢复协议或 MySQL/物理释放资格。
+
+open [#16084](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16084.md) head `446838acb8a9` 拟继续拆 dispatcher，当前 main 仍由 facade 派发；原 dispatch claim/authorization、续租、v3 原 publication/window 和 SSH ACK 不放宽。invocation membership 必须先移除再写终态/UNKNOWN；组件只取消本地 reservation，不关借用线程池/transport，也不提供物理 stop 证明。本次未运行 Java、CI、MySQL、Hosted、SSH/CSI 或真实平台门禁。
+
+## 最新恢复与资格分层，2026-11-02
+
+main `1bdad7d4b794` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 公共快照删除：保留 [#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/stream 覆盖去重，默认 live 页以真实投影 coveredSequence 接 SSE，成员范围不是冻结正文；旧 cursor 需丢弃，projection changed 重载、pending 等待、超大 Item 可无法分页。保 NATIVE_SNAPSHOT/journal/原资源引用、活跃 Turn 和读 lease；floor 自动推进仍 opt-in，不物理删原事件，不授权未知重放或物理释放。
 
 [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已合入六生产 Maven 模块与 verification，server/target 放 exec/维护产物，测试报告在 verification/target；测试资源与原 module/CLI 路径显式传入，不代表普通依赖或真实环境验收。已合入 [#15927](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15927.md)（merge `4cd3372bb669`）补响应开始后取消、同仓库/版本普通与启用宿主 CI；最终还将 SDK 空闲流异常映射为 HarnessStreamIdleFailure，保 transport 继承、idleTimeout 和原异常链，延迟 stream/observe 的 next 同样映射。只精确允许消息页轮询的 503/message_projection_pending 等待；Broker 未知错误增内部日志但不改公开 500。原 caller-cancel 算法不变，本次未运行新检查。
 

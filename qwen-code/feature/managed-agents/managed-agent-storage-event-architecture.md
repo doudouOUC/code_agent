@@ -1,8 +1,8 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## 已合入公共快照删除与关闭查询方案，2026-11-01
+## 已合入公共快照删除与关闭查询方案，2026-11-02
 
-main `eaafba5d140b` 唯一 V1 为 38 业务表：[#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 已删公共 ma_snapshot/SNAPSHOT owner/page metadata，保 NATIVE_SNAPSHOT/JOURNAL/工具捕获/制品和 message-parts 读 lease/原引用回收；projection coverage 支撑 replay floor，受活跃 Turn 限制、自动推进仍 opt-in，不物理删事件。[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已将 DDL/CSI inventory 移 persistence/contracts 分工，不新增表或 migration。下方带日期公共快照布局为历史，native 恢复边界仍保留。
+main `1bdad7d4b794` 唯一 V1 为 38 业务表：[#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 已删公共 ma_snapshot/SNAPSHOT owner/page metadata，保 NATIVE_SNAPSHOT/JOURNAL/工具捕获/制品和 message-parts 读 lease/原引用回收；projection coverage 支撑 replay floor，受活跃 Turn 限制、自动推进仍 opt-in，不物理删事件。[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 已将 DDL/CSI inventory 移 persistence/contracts 分工，不新增表或 migration。下方带日期公共快照布局为历史，native 恢复边界仍保留。
 
 [#15696](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15696.md) 已关闭未合入，关闭前 head `194469a54723` 基于旧目录/含公共 snapshot 的 41 表方案，不是最新 38 表直接加两表。历史设计以 generation-qualified history state/fact 与 canonical commit 同事务写，旧数据每批至多 100 事务连续 backfill，256 hash bucket 计数及原 locator/ordinal/digest 证实答案；repair CAS 换派生代、旧行分批清理，不修写 canonical 损坏。文件侧 64 KiB trie/目录摘要和共享 2,048 项/4 MiB cache、逐事务流式恢复仍未成为 main 完整历史能力，关闭不证明目标完成。
 

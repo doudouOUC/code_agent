@@ -1,8 +1,14 @@
 # Managed Runtime Broker JDBC 持久化
 
-## 已合入模块与公共快照删除，2026-11-01
+## Broker 工作流与 Store 装配，2026-11-02
 
-main `eaafba5d140b` 唯一 V1 为 38 业务表。已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 删除公共 ma_snapshot/SNAPSHOT owner 和专用元数据，不删 NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获或制品 owner。消息走 live keyset，仍保读 lease/原资源引用；projection coverage/活跃 Turn 围住 replay floor，自动推进仍 opt-in，不物理删事件。旧签名/十进制 transcript cursor 需重载，limit 1–100，投影换代/落后和页预算错误分开；成员上界不冻结正文。
+main `1bdad7d4b794` 已合入 [#16029](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16029.md)。进程内 registry 只拥有已核原 generation/lease 的路由和 reservation，不是 durable authority。执行状态 CAS、证据式对账、有界恢复/后台 hold 与取消拆成包内协作者，原 owner/authorization 围栏及先 stamp cooldown 再移除 reservation 的次序保留。不新增 schema、wire 或部署边界，唯一 V1 仍 38 业务表；facade 仍负责派发和共享资源关闭，取消本地 future 不是物理 stop 证据。
+
+open [#16084](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16084.md) head `446838acb8a9` 拟独立 dispatcher 管 claim、invocation membership、续租、v3 结果与 SSH ACK，借用 facade 资源，保 UNKNOWN/原 publication 边界，尚非 main。已合入 [#16061](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16061.md)（merge `1bdad7d4b794`）将 Store 八个引用改 final/构造注入：必需 bean 仍必需，可选仍 nullable，lazy records 在禁循环引用时解析回已完成事务代理；非 null proxy 不保证目标存在。七参数手工构造只属 standalone，删除 public setter 需消费者迁移；最终同步 fixture 和三 Spring 工厂，不改 SQL 或承诺外部 source/binary 全兼容。open、合入与本次文档复核均不证明 Maven、嵌入、MySQL、Hosted 或平台资格，本次未执行这些测试。
+
+## 已合入模块与公共快照删除，2026-11-02
+
+main `1bdad7d4b794` 唯一 V1 为 38 业务表。已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 删除公共 ma_snapshot/SNAPSHOT owner 和专用元数据，不删 NATIVE_SNAPSHOT、canonical journal/checkpoint、工具捕获或制品 owner。消息走 live keyset，仍保读 lease/原资源引用；projection coverage/活跃 Turn 围住 replay floor，自动推进仍 opt-in，不物理删事件。旧签名/十进制 transcript cursor 需重载，limit 1–100，投影换代/落后和页预算错误分开；成员上界不冻结正文。
 
 已合入 [#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md) 拆 contracts/control-plane/runtime-broker/persistence/adapters/server 与 verification。JDBC/schema 在 persistence、SDK/OSS/MQ 在 adapters、Boot 在 server，最终 SQL 仍同一 38 表基线；server/target 放 exec/维护产物，verification/target 放报告，verification 不发布。显式 server 测试资源和原 module/CLI 参数不把默认 application 配置放回生产 library；native 声明只在 contracts，相同 V1 不证明旧 catalog/writer 可混跑。
 
