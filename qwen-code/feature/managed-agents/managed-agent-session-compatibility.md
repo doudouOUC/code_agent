@@ -6,7 +6,7 @@
 
 ## 当前接口演进与 open 候选，2026-11-02
 
-main `1bdad7d4b794` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)/[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：默认消息接口统一 live keyset，旧 view 不再解释，旧签名/十进制 transcript cursor 必须丢弃，limit 收窄为 1–100。400 invalid_message_cursor、409 message_projection_changed、503 message_projection_pending 和 413 message_page_too_large 分别对应拒绝、重载、等待与页预算；单个超大 Item 不能靠 limit=1 返回。[#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/coveredSequence 接 SSE 和 live 导出保留，正文不是 as-of snapshot，NATIVE_SNAPSHOT 不删。
+main `dd020ddfcc25` 已合入 [#15870](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md)/[#15871](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：默认消息接口统一 live keyset，旧 view 不再解释，旧签名/十进制 transcript cursor 必须丢弃，limit 收窄为 1–100。400 invalid_message_cursor、409 message_projection_changed、503 message_projection_pending 和 413 message_page_too_large 分别对应拒绝、重载、等待与页预算；单个超大 Item 不能靠 limit=1 返回。[#15865](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) 的 Item/coveredSequence 接 SSE 和 live 导出保留，正文不是 as-of snapshot，NATIVE_SNAPSHOT 不删。
 
 主干 Maven 已是六生产模块与 verification，server/target、维护 main-class 和 verification 报告路径须配套；library 不夹默认 application 配置，verification 的测试资源/原 module/CLI 路径不改变 wire 或 SQL 权威。唯一 V1/38 业务表，相同 schemaVersion 不证明旧 catalog/writer 兼容。[#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md) worktree descriptor/互斥 Session 或 Workspace+cwd locator 保留，可信 sessionFileScope 不公开，未 READY 不执行；只有 API 支持 ref，不等于任意 ref UI。
 

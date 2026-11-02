@@ -2,7 +2,7 @@
 
 ### 已合入模块/消息接口与 open 候选，2026-11-02
 
-main `1bdad7d4b794` 已合入 [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：SDK/OSS/MQ 适配在 adapters，Boot 在 server，verification 不安装/发布，library 不夹默认 application 配置，exec/维护产物在 server/target。配置/CLI 传入测试 fork，单模块旧路径不再是 main 锚点；普通依赖、exec、维护工具、发行和真实运行仍分别验证。
+main `dd020ddfcc25` 已合入 [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：SDK/OSS/MQ 适配在 adapters，Boot 在 server，verification 不安装/发布，library 不夹默认 application 配置，exec/维护产物在 server/target。配置/CLI 传入测试 fork，单模块旧路径不再是 main 锚点；普通依赖、exec、维护工具、发行和真实运行仍分别验证。
 
 已合入 [#15870](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15870.md) 统一默认 live 消息页/导出，删除公共快照/view，保留 native journal 快照；旧签名/十进制 transcript cursor 不跨实现复用，limit 1–100、投影 pending/changed 与页过大分别处理。原 [#15865](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15865.md) provider Item/coveredSequence/SSE 去重保留，成员范围不冻结正文；[#15839](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15839.md) 的 canonical recent/lookup 独立，其旧签名快照分支不再存在。不能宣称所有公开 SDK 已有同等封装。
 

@@ -30,6 +30,6 @@
 | [#15952](https://github.com/QwenLM/qwen-code/pull/15952) | ✅ merged | refactor(managed-agent): Share the session event delivery loop | [pr-15952.md](pr-15952.md) |
 | [#16029](https://github.com/QwenLM/qwen-code/pull/16029) | ✅ merged | refactor(managed-agent): Separate runtime broker execution workflows | [pr-16029.md](pr-16029.md) |
 | [#16061](https://github.com/QwenLM/qwen-code/pull/16061) | ✅ merged | refactor(managed-agent): Inject store dependencies through constructors | [pr-16061.md](pr-16061.md) |
-| [#16084](https://github.com/QwenLM/qwen-code/pull/16084) | open | refactor(managed-agent): Extract runtime execution dispatcher | [pr-16084.md](pr-16084.md) |
+| [#16084](https://github.com/QwenLM/qwen-code/pull/16084) | ✅ merged | refactor(managed-agent): Extract runtime execution dispatcher | [pr-16084.md](pr-16084.md) |
 
 _按个人 PR 口径更新于 2026-11-02_
