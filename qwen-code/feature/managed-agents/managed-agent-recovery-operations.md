@@ -1,5 +1,13 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## Store 与验证门禁演进，2026-11-03
+
+main `0441faff2149` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 的 Store 分片和完整构造：原事务 facade、journal/resource/head 原子写、afterCommit、owner/native 准入/读 lease/完成重验继续保留，CSI binding 只认同 DataSource 原 JDBC 实例。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 删内部默认重载和 ItemRow 不改变公开默认/锁协议。open [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 才拟以同源真实事务复用 root/head、成对 Session/Turn 和执行轨迹验证替代静态控制流审计；main 未替换，轨迹也只证明执行过的分支。
+
+已合入 [#16101](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16101.md) 将 Hosted cancellation probe 同时接 dispatcher/cancellation 并恢复原 transport，status gate 拦原 execute 结果交付；取消请求计数不是完成/物理退出。[#16099](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16099.md) 只修 Javadoc import/转义；[#16114](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16114.md) 将固定补丁带到原 0.26.5 产品 SHA；[#16134](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16134.md) 再将共享 Failsafe 配置归 pluginManagement、保原 specialist profiles/选择器/打包，发行步骤校验两份补丁摘要、干净 tracked checkout、共同 check/apply 并记录 blob，原 tag 不改。默认 verify、专用 MySQL/Hosted/fault 和发行是不同证据，本次均未运行或发布。
+
+open [#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) head `dbe853da862e` 的可选后端模块/ServiceLoader 仍要求选中缺包拒绝、原 provider 权限和离线维护不启动；安装 JAR 不证明实际恢复资格。open [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 的自增 id/is_ 列/无 FK V1 需新 catalog 与真实 MySQL/CSI 验证，不是旧库升级或 writer 回滚保证。main 仍六生产模块、38 表；三个 open diff 不构成已整合联合版本，下方为历史快照。
+
 ## Broker 工作流拆分与原证据恢复，2026-11-02
 
 main `dd020ddfcc25` 已包含 [#16029](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16029.md)。本地 registry 只路由原 generation/完整 lease，持久 READY 不能绕过 adoption；失效先撤本地路由，持久 claim/CAS 失败也不恢复，释放只用原 operation generation。State/Reconciler/Recovery/Cancellation 分工仍由原 Repository 决定身份与租约；UNKNOWN 不按不存在/异常变 not_started，后台 hold 只因原 owner exited 证据结算，普通 release 不发 stop，drain 才做 status→stop→status。保有界扫描、并发 lookup/cooldown 顺序和 facade 关闭资源所有权，同 JVM 拆分不是新恢复协议或 MySQL/物理释放资格。

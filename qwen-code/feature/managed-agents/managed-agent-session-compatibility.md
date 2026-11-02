@@ -1,5 +1,11 @@
 # Session 服务：兼容接口与实现串联
 
+## facade 保留与候选模块兼容边界，2026-11-03
+
+main `0441faff2149` 的 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 已把两个 Store 的业务逻辑分片，但原公开 facade/事务入口保留，分片不新增 Spring 代理；Session 后置 setter/configure 改完整构造，手工消费者须迁移，standalone 默认不能代替真实装配。同源 JDBC、成对 lifecycle 和 Agent lazy 回指约束仍在。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 将原 null/false/all/空标题等默认集中到公开入口，内部分片不再保第二层默认重载，消息页保持不可变。
+
+open [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 的锁 helper/SQL 轨迹不是 main 行为；open [#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) head `dbe853da862e` 才拟新增后端包/JAR/SPI，普通 library 消费者显式选 provider、完整 exec 仍带后端，选中缺包拒绝不回退；当前仍六生产模块。open [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 拟改 V1 物理主键、列名与 FK 约定，表数/版本相同不证明旧 catalog、Java/Broker writer 或回滚兼容；不提供升级迁移。本次未运行源码、嵌入宿主、数据库或平台验证，下方按日期阅读。
+
 ## Store 构造装配已合入，2026-11-02
 
 已合入 [#16061](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16061.md)（merge `1bdad7d4b794`）：ManagedAgentStore 八个协作者引用改为 final/构造注入，删除原字段/setter 注入。完整 @Autowired 构造器仍要求 WorktreeFiles/Skills/ExtensionPackages，原可选依赖保 @Nullable；configRecords 保 lazy 代理回指已完成事务代理，关闭 circular references，非 null proxy 不证明目标已存在或首次解析成功。七参数手工构造器只保 standalone 基础，测试直建 factory 与 Spring actions/close/retention 工厂显式配套。旧 setter 的源码消费者须迁移；不改 wire/SQL，也不作外部 source/binary 兼容全面保证。本次未运行装配、宿主、数据库或源码测试。

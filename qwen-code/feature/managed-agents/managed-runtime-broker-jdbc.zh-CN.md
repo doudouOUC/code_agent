@@ -1,5 +1,13 @@
 # Managed Runtime Broker JDBC 持久化
 
+## Store 分片与验证所有权，2026-11-03
+
+main `0441faff2149` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：两个事务 facade 保公开入口/事务属性，十 Agent/八 Journal 包内 final 协作者持业务逻辑；它们是无环普通对象，不是 Spring bean 或新事务边界。journal/resource/head 原子写、replay、afterCommit 通知、owner/native 准入、读 lease 与完成重验保留。Session 后置配置改完整构造，lifecycle 依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 删内部重复默认重载和 ItemRow 中转，公开默认值及不可变选定消息页保留；main 仍六生产模块、verification 和唯一 V1/38 表。
+
+已合入 [#16101](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16101.md) 将 Hosted 探针接到 dispatcher/cancellation transport 并同时恢复，门控原 execute 结果交付；不改生产取消或证明物理退出。[#16099](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16099.md) 仅修 Javadoc import/转义；[#16114](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16114.md) 将固定补丁带到原 0.26.5 产品 SHA；后续 [#16134](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16134.md) 将共享 Failsafe 配置归 pluginManagement，保 specialist profiles/选择器/打包。发行步骤校验两份补丁摘要及干净 tracked checkout，共同 check/apply 并记录 blob，不改原 tag。默认验证、专项门禁与发布仍是不同证据，本次均未执行。
+
+三个独立 open diff 不是 main 或已整合联合版本。[#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 拟用 Session-before-Turn helper、仅当前 DataSource 真实事务连接的 root/head 复用，以及执行 SQL/事务轨迹加精确清单替代静态控制流推断；standalone/别库事务不证明 root 留锁。[#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) head `dbe853da862e` 拟十三生产模块和五种可选 runtime provider JAR，ServiceLoader 缺选中后端拒绝、不回退，离线维护不得启动 worker。[#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 拟 V1 自增 id 主键、原业务 UNIQUE、is_ 标志、索引更名及无 FK，SQL/catalog/CSI inventory 同步；物理 id 不是协议身份，去 FK 即不再有该数据库完整性保证。不提供旧 catalog 升级或混 writer 兼容，也不证明源码/MySQL/Hosted/CSI/平台验收；下方日期段为历史快照。
+
 ## Broker 工作流与 Store 装配，2026-11-02
 
 main `dd020ddfcc25` 已合入 [#16029](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-16029.md)。进程内 registry 只拥有已核原 generation/lease 的路由和 reservation，不是 durable authority。执行状态 CAS、证据式对账、有界恢复/后台 hold 与取消拆成包内协作者，原 owner/authorization 围栏及先 stamp cooldown 再移除 reservation 的次序保留。不新增 schema、wire 或部署边界，唯一 V1 仍 38 业务表；本项保 facade 派发，后续 #16084 再提取 dispatcher，facade 仍保外部入口、装配和共享资源关闭所有权，取消本地 future 不是物理 stop 证据。
