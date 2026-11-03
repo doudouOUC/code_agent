@@ -1,10 +1,12 @@
 # Session 服务：兼容接口与实现串联
 
-## facade 保留与候选模块兼容边界，2026-11-03
+## facade、模块与模型配置兼容边界，2026-11-04
 
-main `0441faff2149` 的 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 已把两个 Store 的业务逻辑分片，但原公开 facade/事务入口保留，分片不新增 Spring 代理；Session 后置 setter/configure 改完整构造，手工消费者须迁移，standalone 默认不能代替真实装配。同源 JDBC、成对 lifecycle 和 Agent lazy 回指约束仍在。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 将原 null/false/all/空标题等默认集中到公开入口，内部分片不再保第二层默认重载，消息页保持不可变。
+main `da42e5714ad0` 的 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 已把两个 Store 的业务逻辑分片，但原公开 facade/事务入口保留，分片不新增 Spring 代理；Session 后置 setter/configure 改完整构造，手工消费者须迁移，standalone 默认不能代替真实装配。同源 JDBC、成对 lifecycle 和 Agent lazy 回指约束仍在。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 将原 null/false/all/空标题等默认集中到公开入口，内部分片不再保第二层默认重载，消息页保持不可变。
 
-open [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 的锁 helper/SQL 轨迹不是 main 行为；open [#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) head `dbe853da862e` 才拟新增后端包/JAR/SPI，普通 library 消费者显式选 provider、完整 exec 仍带后端，选中缺包拒绝不回退；当前仍六生产模块。open [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 拟改 V1 物理主键、列名与 FK 约定，表数/版本相同不证明旧 catalog、Java/Broker writer 或回滚兼容；不提供升级迁移。本次未运行源码、嵌入宿主、数据库或平台验证，下方按日期阅读。
+已合入 [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) 的锁 helper/执行轨迹不扩大事务或授权；已合入 [#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) 变为十三生产模块和五种可选 provider JAR，普通 library 显式加 provider、完整 exec 仍带实现，ServiceLoader 选中缺包拒绝不回退，直接引用旧 adapters 类型/包的消费者须迁移。[#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) 已改 V1 物理主键、is_ 列与无 FK，要求 global/session 严格 SQL 模式；表数/版本相同不是旧 catalog、Java/Broker writer 或回滚兼容保证，无升级迁移。
+
+[#16153](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md) 配置创建同时新增字段/摘要和私有读取能力；原未配置 Session 保原语义，配置 Session 需 session-model-config/1 与启用的 Session Store/加密服务，不能在能力缺失时回退宿主模型。原创建 receipt 可在策略撤回后回读，不等于获准新执行；定义、冷恢复及 Java load 副本须保原摘要，旧 writer 无此字段/秘密语义不能据相同 V1 混跑。本次未运行源码、宿主、数据库或平台验证，下方按日期阅读。
 
 ## Store 构造装配已合入，2026-11-02
 

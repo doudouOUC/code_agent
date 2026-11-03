@@ -1,10 +1,10 @@
 # Managed Agent 存储、事件与会话恢复设计
 
-## Store 分片保持原权威，2026-11-03
+## Store 分片保持原权威，2026-11-04
 
-main `0441faff2149` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 十个 Agent/八个 Journal 分片，普通 final 无环对象不持 facade、不另开 Spring 事务。公开入口/事务属性仍在两个 Store facade；资源、派生记录、原 journal/head 写入及 afterCommit 通知顺序不变，native owner 读取的准入/lease/重验不省略。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 只归一公开默认值、移除内部重复重载和 ItemRow，消息页仍选成员后读正文、结果不可变。
+main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 十个 Agent/八个 Journal 分片，普通 final 无环对象不持 facade、不另开 Spring 事务。公开入口/事务属性仍在两个 Store facade；资源、派生记录、原 journal/head 写入及 afterCommit 通知顺序不变，native owner 读取的准入/lease/重验不省略。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 只归一公开默认值、移除内部重复重载和 ItemRow，消息页仍选成员后读正文、结果不可变。
 
-main 仍唯一 V1/38 业务表，没有采用 open [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 的自增 id/原业务 UNIQUE、is_ 标志、idx_/uk_、无 FK 与新校验。候选删除数据库 FK 后不能再依赖其证明资源引用完整性；SQL/Projection/CSI inventory 配套变更仍需新 catalog/真实 MySQL 验证。open [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 才拟同源事务复用锁和执行轨迹契约，不是 main 已删静态锁审计。本次未跑源码、数据库、Hosted 或平台门禁；下方旧日期布局保历史口径。
+已合入 [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) 将唯一 V1/38 表改为自增 id/业务 UNIQUE、is_ 标志、idx_/uk_ 和无 FK，SQL/Projection/CSI inventory 同步；catalog 校验自增、signedness、索引前缀、禁止 FK，DDL 前核 global/session 严格 SQL 模式。物理 id 不替代 journal/恢复身份；去 FK 后不能再依赖数据库外键保证资源引用完整性，无旧 catalog 迁移。已合入 [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) 仅在同源真实事务复用原锁，用执行 SQL/事务轨迹和入口/SQL 所有者清单替代静态控制流推断；未执行分支不能据此证明。本次未跑源码、数据库、Hosted 或平台门禁；下方为历史口径。
 
 ## 已合入公共快照删除与关闭查询方案，2026-11-02
 

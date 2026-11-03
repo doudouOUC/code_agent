@@ -1,5 +1,11 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+## 共享执行成员与上传边界，2026-11-04
+
+main `da42e5714ad0` 已合入 [#16205](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16205.md)：LOCAL/SSH_LOCAL 共享执行先预验原物理 key/mount revision，短事务核 alias/migration、binding generation/READY/drain、原 Runtime/Harness Session；MySQL binding share lock、原 Session 点锁、owner member_count CAS 取代该成员路径的 tenant guard/范围扫描。Session 标记与计数同事务，原重放不重复加数；rewind 需单成员并固定 exclusive_member_key，维护/挂载保占用排斥。原成员正常/已停止/LOST 清理按实际清除行数扣数，retention 不删仍占成员记录，计数不取代身份/claim。
+
+已合入 [#16212](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16212.md) 支持上传与 Runtime/其他上传共享成员：核原 scope/mount、alias-directory-operation 锁序，同 ID 唯一 receipt 仲裁，未知只查原进程并保成员，终态同事务只释放一次。main 上传不再独占 holder，但 maintenance、rewind、migration 不因上传共享而获得旁路。无旧 V1 writer/计数回填迁移，不保证同路径写隔离或吞吐。本次未执行 MySQL FOR SHARE/并发、Hosted、SSH、CSI 或真实挂载验证，下方为历史切片。
+
 ## 主 Session worktree 已合入，2026-11-02
 
 main `dd020ddfcc25` 已包含 [#15745](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15745.md)（merge `4afe1a28fd84`）。保留 ROOT Workspace 的 grant/storage，用一对一 Session worktree 固定原 actor、storage/root/Git common identity、commit 和子目录 offset；原 create receipt 先回读，再只读 preflight，一次事务保存最终 target binding、准备 operation、可选首 Turn 与 receipt。LOCAL/durable session-isolated local-process/非 Windows 条件之外拒绝，不扩大 SSH/CSI 或宿主权限。新准备要求源仓库严格位于 storage root 下；根本身为仓库时只拒新建，不影响当前目录或已有 worktree 清理。

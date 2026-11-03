@@ -1,12 +1,16 @@
 # Managed Runtime Broker JDBC 持久化
 
-## Store 分片与验证所有权，2026-11-03
+## Store 分片与验证所有权，2026-11-04
 
-main `0441faff2149` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：两个事务 facade 保公开入口/事务属性，十 Agent/八 Journal 包内 final 协作者持业务逻辑；它们是无环普通对象，不是 Spring bean 或新事务边界。journal/resource/head 原子写、replay、afterCommit 通知、owner/native 准入、读 lease 与完成重验保留。Session 后置配置改完整构造，lifecycle 依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 删内部重复默认重载和 ItemRow 中转，公开默认值及不可变选定消息页保留；main 仍六生产模块、verification 和唯一 V1/38 表。
+main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：两个事务 facade 保公开入口/事务属性，十 Agent/八 Journal 包内 final 协作者持业务逻辑；它们是无环普通对象，不是 Spring bean 或新事务边界。journal/resource/head 原子写、replay、afterCommit 通知、owner/native 准入、读 lease 与完成重验保留。Session 后置配置改完整构造，lifecycle 依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 删内部重复默认重载和 ItemRow 中转，公开默认值及不可变选定消息页保留；main 已为十三生产模块、verification 和唯一 V1/38 表。
 
 已合入 [#16101](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16101.md) 将 Hosted 探针接到 dispatcher/cancellation transport 并同时恢复，门控原 execute 结果交付；不改生产取消或证明物理退出。[#16099](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16099.md) 仅修 Javadoc import/转义；[#16114](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16114.md) 将固定补丁带到原 0.26.5 产品 SHA；后续 [#16134](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16134.md) 将共享 Failsafe 配置归 pluginManagement，保 specialist profiles/选择器/打包。发行步骤校验两份补丁摘要及干净 tracked checkout，共同 check/apply 并记录 blob，不改原 tag。默认验证、专项门禁与发布仍是不同证据，本次均未执行。
 
-三个独立 open diff 不是 main 或已整合联合版本。[#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 拟用 Session-before-Turn helper、仅当前 DataSource 真实事务连接的 root/head 复用，以及执行 SQL/事务轨迹加精确清单替代静态控制流推断；standalone/别库事务不证明 root 留锁。[#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) head `dbe853da862e` 拟十三生产模块和五种可选 runtime provider JAR，ServiceLoader 缺选中后端拒绝、不回退，离线维护不得启动 worker。[#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 拟 V1 自增 id 主键、原业务 UNIQUE、is_ 标志、索引更名及无 FK，SQL/catalog/CSI inventory 同步；物理 id 不是协议身份，去 FK 即不再有该数据库完整性保证。不提供旧 catalog 升级或混 writer 兼容，也不证明源码/MySQL/Hosted/CSI/平台验收；下方日期段为历史快照。
+[#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md)、[#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md)、[#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) 均已合入：成对 Session/Turn helper、仅本 DataSource 实际事务复用 root/head，执行 SQL/事务轨迹和精确清单替代静态控制流推断；十三生产模块/五种可选 provider JAR，ServiceLoader 选中缺包拒绝、离线维护不启动；V1/38 表自增 id/原业务 UNIQUE、is_ 列、idx_/uk_ 与无 FK，校验自增/signedness/索引前缀，DDL 前核 global/session 严格 SQL 模式。物理 id 非协议身份，去 FK 不再保数据库引用约束，无旧 catalog 升级或混 writer 兼容保证。
+
+[#16205](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16205.md) 已把 LOCAL/SSH_LOCAL 共享执行成员从 tenant guard/范围扫描改为 mount revision 预验、binding FOR SHARE（H2 用 FOR UPDATE）、原 Session 点锁和 owner member_count CAS。成员/Session 同事务，原重放不增计数，rewind 仅单成员可获 exclusive_member_key；原成员释放/LOST/已停止清理按实际行数扣减，retention 保未释放成员。维护/挂载仍排斥占用，不泛化取消 Broker placement 锁。
+
+已合入 [#16212](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16212.md) 将 RUNNING 上传计为共享成员，alias-directory-operation 锁序、无 tenant guard；同 ID 唯一 receipt 仲裁并核 actor/digest，directory-before-operation 同事务一次扣数/终态，未知结果只查原进程并保成员。main 上传已用共享计数而非独占 holder；同路径写冲突不由计数解决。本次未运行源码、MySQL、Hosted、CSI/SSH 或平台验收，下方为历史快照。
 
 ## Broker 工作流与 Store 装配，2026-11-02
 

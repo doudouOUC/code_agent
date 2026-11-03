@@ -1,10 +1,12 @@
 # Managed Session：记录格式、提交与协议限额
 
-## Store 分片与候选锁契约，2026-11-03
+## Store 分片、锁契约与加密配置，2026-11-04
 
-main `0441faff2149` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：ManagedSessionStore 仍是原 repository/事务 facade，八个 Journal 包内 final 普通对象分别持 row/fence/history/lifecycle/resource read/write/writer/commit 逻辑；生命周期依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。资源、journal 与 head 仍同事务，原 replay/afterCommit 通知及 owner/native 准入、读 lease、完成重验保留，不把外部 I/O 包成长事务。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 再删内部默认重载，facade 显式传原 authority=null 等默认，不放宽 writer 权限。
+main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：ManagedSessionStore 仍是原 repository/事务 facade，八个 Journal 包内 final 普通对象分别持 row/fence/history/lifecycle/resource read/write/writer/commit 逻辑；生命周期依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。资源、journal 与 head 仍同事务，原 replay/afterCommit 通知及 owner/native 准入、读 lease、完成重验保留，不把外部 I/O 包成长事务。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 再删内部默认重载，facade 显式传原 authority=null 等默认，不放宽 writer 权限。
 
-open [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 才拟在原 CSI check 后、同 DataSource 的真实非 autocommit 事务连接上复用已锁 root/head；standalone/别库事务不据全局事务状态省锁，原 heartbeat/replay/owner read 边界保留。执行 SQL/事务轨迹只证明所选场景，不代表全分支覆盖。open [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 的自增 id、is_ 列与无 FK V1 仍是另一候选，原业务键保 UNIQUE，物理 id 不替代 journal 身份；main 未采用，不提供旧库升级或混 writer 兼容。本次仅文档核验，未运行源码、MySQL 或 CSI；下方为按日期归档内容。
+已合入 [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) 在原 CSI check 后，仅本 DataSource 实际非 autocommit 事务连接复用已锁 root/head；standalone/别库事务不据全局事务状态省锁，heartbeat/replay/owner read 边界保留，SQL/事务轨迹仅证明所选场景。[#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) 已改唯一 V1/38 表的自增 id、is_ 列和无 FK，原业务键保 UNIQUE；校验自增/signedness/索引前缀/无 FK，DDL 前要求 global/session 严格 SQL 模式，不提供旧库升级或混 writer 兼容。
+
+[#16153](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md) 在 ma_session 保存模型摘要/keyId/密文，同创建事务提交，子身份重新加密；journal/managed-definition 只保存摘要，不保存明文 key。model-config:query 需当前 tenant/Workspace/writer token+generation 和普通或原 lifecycle 授权，核摘要后 no-store 返回；坏记录/缺密钥拒绝，不回退宿主同名配置。allowlist、Session Store、SecretProtector 与能力门禁保留；CSI inventory 同步新列但私有模型活动仍受限制。本次未执行源码、数据库或 CSI 验收，下方为历史快照。
 
 ## 已关闭历史方案与主干消息投影，2026-11-02
 

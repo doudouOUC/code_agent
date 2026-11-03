@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+### Session 模型摘要与可选后端，2026-11-04
+
+main `da42e5714ad0` 已合入 [#16153](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md)：Java CreateHarnessSession/LoadHarnessSession 显式带 modelConfigDigest，创建要求 Managed Session Store，load 的 lifecycle/foreground/child/stopped 副本均保留；HostedHarnessClient 以 session-model-config/1 协商。定义只持摘要，core HTTP client 在原 writer token/generation/Workspace/lifecycle 下请求有界私有 model-config:query，坏响应/缺密钥/摘要冲突不回退宿主连接。公共创建完整配置、私有 SDK 摘要和浏览器编辑器是不同层，不宣称 Python/TypeScript 公共 SDK 或 UI 全面支持。
+
+[#16141](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) 已将 Runtime 拆到十三生产 Maven 模块，普通 library 的五 provider 依赖为 runtime/optional，消费者显式带选中 provider；完整 exec 仍含实现。ServiceLoader 只登记 factory，缺包/歧义拒绝，无 local 自动回退；安装 JAR 不证明 SSH/Kubernetes/external 恢复或普通最小 classpath 验收。旧 adapters 实现类型/包的直接消费者需迁移，本次未运行 SDK、Maven、宿主或平台验证，下方按日期阅读。
+
 ### 已合入模块/消息接口与 open 候选，2026-11-02
 
 main `dd020ddfcc25` 已合入 [#15871](../weekly-report/2026-10-26_2026-11-01/implementations/pr-15871.md)：SDK/OSS/MQ 适配在 adapters，Boot 在 server，verification 不安装/发布，library 不夹默认 application 配置，exec/维护产物在 server/target。配置/CLI 传入测试 fork，单模块旧路径不再是 main 锚点；普通依赖、exec、维护工具、发行和真实运行仍分别验证。

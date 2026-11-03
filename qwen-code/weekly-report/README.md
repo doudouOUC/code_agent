@@ -4,8 +4,8 @@
 
 > 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 周更完整集合已核验，2026-10-13 完成整理并刷新后续合入状态；W42 于 2026-10-19 周一上午完成周更；W43 于 2026-10-26 周一上午独立复核北京时间 10-19 至 10-25 完整创建集合及最新状态/实现；W44 于 2026-11-02 周一上午独立复核北京时间 10-26 至 11-01 完整创建集合及最新状态/实现。PR 按 createdAt 固定周归属，不能按后续合入日期移动，#13642 后续合入也仍属 W41。单 PR 文档可后续复核为最终状态。
 
-**时间范围**: 2026-04-06 ~ 2026-11-02（持续更新）
-**总计**: 726 PRs（W39–W44 保留完整创建周归档快照，W45 日更至 11-02）
+**时间范围**: 2026-04-06 ~ 2026-11-03（持续更新）
+**总计**: 729 PRs（W39–W44 保留完整创建周归档快照，W45 日更至 11-03）
 **代码量**: W15–W22 历史累计 +361,436 / -61,427；后续逐周规模见下表及周目录。文件数为逐 PR changedFiles 累加，不是去重文件数。
 **月度审计**: [2026-07 PR 月度无方向审计汇总](2026-07-monthly-audit.md)
 
@@ -46,11 +46,11 @@
 | 2026-10-12 ~ 2026-10-18 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-12_2026-10-18) · [Obsidian](2026-10-12_2026-10-18/README.md)) (W42 周更) | 43 | 37/4/2 | +132,152/-26,011 | 32 表/V10、统一 Server、共享 Workspace/SSH、Plan/附件/单 run 取消，open 搜索/CSI 文件恢复/创建 warm |
 | 2026-10-19 ~ 2026-10-25 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-19_2026-10-25) · [Obsidian](2026-10-19_2026-10-25/README.md)) (W43 周更) | 55 | 51/2/2 | +159,288/-24,738 | V1/38 表、轮内队列、默认关闭的扩展包、resident 准入/工具围栏与池资格工具；实验 K8s 与 MCP 验收 open |
 | 2026-10-26 ~ 2026-11-01 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-26_2026-11-01) · [Obsidian](2026-10-26_2026-11-01/README.md)) (W44 周更) | 29 | 27/1/1 | +84,462/-33,501 | Broker 工作流/dispatcher 与 Store 构造注入已合入；E2B open，完整历史关闭未合入 |
-| 2026-11-02 ~ 2026-11-08 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-11-02_2026-11-08) · [Obsidian](2026-11-02_2026-11-08/README.md)) (W45 日更至 11-02) | 9 | 6/3/0 | +22,642/-16,618 | Store 分片/精简、探针与发行门禁已合入；锁契约、可选后端模块和 MySQL 规范 open |
+| 2026-11-02 ~ 2026-11-08 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-11-02_2026-11-08) · [Obsidian](2026-11-02_2026-11-08/README.md)) (W45 日更至 11-03) | 12 | 12/0/0 | +27,553/-17,026 | Store/锁契约、可选后端、严格 MySQL、完整模型配置与共享执行/上传均合入；运行和发行另验 |
 
 ## 类型分布
 
-feat ×365, fix ×248, refactor ×37, other ×8, docs ×19, chore ×8, perf ×20, test ×20, merge ×1
+feat ×367, fix ×249, refactor ×37, other ×8, docs ×19, chore ×8, perf ×20, test ×20, merge ×1
 
 类型按各周明细的类型字段（旧周）或标题前缀（新周）汇总，与逐周统计一致；不在总索引另行重分类。W23 的 revert 计入 other。
 

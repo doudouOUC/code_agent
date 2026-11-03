@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## Session 模型配置与共享上传，2026-11-04
+
+main `da42e5714ad0` 已合入 [#16153](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md)：Public/WebShell 创建接收完整 model_config/modelConfig，Workspace 创建与 modelId 互斥；只接受四种协议、精确端点 allowlist、受限采样参数和 8 KiB 配置，新准入需 Session Store/加密服务与 session-model-config/1。原 receipt 先回读，摘要参与幂等而非明文 key；配置 Session 不宣传目录模型切换。类型生成和 API 入参不等于 WebShell 已提供秘密连接编辑器，也不等于公共 SDK 均有封装。文本/workflow/Hook/压缩沿原摘要私有读取，不回退宿主同名配置。
+
+已合入 [#16212](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16212.md) 已让上传共享物理成员计数，同 ID 原 receipt 仲裁、未知保成员/只查询原进程、终态只扣一次；不新增前端并发调度或同路径写冲突协议。main 上传不再独占 holder，但不能把测试定义当实际并发/浏览器验收。本次未运行产品、组件、浏览器或真实模型/上传验收，下方为历史快照。
+
 ## 双投影共享投递循环，2026-11-02
 
 main `dd020ddfcc25` 已合入 [#15952](../../weekly-report/2026-10-26_2026-11-01/implementations/pr-15952.md)：Public/WebShell 仍分别同步做 Session 可读准入，再将事件/resync 转换函数传给同一私有 stream 循环。Public 秒、WebShell 毫秒和各自 payload 不混用；正常 SSE ID/event name/删除判断取原 EventRecord，resync 无 ID 且随后结束，不推进客户端缺失事件的游标。保先订阅后 replay、满页补读、overflow reconcile、keepalive 与原权限复查间隔；不改变客户端 wire、EventHub 或 SQL，不把缓存 read grant 解释成每帧重新授权。四组合回归断言覆盖 Public/WebShell × replay/live 的 ID、事件名、顺序、投影单位和删除后结束；本次未运行源码、组件或浏览器验收。

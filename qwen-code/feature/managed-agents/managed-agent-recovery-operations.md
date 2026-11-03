@@ -1,12 +1,16 @@
 # Managed Runtime：持久回执、平台与运行验收
 
-## Store 与验证门禁演进，2026-11-03
+## Store 与验证门禁演进，2026-11-04
 
-main `0441faff2149` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 的 Store 分片和完整构造：原事务 facade、journal/resource/head 原子写、afterCommit、owner/native 准入/读 lease/完成重验继续保留，CSI binding 只认同 DataSource 原 JDBC 实例。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 删内部默认重载和 ItemRow 不改变公开默认/锁协议。open [#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) head `bc6d54a925de` 才拟以同源真实事务复用 root/head、成对 Session/Turn 和执行轨迹验证替代静态控制流审计；main 未替换，轨迹也只证明执行过的分支。
+main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)/[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 的 Store 分片/委托精简，原 facade 事务、journal/resource/head 原子写、afterCommit、owner/native 读 lease 和重验保留。[#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) 已以 Session-before-Turn helper、同源实际事务 root/head 复用与执行轨迹/精确清单替代静态控制流审计；轨迹仍只证明已执行分支，不给 standalone/别库事务省锁权。
 
 已合入 [#16101](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16101.md) 将 Hosted cancellation probe 同时接 dispatcher/cancellation 并恢复原 transport，status gate 拦原 execute 结果交付；取消请求计数不是完成/物理退出。[#16099](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16099.md) 只修 Javadoc import/转义；[#16114](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16114.md) 将固定补丁带到原 0.26.5 产品 SHA；[#16134](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16134.md) 再将共享 Failsafe 配置归 pluginManagement、保原 specialist profiles/选择器/打包，发行步骤校验两份补丁摘要、干净 tracked checkout、共同 check/apply 并记录 blob，原 tag 不改。默认 verify、专用 MySQL/Hosted/fault 和发行是不同证据，本次均未运行或发布。
 
-open [#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) head `dbe853da862e` 的可选后端模块/ServiceLoader 仍要求选中缺包拒绝、原 provider 权限和离线维护不启动；安装 JAR 不证明实际恢复资格。open [#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) head `e945f27b06ed` 的自增 id/is_ 列/无 FK V1 需新 catalog 与真实 MySQL/CSI 验证，不是旧库升级或 writer 回滚保证。main 仍六生产模块、38 表；三个 open diff 不构成已整合联合版本，下方为历史快照。
+已合入 [#16141](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16141.md) 的十三生产模块/可选 provider，仍要求选中缺包拒绝、原权限、离线维护不启动 worker，装包不是恢复资格。[#16143](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16143.md) 的自增 id/is_ 列/无 FK V1 已落地，global/session SQL 严格模式需同时开启；无旧 catalog 升级或混 writer 保证。
+
+[#16153](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md) 已冻结加密模型配置，冷恢复/Hook/压缩只按原摘要、当前 writer 或原 lifecycle 私有授权取连接，缺密钥/坏摘要/能力不符拒绝，不使用宿主同名路由；子身份重新加密。密钥和 allowlist 是运维前提，原 receipt 回读不是新执行资格。
+
+[#16205](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16205.md) 已用物理 owner 成员计数与 mount revision CAS 准入共享执行，rewind 仅单成员排他；正常/已停止/LOST 清理按实际原成员行数扣减，retention 不删未释放成员，维护/挂载仍核占用。已合入 [#16212](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16212.md) 将上传计入共享成员、未知结果保留占用并只查询原目标，终态 receipt 一次释放；main 上传不再独占 holder。计数不是授权或同路径写隔离，本次未跑源码、MySQL、Hosted、挂载或平台门禁，下方为历史快照。
 
 ## Broker 工作流拆分与原证据恢复，2026-11-02
 
