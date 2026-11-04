@@ -1,5 +1,13 @@
 # Managed Session：记录格式、提交与协议限额
 
+## Session-first 与当前审批行，2026-11-05
+
+main `624d10532ab8` 已合入 [#16223](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16223.md)/[#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 的指定 Turn/Session 命令 Session-first；缺失 receipt 普通 probe，唯一 key 冲突再当前读核语义，rename 初次准入仍保 tenant guard。迁移 prepare 锁住源 alias 后另以 autocommit 读 committed idle，不能用旧快照漏掉已受理 Turn。
+
+[#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 保资源/journal/head 同事务和 afterCommit，但普通 commit/inline publication 改先锁原 Session，普通 storage alias/owner 用 FOR SHARE（H2 为 FOR UPDATE）。lifecycle authority 与 CSI 不按普通 lane 去锁，authority mirror 当前读持到事务结束。[#16275](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16275.md) 对含 hosted.cleanup 的 commit 在 Session 之前保有界 placement，未确认引用必须当前锁定核原 tenant/Workspace/workspaceGeneration/runtimeGeneration 的 binding，confirmed 只结算原引用。
+
+[#16296](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16296.md) 同事务先插 receipt 唯一仲裁、再 FOR UPDATE 读当前 approval_revision/rules/plan，revision CAS 必须更新一行；失败回滚 receipt/公共事件，旧快照不能冒充当前审批。原写者/actor/状态/权限不放宽；本次未运行 Java、真实 MySQL 或 Hosted 测试。下方为有日期的历史实现快照。
+
 ## Store 分片、锁契约与加密配置，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：ManagedSessionStore 仍是原 repository/事务 facade，八个 Journal 包内 final 普通对象分别持 row/fence/history/lifecycle/resource read/write/writer/commit 逻辑；生命周期依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。资源、journal 与 head 仍同事务，原 replay/afterCommit 通知及 owner/native 准入、读 lease、完成重验保留，不把外部 I/O 包成长事务。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 再删内部默认重载，facade 显式传原 authority=null 等默认，不放宽 writer 权限。

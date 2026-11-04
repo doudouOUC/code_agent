@@ -1,5 +1,11 @@
 # Session 服务：兼容接口与实现串联
 
+## 严格 SQL 模式部署边界，2026-11-05
+
+main `624d10532ab8` 的 [#16288](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16288.md) 已替代 #16143 合入时的 GLOBAL+SESSION 约束：仅内嵌 Druid 对每个新 MySQL/MariaDB 物理连接追加 STRICT_TRANS_TABLES，保留原 SESSION 模式；ManagedSchemaCatalog 只验证当前 SESSION 精确严格 token，不读取/修改 GLOBAL。外部 DataSource 必须自行初始化全部应用连接；借出后修改 SESSION 的恢复不在本改动保证内。
+
+唯一 V1/38 表、generated id、业务 UNIQUE、无 FK 和拒绝旧/foreign/partial catalog 均保留，不因此获得升级、混 writer 或 CSI 兼容保证。本次只核源码及文档，未运行数据库/Java/CI。下方 dated 快照中的全局要求不再作为当前部署前提。
+
 ## facade、模块与模型配置兼容边界，2026-11-04
 
 main `da42e5714ad0` 的 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 已把两个 Store 的业务逻辑分片，但原公开 facade/事务入口保留，分片不新增 Spring 代理；Session 后置 setter/configure 改完整构造，手工消费者须迁移，standalone 默认不能代替真实装配。同源 JDBC、成对 lifecycle 和 Agent lazy 回指约束仍在。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 将原 null/false/all/空标题等默认集中到公开入口，内部分片不再保第二层默认重载，消息页保持不可变。

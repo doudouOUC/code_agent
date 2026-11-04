@@ -1,5 +1,11 @@
 # 工具调用 ID 完整性技术方案
 
+## Gemini thought signature 补充，2026-11-05
+
+main `624d10532ab8` 的 [#16270](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16270.md) 在原 call ID 配对之外，补齐 opaque signature 的 round-trip：converter 读取 thoughtSignature 或 extra_content.google.thought_signature，冲突不猜测；内部 Part 随原 call/index/remap 保留签名，接受早到、晚到和 finish delta，重放时写回双扩展。llm-chat 持久记录普通 call 和脱敏 structured_output 参数时仍保留签名，供 resume 使用。
+
+签名不是新 tool ID，不解码、不验证也不为旧历史补造；不能据此扩大原重复调用防护结论。相关 converter/parser/recording 测试只作源码证据，本次未执行 Node、build/typecheck 或真实 Gemini-compatible endpoint 验证；下方原 ID 完整性方案继续保留。
+
 > 适用代码库：`QwenLM/qwen-code` `main`。
 
 ---

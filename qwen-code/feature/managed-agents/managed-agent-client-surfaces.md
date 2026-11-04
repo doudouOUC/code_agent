@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 读取预检与审批一致性，2026-11-05
+
+main `624d10532ab8` 已合入 [#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 的指定 Session 命令去 tenant guard，但 Session/权限/receipt/revision 围栏保留，rename 初次受理仍有租户锁。[#16229](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16229.md) 仅按 Node/CLI 文件身份缓存成功 help；每次文件操作仍执行，read 能力不自动授予 upload。
+
+[#16283](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16283.md)/[#16312](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16312.md) 让目录、文件和 worktree source 使用独立读快照与显式无 storage 行锁路径，I/O 后另取新快照校验 ACL/binding/revision/原 marker；读取不是持久执行资格，上传/创建/worktree 最终 admission 仍锁定并拒绝变更。[#16296](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16296.md) 审批变更先由 receipt 唯一键仲裁、再读当前审批行并检查 revision CAS，失败回滚结果/事件；无新增 UI 或权限。源码/文档核验不代表本次浏览器、MySQL 或 Hosted 验收，下方为历史对照。
+
 ## Session 模型配置与共享上传，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16153](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md)：Public/WebShell 创建接收完整 model_config/modelConfig，Workspace 创建与 modelId 互斥；只接受四种协议、精确端点 allowlist、受限采样参数和 8 KiB 配置，新准入需 Session Store/加密服务与 session-model-config/1。原 receipt 先回读，摘要参与幂等而非明文 key；配置 Session 不宣传目录模型切换。类型生成和 API 入参不等于 WebShell 已提供秘密连接编辑器，也不等于公共 SDK 均有封装。文本/workflow/Hook/压缩沿原摘要私有读取，不回退宿主同名配置。

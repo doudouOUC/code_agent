@@ -1,5 +1,13 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+## 只读预检与持久成员边界，2026-11-05
+
+main `624d10532ab8` 已合入 [#16217](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16217.md)：resident claim/release 的只读分支不拿 tenant guard，仍核原 slot/Runtime 身份。[#16240](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16240.md) 只修 Hosted 测试的新成员快照与 2→1→0 断言，不改变共享 member_count 算法。[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 给普通受理的 storage alias/owner 用共享当前读，维护/迁移写仍等读者；不是取消维护或 exclusive rewind。
+
+[#16229](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16229.md) 仅按 Node/CLI 文件身份缓存成功 help，文件内容、权限和实际 read/upload 不缓存。[#16283](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16283.md)/[#16312](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16312.md) 分开读 scope/source 与最终创建/上传/worktree admission：独立 REPEATABLE READ 快照读取 ACL/binding，内层 LOCAL storage root/key/marker 显式不加行锁，文件 I/O 后或 source 的第二独立快照核原 revision/身份。最终持久受理仍锁定重验，预检不取得 Runtime/upload 成员，也不冻结文件字节。
+
+[#16298](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16298.md) 在一次 2 秒预算内先杀 Git 叶子使父进程能回收，再停止全部已知树；任何观察/信号失败或原 handle 未退出仍 STOP_UNVERIFIED，保维护占用并恢复中断。这是有界 best-effort，不是所有未观察进程不可逃逸的保证。本次未执行真实 MySQL、Linux、Hosted/native CSI 或浏览器测试；下方为历史快照。
+
 ## 共享执行成员与上传边界，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16205](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16205.md)：LOCAL/SSH_LOCAL 共享执行先预验原物理 key/mount revision，短事务核 alias/migration、binding generation/READY/drain、原 Runtime/Harness Session；MySQL binding share lock、原 Session 点锁、owner member_count CAS 取代该成员路径的 tenant guard/范围扫描。Session 标记与计数同事务，原重放不重复加数；rewind 需单成员并固定 exclusive_member_key，维护/挂载保占用排斥。原成员正常/已停止/LOST 清理按实际清除行数扣数，retention 不删仍占成员记录，计数不取代身份/claim。

@@ -1,5 +1,13 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 锁范围与恢复证据增量，2026-11-05
+
+main `624d10532ab8`：[#16217](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16217.md)/[#16221](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16221.md) 的独立 resident/Harness 检查不拿租户锁；[#16223](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16223.md)/[#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 的指定受理/命令按 Session 排序，rename 初次准入仍持 tenant guard。[#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 的普通 journal/inline 发布与生命周期 claim/续租按原行序列化，普通 storage 共享当前读、authority mirror 持锁，不能用旧快照 claim 取得清理资格。[#16275](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16275.md) 仍在 cleanup commit 先有界 placement，再 Session 并核原 binding 全身份；confirmed 仅结算，不重造已收走 Runtime。
+
+[#16240](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16240.md) 只刷新 Hosted 并发测试的 2→1→0 成员快照；[#16288](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16288.md) 改内嵌逐物理连接 strict SQL 初始化和 SESSION-only catalog 校验，不要求或修改 GLOBAL。[#16298](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16298.md) 用一次 2 秒清理预算先杀叶子、保全部曾观察 handle/恢复中断，任何未证停止仍 STOP_UNVERIFIED，不能释放维护占用；CSI generator 关闭顺序修复不等于 native CSI 验收。
+
+[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 是当前 **open diff**：32 并发 startup/64 HTTP dispatch、仅 local-process provision 阶段精确 retryable 503/runtime_local_capacity 可按原 binding/seed 重试。synthetic v1 placeholder 只有 CAS 证明尚未启动时可清，replacement owner/attestation 后同码不走此捷径；这不是 main 能力或所有 Runtime 总量限制。本次未跑源码、MySQL、Linux、Hosted/fault、CSI 或 CI；下方为历史快照。
+
 ## Store 与验证门禁演进，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)/[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 的 Store 分片/委托精简，原 facade 事务、journal/resource/head 原子写、afterCommit、owner/native 读 lease 和重验保留。[#16139](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16139.md) 已以 Session-before-Turn helper、同源实际事务 root/head 复用与执行轨迹/精确清单替代静态控制流审计；轨迹仍只证明已执行分支，不给 standalone/别库事务省锁权。

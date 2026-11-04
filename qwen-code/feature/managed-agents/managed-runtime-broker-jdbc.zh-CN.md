@@ -1,5 +1,13 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 当前锁与连接模式，2026-11-05
+
+main `624d10532ab8` 已合入 [#16217](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16217.md)/[#16221](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16221.md)：独立 resident/Harness 检查不再拿 tenant guard。[#16223](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16223.md)/[#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 对指定 Turn/Session 命令使用 Session 行排序；迁移锁原 alias 后读 committed idle，rename 初次受理仍保 tenant guard。[#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 普通 journal/inline 发布 Session-first，缺失资源先普通 probe/唯一键仲裁，storage 准入共享当前读；lifecycle authority 检查把 claim mirror 锁持到事务结束，lifecycle/CSI 仍有额外围栏。
+
+[#16275](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16275.md) 只对 cleanup commit 恢复有界 placement-before-Session，并当前锁定核原 binding 的 tenant、Workspace 和两个 generation；confirmed 仅结算原引用。[#16240](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16240.md) 只改 Hosted 测试的新 2→1→0 成员快照。[#16288](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16288.md) 已替代旧 GLOBAL+SESSION 要求：内嵌 Druid 每个新 MySQL/MariaDB 物理连接初始化 STRICT_TRANS_TABLES，catalog 只核 SESSION、不读不改 GLOBAL；外部 DataSource 自行初始化全部应用连接。
+
+[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 仍是 **open diff**，非 main 行为：每 provisioner 32 并发本地 startup、64 HTTP dispatch，仅 provisioner 精确启动前容量拒绝可按原 binding/seed 重试。这不是存活 worker 总量限制；已启动/attestation 失败和 replacement owner 仍 fenced。本次未运行源码、MySQL、Hosted、CSI、平台或 CI 测试，下方带日期内容为历史快照。
+
 ## Store 分片与验证所有权，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md)：两个事务 facade 保公开入口/事务属性，十 Agent/八 Journal 包内 final 协作者持业务逻辑；它们是无环普通对象，不是 Spring bean 或新事务边界。journal/resource/head 原子写、replay、afterCommit 通知、owner/native 准入、读 lease 与完成重验保留。Session 后置配置改完整构造，lifecycle 依赖成对启用，CSI 只认同 DataSource 原 JDBC binding。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 删内部重复默认重载和 ItemRow 中转，公开默认值及不可变选定消息页保留；main 已为十三生产模块、verification 和唯一 V1/38 表。

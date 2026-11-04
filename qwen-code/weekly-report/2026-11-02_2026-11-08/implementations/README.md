@@ -14,5 +14,21 @@
 | [#16153](https://github.com/QwenLM/qwen-code/pull/16153) | ✅ merged | feat(managed-agent): support full model configuration at session creation | [pr-16153.md](pr-16153.md) |
 | [#16205](https://github.com/QwenLM/qwen-code/pull/16205) | ✅ merged | fix(managed-agent): keep workspace execution off the tenant lock | [pr-16205.md](pr-16205.md) |
 | [#16212](https://github.com/QwenLM/qwen-code/pull/16212) | ✅ merged | feat(managed-agent): allow concurrent workspace uploads | [pr-16212.md](pr-16212.md) |
+| [#16217](https://github.com/QwenLM/qwen-code/pull/16217) | ✅ merged | perf(managed-agent): take resident claim off the tenant lock | [pr-16217.md](pr-16217.md) |
+| [#16221](https://github.com/QwenLM/qwen-code/pull/16221) | ✅ merged | perf(managed-agent): take harness admission checks off the tenant lock | [pr-16221.md](pr-16221.md) |
+| [#16223](https://github.com/QwenLM/qwen-code/pull/16223) | ✅ merged | perf(managed-agent): take turn admission off the tenant lock | [pr-16223.md](pr-16223.md) |
+| [#16225](https://github.com/QwenLM/qwen-code/pull/16225) | ✅ merged | perf(managed-agent): take session commands off the tenant lock | [pr-16225.md](pr-16225.md) |
+| [#16229](https://github.com/QwenLM/qwen-code/pull/16229) | ✅ merged | perf(managed-agent): reuse local workspace file capability probes | [pr-16229.md](pr-16229.md) |
+| [#16240](https://github.com/QwenLM/qwen-code/pull/16240) | ✅ merged | test(managed-agent): refresh concurrent membership snapshot | [pr-16240.md](pr-16240.md) |
+| [#16256](https://github.com/QwenLM/qwen-code/pull/16256) | ✅ merged | perf(managed-agent): queue journal commits on the Session row instead of the tenant lock | [pr-16256.md](pr-16256.md) |
+| [#16268](https://github.com/QwenLM/qwen-code/pull/16268) | ✅ merged | perf(managed-agent): narrow output, lifecycle, and storage lock scopes | [pr-16268.md](pr-16268.md) |
+| [#16270](https://github.com/QwenLM/qwen-code/pull/16270) | ✅ merged | fix(core): preserve Gemini thought signatures for tool replay | [pr-16270.md](pr-16270.md) |
+| [#16275](https://github.com/QwenLM/qwen-code/pull/16275) | ✅ merged | fix(managed-agent): reject dangling Hosted cleanup references | [pr-16275.md](pr-16275.md) |
+| [#16283](https://github.com/QwenLM/qwen-code/pull/16283) | ✅ merged | perf(managed-agent): separate workspace reads from durable admission | [pr-16283.md](pr-16283.md) |
+| [#16288](https://github.com/QwenLM/qwen-code/pull/16288) | ✅ merged | fix(managed-agent): enforce strict SQL mode per embedded connection | [pr-16288.md](pr-16288.md) |
+| [#16296](https://github.com/QwenLM/qwen-code/pull/16296) | ✅ merged | fix(managed-agent): use current state for approval changes | [pr-16296.md](pr-16296.md) |
+| [#16298](https://github.com/QwenLM/qwen-code/pull/16298) | ✅ merged | fix(managed): Reap Git descendants before terminating parents | [pr-16298.md](pr-16298.md) |
+| [#16312](https://github.com/QwenLM/qwen-code/pull/16312) | ✅ merged | perf(managed-agent): avoid storage locks in read preflight | [pr-16312.md](pr-16312.md) |
+| [#16318](https://github.com/QwenLM/qwen-code/pull/16318) | 🟡 open | fix(managed-agent): bound runtime concurrency and improve error handling | [pr-16318.md](pr-16318.md) |
 
-_按个人 PR 口径更新于 2026-11-04_
+_按个人 PR 口径更新于 2026-11-05_

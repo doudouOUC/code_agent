@@ -1,5 +1,11 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 普通输出与 cleanup 分流，2026-11-05
+
+main `624d10532ab8` 已由 [#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 将普通 journal/inline 工具结果发布按原 Session root 排队，保持资源、引用、journal/head 原事务和 afterCommit。缺失资源先普通 probe、唯一键插入仲裁，已有资源锁定重验；同 ID 异内容或已回收资源不复活。普通 storage 准入共享当前读让不相干 Session 共存，维护写入仍等待读者；lifecycle/CSI 保原额外围栏。
+
+[#16275](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16275.md) 的 hosted.cleanup lane 特殊保有界 placement→Session 的 retention 顺序，未确认引用锁定核原 binding 全身份，缺失/错 generation/跨 scope 返回冲突并回滚，confirmed 不要求已经清掉的 binding 仍存在。输出 collector tick 移除冗余 monitor，不等于跨实例取消原 SQL claim。源码证据不证明 MySQL gap-lock、清理进程或真实 Hosted 资格；本次未执行测试，下方日期段为历史。
+
 ## Store 分片保持原权威，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16090](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16090.md) 十个 Agent/八个 Journal 分片，普通 final 无环对象不持 facade、不另开 Spring 事务。公开入口/事务属性仍在两个 Store facade；资源、派生记录、原 journal/head 写入及 afterCommit 通知顺序不变，native owner 读取的准入/lease/重验不省略。[#16142](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16142.md) 只归一公开默认值、移除内部重复重载和 ItemRow，消息页仍选成员后读正文、结果不可变。
