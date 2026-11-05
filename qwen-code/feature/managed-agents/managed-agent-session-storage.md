@@ -1,5 +1,11 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 普通发布锁分流，2026-11-06
+
+main `11f6163f0fd7`：[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 的队列首锁 Session、创建首锁所选 Workspace；Resident 可能命中保 tenant guard，迁移以新 autocommit 连接核 committed idle+完整 Session profile。[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 的模型/审批/管理/压缩/取消/Action 准入仍共享当前读。[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 逐步将普通 publication CAS、合格 binding placement、物理 alias/owner 检查行锁移除，分别由 ToolPublicationCapacityStore、ToolPublicationPlacement:lockEntry、JournalFencing:requireSessionStorageOpenForRead 承担。root/head、原资源/receipt/afterCommit、CSI/authority 与 hosted.cleanup 的 placement-before-Session 不取消。普通物理检查只见事务 snapshot，不承诺刷新旧 RR；离线维护先停 writer。tenant bytes/active-captures 是允许短暂并发超量的聚合判断，Session 字节限额仍精确。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## Session-first 与当前审批行，2026-11-05
 
 main `624d10532ab8` 已合入 [#16223](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16223.md)/[#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 的指定 Turn/Session 命令 Session-first；缺失 receipt 普通 probe，唯一 key 冲突再当前读核语义，rename 初次准入仍保 tenant guard。迁移 prepare 锁住源 alias 后另以 autocommit 读 committed idle，不能用旧快照漏掉已受理 Turn。

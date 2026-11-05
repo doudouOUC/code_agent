@@ -1,5 +1,11 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+## rewind 与准备维护边界，2026-11-06
+
+main `11f6163f0fd7`：[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 普通 Session 创建先锁 Workspace，Resident 可能命中保 guard，默认解析仍可能扫描同租户；不改权限/存储 admission。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 的 WorkspaceExecutionStore:beginRewind 只 CAS 原 READY Runtime Session 的 is_rewind_pending，不要求 member_count=1；删除 exclusive_member_key，邻居执行/上传/rewind 可并发。成功只清原 pending，未知保原成员；releaseMount 同事务仲裁，确认停止/LOST 只清原身份，maintenance/fence 仍需空闲。[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 只去普通 journal/publication 物理检查行锁，上传/执行成员仍锁定受理，snapshot 不提供并发离线维护安全。[#16386](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入：仅精确 LOCAL SESSION_WORKTREE preparation 身份的 holder 可和成员共存，其他 checkout cleanup/child/物理维护不放行；SSH 按原 alias physical_key+registration 点结算，必须一行；不扩大其他维护权限。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## 只读预检与持久成员边界，2026-11-05
 
 main `624d10532ab8` 已合入 [#16217](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16217.md)：resident claim/release 的只读分支不拿 tenant guard，仍核原 slot/Runtime 身份。[#16240](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16240.md) 只修 Hosted 测试的新成员快照与 2→1→0 断言，不改变共享 member_count 算法。[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 给普通受理的 storage alias/owner 用共享当前读，维护/迁移写仍等读者；不是取消维护或 exclusive rewind。

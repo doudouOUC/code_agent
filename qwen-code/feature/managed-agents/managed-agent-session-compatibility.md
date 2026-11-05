@@ -1,5 +1,11 @@
 # Session 服务：兼容接口与实现串联
 
+## rewind 列与消费者兼容，2026-11-06
+
+main `11f6163f0fd7`：[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 将 Runtime Session 的 is_execution_exclusive 重命名为 is_rewind_pending，删除 ma_storage_owner.exclusive_member_key/约束与 hash helper；beginRewind 改 void、hasPendingRewind 取代 hasExclusiveClaim，新增 releaseMount 在释放事务检查 pending。Projection/boolean decoder/CSI inventory 与消费者一起更新。仍唯一 V1/38 表、generated id/无 FK，不提供旧开发 catalog 升级或混 writer 兼容；必须按原策略重建。pending 是原 Session 未决操作，不是跨 Session 文件隔离。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## 严格 SQL 模式部署边界，2026-11-05
 
 main `624d10532ab8` 的 [#16288](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16288.md) 已替代 #16143 合入时的 GLOBAL+SESSION 约束：仅内嵌 Druid 对每个新 MySQL/MariaDB 物理连接追加 STRICT_TRANS_TABLES，保留原 SESSION 模式；ManagedSchemaCatalog 只验证当前 SESSION 精确严格 token，不读取/修改 GLOBAL。外部 DataSource 必须自行初始化全部应用连接；借出后修改 SESSION 的恢复不在本改动保证内。

@@ -1,12 +1,18 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 原身份恢复、容量与锁边界，2026-11-06
+
+main `11f6163f0fd7`：[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 已合入 RuntimeProvisionFailureHandler 的阶段化精确容量拒绝/原 seed 重试，attestation 同码和 replacement owner 不走捷径；[#16330](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16330.md) 最终为 operation 16/reader 64/stop 4、HTTP 32 worker+64 队列，不保留旧 32-startup 虚拟线程方案。[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md)/[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 收窄队列/创建/命令锁但保原准入；[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 普通 publication 按 root/head 和原 binding 细分 CAS/placement/storage，CSI/authority/cleanup 不泛化去锁，tenant 聚合 quota 可短暂超量。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 原 Runtime Session pending rewind 和 mount handback 同事务仲裁，未知保原成员但不阻邻居，不以 drain/取消回执替代停止证明。[#16386](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入：SSH 点结算与主 worktree preparation 共存仍需原 operation/physical/generation 身份，未知 Git 不释放 holder。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## 锁范围与恢复证据增量，2026-11-05
 
 main `624d10532ab8`：[#16217](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16217.md)/[#16221](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16221.md) 的独立 resident/Harness 检查不拿租户锁；[#16223](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16223.md)/[#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 的指定受理/命令按 Session 排序，rename 初次准入仍持 tenant guard。[#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 的普通 journal/inline 发布与生命周期 claim/续租按原行序列化，普通 storage 共享当前读、authority mirror 持锁，不能用旧快照 claim 取得清理资格。[#16275](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16275.md) 仍在 cleanup commit 先有界 placement，再 Session 并核原 binding 全身份；confirmed 仅结算，不重造已收走 Runtime。
 
 [#16240](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16240.md) 只刷新 Hosted 并发测试的 2→1→0 成员快照；[#16288](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16288.md) 改内嵌逐物理连接 strict SQL 初始化和 SESSION-only catalog 校验，不要求或修改 GLOBAL。[#16298](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16298.md) 用一次 2 秒清理预算先杀叶子、保全部曾观察 handle/恢复中断，任何未证停止仍 STOP_UNVERIFIED，不能释放维护占用；CSI generator 关闭顺序修复不等于 native CSI 验收。
 
-[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 是当前 **open diff**：32 并发 startup/64 HTTP dispatch、仅 local-process provision 阶段精确 retryable 503/runtime_local_capacity 可按原 binding/seed 重试。synthetic v1 placeholder 只有 CAS 证明尚未启动时可清，replacement owner/attestation 后同码不走此捷径；这不是 main 能力或所有 Runtime 总量限制。本次未跑源码、MySQL、Linux、Hosted/fault、CSI 或 CI；下方为历史快照。
+此段 #16318 的旧 open 候选已由上方 2026-11-06 最终实现取代；线程池归 #16330，旧数值不再作为当前能力。
 
 ## Store 与验证门禁演进，2026-11-04
 

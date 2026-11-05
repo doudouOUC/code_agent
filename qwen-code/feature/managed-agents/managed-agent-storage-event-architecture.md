@@ -1,5 +1,11 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 发布、回收与读 lease，2026-11-06
+
+main `11f6163f0fd7`：[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md) 把普通 reserve/producer/admission、结果投影、read lease 建立和 quarantine 从 publication tenant guard 下分离，仍 root→head→publication/operation；lease 续租只锁原 Session root、核 retirement generation/expiry，不锁 head；private Session 拒绝、原租约/回收互斥保留，tenant bytes/active-captures 可短暂超量。[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md) 仅同源原生、非 CSI/Resident 的匹配 session/workspace binding 以 root-first 代 placement：workspace binding 共享行锁，session binding 独立当前读且所有 READY 退出写者保 root；receipt 不携 hosted.cleanup。[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 普通 journal/inline/placement-free writer 不锁物理 alias/owner，receipt 仍走共同 commit，不新增请求 bypass。普通 snapshot 不替代离线维护停 writer，也不扩大 cleanup/CSI/authority；资源/journal/head 保原子写，afterCommit 通知保原顺序。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## 普通输出与 cleanup 分流，2026-11-05
 
 main `624d10532ab8` 已由 [#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 将普通 journal/inline 工具结果发布按原 Session root 排队，保持资源、引用、journal/head 原事务和 afterCommit。缺失资源先普通 probe、唯一键插入仲裁，已有资源锁定重验；同 ID 异内容或已回收资源不复活。普通 storage 准入共享当前读让不相干 Session 共存，维护写入仍等待读者；lifecycle/CSI 保原额外围栏。

@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 队列、命令与 rewind 并发，2026-11-06
+
+main `11f6163f0fd7`：[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 不改 wire：队列 startNext 先 Session 锁、Harness 提交后派发；Workspace 创建先锁目标行，Resident 保守 guard 与默认租户扫描仍在。[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 只令指定 Session 命令共享 storage fence，actor/revision/空闲/幂等不变。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 不再因邻居成员伪造 rewind conflict，直转原 worker；原 Runtime Session pending 阻普通执行/再 rewind/mount handback，未知只留自身标志，邻居可执行/上传/rewind。原文件 digest/mode 乐观检查不是 merge 或多文件事务；没有新增 UI、权限或任意文件并发无冲突保证。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## 读取预检与审批一致性，2026-11-05
 
 main `624d10532ab8` 已合入 [#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 的指定 Session 命令去 tenant guard，但 Session/权限/receipt/revision 围栏保留，rename 初次受理仍有租户锁。[#16229](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16229.md) 仅按 Node/CLI 文件身份缓存成功 help；每次文件操作仍执行，read 能力不自动授予 upload。

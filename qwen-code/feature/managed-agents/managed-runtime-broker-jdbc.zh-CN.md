@@ -1,12 +1,18 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 发布、rewind 与容量当前口径，2026-11-06
+
+main `11f6163f0fd7`：[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 已合入：RuntimeProvisionFailureHandler 只认启动前精确容量拒绝并保 binding/seed；attestation 错误和 replacement owner 仍 fenced。独立已合入 [#16330](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16330.md) 为 platform operation 16/reader 64/stop 4，HTTP 32 worker+64 队列，不是旧 startup 32/dispatch 64。[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 队列/创建按 Session/Workspace 排序，可能命中 Resident 仍保 guard，默认保租户前缀扫描；[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 指定命令共享当前 storage 准入。[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 分别去普通 publication CAS、合格 placement 与物理存储行锁，root/head/原资源/receipt/CSI/authority/cleanup 保留；Session bytes 精确，tenant bytes/active-captures 可跨 Session 短暂超量。普通物理读不刷新旧 ambient RR，离线维护须先停 writer。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 用原 Runtime Session is_rewind_pending 代目录排他，V1 删除 exclusive_member_key，mount handback 同事务仲裁；邻居可用但不保证文件无冲突或旧库升级。[#16386](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入：精确 LOCAL worktree preparation 共存与 SSH 原 physical owner 点结算，其他维护仍排他。
+
+本次仅核文档与源码证据，未运行 Java、MySQL、Hosted、SSH/CSI、浏览器、压力或 CI 测试；下方带日期内容为历史快照。
+
 ## 当前锁与连接模式，2026-11-05
 
 main `624d10532ab8` 已合入 [#16217](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16217.md)/[#16221](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16221.md)：独立 resident/Harness 检查不再拿 tenant guard。[#16223](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16223.md)/[#16225](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16225.md) 对指定 Turn/Session 命令使用 Session 行排序；迁移锁原 alias 后读 committed idle，rename 初次受理仍保 tenant guard。[#16256](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16256.md)/[#16268](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16268.md) 普通 journal/inline 发布 Session-first，缺失资源先普通 probe/唯一键仲裁，storage 准入共享当前读；lifecycle authority 检查把 claim mirror 锁持到事务结束，lifecycle/CSI 仍有额外围栏。
 
 [#16275](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16275.md) 只对 cleanup commit 恢复有界 placement-before-Session，并当前锁定核原 binding 的 tenant、Workspace 和两个 generation；confirmed 仅结算原引用。[#16240](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16240.md) 只改 Hosted 测试的新 2→1→0 成员快照。[#16288](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16288.md) 已替代旧 GLOBAL+SESSION 要求：内嵌 Druid 每个新 MySQL/MariaDB 物理连接初始化 STRICT_TRANS_TABLES，catalog 只核 SESSION、不读不改 GLOBAL；外部 DataSource 自行初始化全部应用连接。
 
-[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 仍是 **open diff**，非 main 行为：每 provisioner 32 并发本地 startup、64 HTTP dispatch，仅 provisioner 精确启动前容量拒绝可按原 binding/seed 重试。这不是存活 worker 总量限制；已启动/attestation 失败和 replacement owner 仍 fenced。本次未运行源码、MySQL、Hosted、CSI、平台或 CI 测试，下方带日期内容为历史快照。
+此段 #16318 的旧 open 候选已由上方 2026-11-06 最终实现取代；线程池归 #16330，旧数值不再作为当前能力。
 
 ## Store 分片与验证所有权，2026-11-04
 

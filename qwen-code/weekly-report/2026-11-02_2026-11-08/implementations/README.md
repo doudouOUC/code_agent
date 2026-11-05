@@ -29,6 +29,14 @@
 | [#16296](https://github.com/QwenLM/qwen-code/pull/16296) | ✅ merged | fix(managed-agent): use current state for approval changes | [pr-16296.md](pr-16296.md) |
 | [#16298](https://github.com/QwenLM/qwen-code/pull/16298) | ✅ merged | fix(managed): Reap Git descendants before terminating parents | [pr-16298.md](pr-16298.md) |
 | [#16312](https://github.com/QwenLM/qwen-code/pull/16312) | ✅ merged | perf(managed-agent): avoid storage locks in read preflight | [pr-16312.md](pr-16312.md) |
-| [#16318](https://github.com/QwenLM/qwen-code/pull/16318) | 🟡 open | fix(managed-agent): bound runtime concurrency and improve error handling | [pr-16318.md](pr-16318.md) |
+| [#16318](https://github.com/QwenLM/qwen-code/pull/16318) | ✅ merged | fix(managed-agent): harden capacity recovery and clean up Java conventions | [pr-16318.md](pr-16318.md) |
+| [#16327](https://github.com/QwenLM/qwen-code/pull/16327) | ✅ merged | perf(managed-agent): narrow queue dispatch and workspace session creation locks | [pr-16327.md](pr-16327.md) |
+| [#16329](https://github.com/QwenLM/qwen-code/pull/16329) | ✅ merged | perf(managed-agent): share the storage fence in session command admissions | [pr-16329.md](pr-16329.md) |
+| [#16330](https://github.com/QwenLM/qwen-code/pull/16330) | ✅ merged | fix(managed-agent): bound runtime thread pools | [pr-16330.md](pr-16330.md) |
+| [#16335](https://github.com/QwenLM/qwen-code/pull/16335) | ✅ merged | perf(managed-agent): take ordinary tool publication and read leases off the tenant lock | [pr-16335.md](pr-16335.md) |
+| [#16354](https://github.com/QwenLM/qwen-code/pull/16354) | ✅ merged | perf(managed-agent): take ordinary publication lanes off the placement guard | [pr-16354.md](pr-16354.md) |
+| [#16369](https://github.com/QwenLM/qwen-code/pull/16369) | ✅ merged | feat(managed-agent): allow concurrent workspace rewinds | [pr-16369.md](pr-16369.md) |
+| [#16370](https://github.com/QwenLM/qwen-code/pull/16370) | ✅ merged | perf(managed-agent): remove ordinary journal and publication storage locks | [pr-16370.md](pr-16370.md) |
+| [#16386](https://github.com/QwenLM/qwen-code/pull/16386) | ✅ merged | perf(managed-agent): narrow SSH settlement and worktree locking | [pr-16386.md](pr-16386.md) |
 
-_按个人 PR 口径更新于 2026-11-05_
+_按个人 PR 口径更新于 2026-11-06_
