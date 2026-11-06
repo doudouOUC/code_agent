@@ -1,5 +1,11 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 快照与执行控制当前锁序，2026-11-07
+
+main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 只去普通 native snapshot writer 的 placement/publication guard，root/head、预期 journal 身份和资源读 lease 保留；build 不在嵌套 lease 读之前首锁 root，已 pin CSI 保 guard。[#16415](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16415.md) 新增 JdbcCsiFilesRetirementGuard:lockExecutionControl，仅已有公共 Session root 能为非 CSI 检查串行而不取 tenant guard/整组 slot/binding。缺 root 的 gap lock 不能约束 binding control，所以保原 guarded 路径；requireProvisionPin/lockManagedSession 先 root 后 slot/binding，后续原 binding/execution 必要锁不删。admission 的 Harness drain fence 仍取 placement，不是所有执行无锁证明。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## 发布、rewind 与容量当前口径，2026-11-06
 
 main `11f6163f0fd7`：[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 已合入：RuntimeProvisionFailureHandler 只认启动前精确容量拒绝并保 binding/seed；attestation 错误和 replacement owner 仍 fenced。独立已合入 [#16330](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16330.md) 为 platform operation 16/reader 64/stop 4，HTTP 32 worker+64 队列，不是旧 startup 32/dispatch 64。[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 队列/创建按 Session/Workspace 排序，可能命中 Resident 仍保 guard，默认保租户前缀扫描；[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 指定命令共享当前 storage 准入。[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 分别去普通 publication CAS、合格 placement 与物理存储行锁，root/head/原资源/receipt/CSI/authority/cleanup 保留；Session bytes 精确，tenant bytes/active-captures 可跨 Session 短暂超量。普通物理读不刷新旧 ambient RR，离线维护须先停 writer。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 用原 Runtime Session is_rewind_pending 代目录排他，V1 删除 exclusive_member_key，mount handback 同事务仲裁；邻居可用但不保证文件无冲突或旧库升级。[#16386](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入：精确 LOCAL worktree preparation 共存与 SSH 原 physical owner 点结算，其他维护仍排他。

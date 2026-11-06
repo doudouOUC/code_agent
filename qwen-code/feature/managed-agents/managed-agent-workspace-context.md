@@ -1,5 +1,11 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+## 普通基础工具已合入，2026-11-07
+
+main `45cde869985a`：[#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入：普通 files/1 加入 glob，shell/1 加入 journal-backed todo_write，不增加 profile version/协商；create/load 用当前声明，旧 pending read schema 不兼容则拒绝。普通 read_file 和只读 child 带 Core pages（1-based、闭区间、最多 20 页），Resident/CSI 保原 read/write/edit restricted schema、SSH 保 foreground-only；native glob 预批准不扩到 MCP 同名工具。Todo 状态在 Session journal、Plan 不广告，cold load 跟 managed-todo_state/previousRecordRef 验证原链。已在 main，现有文件身份/持久成员、权限和恢复围栏不放宽。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## rewind 与准备维护边界，2026-11-06
 
 main `11f6163f0fd7`：[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 普通 Session 创建先锁 Workspace，Resident 可能命中保 guard，默认解析仍可能扫描同租户；不改权限/存储 admission。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 的 WorkspaceExecutionStore:beginRewind 只 CAS 原 READY Runtime Session 的 is_rewind_pending，不要求 member_count=1；删除 exclusive_member_key，邻居执行/上传/rewind 可并发。成功只清原 pending，未知保原成员；releaseMount 同事务仲裁，确认停止/LOST 只清原身份，maintenance/fence 仍需空闲。[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 只去普通 journal/publication 物理检查行锁，上传/执行成员仍锁定受理，snapshot 不提供并发离线维护安全。[#16386](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入：仅精确 LOCAL SESSION_WORKTREE preparation 身份的 holder 可和成员共存，其他 checkout cleanup/child/物理维护不放行；SSH 按原 alias physical_key+registration 点结算，必须一行；不扩大其他维护权限。

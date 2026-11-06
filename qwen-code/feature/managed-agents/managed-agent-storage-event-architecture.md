@@ -1,5 +1,11 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## native 快照 writer 去 guard，2026-11-07
+
+main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 只调整 JournalWriterLifecycle:lockSnapshotWriter 的普通 writer 检查：不先持 placement/publication guard，原 root/head、expected head 与资源读 lease 仍在。snapshot build 到 root 前只持本次新行，不能改为 root-first 长事务而堵住嵌套 read lease；CSI continuation 保原围栏。此前普通 publication/物理检查去锁不因此扩成回收或所有 profile 无锁。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## 发布、回收与读 lease，2026-11-06
 
 main `11f6163f0fd7`：[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md) 把普通 reserve/producer/admission、结果投影、read lease 建立和 quarantine 从 publication tenant guard 下分离，仍 root→head→publication/operation；lease 续租只锁原 Session root、核 retirement generation/expiry，不锁 head；private Session 拒绝、原租约/回收互斥保留，tenant bytes/active-captures 可短暂超量。[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md) 仅同源原生、非 CSI/Resident 的匹配 session/workspace binding 以 root-first 代 placement：workspace binding 共享行锁，session binding 独立当前读且所有 READY 退出写者保 root；receipt 不携 hosted.cleanup。[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 普通 journal/inline/placement-free writer 不锁物理 alias/owner，receipt 仍走共同 commit，不新增请求 bypass。普通 snapshot 不替代离线维护停 writer，也不扩大 cleanup/CSI/authority；资源/journal/head 保原子写，afterCommit 通知保原顺序。

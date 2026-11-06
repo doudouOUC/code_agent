@@ -1,5 +1,11 @@
 # SSE 事件总线（深入）
 
+## 当前轻回放与字节计费，2026-11-07
+
+main `45cde869985a`：[#16413](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16413.md) 的 EventBus:ring 改存 event+serialized bytes，默认 ring 数量仍 8000，新增 maxRingBytes 默认 8 MiB/可配至 256 MiB、无 unlimited。ring 和 compaction 的 command event 不保旧 availableSkillDetails，单独持最新完整 event；restoreLatestCommandSnapshot 只在原 matching ID 补正文，若 ID 已淘汰不造乱序新帧，SDK/浏览器出站继续脱敏。计费为轻 ring 总 bytes 加完整 slot，超数量或字节删最旧前缀，但至少保最新 ring 一帧，超大完整 slot/事件允许超预算。replay budget 计算实际恢复后的交付帧，ring_evicted/epoch/resync 仍按原 ID；seed 避免给普通 history 再序列化一遍，reset/close 清当前占用，evictedEvents/Bytes 保本 EventBus 生命周期累计。下文旧行号/ring-only count 描述是历史，不可当严格当前 byte/heap 上限。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 > 子文档；总览见 [README.md](README.md)。本文 **取代** 总览 §3.2，下沉到函数/行级。
 > 所有 `file:symbol`(+line) 锚点除特别说明外均以集成分支 `daemon_mode_b_main` 为准（用 `git -C <repo> show daemon_mode_b_main:<path>` 阅读）。代码/路径用英文，正文用中文。
 

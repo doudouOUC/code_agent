@@ -1,5 +1,11 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 问答恢复与运行边界，2026-11-07
+
+main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md)/[#16415](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16415.md) 分别收窄普通 snapshot writer 与已有 root 的 execution control 锁，缺 root/CSI、原 drain/placement 与物理停止证据不取消。[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 问题先存 input/definition/continuation 和 Action；同原 canonical answer 可重放，冲突拒绝，冷 Harness/Java context 通过原 attachment/Action 继续，决定已存但 result 未落时复用原答案，过期取消不造答案；问答不新建 Runtime tool execution。[#16448](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 宿主总开关默认 true，升级需复核 armed schedule，必要时显式 false。[#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入的最终 diff 校验 Todo 状态祖先链、拒旧 read schema，已在 main；真实进程/数据库/模型恢复仍待独立验收。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## 原身份恢复、容量与锁边界，2026-11-06
 
 main `11f6163f0fd7`：[#16318](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 已合入 RuntimeProvisionFailureHandler 的阶段化精确容量拒绝/原 seed 重试，attestation 同码和 replacement owner 不走捷径；[#16330](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16330.md) 最终为 operation 16/reader 64/stop 4、HTTP 32 worker+64 队列，不保留旧 32-startup 虚拟线程方案。[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md)/[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 收窄队列/创建/命令锁但保原准入；[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 普通 publication 按 root/head 和原 binding 细分 CAS/placement/storage，CSI/authority/cleanup 不泛化去锁，tenant 聚合 quota 可短暂超量。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 原 Runtime Session pending rewind 和 mount handback 同事务仲裁，未知保原成员但不阻邻居，不以 drain/取消回执替代停止证明。[#16386](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入：SSH 点结算与主 worktree preparation 共存仍需原 operation/physical/generation 身份，未知 Git 不释放 holder。

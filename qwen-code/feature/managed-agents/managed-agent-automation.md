@@ -1,5 +1,11 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 宿主开关默认启用，2026-11-07
+
+main `45cde869985a`：[#16448](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 已将 ManagedAgentProperties.Automation.enabled 和 shipped application.yml 的 QWEN_MANAGED_AGENT_AUTOMATION_ENABLED fallback 改为 true；显式该环境变量或 qwen.managed-agent.automation.enabled=false 仍关闭，scan 10s/lease 60s/late tolerance 5m/lookback 24h/slots 1000/concurrency 与 scanner threads 各 4 保原值。只改宿主扫描总开关，原 disabled schedule、Session mode、gate、claim/revision/幂等与 Runtime 能力不被绕过；也不表示下方完整 Channels/Goal/Live/交付目标已完成。升级前检查已 armed 任务，需静默时显式 false。AutomationScannerTest 显式禁真实自动 scanner 以隔离手动 fake，不代表线上默认仍关闭。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 > **阶段 H 统一设计（2026-09-20，HTML v1.7）：** 本文保留 Channels、Schedule、child/team/memory 的字段级契约；它们与 MCP、Hooks、后台 Shell、Monitor 的共同 owner、任务投影、Runtime hold 和 H0～H6 顺序见[扩展运行时设计](managed-agent-extension-runtime.md)。
 
 > **HTML 对齐（2026-09-18）：** 领域准入、幂等、父接受、取消和交付语义继续复用。HTML 第一阶段将 Channel、Scheduled Task 等用途留在 Legacy，完整扩展按阶段 H 逐项迁移；执行记录与 Java 公共投影分开，不能提前把全部领域状态搬成 Java 首阶段 Session authority。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。

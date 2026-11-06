@@ -38,5 +38,11 @@
 | [#16369](https://github.com/QwenLM/qwen-code/pull/16369) | ✅ merged | feat(managed-agent): allow concurrent workspace rewinds | [pr-16369.md](pr-16369.md) |
 | [#16370](https://github.com/QwenLM/qwen-code/pull/16370) | ✅ merged | perf(managed-agent): remove ordinary journal and publication storage locks | [pr-16370.md](pr-16370.md) |
 | [#16386](https://github.com/QwenLM/qwen-code/pull/16386) | ✅ merged | perf(managed-agent): narrow SSH settlement and worktree locking | [pr-16386.md](pr-16386.md) |
+| [#16410](https://github.com/QwenLM/qwen-code/pull/16410) | ✅ merged | perf(managed-agent): take native journal snapshots off the tenant guards | [pr-16410.md](pr-16410.md) |
+| [#16413](https://github.com/QwenLM/qwen-code/pull/16413) | ✅ merged | fix(serve): bound command snapshot replay memory | [pr-16413.md](pr-16413.md) |
+| [#16415](https://github.com/QwenLM/qwen-code/pull/16415) | ✅ merged | perf(managed-agent): take tool execution control off the tenant guards | [pr-16415.md](pr-16415.md) |
+| [#16433](https://github.com/QwenLM/qwen-code/pull/16433) | ✅ merged | feat(managed-agent): support durable structured user questions | [pr-16433.md](pr-16433.md) |
+| [#16445](https://github.com/QwenLM/qwen-code/pull/16445) | ✅ merged | feat(cli): align managed agent basic tools with daemon | [pr-16445.md](pr-16445.md) |
+| [#16448](https://github.com/QwenLM/qwen-code/pull/16448) | ✅ merged | feat(managed-agent): enable automation by default | [pr-16448.md](pr-16448.md) |
 
-_按个人 PR 口径更新于 2026-11-06_
+_按个人 PR 口径更新于 2026-11-07_

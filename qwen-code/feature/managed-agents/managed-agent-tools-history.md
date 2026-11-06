@@ -1,5 +1,11 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
+## 结构化问题与基础工具对齐，2026-11-07
+
+main `45cde869985a`：[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 在普通 files/1–3、shell/1 根 Session（含 public Plan）支持独占 batch 的 ask_user_question；MCP/Hook、foreground-only、Resident/CSI、child/memberPlan 不广告。先持久 input/definition/continuation 与 question Action，requiresHumanDecision 即使 yolo/auto 也不自动结算；题/选项用顺序 ID，输入 16 KiB/answers 32 KiB，单选一个 option 或文本，多选可兼容文本，规范化原序并核 revision/原 digest。[#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入的最终 diff：files/1 加 native glob、shell/1 复用 Session Todo，普通 read_file/只读 child 广告 Core pages（1-based、闭区间、最多 20 页），Resident/CSI 不扩。Todo 不写 Runtime 文件、Plan 不广告；load 跟 previousRecordRef 校验 Todo 链，旧 read schema 直接拒绝，不提供 mixed-version 工具协商。代码合入不等于产品验收；后文全量工具目标也不因这两个切片全部完成。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 > **普通工具接线（2026-09-20，HTML v1.7；工具契约源自 v1.4）：** 普通工具首版的资源内容通过 Java Broker 分片传递到 qwen 持久仓库，完整必要引用接收后再 ACK；精确路由、错误和释放顺序见[结果交付设计](managed-agent-ordinary-tools-integration.md#5-结果-bytes-传输与持久交付)。文件历史沿用原覆盖范围，不宣称任意 Shell 写入均可回滚。
 
 > **长期任务设计（2026-09-20）：** 后台 Shell 与 Monitor 的持久 process/observation binding、Runtime hold、Task 投影和恢复边界见[扩展运行时设计](managed-agent-extension-runtime.md)。本文继续定义它们作为工具时的调用、结果和物理 receipt。

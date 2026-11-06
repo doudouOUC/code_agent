@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 结构化答案与回放诊断，2026-11-07
+
+main `45cde869985a`：[#16433](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 的 Java HostedHarnessClient 增 resolveQuestion，QwenHostedHarnessConnector 在已认证的原 attachment 上送 answers/inputRevision/policyRevision，permission overload 保留；不是给任意客户端造用户投票。题答先经 Java/TS 同构规范化、原资源摘要与 outbox 一次结算。[#16413](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16413.md) 同步 TypeScript daemon status 的 eventRingMaxBytes 和每 Session ring count/bytes/earliest/evictions/availableCommandsSnapshotBytes；SSE/浏览器不暴露 Skill 正文，ACP live 和原 ID 最新快照仍可完整。新增 DTO/字段不等于 Python/TS 公共客户端已有完整 question 高层封装或真实端到端验收。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ### Session 模型摘要与可选后端，2026-11-04
 
 main `da42e5714ad0` 已合入 [#16153](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16153.md)：Java CreateHarnessSession/LoadHarnessSession 显式带 modelConfigDigest，创建要求 Managed Session Store，load 的 lifecycle/foreground/child/stopped 副本均保留；HostedHarnessClient 以 session-model-config/1 协商。定义只持摘要，core HTTP client 在原 writer token/generation/Workspace/lifecycle 下请求有界私有 model-config:query，坏响应/缺密钥/摘要冲突不回退宿主连接。公共创建完整配置、私有 SDK 摘要和浏览器编辑器是不同层，不宣称 Python/TypeScript 公共 SDK 或 UI 全面支持。

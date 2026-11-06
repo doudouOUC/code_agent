@@ -1,5 +1,11 @@
 # Managed Session：记录格式、提交与协议限额
 
+## native 快照与 question 资源闭合，2026-11-07
+
+main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 普通 native snapshot writer 改 placement=false/publicationGuard=false，原 expected revision/sequence/digest 与读 lease 保留；build 在嵌套读取前不强行首锁 root，CSI pin 仍有 guard。[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 增 question options v4、decision v2、hosted-user-question/1：ManagedActionJournalValidation 核 input/continuation/call/Runtime/资源原身份，ManagedUserQuestions 按原题/选项序 canonicalize，input 总 16 KiB、answers 32 KiB。JournalCommit 将这类可恢复 Action 的 reader floor 提升为 2，业务表仍 38、无新队列/迁移。只复用原 ACTION_RESPONSE/outbox 和 writer/activation/revision，不把答案或 question 标签当成新执行权限。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## 普通发布锁分流，2026-11-06
 
 main `11f6163f0fd7`：[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 的队列首锁 Session、创建首锁所选 Workspace；Resident 可能命中保 tenant guard，迁移以新 autocommit 连接核 committed idle+完整 Session profile。[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 的模型/审批/管理/压缩/取消/Action 准入仍共享当前读。[#16335](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 逐步将普通 publication CAS、合格 binding placement、物理 alias/owner 检查行锁移除，分别由 ToolPublicationCapacityStore、ToolPublicationPlacement:lockEntry、JournalFencing:requireSessionStorageOpenForRead 承担。root/head、原资源/receipt/afterCommit、CSI/authority 与 hosted.cleanup 的 placement-before-Session 不取消。普通物理检查只见事务 snapshot，不承诺刷新旧 RR；离线维护先停 writer。tenant bytes/active-captures 是允许短暂并发超量的聚合判断，Session 字节限额仍精确。

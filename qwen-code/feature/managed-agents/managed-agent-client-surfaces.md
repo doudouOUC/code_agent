@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 持久问题表单与原答复，2026-11-07
+
+main `45cde869985a`：[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 已把 question Action 接入 Public/WebShell：public 用 snake_case，内部/浏览器用 camelCase，答案只能选原 question/option ID 与合法文本，Java 做原题/修订/策略/权限校验。ManagedQuestionForm 复用 radio/checkbox/textarea、要求所有题有答案、到期/无权限禁用、UTF-8 32 KiB 上限；use-managed-actions 以 Action/revision/规范化答案算 SHA-256 key、防并发重复，失败/未确认保当前草稿，确认 operation 后才隐藏，冷重载重新列 pending Action。没有答案 localStorage，页面重载不承诺保存未提交草稿；过期取消不造答案，yolo/auto 不代答。原 permission 与问答分支封闭，UI 接入不扩大 profile 能力。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## 队列、命令与 rewind 并发，2026-11-06
 
 main `11f6163f0fd7`：[#16327](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 不改 wire：队列 startNext 先 Session 锁、Harness 提交后派发；Workspace 创建先锁目标行，Resident 保守 guard 与默认租户扫描仍在。[#16329](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) 只令指定 Session 命令共享 storage fence，actor/revision/空闲/幂等不变。[#16369](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 不再因邻居成员伪造 rewind conflict，直转原 worker；原 Runtime Session pending 阻普通执行/再 rewind/mount handback，未知只留自身标志，邻居可执行/上传/rewind。原文件 digest/mode 乐观检查不是 merge 或多文件事务；没有新增 UI、权限或任意文件并发无冲突保证。

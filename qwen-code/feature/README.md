@@ -1,5 +1,11 @@
 # qwen-code feature 技术方案
 
+## W45 日更至 11-06，2026-11-07
+
+main `45cde869985a`：本周截至 11-06 创建的本人集合为 **42 PR：42 merged / 0 open / 0 closed**。[#16410](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 普通 native snapshot writer 去两类 guard，CSI pin 例外保留；[#16415](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16415.md) 非 CSI execution control 仅在已有原 Session root 时省 guard，缺 root 回原路径，admission drain placement 仍在。[#16413](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16413.md) 命令快照成功摘要去重、轻回放加最新完整 slot 和默认 8 MiB 字节预算，单超大帧仍是例外。[#16433](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 已接持久 question options v4/decision v2、原 continuation 与 WebShell 表单，限定普通根 Session、独占 batch，原题答 ID/revision 不放宽。[#16448](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 宿主 automation 默认 true，显式 false/原 armed/gate/Session 权限不变。[#16445](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入：files/1 glob、shell/1 Todo 与普通 read_file.pages/冷恢复对齐，原 profile/权限边界保留。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实模型或平台测试；下方带日期内容保留历史口径。
+
 ## W45 日更至 11-05，2026-11-06
 
 main `11f6163f0fd7`：截至 11-05 创建的本人集合为 **36 PR：36 merged / 0 open / 0 closed**。[#16318](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16318.md) 已合入阶段化容量恢复/Java 约定；最终线程池归 [#16330](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16330.md)：本地 operation 16、reader 64、stop 4，HTTP 32 worker+64 队列，不是旧候选 startup 32/dispatch 64。[#16327](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16327.md) 队列/创建按 Session/Workspace 首锁且保 Resident/默认扫描例外，[#16329](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16329.md) Session 命令共享存储准入。[#16335](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16335.md)/[#16354](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16354.md)/[#16370](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16370.md) 分别收窄普通 publication CAS、placement 与物理 storage 检查行锁；Session quota 精确，tenant bytes/active-captures 允许并发短暂超量。[#16369](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16369.md) 用原 Runtime Session pending 取代目录 exclusive rewind，未知不阻邻居但不重放原操作。[#16386](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16386.md) 已合入，SSH 点结算和精确 LOCAL 主 worktree preparation 成员共存已在 main，其他 maintenance 仍排他。
