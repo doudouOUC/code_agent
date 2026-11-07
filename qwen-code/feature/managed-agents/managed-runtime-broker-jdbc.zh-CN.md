@@ -1,5 +1,11 @@
 # Managed Runtime Broker JDBC 持久化
 
+## 准入、租约与等价复用，2026-11-08
+
+main `a32684604a12`：[#16478](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16478.md) 对已有公共 root 的限定普通 session-class、无/LOCAL storage 准入先锁 root，不先建立 RR snapshot；drain 仍 placement→root，停止释放改 binding→storage。CSI/Resident/shared Runtime/lifecycle/缺 root 保 guard。[#16480](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16480.md) 只将 operation claim/renew/release 接普通无 guard 检查，原 binding/generation/lease 保留；状态 CAS 不走该捷径。[#16485](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16485.md) 保 alias key bytes，统一摘要库；[#16486](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16486.md)/[#16503](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16503.md) 共用 10 秒 statement，历史读剩余预算和严格 mapper 不变。[#16501](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16501.md) 保公开 Broker/claim/renewal，将 provision/recovery 搬 RuntimeBindingProvisioning。[#16504](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16504.md)/[#16533](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16533.md)/[#16534](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16534.md)/[#16535](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16535.md) 是类型引用整理，不是新协议或真实环境验收。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 快照与执行控制当前锁序，2026-11-07
 
 main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 只去普通 native snapshot writer 的 placement/publication guard，root/head、预期 journal 身份和资源读 lease 保留；build 不在嵌套 lease 读之前首锁 root，已 pin CSI 保 guard。[#16415](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16415.md) 新增 JdbcCsiFilesRetirementGuard:lockExecutionControl，仅已有公共 Session root 能为非 CSI 检查串行而不取 tenant guard/整组 slot/binding。缺 root 的 gap lock 不能约束 binding control，所以保原 guarded 路径；requireProvisionPin/lockManagedSession 先 root 后 slot/binding，后续原 binding/execution 必要锁不删。admission 的 Harness drain fence 仍取 placement，不是所有执行无锁证明。

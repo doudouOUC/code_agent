@@ -1,5 +1,11 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 诊断与个人状态仍为分支候选，2026-11-08
+
+main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 已合入：原 question Action/资源仍核 revision/call/runtime；可选 provisionerKind 只接受单 question 的 local-process，恢复核原 binding/generation/workspaceGeneration。[#16485](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16485.md) 维持原长度前缀/UTF-8 key，[#16486](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16486.md) 不改严格 JSON。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 在原 journal 原子提交 context/model stats，基础 usage v2/floor 3；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 的 activity/floor 4 仅合入其功能分支。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 增 tool.measured/floor 5，不能把这些 storage reader 版本当成 main 或 DDL migration。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 的个人 Store/entry/owner_only 与 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 的 OAuth grant/attempt 都修改候选 V1，main 仍 38 业务表，无旧库升级。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## native 快照与 question 资源闭合，2026-11-07
 
 main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 普通 native snapshot writer 改 placement=false/publicationGuard=false，原 expected revision/sequence/digest 与读 lease 保留；build 在嵌套读取前不强行首锁 root，CSI pin 仍有 guard。[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 增 question options v4、decision v2、hosted-user-question/1：ManagedActionJournalValidation 核 input/continuation/call/Runtime/资源原身份，ManagedUserQuestions 按原题/选项序 canonicalize，input 总 16 KiB、answers 32 KiB。JournalCommit 将这类可恢复 Action 的 reader floor 提升为 2，业务表仍 38、无新队列/迁移。只复用原 ACTION_RESPONSE/outbox 和 writer/activation/revision，不把答案或 question 标签当成新执行权限。

@@ -1,5 +1,11 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 自助导入与个人 OAuth 当前方案，2026-11-08
+
+main `a32684604a12`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff，不能作为 main 能力承诺：operator+部署 allowlist 先检查，Java 将有界输入交认证 Hosted 纯准备/预览/inspection，再复用原精确包发布/settings/config_install；预览不创建 revision、不启 Runtime/模型/MCP/脚本。Runtime Skill 显式快照核原 owner/generation，拒绝变化/越界；apply 仍需 idle/expectedConfigRevision，其他 Session 不随包更新。独立 MCP 表单秘密只引用声明 settings，Workspace 服务凭据与个人 HTTP OAuth 分开。个人 grant/attempt 加密持久、PKCE/state/browser nonce/actor、refresh/revoke generation CAS 与原 executionActor 约束，默认关闭并要求已证明隔离 profile/provider；同 UID 不自动隔离，撤销不能瞬间收回已交付 token。不搬 daemon 凭据，不重跑结果不明的 MCP 调用。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 固定扩展包最终实现，2026-10-26 周更
 
 [#15490](../../weekly-report/2026-10-19_2026-10-25/implementations/pr-15490.md) 已以 head `099f5f46621d`、merge `41ce46af24c0` 合入 main `49569f16a5a3`，发布/执行仍默认关闭且受 allowedActors 限制。最终实现从原始 git/npm/release/目录/archive 编译目标 platform/arch 的静态 Skills、commands、agents、context、MCP、Hooks、settings，去私有凭据、验路径/资源类型与预算，拒动态 Skill 权限/Hook/model/path 及 LSP/channel/workflow/executor。不读已安装宿主配置作为 Session authority，不隐式 watcher 热载。

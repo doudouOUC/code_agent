@@ -1,5 +1,11 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 源码复用与未合主干诊断投影，2026-11-08
+
+main `a32684604a12`：[#16485](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16485.md) 共享 key/摘要但保原 canonical bytes，[#16486](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16486.md) 共用 statement/专用 mapper，不改资源/journal/head 原子性。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 沿 main/hook/maintenance carrier 提交有界统计/上下文，以 snapshotRevision 防回退；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) activity evidence 与 SQL 投影只在该功能分支合并，原 assistant 出现身份/intent/receipt 关联和贡献替换不成为第二执行 authority。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 在同投影接 tool.measured，先持久冻结测量再交付/ACK，不授权重派发。不把三个候选 reader floor 3/4/5 写成 main 存储事实。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## native 快照 writer 去 guard，2026-11-07
 
 main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md) 只调整 JournalWriterLifecycle:lockSnapshotWriter 的普通 writer 检查：不先持 placement/publication guard，原 root/head、expected head 与资源读 lease 仍在。snapshot build 到 root 前只持本次新行，不能改为 root-first 长事务而堵住嵌套 read lease；CSI continuation 保原围栏。此前普通 publication/物理检查去锁不因此扩成回收或所有 profile 无锁。

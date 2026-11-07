@@ -1,5 +1,11 @@
 # Managed Agent Workspace and Session cwd Contract
 
+## Question mounts and candidate Skill snapshots, 2026-11-08
+
+Main `a32684604a12`: [#16478](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16478.md) uses root-first admission only for qualified ordinary absent/LOCAL storage and orders drain on the same root; stopped release remains binding-before-storage. [#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) attempts to hand back the original mount claim while a qualified question waits, then reacquires the original binding/generation/workspaceGeneration/provider before continuing. A held cleanup debt is not proof of physical stop. [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) remains a current open diff, not main: explicit Skill snapshots validate the original ready owner, trust/root boundaries and source identity/digest before and after copying, refusing source_changed without falling back to the daemon or a different workspace/home. This is neither a watcher nor a filesystem transaction.
+
+Only source/documentation evidence was inspected; no Java, Node, CI, MySQL, Hosted, browser, provider or platform tests ran. Dated material below remains historical.
+
 ## Ordinary basic-tool alignment, 2026-11-07
 
 Main `45cde869985a`: [#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) is merged: ordinary files/1 adds native glob, shell/1 reuses journal-backed todo_write, and ordinary read_file/read-only children expose Core pages (1-based closed ranges, at most 20 pages). Resident/CSI keeps its restricted read/write/edit schema and SSH stays foreground-only. Native glob preapproval does not cover an MCP tool of the same name. No profile version or capability negotiation is added: create/load use current declarations and refuse incompatible saved pending reads, without a pages-stripping fallback. Todo writes remain Session journal operations, absent from Plan tools; cold load follows managed-todo_state/previousRecordRef and refuses invalid or missing ancestors. Existing membership, authorization and recovery fences remain; deploy matching artifacts and recreate incompatible development Sessions.

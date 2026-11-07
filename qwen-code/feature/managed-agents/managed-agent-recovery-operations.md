@@ -1,5 +1,11 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 原身份问答与候选协议恢复，2026-11-08
+
+main `a32684604a12`：[#16478](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16478.md) 的 root-first admit 与 drain 同序，[#16480](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16480.md) operation 租约缩 guard 不取消 owner/generation；[#16501](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16501.md) 搬绑定恢复但保原 seed/claim/renewal/deadline/停止证据。[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 等待问题可交还原 mount，回答/冷恢复重新 acquire 精确 LOCAL 身份；held/pending debt 不伪造 released，terminal 与真实 drain 分开。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md)/[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md)/[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md)/[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 均为当前 open diff：诊断恢复不清零覆盖缺口，记忆未知写不重试，测量 v4 不降级重跑，OAuth 不明交换需重新授权；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 的 merged 只指诊断功能分支。不能据分支测试定义宣称跨进程/MySQL/真实 provider 验收。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 问答恢复与运行边界，2026-11-07
 
 main `45cde869985a`：[#16410](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16410.md)/[#16415](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16415.md) 分别收窄普通 snapshot writer 与已有 root 的 execution control 锁，缺 root/CSI、原 drain/placement 与物理停止证据不取消。[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 问题先存 input/definition/continuation 和 Action；同原 canonical answer 可重放，冲突拒绝，冷 Harness/Java context 通过原 attachment/Action 继续，决定已存但 result 未落时复用原答案，过期取消不造答案；问答不新建 Runtime tool execution。[#16448](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 宿主总开关默认 true，升级需复核 armed schedule，必要时显式 false。[#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入的最终 diff 校验 Todo 状态祖先链、拒旧 read schema，已在 main；真实进程/数据库/模型恢复仍待独立验收。

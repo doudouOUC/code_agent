@@ -1,5 +1,11 @@
 # Managed 子任务执行与持久文件历史
 
+## 一层 LOCAL 子问题，2026-11-08
+
+main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 已合入：definition/lineage 证实 publicChildAgentsVersion=1、depth=1、parent=root 的 shell/1 LOCAL child 可持久 ask_user_question，仍独占 batch。等待时尝试原 mount handback，让同 Workspace 其他工作可继续；回答前 acquire 原 Runtime 身份，未知保债务，cancel/expire 不编造答案。父页逐 Action 草稿/提交与子页定位不新建跨用户回答权限，不开放多层、MCP/Hook、Resident/CSI 或扩展 agent。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅合入诊断功能分支的惰性子树展示更深历史，不等于增加执行深度。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 > **阶段 H 统一设计（2026-09-20，HTML v1.7）：** 本文保留已有子作用域实现与历史证据；目标 Hosted child Session、父结果 accepted/consumed、工作区隔离、关闭级联及 WebShell Task 投影以[扩展运行时设计](managed-agent-extension-runtime.md#8-子-agent)为准。
 
 > **HTML 对齐（2026-09-18）：** 父子作用域、稳定 Runtime ID、文件历史 owner、取消和结果接管作为专项能力保留；同 daemon 双引擎与固定 owner 属于 B，完整后台/子任务能力按 H 的兼容与验收范围启用。以[HTML 双链路基准](managed-agent-dual-path-architecture.html)与[Markdown 方案](managed-agent-java-hosted-runtime.md)为准。

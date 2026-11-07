@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 候选诊断、记忆和自助扩展接线，2026-11-08
+
+main `a32684604a12`：[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md)/[#16488](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md)/[#16500](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 均为当前 open diff：SDK/OpenAPI/生成 WebShell 类型分别接诊断读取、可选个人 Store 创建/恢复参数、纯包准备与 MCP OAuth 操作；[#16499](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) merged 只在诊断功能分支。原 tenant/actor/Session/attachment、包 pin/settings/config revision 与 credential generation 校验不因 DTO 透传而放宽。不宣称 Python/TypeScript 公共 SDK、真实 provider、跨语言部署或浏览器完整验收。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 结构化答案与回放诊断，2026-11-07
 
 main `45cde869985a`：[#16433](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 的 Java HostedHarnessClient 增 resolveQuestion，QwenHostedHarnessConnector 在已认证的原 attachment 上送 answers/inputRevision/policyRevision，permission overload 保留；不是给任意客户端造用户投票。题答先经 Java/TS 同构规范化、原资源摘要与 outbox 一次结算。[#16413](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16413.md) 同步 TypeScript daemon status 的 eventRingMaxBytes 和每 Session ring count/bytes/earliest/evictions/availableCommandsSnapshotBytes；SSE/浏览器不暴露 Skill 正文，ACP live 和原 ID 最新快照仍可完整。新增 DTO/字段不等于 Python/TS 公共客户端已有完整 question 高层封装或真实端到端验收。

@@ -1,5 +1,11 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 个人 Holo 记忆候选，2026-11-08
+
+main `a32684604a12`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff：认证 tenant+actor 一个个人 Store，显式 Session memory_store_id、不可变 owner_only 绑定，省略关闭，部署 memory.enabled 默认 false。SQL 管归属/墓碑/receipt，Holo 保存正文；writer/generation 在短事务核验，外部 I/O 在事务外，unknown 写不自动重试。真实用户输入召回有界不可信上下文，四个 context_* 工具只按显式要求保存/删除，infer=false，子上下文可私有但不自动继承 Store，Workspace 文件仍共享。不是全量自动抽取/Dream/team memory；需要真实 Holo/隐私/恢复验收。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 的个人 MCP OAuth 是另一种 grant，不隐式委托给 child/channel/automation，不能用此候选改变 [#16448](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 已合入的宿主 automation 默认值。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 宿主开关默认启用，2026-11-07
 
 main `45cde869985a`：[#16448](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 已将 ManagedAgentProperties.Automation.enabled 和 shipped application.yml 的 QWEN_MANAGED_AGENT_AUTOMATION_ENABLED fallback 改为 true；显式该环境变量或 qwen.managed-agent.automation.enabled=false 仍关闭，scan 10s/lease 60s/late tolerance 5m/lookback 24h/slots 1000/concurrency 与 scanner threads 各 4 保原值。只改宿主扫描总开关，原 disabled schedule、Session mode、gate、claim/revision/幂等与 Runtime 能力不被绕过；也不表示下方完整 Channels/Goal/Live/交付目标已完成。升级前检查已 armed 任务，需静默时显式 false。AutomationScannerTest 显式禁真实自动 scanner 以隔离手动 fake，不代表线上默认仍关闭。

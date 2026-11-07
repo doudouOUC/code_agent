@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 并发问题与未合主干管理视图，2026-11-08
+
+main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 已让父页呈现/定位子问题，按 Action/request/revision 隔离当前页面草稿与提交态，避免多题串答；错误/未确认不丢草稿，冷重载重查 pending，不承诺未提交草稿持久。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 提供被动 context/stats/resources/trace，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 功能分支内已合入 activity 与惰性子树，均非 main；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 再加测量展示。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 仅透传个人 memory_store_id/owner-only，不新增独立记忆管理页。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 才补 Skill/MCP 安装预览、显式 apply 与 OAuth；发布、激活、在线和已授权是不同状态。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 持久问题表单与原答复，2026-11-07
 
 main `45cde869985a`：[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 已把 question Action 接入 Public/WebShell：public 用 snake_case，内部/浏览器用 camelCase，答案只能选原 question/option ID 与合法文本，Java 做原题/修订/策略/权限校验。ManagedQuestionForm 复用 radio/checkbox/textarea、要求所有题有答案、到期/无权限禁用、UTF-8 32 KiB 上限；use-managed-actions 以 Action/revision/规范化答案算 SHA-256 key、防并发重复，失败/未确认保当前草稿，确认 operation 后才隐藏，冷重载重新列 pending Action。没有答案 localStorage，页面重载不承诺保存未提交草稿；过期取消不造答案，yolo/auto 不代答。原 permission 与问答分支封闭，UI 接入不扩大 profile 能力。

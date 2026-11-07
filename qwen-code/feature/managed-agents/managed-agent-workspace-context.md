@@ -1,5 +1,11 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+## 原 mount 问答与源快照候选，2026-11-08
+
+main `a32684604a12`：[#16478](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16478.md) 合格 LOCAL/无存储 admit 用 root-first，drain 同 root 排序，停止释放 binding-before-storage；[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 等待问题只交还原 mount claim，回答前按原 binding/generation/workspaceGeneration/provider 重获并刷新上下文，held 不当停止证明。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 的 Runtime Skill 快照要求原 ready owner/generation、可信根和复制前后身份/摘要，source_changed 拒绝，不回退 daemon/主 Workspace/home；只是显式导入快照，不是 watcher 或文件系统事务，非 main。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 普通基础工具已合入，2026-11-07
 
 main `45cde869985a`：[#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入：普通 files/1 加入 glob，shell/1 加入 journal-backed todo_write，不增加 profile version/协商；create/load 用当前声明，旧 pending read schema 不兼容则拒绝。普通 read_file 和只读 child 带 Core pages（1-based、闭区间、最多 20 页），Resident/CSI 保原 read/write/edit restricted schema、SSH 保 foreground-only；native glob 预批准不扩到 MCP 同名工具。Todo 状态在 Session journal、Plan 不广告，cold load 跟 managed-todo_state/previousRecordRef 验证原链。已在 main，现有文件身份/持久成员、权限和恢复围栏不放宽。

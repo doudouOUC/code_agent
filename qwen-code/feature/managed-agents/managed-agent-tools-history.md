@@ -1,5 +1,11 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
+## 合格子问题与分支执行测量，2026-11-08
+
+main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 在原根 Session 外只允许 definition/lineage 合格的 depth 1 LOCAL shell child 提问，MCP/Hook/Resident/CSI/memberPlan 与扩展 agent 不泛化，仍独占 batch/人类决定。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 虽 merged 但只在诊断功能分支：按 assistant UUID+调用 ordinal 计请求，准入/执行/交付分开，原生显式文件和 Skill 指令加载不推断 Shell/MCP 内部行为或后续模型消费。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 已含该活动切片。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 用冻结 v4 结果/测量、tool.measured 和 floor 5 接同 activity；耗时排除等待，累计行数非 Git diff，CSI 不扩，默认 false 且非 main。
+
+本次仅核文档与源码证据，未运行 Java、Node、CI、MySQL、Hosted、浏览器、真实 provider 或平台测试；下方带日期内容保留历史口径。
+
 ## 结构化问题与基础工具对齐，2026-11-07
 
 main `45cde869985a`：[#16433](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16433.md) 在普通 files/1–3、shell/1 根 Session（含 public Plan）支持独占 batch 的 ask_user_question；MCP/Hook、foreground-only、Resident/CSI、child/memberPlan 不广告。先持久 input/definition/continuation 与 question Action，requiresHumanDecision 即使 yolo/auto 也不自动结算；题/选项用顺序 ID，输入 16 KiB/answers 32 KiB，单选一个 option 或文本，多选可兼容文本，规范化原序并核 revision/原 digest。[#16445](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16445.md) 已合入的最终 diff：files/1 加 native glob、shell/1 复用 Session Todo，普通 read_file/只读 child 广告 Core pages（1-based、闭区间、最多 20 页），Resident/CSI 不扩。Todo 不写 Runtime 文件、Plan 不广告；load 跟 previousRecordRef 校验 Todo 链，旧 read schema 直接拒绝，不提供 mixed-version 工具协商。代码合入不等于产品验收；后文全量工具目标也不因这两个切片全部完成。
