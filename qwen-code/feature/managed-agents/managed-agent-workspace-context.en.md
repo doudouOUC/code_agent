@@ -1,5 +1,11 @@
 # Managed Agent Workspace and Session cwd Contract
 
+## Runtime Skill import is a separate candidate, 2026-11-09
+
+main `7d99e7d26ee4`: [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) is now limited to archive/MCP preparation and installation. [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) is a current open diff on that branch, not main: it checks the original Session/binding owner and generation, scans authorized .qwen/skills and .agents/skills roots, rejects links and out-of-root sources, filters private files, and refuses source_changed when identity or content changes around copying. Chunked download rechecks owner, offset, length and archive SHA-256. Import reuses explicit publication, does not auto-apply and never falls back to a daemon/home or another workspace. This is not a watcher or a filesystem transaction.
+
+Source/documentation checks only; no product, CI, MySQL, Hosted, browser or provider tests ran. Earlier dated sections below are historical and superseded where this update differs.
+
 ## Question mounts and candidate Skill snapshots, 2026-11-08
 
 Main `a32684604a12`: [#16478](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16478.md) uses root-first admission only for qualified ordinary absent/LOCAL storage and orders drain on the same root; stopped release remains binding-before-storage. [#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) attempts to hand back the original mount claim while a qualified question waits, then reacquires the original binding/generation/workspaceGeneration/provider before continuing. A held cleanup debt is not proof of physical stop. [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) remains a current open diff, not main: explicit Skill snapshots validate the original ready owner, trust/root boundaries and source identity/digest before and after copying, refusing source_changed without falling back to the daemon or a different workspace/home. This is neither a watcher nor a filesystem transaction.

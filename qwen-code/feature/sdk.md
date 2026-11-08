@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 已合入资源查询与分支 DTO 分开，2026-11-09
+
+main `7d99e7d26ee4`：[#16640](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 Java SDK resources/agent-trace 与生成契约，服务端原 tenant/actor/Session 授权不因 DTO 省略。[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才接模型/context；[#16488](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 Mem0 方案仍未合入。[#16500](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄为包 preparation/inspection/publish/apply，Runtime Skill [#16638](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 和个人 OAuth [#16647](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 为其上的当前 open diff；精确 owner/generation、包 pin/config revision 和 actor/credential generation 不因透传放宽。不承诺其他公共 SDK 或真实部署验收。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 候选诊断、记忆和自助扩展接线，2026-11-08
 
 main `a32684604a12`：[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md)/[#16488](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md)/[#16500](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 均为当前 open diff：SDK/OpenAPI/生成 WebShell 类型分别接诊断读取、可选个人 Store 创建/恢复参数、纯包准备与 MCP OAuth 操作；[#16499](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) merged 只在诊断功能分支。原 tenant/actor/Session/attachment、包 pin/settings/config revision 与 credential generation 校验不因 DTO 透传而放宽。不宣称 Python/TypeScript 公共 SDK、真实 provider、跨语言部署或浏览器完整验收。

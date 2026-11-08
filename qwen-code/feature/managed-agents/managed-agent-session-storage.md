@@ -1,5 +1,11 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 只读资源落地与候选持久状态分层，2026-11-09
+
+main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入被动资源/直接 agent-trace，不新增表/reader floor。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 关闭未合入，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才将模型/context v2 原子提交并推进 reader 3，[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 依赖其活动 evidence 推进 4，旧 [#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅功能分支 merged、[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前测量方案 floor 5 不变。这些不是 DDL migration。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 的个人 Store/owner_only 已用 Mem0；[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄无 OAuth DDL，原两张 OAuth 表和 Session execution actor/config revision 在 [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff。main 仍唯一 V1/38 业务表，无旧库升级证明。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 诊断与个人状态仍为分支候选，2026-11-08
 
 main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 已合入：原 question Action/资源仍核 revision/call/runtime；可选 provisionerKind 只接受单 question 的 local-process，恢复核原 binding/generation/workspaceGeneration。[#16485](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16485.md) 维持原长度前缀/UTF-8 key，[#16486](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16486.md) 不改严格 JSON。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 在原 journal 原子提交 context/model stats，基础 usage v2/floor 3；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 的 activity/floor 4 仅合入其功能分支。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 增 tool.measured/floor 5，不能把这些 storage reader 版本当成 main 或 DDL migration。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 的个人 Store/entry/owner_only 与 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 的 OAuth grant/attempt 都修改候选 V1，main 仍 38 业务表，无旧库升级。

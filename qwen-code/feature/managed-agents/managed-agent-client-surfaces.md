@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 主干两类诊断与候选管理界面，2026-11-09
+
+main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 WebShell resources/agents 两页签、覆盖状态和直接 child 分页/独立授权链接，非 context/stats/activity 全套。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)/[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 才补模型/活动视图；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅旧分支 merged，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前测量仍 open。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 个人 Mem0 只透传绑定，不新增独立记忆管理页。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 仅安装预览/发布/apply，Runtime Skill importer 与个人 OAuth panel 分别在 [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md)/[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff；发布、激活、发现和授权不是同一状态。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 并发问题与未合主干管理视图，2026-11-08
 
 main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 已让父页呈现/定位子问题，按 Action/request/revision 隔离当前页面草稿与提交态，避免多题串答；错误/未确认不丢草稿，冷重载重查 pending，不承诺未提交草稿持久。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 提供被动 context/stats/resources/trace，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 功能分支内已合入 activity 与惰性子树，均非 main；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 再加测量展示。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 仅透传个人 memory_store_id/owner-only，不新增独立记忆管理页。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 才补 Skill/MCP 安装预览、显式 apply 与 OAuth；发布、激活、在线和已授权是不同状态。

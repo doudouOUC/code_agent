@@ -1,8 +1,14 @@
 # Managed 持久诊断与执行测量
 
-## 状态与范围，2026-11-08
+## 资源与直接调用进入主干，2026-11-09
 
-对照 main `a32684604a12`。诊断相关生产入口尚未进入 main；以下均是指定功能分支证据，不是已部署能力。
+main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 main：resources/agent-trace、Java SDK、生成类型和 WebShell resources/agents 页签。短只读 RR、原 actor 授权、private/no-store；配置/发现/最新尝试/实时未知分开，扫描及响应有预算，partial 不伪造完整。direct-invocations 在 SQL 分页前筛 child_agent，子链接需独立授权和谱系匹配，不递归执行。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才持久模型/context（floor 3），[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 依赖它并持久 activity（floor 4）；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅合入旧功能分支，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) floor 5/Tool v4 当前 open diff 尚未改 base。以下旧章节为关闭前方案与分支技术历史，不代表 main。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
+## 关闭前历史快照，2026-11-08
+
+对照 main `a32684604a12`。在该历史快照中生产入口尚未进入 main；后续 #16640 已落资源/直接 agent-trace，其余按上方最新切片状态。
 
 | PR | 当前状态与基底 | 口径 |
 |---|---|---|
@@ -24,7 +30,7 @@
 
 ## 关键代码锚点
 
-- `packages/core/src/managed-runtime/managed-session-diagnostics.ts`：#16475 的有界统计与上下文契约，仅在当前 open diff。
+- `packages/core/src/managed-runtime/managed-session-diagnostics.ts`：#16475 的有界统计与上下文契约，仅在关闭前 broad diff，新模型切片为 #16641。
 - `packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/ManagedActivityDiagnosticProjection.java`：#16499 的功能分支最终活动投影，不在 main。
 - `packages/cli/src/serve/managed-runtime-tool-v4-routes.ts`：#16498 当前 open diff 的冻结结果与 ACK，不在 main。
 

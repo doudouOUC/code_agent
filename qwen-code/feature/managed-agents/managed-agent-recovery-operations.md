@@ -1,5 +1,11 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 查询不恢复执行，分支恢复不混主干，2026-11-09
+
+main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 主干 resources/直接 agent-trace 只读授权，不 attach/warm/恢复 Runtime。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 关闭后，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)/[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 的模型 gap/单调快照与 fenced-writer 活动重建仍为当前 open diff；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅旧功能分支 merged，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) v4 结果/测量冻结不降级重跑，超大 outcome 只保原 receipt 与 coverage。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 Mem0 方案仍对未知写保 unknown；[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 仅纯准备/发布，[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Skill owner/摘要变动拒绝，[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) OAuth 不明交换 fail closed，两者皆依赖分支、非 main。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 原身份问答与候选协议恢复，2026-11-08
 
 main `a32684604a12`：[#16478](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16478.md) 的 root-first admit 与 drain 同序，[#16480](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16480.md) operation 租约缩 guard 不取消 owner/generation；[#16501](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16501.md) 搬绑定恢复但保原 seed/claim/renewal/deadline/停止证据。[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 等待问题可交还原 mount，回答/冷恢复重新 acquire 精确 LOCAL 身份；held/pending debt 不伪造 released，terminal 与真实 drain 分开。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md)/[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md)/[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md)/[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 均为当前 open diff：诊断恢复不清零覆盖缺口，记忆未知写不重试，测量 v4 不降级重跑，OAuth 不明交换需重新授权；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 的 merged 只指诊断功能分支。不能据分支测试定义宣称跨进程/MySQL/真实 provider 验收。

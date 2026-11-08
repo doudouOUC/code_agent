@@ -1,5 +1,11 @@
 # Managed 子任务执行与持久文件历史
 
+## 直接调用查询与候选活动子树，2026-11-09
+
+main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 direct-invocations 查询：SQL 先筛 child_agent 再分页，父 task 在子不可读时保留，child 链接需独立授权及 parentSessionId/parentChildRunId/depth 核验。不递归执行、不扩大现有一层执行权限。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged，父 [#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 的惰性活动子树是读已有谱系，不等于多层执行或 [#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 当前能力。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 一层 LOCAL 子问题，2026-11-08
 
 main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 已合入：definition/lineage 证实 publicChildAgentsVersion=1、depth=1、parent=root 的 shell/1 LOCAL child 可持久 ask_user_question，仍独占 batch。等待时尝试原 mount handback，让同 Workspace 其他工作可继续；回答前 acquire 原 Runtime 身份，未知保债务，cancel/expire 不编造答案。父页逐 Action 草稿/提交与子页定位不新建跨用户回答权限，不开放多层、MCP/Hook、Resident/CSI 或扩展 agent。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅合入诊断功能分支的惰性子树展示更深历史，不等于增加执行深度。

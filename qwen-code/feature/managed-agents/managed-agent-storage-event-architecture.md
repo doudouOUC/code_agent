@@ -1,5 +1,11 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 模型与活动投影仍待独立切片，2026-11-09
+
+main `7d99e7d26ee4`：[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭未合入；[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 主干只被动查既有资源/task 投影，不新增诊断 event/floor。[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 以原 usage/maintenance carrier 和 snapshotRevision 持久模型/context，[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 依赖它并以 assistant UUID+ordinal 的原 invocation、typed evidence 与贡献替换持久 activity。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍旧功能分支 merged；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 对超大外部 outcome 在 fence 内不取远端正文，记录 receipt_outcome_not_inline 并绑定原 receipt，测量匹配原引用而非重派发。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 源码复用与未合主干诊断投影，2026-11-08
 
 main `a32684604a12`：[#16485](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16485.md) 共享 key/摘要但保原 canonical bytes，[#16486](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16486.md) 共用 statement/专用 mapper，不改资源/journal/head 原子性。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 沿 main/hook/maintenance carrier 提交有界统计/上下文，以 snapshotRevision 防回退；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) activity evidence 与 SQL 投影只在该功能分支合并，原 assistant 出现身份/intent/receipt 关联和贡献替换不成为第二执行 authority。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 在同投影接 tool.measured，先持久冻结测量再交付/ACK，不授权重派发。不把三个候选 reader floor 3/4/5 写成 main 存储事实。

@@ -1,5 +1,11 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 个人记忆改用 Mem0，OAuth 独立切片，2026-11-09
+
+main `7d99e7d26ee4`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 已替换为 Mem0MemoryProvider：tenant+actor Store、不可变 memory_store_id/owner_only、SQL 归属/墓碑/receipt 与短事务 fencing 保留。Token 鉴权、v2 search user_id filter、v1 infer=false add，get/delete 核原 scope/完整内容，写后回读，不完整/异步 ADD 或结果丢失保 unknown 不盲重试；5 秒/64 KiB HTTP 有界。最新 head 召回 query 去 Shell 续行并拒绝 MYSQL_PWD、curl user、redis-cli -a/--pass 等凭据形式，命中不发召回，但不是任意秘密检测。默认关闭、真实用户输入有界召回不可信参考，不是自动抽取/team memory。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 已不含 OAuth；个人 HTTP 授权在依赖它的 [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff，禁 unattended 隐式委托，不改变既有 automation 默认值。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 个人 Holo 记忆候选，2026-11-08
 
 main `a32684604a12`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff：认证 tenant+actor 一个个人 Store，显式 Session memory_store_id、不可变 owner_only 绑定，省略关闭，部署 memory.enabled 默认 false。SQL 管归属/墓碑/receipt，Holo 保存正文；writer/generation 在短事务核验，外部 I/O 在事务外，unknown 写不自动重试。真实用户输入召回有界不可信上下文，四个 context_* 工具只按显式要求保存/删除，infer=false，子上下文可私有但不自动继承 Store，Workspace 文件仍共享。不是全量自动抽取/Dream/team memory；需要真实 Holo/隐私/恢复验收。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 的个人 MCP OAuth 是另一种 grant，不隐式委托给 child/channel/automation，不能用此候选改变 [#16448](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16448.md) 已合入的宿主 automation 默认值。

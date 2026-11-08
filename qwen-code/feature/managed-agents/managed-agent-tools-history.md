@@ -1,5 +1,11 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
+## 活动切片与执行方测量保持分层，2026-11-09
+
+main `7d99e7d26ee4`：[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged；新 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 依赖 [#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)，将 invocation 请求/准入/执行/交付分开，只有原生显式文件/Skill 加载事实，不推断 Shell/MCP 内部行为。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 仍基于旧诊断分支，Tool v4 单调耗时/原生累计行数、冻结结果/ACK 和 tool.measured 不因拆分已进入 main；非 Git 净 diff、默认关闭、未知不重跑。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 合格子问题与分支执行测量，2026-11-08
 
 main `a32684604a12`：[#16484](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16484.md) 在原根 Session 外只允许 definition/lineage 合格的 depth 1 LOCAL shell child 提问，MCP/Hook/Resident/CSI/memberPlan 与扩展 agent 不泛化，仍独占 batch/人类决定。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 虽 merged 但只在诊断功能分支：按 assistant UUID+调用 ordinal 计请求，准入/执行/交付分开，原生显式文件和 Skill 指令加载不推断 Shell/MCP 内部行为或后续模型消费。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 当前 open diff 已含该活动切片。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 用冻结 v4 结果/测量、tool.measured 和 floor 5 接同 activity；耗时排除等待，累计行数非 Git diff，CSI 不扩，默认 false 且非 main。

@@ -1,5 +1,11 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 纯包准备、Runtime Skill 与个人授权分开，2026-11-09
+
+main `7d99e7d26ee4`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 仅 archive/Skill/MCP 输入规范化、Hosted 纯 prepare/preview/inspection、原幂等发布/settings 和显式 idle apply；默认自助开关、operator/allowlist、原 package namespace/pin/config revision 不取消，不启动模型/MCP/脚本。[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 当前 open diff 依赖它，才增加原 owner/generation 可信根 Skill 扫描/双摘要快照、分块下载/显式导入，source_changed 拒绝且不回退 daemon/home。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 同样依赖它，才增加默认关闭的个人 HTTP OAuth、加密两表和 execution actor；PKCE/state/browser nonce、原 config/grant generation 与刷新/撤销 CAS 保隔离，child/automation 不隐式继承。两切片都不属于 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 diff 或 main。[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入的资源清单只读原配置/发现/最近失败，live unknown，不主动探测健康。
+
+本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
+
 ## 自助导入与个人 OAuth 当前方案，2026-11-08
 
 main `a32684604a12`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff，不能作为 main 能力承诺：operator+部署 allowlist 先检查，Java 将有界输入交认证 Hosted 纯准备/预览/inspection，再复用原精确包发布/settings/config_install；预览不创建 revision、不启 Runtime/模型/MCP/脚本。Runtime Skill 显式快照核原 owner/generation，拒绝变化/越界；apply 仍需 idle/expectedConfigRevision，其他 Session 不随包更新。独立 MCP 表单秘密只引用声明 settings，Workspace 服务凭据与个人 HTTP OAuth 分开。个人 grant/attempt 加密持久、PKCE/state/browser nonce/actor、refresh/revoke generation CAS 与原 executionActor 约束，默认关闭并要求已证明隔离 profile/provider；同 UID 不自动隔离，撤销不能瞬间收回已交付 token。不搬 daemon 凭据，不重跑结果不明的 MCP 调用。
