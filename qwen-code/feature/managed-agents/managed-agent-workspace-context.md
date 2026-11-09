@@ -1,8 +1,14 @@
 # Managed Agent Workspace 与 Session cwd 契约
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 自助包准备与 [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Runtime Skill 导入均已合入 main。Skill 只扫描原授权根 .qwen/skills、.agents/skills，逐响应校验 owner、双摘要和分块下载；source_changed 拒绝，不回退 daemon/home，发布不自动 apply，不变更 Workspace authority。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## Runtime Skill 改为独立分支观察，2026-11-09
 
-main `7d99e7d26ee4`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 已不含 Runtime Skill；[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 当前 open diff 依赖它，在原 Session/binding owner/generation 和授权可信根内扫描 .qwen/skills、.agents/skills，拒绝链接/越界并过滤私密文件，复制前后身份和摘要不符 source_changed；分块下载另核 archive SHA-256、owner/offset/长度。显式导入复用原发布，不自动 apply，不回退 daemon/home/其他 Workspace，不是 watcher 或文件系统事务。
+main `9da77be628da`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 已不含 Runtime Skill；[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 当前 open diff 依赖它，在原 Session/binding owner/generation 和授权可信根内扫描 .qwen/skills、.agents/skills，拒绝链接/越界并过滤私密文件，复制前后身份和摘要不符 source_changed；分块下载另核 archive SHA-256、owner/offset/长度。显式导入复用原发布，不自动 apply，不回退 daemon/home/其他 Workspace，不是 watcher 或文件系统事务。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

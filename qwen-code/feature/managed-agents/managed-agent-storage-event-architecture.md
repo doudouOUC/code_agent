@@ -1,8 +1,14 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。原资源、DOMAIN 投影和 fenced writer 有界恢复保持，query 不重放。main floor 4 不等于候选 Tool v4/floor 5，也不把分支合入或静态断言当作平台兼容验收。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 模型与活动投影仍待独立切片，2026-11-09
 
-main `7d99e7d26ee4`：[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭未合入；[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 主干只被动查既有资源/task 投影，不新增诊断 event/floor。[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 以原 usage/maintenance carrier 和 snapshotRevision 持久模型/context，[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 依赖它并以 assistant UUID+ordinal 的原 invocation、typed evidence 与贡献替换持久 activity。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍旧功能分支 merged；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 对超大外部 outcome 在 fence 内不取远端正文，记录 receipt_outcome_not_inline 并绑定原 receipt，测量匹配原引用而非重派发。
+main `9da77be628da`：[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭未合入；[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 主干只被动查既有资源/task 投影，不新增诊断 event/floor。[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 以原 usage/maintenance carrier 和 snapshotRevision 持久模型/context，[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 依赖它并以 assistant UUID+ordinal 的原 invocation、typed evidence 与贡献替换持久 activity。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍旧功能分支 merged；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 对超大外部 outcome 在 fence 内不取远端正文，记录 receipt_outcome_not_inline 并绑定原 receipt，测量匹配原引用而非重派发。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

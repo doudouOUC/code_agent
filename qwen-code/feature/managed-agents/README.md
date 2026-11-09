@@ -1,8 +1,22 @@
 # Qwen Code Managed Agents 双链路方案
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。
+
+[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) archive/MCP 纯 prepare/preview、幂等发布和显式 apply 已合入；[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Runtime Skill 扫描/快照/导入也已独立合入 main，source_changed 拒绝，不自动 apply。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 个人 OAuth 已改目标 main、head 未变，仍 open；其旧基底重叠 diff 不能当净新增，候选 OAuth schema 尚未整合主干 Mem0 表。
+
+[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。主干唯一 V1 当前为 40 表。
+
+[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 已合入：独立 Managed Web 浏览器 token 取消 32 字节下限，仍先选参数/环境后 trim 并拒绝空白，签名密钥至少 32 个 UTF-8 字节，且不能与浏览器 token 共用。bearerAuth、原 Host/Origin 和签名代理不变，短 token 不代表安全部署。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 诊断与安装拆分的当前边界，2026-11-09
 
-main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入仅 resources/直接 agent-trace；[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) broad 方案关闭未合入，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型统计/context 与依赖它的 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 均为当前 open diff。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅功能分支 merged；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) Tool v4 测量仍 open，原 base 未改新切片。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 是 Mem0 个人记忆，非 Holo。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄 archive/MCP 自助准备，原 Runtime Skill [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md)、个人 HTTP OAuth [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 均为依赖本分支的当前 open diff。
+main `9da77be628da`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入仅 resources/直接 agent-trace；[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) broad 方案关闭未合入，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型统计/context 与依赖它的 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 均为当前 open diff。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅功能分支 merged；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) Tool v4 测量仍 open，原 base 未改新切片。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 是 Mem0 个人记忆，非 Holo。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄 archive/MCP 自助准备，原 Runtime Skill [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md)、个人 HTTP OAuth [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 均为依赖本分支的当前 open diff。
+
+周更补充：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 head 补 MCP 地址/settings 及编辑 timeout、canApply 元数据和能力回退；[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 head 对齐正数/null contextWindowSize 与共享契约 fixture。两项仍 open，无新主干能力承诺。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

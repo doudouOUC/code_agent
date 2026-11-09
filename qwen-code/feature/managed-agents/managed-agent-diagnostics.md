@@ -1,8 +1,16 @@
 # Managed 持久诊断与执行测量
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。 main 已有 context/statistics/resources/agents 视图及 activity/惰性授权子树；contextWindowSize 必有、正数或 null，共享拒绝 fixture 已落地。查询仍被动授权，不 warm；模型、活动和 Tool v4 测量不是同一能力。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 资源与直接调用进入主干，2026-11-09
 
-main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 main：resources/agent-trace、Java SDK、生成类型和 WebShell resources/agents 页签。短只读 RR、原 actor 授权、private/no-store；配置/发现/最新尝试/实时未知分开，扫描及响应有预算，partial 不伪造完整。direct-invocations 在 SQL 分页前筛 child_agent，子链接需独立授权和谱系匹配，不递归执行。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才持久模型/context（floor 3），[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 依赖它并持久 activity（floor 4）；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅合入旧功能分支，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) floor 5/Tool v4 当前 open diff 尚未改 base。以下旧章节为关闭前方案与分支技术历史，不代表 main。
+main `9da77be628da`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 main：resources/agent-trace、Java SDK、生成类型和 WebShell resources/agents 页签。短只读 RR、原 actor 授权、private/no-store；配置/发现/最新尝试/实时未知分开，扫描及响应有预算，partial 不伪造完整。direct-invocations 在 SQL 分页前筛 child_agent，子链接需独立授权和谱系匹配，不递归执行。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才持久模型/context（floor 3），[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 依赖它并持久 activity（floor 4）；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅合入旧功能分支，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) floor 5/Tool v4 当前 open diff 尚未改 base。以下旧章节为关闭前方案与分支技术历史，不代表 main。
+
+周更补充：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 diff 的 contextWindowSize 必有、允许 null，非 null 限 1..MAX_SAFE；不能以零代表未知。Java validator/候选 OpenAPI 与共享 producer fixture 对齐，新增 zero-context-window、duplicate-coverage-gap 拒绝样本；这里只检查测试定义，未执行跨语言产品测试。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

@@ -1,8 +1,14 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 自助安装已合入；[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 仍为目标 main 的 open OAuth 候选，默认关闭且不支持 unattended/child 隐式委托。召回凭据模式过滤不是任意秘密检测，外部 Mem0 与定时任务均未由本次验收。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 个人记忆改用 Mem0，OAuth 独立切片，2026-11-09
 
-main `7d99e7d26ee4`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 已替换为 Mem0MemoryProvider：tenant+actor Store、不可变 memory_store_id/owner_only、SQL 归属/墓碑/receipt 与短事务 fencing 保留。Token 鉴权、v2 search user_id filter、v1 infer=false add，get/delete 核原 scope/完整内容，写后回读，不完整/异步 ADD 或结果丢失保 unknown 不盲重试；5 秒/64 KiB HTTP 有界。最新 head 召回 query 去 Shell 续行并拒绝 MYSQL_PWD、curl user、redis-cli -a/--pass 等凭据形式，命中不发召回，但不是任意秘密检测。默认关闭、真实用户输入有界召回不可信参考，不是自动抽取/team memory。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 已不含 OAuth；个人 HTTP 授权在依赖它的 [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff，禁 unattended 隐式委托，不改变既有 automation 默认值。
+main `9da77be628da`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 已替换为 Mem0MemoryProvider：tenant+actor Store、不可变 memory_store_id/owner_only、SQL 归属/墓碑/receipt 与短事务 fencing 保留。Token 鉴权、v2 search user_id filter、v1 infer=false add，get/delete 核原 scope/完整内容，写后回读，不完整/异步 ADD 或结果丢失保 unknown 不盲重试；5 秒/64 KiB HTTP 有界。最新 head 召回 query 去 Shell 续行并拒绝 MYSQL_PWD、curl user、redis-cli -a/--pass 等凭据形式，命中不发召回，但不是任意秘密检测。默认关闭、真实用户输入有界召回不可信参考，不是自动抽取/team memory。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 已不含 OAuth；个人 HTTP 授权在依赖它的 [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff，禁 unattended 隐式委托，不改变既有 automation 默认值。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

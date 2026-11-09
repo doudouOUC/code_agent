@@ -1,8 +1,20 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。
+
+[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) archive/MCP 纯 prepare/preview、幂等发布和显式 apply 已合入；[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Runtime Skill 扫描/快照/导入也已独立合入 main，source_changed 拒绝，不自动 apply。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 个人 OAuth 已改目标 main、head 未变，仍 open；其旧基底重叠 diff 不能当净新增，候选 OAuth schema 尚未整合主干 Mem0 表。
+
+[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。主干 V1 当前 40 表，不提供旧 catalog 升级链。
+
+[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 已合入：独立 Managed Web 浏览器 token 取消 32 字节下限，仍先选参数/环境后 trim 并拒绝空白，签名密钥至少 32 个 UTF-8 字节，且不能与浏览器 token 共用。bearerAuth、原 Host/Origin 和签名代理不变，短 token 不代表安全部署。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 查询不恢复执行，分支恢复不混主干，2026-11-09
 
-main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 主干 resources/直接 agent-trace 只读授权，不 attach/warm/恢复 Runtime。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 关闭后，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)/[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 的模型 gap/单调快照与 fenced-writer 活动重建仍为当前 open diff；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅旧功能分支 merged，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) v4 结果/测量冻结不降级重跑，超大 outcome 只保原 receipt 与 coverage。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 Mem0 方案仍对未知写保 unknown；[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 仅纯准备/发布，[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Skill owner/摘要变动拒绝，[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) OAuth 不明交换 fail closed，两者皆依赖分支、非 main。
+main `9da77be628da`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 主干 resources/直接 agent-trace 只读授权，不 attach/warm/恢复 Runtime。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 关闭后，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)/[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 的模型 gap/单调快照与 fenced-writer 活动重建仍为当前 open diff；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅旧功能分支 merged，[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) v4 结果/测量冻结不降级重跑，超大 outcome 只保原 receipt 与 coverage。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 Mem0 方案仍对未知写保 unknown；[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 仅纯准备/发布，[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Skill owner/摘要变动拒绝，[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) OAuth 不明交换 fail closed，两者皆依赖分支、非 main。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

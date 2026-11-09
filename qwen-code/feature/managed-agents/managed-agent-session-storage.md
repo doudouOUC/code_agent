@@ -1,8 +1,16 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)/[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 已将模型/context 和 activity 沿原 journal 原子投影落入 main，reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 目标改最新 main，Tool v4/floor 5 仍 open。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。主干唯一 V1 当前为 40 表，需重建旧 catalog。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 自助安装已合入，[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) OAuth 仍 open：其旧基底候选 40 表由旧 38 表加 OAuth 两表组成，不含 main 的 Mem0 两表；数量相同不代表 schema 相同。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 只读资源落地与候选持久状态分层，2026-11-09
 
-main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入被动资源/直接 agent-trace，不新增表/reader floor。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 关闭未合入，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才将模型/context v2 原子提交并推进 reader 3，[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 依赖其活动 evidence 推进 4，旧 [#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅功能分支 merged、[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前测量方案 floor 5 不变。这些不是 DDL migration。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 的个人 Store/owner_only 已用 Mem0；[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄无 OAuth DDL，原两张 OAuth 表和 Session execution actor/config revision 在 [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff。main 仍唯一 V1/38 业务表，无旧库升级证明。
+main `9da77be628da`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入被动资源/直接 agent-trace，不新增表/reader floor。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 关闭未合入，[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才将模型/context v2 原子提交并推进 reader 3，[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 依赖其活动 evidence 推进 4，旧 [#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仅功能分支 merged、[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前测量方案 floor 5 不变。这些不是 DDL migration。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 open diff 的个人 Store/owner_only 已用 Mem0；[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄无 OAuth DDL，原两张 OAuth 表和 Session execution actor/config revision 在 [#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 当前 open diff。main 仍唯一 V1/38 业务表，无旧库升级证明。
+
+周更补充：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 diff 明确 contextWindowSize 为正数或 null，Java/候选 OpenAPI 和共享拒绝 fixture 对齐；原 floor 3、原子投影与 gap 保留，未增加 DDL 或把候选数据当作 main。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

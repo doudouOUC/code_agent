@@ -1,8 +1,14 @@
 # Managed 子任务执行与持久文件历史
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 直接 agent-trace 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity/惰性授权子树均已合入 main，仍须逐 child 独立授权/谱系检查，不递归执行。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只在旧功能分支 merged，不单独作为 main 合入证明。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 直接调用查询与候选活动子树，2026-11-09
 
-main `7d99e7d26ee4`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 direct-invocations 查询：SQL 先筛 child_agent 再分页，父 task 在子不可读时保留，child 链接需独立授权及 parentSessionId/parentChildRunId/depth 核验。不递归执行、不扩大现有一层执行权限。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged，父 [#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 的惰性活动子树是读已有谱系，不等于多层执行或 [#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 当前能力。
+main `9da77be628da`：[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 direct-invocations 查询：SQL 先筛 child_agent 再分页，父 task 在子不可读时保留，child 链接需独立授权及 parentSessionId/parentChildRunId/depth 核验。不递归执行、不扩大现有一层执行权限。[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged，父 [#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭；[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 的惰性活动子树是读已有谱系，不等于多层执行或 [#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 当前能力。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

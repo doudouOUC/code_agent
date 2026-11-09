@@ -1,8 +1,14 @@
 # Managed Agent：完整工具、内容资源与会话历史
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。显式文件和 Skill 加载事实已落地，不审计 Shell/MCP 内部 I/O，不推断模型消费；交付失败仍不覆盖执行结果，精确执行方耗时和增删行仍候选。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 活动切片与执行方测量保持分层，2026-11-09
 
-main `7d99e7d26ee4`：[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged；新 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 依赖 [#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)，将 invocation 请求/准入/执行/交付分开，只有原生显式文件/Skill 加载事实，不推断 Shell/MCP 内部行为。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 仍基于旧诊断分支，Tool v4 单调耗时/原生累计行数、冻结结果/ACK 和 tool.measured 不因拆分已进入 main；非 Git 净 diff、默认关闭、未知不重跑。
+main `9da77be628da`：[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged；新 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 当前 open diff 依赖 [#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)，将 invocation 请求/准入/执行/交付分开，只有原生显式文件/Skill 加载事实，不推断 Shell/MCP 内部行为。[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 当前 open diff 仍基于旧诊断分支，Tool v4 单调耗时/原生累计行数、冻结结果/ACK 和 tool.measured 不因拆分已进入 main；非 Git 净 diff、默认关闭、未知不重跑。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

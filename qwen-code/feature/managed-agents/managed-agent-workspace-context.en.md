@@ -1,8 +1,14 @@
 # Managed Agent Workspace and Session cwd Contract
 
+## Main status and original Runtime import, 2026-11-10
+
+main `e5eb6a177560`: [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) package preparation and [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) original-Runtime Skill import have both landed on main. Scanning stays within the original authorized .qwen/skills and .agents/skills roots; owner checks, source digests and bounded chunk downloads remain mandatory. source_changed refuses the import without falling back to daemon/home. Publishing does not automatically apply a package or change Workspace authority.
+
+Only source and documentation were inspected. No product, CI, database, Hosted, browser or real-provider tests were run. Dated sections below are historical snapshots; this section supersedes their old statuses.
+
 ## Runtime Skill import is a separate candidate, 2026-11-09
 
-main `7d99e7d26ee4`: [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) is now limited to archive/MCP preparation and installation. [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) is a current open diff on that branch, not main: it checks the original Session/binding owner and generation, scans authorized .qwen/skills and .agents/skills roots, rejects links and out-of-root sources, filters private files, and refuses source_changed when identity or content changes around copying. Chunked download rechecks owner, offset, length and archive SHA-256. Import reuses explicit publication, does not auto-apply and never falls back to a daemon/home or another workspace. This is not a watcher or a filesystem transaction.
+main `9da77be628da`: [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) is now limited to archive/MCP preparation and installation. [#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) is a current open diff on that branch, not main: it checks the original Session/binding owner and generation, scans authorized .qwen/skills and .agents/skills roots, rejects links and out-of-root sources, filters private files, and refuses source_changed when identity or content changes around copying. Chunked download rechecks owner, offset, length and archive SHA-256. Import reuses explicit publication, does not auto-apply and never falls back to a daemon/home or another workspace. This is not a watcher or a filesystem transaction.
 
 Source/documentation checks only; no product, CI, MySQL, Hosted, browser or provider tests ran. Earlier dated sections below are historical and superseded where this update differs.
 

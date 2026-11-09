@@ -50,20 +50,20 @@
 | [#16484](https://github.com/QwenLM/qwen-code/pull/16484) | ✅ merged | feat(managed-agent): support concurrent child questions | [pr-16484.md](pr-16484.md) |
 | [#16485](https://github.com/QwenLM/qwen-code/pull/16485) | ✅ merged | refactor(managed-agent): consolidate storage alias keys and use DigestUtils | [pr-16485.md](pr-16485.md) |
 | [#16486](https://github.com/QwenLM/qwen-code/pull/16486) | ✅ merged | refactor(managed-agent): share JDBC statement helper and reuse JSON mappers | [pr-16486.md](pr-16486.md) |
-| [#16488](https://github.com/QwenLM/qwen-code/pull/16488) | 🟡 open | feat(managed-agent): add opt-in personal memory backed by Mem0 | [pr-16488.md](pr-16488.md) |
+| [#16488](https://github.com/QwenLM/qwen-code/pull/16488) | ✅ merged | feat(managed-agent): add opt-in personal memory backed by Mem0 | [pr-16488.md](pr-16488.md) |
 | [#16498](https://github.com/QwenLM/qwen-code/pull/16498) | 🟡 open | feat(managed-agent): add Tool v4 execution measurements | [pr-16498.md](pr-16498.md) |
 | [#16499](https://github.com/QwenLM/qwen-code/pull/16499) | ✅ merged | feat(managed-agent): add persisted execution diagnostics | [pr-16499.md](pr-16499.md) |
-| [#16500](https://github.com/QwenLM/qwen-code/pull/16500) | 🟡 open | feat(managed-agent): add archive and MCP self-service installation | [pr-16500.md](pr-16500.md) |
+| [#16500](https://github.com/QwenLM/qwen-code/pull/16500) | ✅ merged | feat(managed-agent): add archive and MCP self-service installation | [pr-16500.md](pr-16500.md) |
 | [#16501](https://github.com/QwenLM/qwen-code/pull/16501) | ✅ merged | refactor(runtime-broker): extract binding provisioning from RuntimeBrokerService | [pr-16501.md](pr-16501.md) |
 | [#16503](https://github.com/QwenLM/qwen-code/pull/16503) | ✅ merged | refactor(managed-agent): fold the last CSI statement helper copies | [pr-16503.md](pr-16503.md) |
 | [#16504](https://github.com/QwenLM/qwen-code/pull/16504) | ✅ merged | refactor(runtime): import inline fully qualified names in runtime modules | [pr-16504.md](pr-16504.md) |
 | [#16533](https://github.com/QwenLM/qwen-code/pull/16533) | ✅ merged | refactor(adapters): import inline fully qualified names in adapters | [pr-16533.md](pr-16533.md) |
 | [#16534](https://github.com/QwenLM/qwen-code/pull/16534) | ✅ merged | refactor(contracts): import inline fully qualified names in contracts | [pr-16534.md](pr-16534.md) |
 | [#16535](https://github.com/QwenLM/qwen-code/pull/16535) | ✅ merged | refactor(runtime-broker): import inline fully qualified names | [pr-16535.md](pr-16535.md) |
-| [#16638](https://github.com/QwenLM/qwen-code/pull/16638) | 🟡 open | feat(managed-agent): import Skills from the original Runtime | [pr-16638.md](pr-16638.md) |
+| [#16638](https://github.com/QwenLM/qwen-code/pull/16638) | ✅ merged | feat(managed-agent): import Skills from the original Runtime | [pr-16638.md](pr-16638.md) |
 | [#16640](https://github.com/QwenLM/qwen-code/pull/16640) | ✅ merged | feat(managed-agent): add Session resource and agent-trace diagnostics | [pr-16640.md](pr-16640.md) |
-| [#16641](https://github.com/QwenLM/qwen-code/pull/16641) | 🟡 open | feat(managed-agent): persist Session model statistics and request context | [pr-16641.md](pr-16641.md) |
-| [#16642](https://github.com/QwenLM/qwen-code/pull/16642) | 🟡 open | feat(managed-agent): persist Session execution diagnostics | [pr-16642.md](pr-16642.md) |
+| [#16641](https://github.com/QwenLM/qwen-code/pull/16641) | ✅ merged | feat(managed-agent): persist Session model statistics and request context | [pr-16641.md](pr-16641.md) |
+| [#16642](https://github.com/QwenLM/qwen-code/pull/16642) | ✅ merged | feat(managed-agent): persist Session execution diagnostics | [pr-16642.md](pr-16642.md) |
 | [#16647](https://github.com/QwenLM/qwen-code/pull/16647) | 🟡 open | feat(managed-agent): add personal HTTP MCP authorization | [pr-16647.md](pr-16647.md) |
 
-_按个人 PR 口径更新于 2026-11-09；#16499 merged 仅指旧诊断功能分支，并非 main；#16475 closed 未合入。_
+_按个人 PR 口径完成 W45 周更及发布前复核于 2026-11-10；#16499 merged 仅指旧诊断功能分支，并非 main；#16475 closed 未合入。_

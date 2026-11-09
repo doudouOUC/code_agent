@@ -1,8 +1,20 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16640](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) resources/agent-trace、[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context、[#16642](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 的 API/生成类型已合入 main，reader floor 4；[#16499](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged，[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭。
+
+[#16500](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) archive/MCP 纯 prepare/preview、幂等发布和显式 apply 已合入；[#16638](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Runtime Skill 扫描/快照/导入也已独立合入 main，source_changed 拒绝，不自动 apply。[#16647](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 个人 OAuth 已改目标 main、head 未变，仍 open；其旧基底重叠 diff 不能当净新增，候选 OAuth schema 尚未整合主干 Mem0 表。
+
+[#16488](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。主干唯一 V1 当前 40 表；Java SDK/生成契约落地不等于发行与真实 provider 验收。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 已合入资源查询与分支 DTO 分开，2026-11-09
 
-main `7d99e7d26ee4`：[#16640](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 Java SDK resources/agent-trace 与生成契约，服务端原 tenant/actor/Session 授权不因 DTO 省略。[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才接模型/context；[#16488](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 Mem0 方案仍未合入。[#16500](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄为包 preparation/inspection/publish/apply，Runtime Skill [#16638](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 和个人 OAuth [#16647](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 为其上的当前 open diff；精确 owner/generation、包 pin/config revision 和 actor/credential generation 不因透传放宽。不承诺其他公共 SDK 或真实部署验收。
+main `9da77be628da`：[#16640](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入 Java SDK resources/agent-trace 与生成契约，服务端原 tenant/actor/Session 授权不因 DTO 省略。[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前 open diff 才接模型/context；[#16488](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 当前 Mem0 方案仍未合入。[#16500](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 收窄为包 preparation/inspection/publish/apply，Runtime Skill [#16638](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 和个人 OAuth [#16647](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 为其上的当前 open diff；精确 owner/generation、包 pin/config revision 和 actor/credential generation 不因透传放宽。不承诺其他公共 SDK 或真实部署验收。
+
+周更补充：[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 当前候选 OpenAPI 将非 null contextWindowSize 最小值对齐为 1，未知仍 null；共享 fixture 覆盖零窗口与重复 coverage gap 拒绝，不把 API schema 改动误作部署证据。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 

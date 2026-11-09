@@ -1,8 +1,16 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 发布前主干与候选边界，2026-11-10
+
+main `e5eb6a177560`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) archive/MCP 纯 prepare/preview、幂等发布和显式 apply 已合入；[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Runtime Skill 扫描/快照/导入也已独立合入 main，source_changed 拒绝，不自动 apply。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 个人 OAuth 已改目标 main、head 未变，仍 open；其旧基底重叠 diff 不能当净新增，候选 OAuth schema 尚未整合主干 Mem0 表。[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 的资源清单仍只做被动观察。最终 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 还拒绝非字符串 recipe type；无 Workspace 的指定 operation 查询返回 missing，静态 Skill 刷新失败保旧清单并报错，复合包无法编辑时恢复独立 MCP 控件。
+
+本次仅核源码、diff 与测试定义，未运行产品、CI、数据库、Hosted、浏览器或真实 provider 测试。下方带日期内容保留历史，旧 open/基底/表数状态以上述最新复核为准；合入不等于部署或平台验收。
+
 ## 纯包准备、Runtime Skill 与个人授权分开，2026-11-09
 
-main `7d99e7d26ee4`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 仅 archive/Skill/MCP 输入规范化、Hosted 纯 prepare/preview/inspection、原幂等发布/settings 和显式 idle apply；默认自助开关、operator/allowlist、原 package namespace/pin/config revision 不取消，不启动模型/MCP/脚本。[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 当前 open diff 依赖它，才增加原 owner/generation 可信根 Skill 扫描/双摘要快照、分块下载/显式导入，source_changed 拒绝且不回退 daemon/home。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 同样依赖它，才增加默认关闭的个人 HTTP OAuth、加密两表和 execution actor；PKCE/state/browser nonce、原 config/grant generation 与刷新/撤销 CAS 保隔离，child/automation 不隐式继承。两切片都不属于 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 diff 或 main。[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入的资源清单只读原配置/发现/最近失败，live unknown，不主动探测健康。
+main `9da77be628da`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 open diff 仅 archive/Skill/MCP 输入规范化、Hosted 纯 prepare/preview/inspection、原幂等发布/settings 和显式 idle apply；默认自助开关、operator/allowlist、原 package namespace/pin/config revision 不取消，不启动模型/MCP/脚本。[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 当前 open diff 依赖它，才增加原 owner/generation 可信根 Skill 扫描/双摘要快照、分块下载/显式导入，source_changed 拒绝且不回退 daemon/home。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 同样依赖它，才增加默认关闭的个人 HTTP OAuth、加密两表和 execution actor；PKCE/state/browser nonce、原 config/grant generation 与刷新/撤销 CAS 保隔离，child/automation 不隐式继承。两切片都不属于 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 diff 或 main。[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 已合入的资源清单只读原配置/发现/最近失败，live unknown，不主动探测健康。
+
+周更补充：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 当前 diff 对 MCP 地址只接受已声明完整 settings 占位符，并用安全替代值复核 recipe 地址；编辑/再发布保留可选 timeout（安全整数 1–600000）。canApply 元数据与原 SHELL/MCP/FILES/READ 入口对齐，保 ACTIVE、非 child、idle，FILES_V3 不泛化。包安装/编辑需权限及 import/preview/lookup/inspect 能力；不能开编辑器时保留独立 MCP 管理控件，发布/激活仍不同于在线。
 
 本次只核源码与文档，未运行产品、CI、MySQL、Hosted、浏览器或真实 provider 测试。下方旧日期段落保留历史，状态/基底/拆分范围以本节为准。
 
