@@ -1,5 +1,11 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## Harness capability 定义同源，2026-11-11
+
+main `74b8cde46612` 的 [#16763](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16763.md) 已合入包内 `HarnessFeature` enum；token 与审批基础依赖集中在 `in(advertised)`，单实例与池连接器共用。原 SessionStore 开关、public child 非池/lifecycle 检查仍在，单实例协商失败返回 false。它只消除重复定义，不新增执行授权，token 存在不替代 owner、attachment 和实际入口校验。
+
+锚点为 `packages/managed-agent-server/adapters/src/main/java/com/alibaba/qwen/code/managedagent/harness/HarnessFeature.java:in`、`HarnessPoolConnector` 与 `QwenHostedHarnessConnector`。验证需覆盖缺基础 token、协商失败和关闭 SessionStore；本次只核 diff/main/测试定义，未运行 Java 或真实 Harness。下方旧日期保留历史，本节仅更新该重构，不重新认定其他候选能力状态。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) archive/MCP 纯 prepare/preview、幂等发布和显式 apply 已合入；[#16638](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16638.md) 原 Runtime Skill 扫描/快照/导入也已独立合入 main，source_changed 拒绝，不自动 apply。[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 个人 OAuth 已改目标 main、head 未变，仍 open；其旧基底重叠 diff 不能当净新增，候选 OAuth schema 尚未整合主干 Mem0 表。[#16640](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) 的资源清单仍只做被动观察。最终 [#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 还拒绝非字符串 recipe type；无 Workspace 的指定 operation 查询返回 missing，静态 Skill 刷新失败保旧清单并报错，复合包无法编辑时恢复独立 MCP 控件。

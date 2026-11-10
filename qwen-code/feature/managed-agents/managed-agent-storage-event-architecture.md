@@ -1,5 +1,15 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 实现名称、路由同源与冷归档候选，2026-11-11
+
+main `74b8cde46612` 的 [#16759](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16759.md) 将 23 个 JDBC 实现与同名 repository 接口分离，现行 `JdbcManagedSessionStore`、`JdbcWorkspaceExecutionStore` 保原 SQL/锁/事务；`ToolPublicationArtifactReader` 为非 JDBC 适配器，verification 锁签名与 SQL owner 路径同步，不是取消约束。
+
+[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 已合入 `resolveManagedShellPublisherMode` 与 `resolveManagedRuntimeWorkerRoutePlan`：context mount 和外层 route gate 消费同源模式/plan，publication 计入 capture publisher；resident 不隐式造 remote publisher/install。boot v1 保 owned/provider，v2 按真实配置组合测量/扩展/CSI/SSH/result，路由可达仍不替代 attestation/owner/generation。[#16828](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16828.md) 已合入 Activation 字段复制（installRef 仍 deepCopy）、预编译单 matcher lookup、三 provisioner 200–2000 ms 退避，保原身份/deadline/中断，未测吞吐或 Ready 延迟。
+
+[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 当前 open diff，不能作为 main 能力承诺：不可变对象 SPI 的 identity/guard、有界读取与精确删除由 provider 兑现；SQL resource/operation/manifest 持权威，外部 IO 不持长事务，UNKNOWN 不盲 PUT。冷归档只选满足关闭、PUBLIC、SEALED/READY、activation released、至少 7 天/32 MiB 及无活读执行恢复的 Session，排除 CSI guard/recovery-protected；归档和驱逐分开，补热核 digest/链/revision/generation/epoch 后才恢复 HOT。主干 reader 5，候选 reader 6，均唯一 V1/42 表；冷存储不是备份或在线 migration。
+
+本次仅静态验证引用和代码事实，未运行产品、数据库、插件、CI 或平台故障测试；下方旧日期的表数/reader/实现路径保留历史，与本节重叠者以本节为准。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。原资源、DOMAIN 投影和 fenced writer 有界恢复保持，query 不重放。main floor 4 不等于候选 Tool v4/floor 5，也不把分支合入或静态断言当作平台兼容验收。

@@ -1,5 +1,15 @@
 # qwen-code feature 技术方案
 
+## 私有旁路查询与存储候选，2026-11-11
+
+main `74b8cde46612`：W46 累计 10 个本人 PR，8 merged / 2 open。[#16758](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 私有 BTW/Recap 已合入，账本按 actor 隔离、冻结主历史后无工具执行，不恢复主 Runtime；服务端与自动 Recap 默认关闭，见[客户端](managed-agents/managed-agent-client-surfaces.md)、[存储](managed-agents/managed-agent-session-storage.md)与 [SDK](sdk.md)。[#16723](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 非空短浏览器 token 保原签名/凭据隔离。
+
+[#16759](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16759.md) 将 23 个 JDBC 实现改 Jdbc 前缀，接口不改；[#16763](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16763.md) 统一 Harness token/依赖，见[配置与扩展](managed-agents/managed-agent-config-extensions.md)；[#16788](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) publisher mode 与 worker route plan 同源；[#16822](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16822.md) 仅清闲置构造器/helper；[#16827](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 已合入请求内读取复用；[#16828](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16828.md) 已合入 proof/lookup/启动退避优化，均不扩大原事务或授权。细节见[存储事件架构](managed-agents/managed-agent-storage-event-architecture.md)、[自动任务](managed-agents/managed-agent-automation.md)与[恢复运维](managed-agents/managed-agent-recovery-operations.md)。
+
+[#16826](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 当前 open diff 只登记错误码/异常原因和 stdout 线程修正，最新 head 已撤取消键回收；[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 当前 open diff 才有不可变对象 SPI、资源外置、冷归档与受保护补热，默认关闭，不能作为 main 能力承诺。主干唯一 V1 为 42 张业务表、reader 5；冷归档候选也是 42 表但 reader 6，不是升级链或兼容证明。
+
+本次只核静态代码、diff、文件与测试定义，未运行产品、CI、数据库、浏览器或平台验收。下方带日期内容保留历史；旧表数/reader 以及与本节重叠的状态以上述新快照为准，其他历史 PR 不因本次跨周纳入统计。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。

@@ -1,5 +1,15 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 私有账本与候选对象正文，2026-11-11
+
+main `74b8cde46612` 唯一 V1 当前为 **42 张业务表、reader 5**。[#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 只新增 `ma_side_query`，`SideQueryConversation` 复用 `ma_session_record` 的 CONVERSATION 投影，不另建 conversation 表。`ManagedSideQueryStore` 按 tenant/Session/actor 冻结 prefix revision/sequence/digest、完成边界、模型和私有历史，原 claim 绑定一次无工具生成，单调结果/资源引用不改变主 journal。
+
+[#16759](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16759.md) 已将 23 个 JDBC 实现改名，如 `JdbcManagedSessionStore`；接口/事务 facade、Session-before-Turn、资源/journal/head 原子提交与 reader 围栏保留，旁路新增类仍名 `ManagedSideQueryStore`。`ToolPublicationArtifactReader` 和 `ChildWorktreeOperations` 分清 adapter 与端口。默认 bean/logger 名会变，但不是 DDL/wire 变更。[#16822](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16822.md) 删除闲置 ApiModels 缩参构造器/转发，保 record 字段；仓外 Java 源码兼容不能从 wire 未改推断。
+
+[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 当前 open diff，不能作为 main 能力承诺：以 ImmutableObjectStore SPI/ServiceLoader 外置资源，SQL store_id/locator/digest/operation 仍权威；短事务 allocate、事务外一次 PUT/回读确认，UNKNOWN 沿原 locator 对账。journal manifest/epoch 支持 HOT→EVICTING→COLD 与 HYDRATING→验证 HOT，读/写/恢复须先 pinHot/ensureHot，不把缺失 bytes 当空历史。候选同为 42 表、reader 上限 5→6，修改唯一 V1 而非追加 migration；provider 未配置、新写/GC/归档/驱逐默认关闭。关闭新写也必须保现存对象 provider。
+
+本次静态核对源码和测试定义，未运行数据库、插件、产品或恢复验收；应单独验证 writer/reader 5/6、GC 与读 lease、archive/hydrate 中断和旧 catalog 处理。下方旧日期表数、reader 及已改名路径仅作历史，不据数量相同证明兼容。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md)/[#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) 已将模型/context 和 activity 沿原 journal 原子投影落入 main，reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 目标改最新 main，Tool v4/floor 5 仍 open。[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。主干唯一 V1 当前为 40 表，需重建旧 catalog。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 自助安装已合入，[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) OAuth 仍 open：其旧基底候选 40 表由旧 38 表加 OAuth 两表组成，不含 main 的 Mem0 两表；数量相同不代表 schema 相同。

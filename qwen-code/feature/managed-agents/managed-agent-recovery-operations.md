@@ -1,5 +1,15 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 旁路 claim、启动与冷归档边界，2026-11-11
+
+main `74b8cde46612` 的 [#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 私有 BTW/Recap 冻结原历史/模型后绑定 instance/boot/generation/token claim；准备完整输入后 running CAS，无工具且不恢复主 Runtime。原键确认、单调结果与 read lease 支持刷新/丢答，超时、取消、权限丢失和 Session 关闭均需拒绝迟到结果，未知不重派发。服务与自动 Recap 默认关闭，不把 UI 返回触发当后台任务。[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 短浏览器 token 的独立签名密钥/授权规则保持，不是安全部署证明。
+
+[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 已合入实际 publisher 与 route gate 同源，不改变 attestation；[#16827](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 已合入原 owner binding/occurrence/Git diff 的请求内复用，不建跨请求缓存；[#16828](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16828.md) 启动退避从 200 ms 到最多 2000 ms，保 deadline/资源身份/中断但可能延迟观察 Ready，proof 深复制边界不取消。
+
+[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 当前 open diff 共享错误体 code 提取、优先结构化 code、保 Skills/CSI 原 cause、缩窄 child relay 捕获并给 stdout 显式虚拟线程；最新 head 已撤终态取消键回收，不登记取消泄漏修复。[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 当前 open diff 才有对象资源/冷归档：原 locator 对账，不盲重 PUT，GC 核引用、read lease、retirement/recovery，默认删除宽限 24 小时；读/写/恢复先受保护补热、链验证后 HOT，不能把冷归档当数据库备份。provider 未配且新写/GC/归档/驱逐默认关闭，已有对象仍需原 provider。
+
+两项 open 都不能作为 main 能力承诺。主干 reader 5/V1 42 表，冷归档候选 reader 6；下方带日期表数/reader 保留历史，与本节重叠的状态以本节为准。本次仅核代码与测试定义，未运行产品、MySQL、Hosted、CSI/SSH/Kubernetes、真实模型/插件或故障资格；部署和性能结论须另取证。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。

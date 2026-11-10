@@ -1,5 +1,13 @@
 # Managed 普通客户端、交互与事件投影
 
+## 持久私有 BTW 与返回 Recap，2026-11-11
+
+main `74b8cde46612` 的 [#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 已合入 `/btw`、`/recap`、历史面板和取消。`use-managed-side-queries.ts` 按 provider/actor/Session 保存原 intent/queryId，刷新或提交丢答先确认原键，不另造模型请求。`ManagedSideQueryPanel.tsx` 展示独立结果；旁路问答不进入主历史，也不调用工具或启动主 Runtime。
+
+服务端 `sideQueriesEnabled` 与浏览器自动 Recap 均默认 false。自动模式只在离开至少 5 分钟后、前台交互且主任务 idle 时尝试，内容版本/主输入边界、已完成轮数和同内容去重共同约束；迟到结果还需展示门禁，不是后台定时生成。服务的 tenant/actor 授权、冻结前缀和 claim 失效拒绝不能由客户端本地标记替代。
+
+[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 已合入的非空短 token 保持原 bearerAuth/Host/Origin，签名密钥至少 32 个 UTF-8 字节且不能共用。验证应覆盖双 actor、刷新/丢答/取消、冷 Session、前台切换和 late result；本次仅核代码/测试定义，未运行浏览器、真实模型或产品测试。下方旧日期的 reader 4 已被当前 main reader 5 取代，其余不重叠历史保持。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。

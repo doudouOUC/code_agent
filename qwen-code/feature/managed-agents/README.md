@@ -1,5 +1,15 @@
 # Qwen Code Managed Agents 双链路方案
 
+## 私有旁路查询与存储候选，2026-11-11
+
+main `74b8cde46612`：[#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 已合入私有 BTW/Recap，tenant/Session/actor 账本、冻结前缀、原 claim 和无工具模型不污染主任务；服务与自动 Recap 默认关闭，见[客户端](managed-agent-client-surfaces.md)。[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 的短 token 仍拒空白/共用签名密钥，不代表部署安全。
+
+[#16759](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16759.md) 统一 Jdbc 实现名称、[#16822](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16822.md) 删除闲置构造器，未改 wire/事务，见[存储](managed-agent-session-storage.md)；[#16763](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16763.md) 统一 capability token/依赖，见[配置](managed-agent-config-extensions.md)；[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 同源 worker route/publisher 与 [#16828](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16828.md) proof/lookup/退避优化已合入，见[存储事件架构](managed-agent-storage-event-architecture.md)。[#16827](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 已合入请求内查询复用，见[自动任务](managed-agent-automation.md)。
+
+[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 错误码/异常原因修正与 [#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 对象存储/冷归档仍为当前 open diff，不能作为 main 能力承诺；前者已撤取消键回收，后者保持 SQL locator/manifest 权威、UNKNOWN 不盲写及恢复围栏。主干唯一 V1/42 表、reader 5，候选冷归档 reader 6，见[恢复运维](managed-agent-recovery-operations.md)。
+
+仅静态证据，未运行产品/CI/数据库/平台测试；下方旧日期内容保留历史，与本节重叠的状态、表数和 reader 以本节为准。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16641](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context 与 [#16642](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 已合入，main reader floor 4/CSI /3；[#16498](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16498.md) 已改目标最新 main，但 Tool v4/floor 5 仍 open。[#16475](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭，[#16499](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍只合入旧功能分支。

@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## Hosted 私有旁路查询契约，2026-11-11
+
+main `74b8cde46612` 的 [#16758](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 已同步 Java Hosted 客户端、OpenAPI 和生成类型的 side-query claim、输入/资源、进度/结果与取消接口。服务绑定原 instance/boot/generation/token、冻结模型/历史并校验输入；tenant/Session/actor 私有隔离及原幂等键不因 SDK 透传而省略。它是不启动主 Runtime、无工具的旁路模型查询，不是子任务执行接口，也不自动扩展其他语言 SDK 的公开能力。
+
+服务 sideQueriesEnabled 与浏览器自动 Recap 均默认关闭；当前 main reader 5、唯一 V1/42 表取代下方旧日期的 4/40 快照。应验证双 actor、原 claim/资源授权、取消/过期和序列化契约；本次仅核源码及测试定义，未运行 SDK、产品、CI、真实 Harness/模型或发行验证。合入不等于新 SDK 版本已发布。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16640](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16640.md) resources/agent-trace、[#16641](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16641.md) 模型/context、[#16642](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16642.md) activity 的 API/生成类型已合入 main，reader floor 4；[#16499](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16499.md) 仍仅旧功能分支 merged，[#16475](../weekly-report/2026-11-02_2026-11-08/implementations/pr-16475.md) 已关闭。

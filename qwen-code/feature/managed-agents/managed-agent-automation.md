@@ -1,5 +1,13 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 原 occurrence 复用与错误分类候选，2026-11-11
+
+main `74b8cde46612` 的 [#16827](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 已合入 `ManagedAutomationService.run` 一次读取 settled occurrence 并同时用于 skipped/reason，配合 `ChildWorktreeGit.apply` 和 `RuntimeBrokerService.releasedSession` 的本次事实复用，不增加跨请求缓存/快照保证，不改原代际或终态判定，收益尚未测量。
+
+[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 当前 open diff，不能作为 main 能力承诺：AutomationScanner 与 Channel 优先 `HarnessHttpFailure.getErrorCode()`，无值才由共享 `HarnessConflictCodes.bodyCode` 提取；ManagedAutomationService 对 lastError 使用同一提取器。正则容忍空白和完整 code 后截断，未取到仍用原 unknown/failed 分类，不重派发未知操作，也不是通用 JSON 解析器。最新 head 已撤取消键回收，不登记取消泄漏修复。
+
+本次只核源码/diff/测试定义，未运行自动任务、Channel、产品/CI 或性能测试。下方带日期内容保留历史，本节仅覆盖上述本周 PR。
+
 ## 发布前主干与候选边界，2026-11-10
 
 main `e5eb6a177560`：[#16488](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16488.md) 最终已合入 Mem0，合入提交标题虽保留 Holo，实际适配器为 Mem0；显式 memory_store_id、owner_only、原 receipt/unknown 与默认关闭保持，不隐式给 child/automation 继承。[#16500](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16500.md) 自助安装已合入；[#16647](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16647.md) 仍为目标 main 的 open OAuth 候选，默认关闭且不支持 unattended/child 隐式委托。召回凭据模式过滤不是任意秘密检测，外部 Mem0 与定时任务均未由本次验收。
