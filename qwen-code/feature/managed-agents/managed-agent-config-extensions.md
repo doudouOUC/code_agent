@@ -1,5 +1,13 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：[#16882](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16882.md) 已合入 ManagedExtensionSource 与 ExtensionArchiveStorage。业务 provider 用 tenant/actor/Workspace/deadline resolve/open 精确 revision，拒绝 latest；原 archiveId 不下发为地址/凭据。importSource 在 SQL 事务外授权、限时暂存、核 digest 后交 Harness prepare，再沿持久幂等 operation 发布 provenance/归档。
+
+list/get/settings/selection 重查来源权限；受理前冻结完整 selection，事务内只核 pin/package/有效期，不远调 provider。默认目录归档可由业务 bean 替换，下载改已验证临时文件 lease。需要多副本共享持久存储与 provider 授权/超时/不可变契约，不自动提供任何业务后端或允许自动 apply。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## Harness capability 定义同源，2026-11-11
 
 main `74b8cde46612` 的 [#16763](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16763.md) 已合入包内 `HarnessFeature` enum；token 与审批基础依赖集中在 `in(advertised)`，单实例与池连接器共用。原 SessionStore 开关、public child 非池/lifecycle 检查仍在，单实例协商失败返回 false。它只消除重复定义，不新增执行授权，token 存在不替代 owner、attachment 和实际入口校验。

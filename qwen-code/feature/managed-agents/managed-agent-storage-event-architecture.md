@@ -1,5 +1,13 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) 已将 Tool Publication 收敛为持久异步受理，不再有模式 header/config/SQL execution_mode；PENDING 202 不代表 receipt 已成功。[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已有原对象适配器上的资源外置/pack 及集中正文解析；pack 发布事务负责 catalog、manifest 和 head watermark，资源上传仍不能概括成全程事务外 IO。
+
+[#16922](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16922.md) 公共 RuntimeBrokerService 委托 BindingRenewal、RuntimeSessionRelease、RuntimeDrainCoordinator；RuntimeObservation.matchesRuntime 只比身份，READY attestation 仍独立。[#16936](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16936.md) 已合入 RuntimeAdmissionFences，保调用者 Connection/事务和锁；[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) 当前 open diff 才删除 InMemory 三实现并迁 JDBC/H2 fixture，后者不能作为 main 能力承诺。[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用 SPI/冷归档同样仍 open，不等于主干 pack。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## 实现名称、路由同源与冷归档候选，2026-11-11
 
 main `74b8cde46612` 的 [#16759](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16759.md) 将 23 个 JDBC 实现与同名 repository 接口分离，现行 `JdbcManagedSessionStore`、`JdbcWorkspaceExecutionStore` 保原 SQL/锁/事务；`ToolPublicationArtifactReader` 为非 JDBC 适配器，verification 锁签名与 SQL owner 路径同步，不是取消约束。

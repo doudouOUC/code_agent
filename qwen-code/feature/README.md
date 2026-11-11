@@ -1,5 +1,15 @@
 # qwen-code feature 技术方案
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：本周累计 20 个本人 PR，18 merged / 2 open。[#16840](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) publication 统一异步受理；[#16868](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已落地超限资源 OSS 外置和 journal pack，复用原 ToolPublicationObjectStore，默认关闭。[#16882](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16882.md) 已落地业务扩展来源与不可变归档 SPI。
+
+[#16910](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16910.md) 退役证据改原 Session 范围并删除全库 inventory；[#16923](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16923.md)/[#16934](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16934.md) 修证据正文/公共 proof 的真实 base64 上限；[#16928](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16928.md) 删除无调用 catalog/READY helper。[#16922](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16922.md) 已拆 Broker 续租、release 与 drain；[#16826](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 错误解析、存储 Skill 冲突词汇与 cause/stdout 修正已合入，不含取消键回收。
+
+[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用对象 SPI/冷归档仍旧基底 open，不等于主干 OSS pack；[#16936](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16936.md) fence 引擎提取已合入；[#16953](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) InMemory repository 退役也仅当前 open diff，不能作为 main 能力承诺。主干唯一 V1/44 表、reader 5；候选表数/reader 不能证明兼容。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## 私有旁路查询与存储候选，2026-11-11
 
 main `74b8cde46612`：W46 累计 10 个本人 PR，8 merged / 2 open。[#16758](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 私有 BTW/Recap 已合入，账本按 actor 隔离、冻结主历史后无工具执行，不恢复主 Runtime；服务端与自动 Recap 默认关闭，见[客户端](managed-agents/managed-agent-client-surfaces.md)、[存储](managed-agents/managed-agent-session-storage.md)与 [SDK](sdk.md)。[#16723](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 非空短浏览器 token 保原签名/凭据隔离。

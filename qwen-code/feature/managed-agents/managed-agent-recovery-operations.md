@@ -1,5 +1,15 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) publication 只剩异步 operation，丢答查原键，不能重放未知副作用；[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 已合入结构化 code 优先、存储 Skills 409 词汇归一/保 cause 和 stdout 虚拟线程，不登记取消键回收。[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 资源/pack 默认关闭，已有外置数据需要原 store，SQL metadata/watermark 仍权威；72 小时删除宽限不代表真实 GC/恢复已验收。
+
+[#16910](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16910.md) CSI live/saved/historical 只核原 Session/Binding、terminal/执行/资源及 Worker receipt，历史读取只读 REPEATABLE READ；[#16923](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16923.md)/[#16934](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16934.md) 正文限 128 KiB 并保 canonical/digest，[#16928](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16928.md) 删死 catalog/READY helper 不放宽实际准入。[#16922](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16922.md) 释放/drain/续租同包拆分仍保原 claim、generation 与 stopped receipt。
+
+[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 冷归档仍当前 open diff，不能作为 main 能力承诺；[#16936](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16936.md) fence 引擎已合入；[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) JDBC/H2 测试迁移仍当前 open diff，不能作为 main 能力承诺；H2 fixture 和静态断言都不能替代 MySQL/真实进程/CSI 验收。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## 旁路 claim、启动与冷归档边界，2026-11-11
 
 main `74b8cde46612` 的 [#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 私有 BTW/Recap 冻结原历史/模型后绑定 instance/boot/generation/token claim；准备完整输入后 running CAS，无工具且不恢复主 Runtime。原键确认、单调结果与 read lease 支持刷新/丢答，超时、取消、权限丢失和 Session 关闭均需拒绝迟到结果，未知不重派发。服务与自动 Recap 默认关闭，不把 UI 返回触发当后台任务。[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 短浏览器 token 的独立签名密钥/授权规则保持，不是安全部署证明。

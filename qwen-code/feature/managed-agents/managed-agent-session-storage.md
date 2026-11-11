@@ -1,5 +1,15 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已合入超限资源 allocate/upload/finalize，Controller 保 writer/Workspace 授权，SQL locator/长度/digest 决定原资源身份。TS 外置后只提交 ref；upload/finalize 仍有事务内对象 IO，不能套用 [#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 候选的事务外 IO/UNKNOWN 协议。pack 将连续 journal 逐事务 gzip，先独立提交 BUILDING、再外部 PUT/回读，最后原子提交 watermark/manifest/catalog；PUBLISHED→EVICTED 后仍可按 SQL 摘要解析，禁止把缺失 bytes 当空历史。开关 enabled/packJobEnabled/deletionEnabled 默认 false，16 MiB/4096 笔、72 小时宽限。
+
+[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) 移除 publication 双模式/SQL execution_mode，仍用原异步 operation；[#16910](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16910.md) 删除 inventory 后只读原 Session 证据，[#16923](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16923.md)/[#16934](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16934.md) 保 128 KiB 正文与声明 base64 预算；[#16928](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16928.md) 删未调用 catalog/READY helper，不取消现行 Workspace/CSI authority。
+
+[#16936](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16936.md) 无状态 fence 提取已合入；[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) InMemory 退役仍当前 open diff，不能作为 main 能力承诺。主干唯一 V1 为 44 表、reader 5，新增 pack 和来源表不形成升级链；[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 仍旧基底 42 表/reader 6，应与当前主干分开比较。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## 私有账本与候选对象正文，2026-11-11
 
 main `74b8cde46612` 唯一 V1 当前为 **42 张业务表、reader 5**。[#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 只新增 `ma_side_query`，`SideQueryConversation` 复用 `ma_session_record` 的 CONVERSATION 投影，不另建 conversation 表。`ManagedSideQueryStore` 按 tenant/Session/actor 冻结 prefix revision/sequence/digest、完成边界、模型和私有历史，原 claim 绑定一次无工具生成，单调结果/资源引用不改变主 journal。

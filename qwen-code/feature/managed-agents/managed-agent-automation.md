@@ -1,5 +1,11 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 已合入共享 bodyCode、结构化 getErrorCode 优先、cause 保留和 stdout 虚拟线程；存储 Skills reader 将非 session_skills_conflict 异常规范到该 409 code，caller admission 仍保原词汇。最终 diff 没有取消键回收，不能将本 PR 描述为取消泄漏已修复。[#16827](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 的请求内 occurrence 复用仍保持，不新增跨请求缓存。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## 原 occurrence 复用与错误分类候选，2026-11-11
 
 main `74b8cde46612` 的 [#16827](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 已合入 `ManagedAutomationService.run` 一次读取 settled occurrence 并同时用于 skipped/reason，配合 `ChildWorktreeGit.apply` 和 `RuntimeBrokerService.releasedSession` 的本次事实复用，不增加跨请求缓存/快照保证，不改原代际或终态判定，收益尚未测量。

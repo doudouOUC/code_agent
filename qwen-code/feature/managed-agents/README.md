@@ -1,5 +1,15 @@
 # Qwen Code Managed Agents 双链路方案
 
+## 主干存储与生命周期边界，2026-11-12
+
+main `3c0140f98c26`：[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) 已合入 publication 单一异步受理，原 claim/回执仍在；[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已合入默认关闭的 OSS 资源/pack，[#16882](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16882.md) 增加外部扩展来源授权与可替换归档。细节见存储、存储事件架构、配置扩展及恢复运维专题。
+
+[#16910](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16910.md) 将 CSI 证据收敛到原 Session，[#16923](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16923.md)/[#16934](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16934.md) 分开正文和短文本限额，[#16928](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16928.md) 删无调用 catalog/READY helper；[#16922](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16922.md) 保 facade 拆续租/release/drain。[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 最终 409 词汇归一与 cause/stdout 修复已合入。
+
+[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用 SPI/冷归档仍当前 open diff，不能作为 main 能力承诺；[#16936](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16936.md) fence 提取已合入；[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) JDBC/H2 测试迁移仍当前 open diff，不能作为 main 能力承诺；主干 reader 5/V1 44 表，OSS pack 不等于候选冷归档。
+
+本次只核代码、diff、文件和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台故障验收。下方旧日期内容保留历史；与本节重叠的状态、schema、已删除路径和实现边界以本节为准。
+
 ## 私有旁路查询与存储候选，2026-11-11
 
 main `74b8cde46612`：[#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 已合入私有 BTW/Recap，tenant/Session/actor 账本、冻结前缀、原 claim 和无工具模型不污染主任务；服务与自动 Recap 默认关闭，见[客户端](managed-agent-client-surfaces.md)。[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 的短 token 仍拒空白/共用签名密钥，不代表部署安全。
