@@ -1,5 +1,13 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 把 pack 的副本 builder 身份和十分钟 BUILDING 租约纳入持久发布协议：活跃异主不抢删，BUILDING→VERIFIED、水位 CAS、VERIFIED→PUBLISHED 各恰一行。它只解决发布并发，不能推导所有 CSI 消费者可读已清空正文。
+
+[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) 当前 open diff 把 pack resolver 沿 CSI admission/retirement、activation lease 与 repository 构造链共享，inline 同样核长度/sha；缺失或损坏 fail closed，尚不能作为 main 能力承诺。[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) InMemory 三 repository 退役已合入，fixture 复用真实 JDBC/schema，不再是未合入候选；H2 仍不是线上持久恢复资格。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) 已将 Tool Publication 收敛为持久异步受理，不再有模式 header/config/SQL execution_mode；PENDING 202 不代表 receipt 已成功。[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已有原对象适配器上的资源外置/pack 及集中正文解析；pack 发布事务负责 catalog、manifest 和 head watermark，资源上传仍不能概括成全程事务外 IO。

@@ -1,5 +1,15 @@
 # Qwen Code Managed Agents 双链路方案
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) 已合入 InMemory repository 退役，测试改用 JDBC/H2，并非新增生产持久能力。[#16956](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 合入 CSI 四层大小预算和补漏检查；[#16957](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 清掉无调用 snapshot/log reader，[#16984](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 强调其余 direct readers 的 pack-only 前置条件。[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 已加十分钟 builder 租约/发布行数围栏，不代表正文删除资格完成。
+
+[#17006](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17006.md)/[#17043](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17043.md) 已以 SQL 标题为显示权威，提交后 best-effort Harness 通知；纯成功重放 revision=0 不再通知，WebShell capability 仍有 Harness 门禁。[#17044](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17044.md) 移除元清单 ratchet，保架构/体量及实际测试。
+
+[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用冷归档与 [#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md)/[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md)/[#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 的 pack-aware 读取、OSS/数据源配置和单 JAR 分发都仍为当前 open diff，不能作为 main 能力承诺；main 为 V1 44 表/reader 5。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) 已合入 publication 单一异步受理，原 claim/回执仍在；[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已合入默认关闭的 OSS 资源/pack，[#16882](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16882.md) 增加外部扩展来源授权与可替换归档。细节见存储、存储事件架构、配置扩展及恢复运维专题。

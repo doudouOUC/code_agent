@@ -1,5 +1,15 @@
 # Managed Session：记录格式、提交与协议限额
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：[#16956](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 将 CSI record/candidate/body/command 预算统一为 128/16/256/384 KiB，terminalHistory 检查实际 body 长度；[#16957](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 删除闲置 checkpoint snapshot/log reader，未删当前 CSI authority。[#16984](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 明确 JournalStoreRows.activationLeaseRow、JdbcCsiActivationAdmission、JdbcCsiExecutionAdmission 仍有直接正文读取，不能只凭 pack 已发布或 72 小时宽限开启 deletion-enabled。
+
+[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 为 ma_journal_pack 加 builder_id；同 builder/十分钟过期才可回收 BUILDING，其他活跃 builder 保唯一键冲突；状态迁移、水位 CAS、最终发布各须恰一行并同事务回滚。[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) 当前 open diff 才以 CsiPackRecords 优先 inline、否则 pack，并核 SQL 长度/摘要；main 尚无此 resolver，测试定义不构成 pack-only 资格。
+
+[#17006](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17006.md)/[#17043](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17043.md) 已由 ma_session.title 与 title_revision 在本地 SQL 同步结算，保 actor/receipt 幂等，去除 RENAME delivery；Harness 标题只尽力同步，旧失败键新结算仍通知。[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) 已删除 InMemory 三 repository，H2 fixture 不替代 MySQL。[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 仅当前 open diff 提议独立 object-storage.enabled 与 OSS 读免重复 probe，不能承诺关闭开关仍可读所有旧 locator。主干唯一 V1 44 表/reader 5，无升级链。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已合入超限资源 allocate/upload/finalize，Controller 保 writer/Workspace 授权，SQL locator/长度/digest 决定原资源身份。TS 外置后只提交 ref；upload/finalize 仍有事务内对象 IO，不能套用 [#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 候选的事务外 IO/UNKNOWN 协议。pack 将连续 journal 逐事务 gzip，先独立提交 BUILDING、再外部 PUT/回读，最后原子提交 watermark/manifest/catalog；PUBLISHED→EVICTED 后仍可按 SQL 摘要解析，禁止把缺失 bytes 当空历史。开关 enabled/packJobEnabled/deletionEnabled 默认 false，16 MiB/4096 笔、72 小时宽限。

@@ -1,5 +1,15 @@
 # qwen-code feature 技术方案
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：本周累计 31 个本人 PR，27 merged / 4 open。[#16953](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) InMemory 三 repository 退役及 JDBC/H2 fixture 已合入；H2 不代表 MySQL/Hosted 验收。[#16956](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 统一 CSI record/candidate/body/command 为 128/16/256/384 KiB 并补 terminalHistory 上限，保 canonical/digest。[#16957](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 删除无调用 snapshot/log reader，[#16984](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 同步正文删除前置清单。
+
+[#16983](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 已加 pack builder_id/十分钟租约和事务行数围栏；CSI direct readers 尚未全部 pack-aware，不能开启正文删除。[#17006](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17006.md)/[#17043](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17043.md) 已改 SQL 同步标题权威，Harness 提交后尽力同步，新 revision 才通知。[#17044](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17044.md) 清理元清单测试并隔离九个专属 profile 的 unit 执行。
+
+[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用冷归档、[#17047](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware CSI 读取、[#17058](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) OSS 热路径/独立开关和池默认值、[#17064](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 单 exec 分发仍为当前 open diff，不能作为 main 能力承诺。主干唯一 V1/44 表、reader 5，候选旧基底和 reader 不能充当兼容证明。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：本周累计 20 个本人 PR，18 merged / 2 open。[#16840](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) publication 统一异步受理；[#16868](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 已落地超限资源 OSS 外置和 journal pack，复用原 ToolPublicationObjectStore，默认关闭。[#16882](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16882.md) 已落地业务扩展来源与不可变归档 SPI。

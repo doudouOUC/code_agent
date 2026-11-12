@@ -1,5 +1,13 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 当前 open diff 将对象存储 bean 改由独立 object-storage.enabled（默认 false）控制，不再与 Tool Publication bean/开关绑定；open/openRange 不再逐次探测 versioning，写/删保探测与既有长度/digest 校验。ManagedDataSourceDefaults 在 URL/绑定完成后统一 MySQL/MariaDB strict SQL mode 与 statement cache 默认值，接入三类启动入口。未修改资源业务 reader，不承诺关开关仍可读旧资源。
+
+[#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 当前 open diff 删除六类 operator classifier 的重复打包，保普通 library 和 exec，维护命令通过 admin launcher/PropertiesLauncher loader.main 运行，reference package 同步去独立 recovery 副本。两项都不能作为 main 能力承诺；现行多 classifier 的外部脚本不能提前按候选名称迁移。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：[#16882](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16882.md) 已合入 ManagedExtensionSource 与 ExtensionArchiveStorage。业务 provider 用 tenant/actor/Workspace/deadline resolve/open 精确 revision，拒绝 latest；原 archiveId 不下发为地址/凭据。importSource 在 SQL 事务外授权、限时暂存、核 digest 后交 Harness prepare，再沿持久幂等 operation 发布 provenance/归档。

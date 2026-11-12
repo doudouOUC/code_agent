@@ -21,6 +21,17 @@
 | [#16928](https://github.com/QwenLM/qwen-code/pull/16928) | merged | refactor(managed-agent): remove uncalled CSI admission and workspace catalog code | [pr-16928.md](pr-16928.md) |
 | [#16934](https://github.com/QwenLM/qwen-code/pull/16934) | merged | fix(managed-agent): honour the declared base64 bounds and drop an orphaned import | [pr-16934.md](pr-16934.md) |
 | [#16936](https://github.com/QwenLM/qwen-code/pull/16936) | merged | refactor(managed-agent): extract binding admission and fence engine | [pr-16936.md](pr-16936.md) |
-| [#16953](https://github.com/QwenLM/qwen-code/pull/16953) | open | refactor(managed-agent): retire the InMemory runtime broker repositories | [pr-16953.md](pr-16953.md) |
+| [#16953](https://github.com/QwenLM/qwen-code/pull/16953) | merged | refactor(managed-agent): retire the InMemory runtime broker repositories | [pr-16953.md](pr-16953.md) |
+| [#16956](https://github.com/QwenLM/qwen-code/pull/16956) | merged | fix(managed-agent): give the CSI retirement size bounds a single owner | [pr-16956.md](pr-16956.md) |
+| [#16957](https://github.com/QwenLM/qwen-code/pull/16957) | merged | refactor(managed-agent): remove unused CSI checkpoint snapshot and log readers | [pr-16957.md](pr-16957.md) |
+| [#16981](https://github.com/QwenLM/qwen-code/pull/16981) | merged | chore(managed-agent): finish the CSI bound conversion and name it once | [pr-16981.md](pr-16981.md) |
+| [#16983](https://github.com/QwenLM/qwen-code/pull/16983) | merged | fix(managed-agent): fence concurrent journal pack publication with a builder lease | [pr-16983.md](pr-16983.md) |
+| [#16984](https://github.com/QwenLM/qwen-code/pull/16984) | merged | docs(managed-agent): drop removed WorkspaceCsiCheckpointSnapshotStore from the deletion precondition | [pr-16984.md](pr-16984.md) |
+| [#17006](https://github.com/QwenLM/qwen-code/pull/17006) | merged | refactor(managed-agent): settle Session rename synchronously under one display authority | [pr-17006.md](pr-17006.md) |
+| [#17043](https://github.com/QwenLM/qwen-code/pull/17043) | merged | fix(managed-agent): repair rename recovery test and address the #17006 review round | [pr-17043.md](pr-17043.md) |
+| [#17044](https://github.com/QwenLM/qwen-code/pull/17044) | merged | chore(managed-agent): trim verification meta-ratchets and align local gate profiles | [pr-17044.md](pr-17044.md) |
+| [#17047](https://github.com/QwenLM/qwen-code/pull/17047) | open | feat(managed-agent): make CSI admission, activation-lease, and broker repository readers pack-aware | [pr-17047.md](pr-17047.md) |
+| [#17058](https://github.com/QwenLM/qwen-code/pull/17058) | open | refactor(managed-agent): converge OSS hot path, dead code and pool defaults | [pr-17058.md](pr-17058.md) |
+| [#17064](https://github.com/QwenLM/qwen-code/pull/17064) | open | refactor(managed-agent): collapse the distribution to a single executable jar | [pr-17064.md](pr-17064.md) |
 
-_按个人 PR 口径更新于 2026-11-12；累计收录北京时间 11-09 至 11-11 创建的目标 PR，非完整周窗口。_
+_按个人 PR 口径更新于 2026-11-13；累计收录北京时间 11-09 至 11-12 创建的目标 PR，非完整周窗口。_

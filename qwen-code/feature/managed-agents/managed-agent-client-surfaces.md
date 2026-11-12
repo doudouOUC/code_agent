@@ -1,5 +1,13 @@
 # Managed 普通客户端、交互与事件投影
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：[#17006](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17006.md)/[#17043](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17043.md) 已使 public/WebShell 的 SQL title 成为显示权威：原授权与同键 digest 检查后同步 SQL 结算，HTTP 200 不要求 Harness journal 同步成功，不新增响应字段。通知在提交后 best-effort，revision>0 才发；旧 FAILED/PENDING 键重新结算会发新 revision，COMPLETED replay 返回当前 SQL 标题且不重发。
+
+WebShell renameSupported 仍依赖 Harness available/supportsFencedTitles，不能从 SQL 独立结算推导 UI 无条件启用。OpenAPI/生成 TS 描述同步，响应标题可能已被后来改名覆盖；通知失败允许 journal 滞后，不是持久通知重试协议。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 持久私有 BTW 与返回 Recap，2026-11-11
 
 main `74b8cde46612` 的 [#16758](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 已合入 `/btw`、`/recap`、历史面板和取消。`use-managed-side-queries.ts` 按 provider/actor/Session 保存原 intent/queryId，刷新或提交丢答先确认原键，不另造模型请求。`ManagedSideQueryPanel.tsx` 展示独立结果；旁路问答不进入主历史，也不调用工具或启动主 Runtime。

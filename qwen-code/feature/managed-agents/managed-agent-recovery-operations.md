@@ -1,5 +1,15 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## CSI、pack 与同步标题边界，2026-11-13
+
+main `19c6af15b730`：[#16956](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 已统一 CSI 预算并补 terminalHistory 限额；[#16957](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 删除旧 snapshot/log reader，[#16984](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 明确剩余 direct readers 未通过 pack-only 前不能启正文删除。[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 十分钟 builder 租约和发布三步行数围栏已合入，不能代替回收/读并发验收。[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware reader 迁移仍为当前 open diff，不能作为 main 能力承诺。
+
+[#17006](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17006.md)/[#17043](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17043.md) 同步 rename 只保证 SQL 显示标题；通知 Harness 失败仍成功，纯 COMPLETED replay 不重发，旧失败键新 revision 要发。[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) 已合入 JDBC/H2 fixture 替代 InMemory，fixture CSI bypass 不是生产后门。[#17044](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17044.md) 已删除 SessionRowLockOrderTest/Javadoc/schema 元清单；ModuleArchitectureTest、ClassSizeRatchetTest 与实际行为/MySQL 验证保留，九个专属 profile 跳 unit 不等于 unit 通过。
+
+[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) OSS 读免 probe/独立开关/数据源默认值与 [#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 单 exec 分发都仍为当前 open diff，不能作为 main 能力承诺；后者保 library JAR 与 loader.main 维护入口，不删除维护命令。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方旧日期内容保留历史；重叠的状态、预算、路径与实现边界以本节为准。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：[#16840](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16840.md) publication 只剩异步 operation，丢答查原键，不能重放未知副作用；[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 已合入结构化 code 优先、存储 Skills 409 词汇归一/保 cause 和 stdout 虚拟线程，不登记取消键回收。[#16868](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16868.md) 资源/pack 默认关闭，已有外置数据需要原 store，SQL metadata/watermark 仍权威；72 小时删除宽限不代表真实 GC/恢复已验收。
