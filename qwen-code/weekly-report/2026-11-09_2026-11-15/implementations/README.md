@@ -30,8 +30,14 @@
 | [#17006](https://github.com/QwenLM/qwen-code/pull/17006) | merged | refactor(managed-agent): settle Session rename synchronously under one display authority | [pr-17006.md](pr-17006.md) |
 | [#17043](https://github.com/QwenLM/qwen-code/pull/17043) | merged | fix(managed-agent): repair rename recovery test and address the #17006 review round | [pr-17043.md](pr-17043.md) |
 | [#17044](https://github.com/QwenLM/qwen-code/pull/17044) | merged | chore(managed-agent): trim verification meta-ratchets and align local gate profiles | [pr-17044.md](pr-17044.md) |
-| [#17047](https://github.com/QwenLM/qwen-code/pull/17047) | open | feat(managed-agent): make CSI admission, activation-lease, and broker repository readers pack-aware | [pr-17047.md](pr-17047.md) |
-| [#17058](https://github.com/QwenLM/qwen-code/pull/17058) | open | refactor(managed-agent): converge OSS hot path, dead code and pool defaults | [pr-17058.md](pr-17058.md) |
-| [#17064](https://github.com/QwenLM/qwen-code/pull/17064) | open | refactor(managed-agent): collapse the distribution to a single executable jar | [pr-17064.md](pr-17064.md) |
+| [#17047](https://github.com/QwenLM/qwen-code/pull/17047) | merged | feat(managed-agent): make CSI admission, activation-lease, and broker repository readers pack-aware | [pr-17047.md](pr-17047.md) |
+| [#17058](https://github.com/QwenLM/qwen-code/pull/17058) | merged | refactor(managed-agent): converge OSS hot path, dead code and pool defaults | [pr-17058.md](pr-17058.md) |
+| [#17064](https://github.com/QwenLM/qwen-code/pull/17064) | merged | refactor(managed-agent): collapse the distribution to a single executable jar | [pr-17064.md](pr-17064.md) |
+| [#17069](https://github.com/QwenLM/qwen-code/pull/17069) | merged | fix(managed-agent): stop the legacy CSI guard from gap-locking other Sessions | [pr-17069.md](pr-17069.md) |
+| [#17072](https://github.com/QwenLM/qwen-code/pull/17072) | merged | refactor(managed-agent): drop the catalog probe and repeated root lock from binding control | [pr-17072.md](pr-17072.md) |
+| [#17073](https://github.com/QwenLM/qwen-code/pull/17073) | merged | docs(managed-agent): inventory the lifecycle claim mirror and tenant guards | [pr-17073.md](pr-17073.md) |
+| [#17074](https://github.com/QwenLM/qwen-code/pull/17074) | merged | fix(managed-agent): drop the stale tenant guard from synchronous rename settlement | [pr-17074.md](pr-17074.md) |
+| [#17075](https://github.com/QwenLM/qwen-code/pull/17075) | merged | refactor(managed-agent): delete the redundant JdbcRuntimeBrokerSchema alias | [pr-17075.md](pr-17075.md) |
+| [#17139](https://github.com/QwenLM/qwen-code/pull/17139) | merged | chore(managed-agent): convergence alignment — embedding regression test, release repair removal, design | [pr-17139.md](pr-17139.md) |
 
-_按个人 PR 口径更新于 2026-11-13；累计收录北京时间 11-09 至 11-12 创建的目标 PR，非完整周窗口。_
+_按个人 PR 口径更新于 2026-11-14；累计收录北京时间 11-09 至 11-13 创建的目标 PR，非完整周窗口。_

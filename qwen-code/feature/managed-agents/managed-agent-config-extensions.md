@@ -1,5 +1,13 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 已合入独立默认关闭 object-storage.enabled、OSS 读免重复 versioning probe、三类启动入口池默认值，以及 sessionWorktreeScheduler 的 defaultCandidate=false；[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 用实际 bean 枚举补嵌入隔离回归。MaintenanceObjectStores.settingsOss 仍依赖 publication 开关，Spring bean 独立不代表所有维护入口已独立。
+
+[#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 已落地一个 exec 分发与普通 library，admin/loader.main 保维护命令；[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 删除 v0.26.3/v0.26.5 条件 repair 与三份 patch，不承诺旧 tag backfill，保 Javadoc gate。模块/Settings/preflight/schema 重设计只在后续计划中，不写成现行配置契约。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 当前 open diff 将对象存储 bean 改由独立 object-storage.enabled（默认 false）控制，不再与 Tool Publication bean/开关绑定；open/openRange 不再逐次探测 versioning，写/删保探测与既有长度/digest 校验。ManagedDataSourceDefaults 在 URL/绑定完成后统一 MySQL/MariaDB strict SQL mode 与 statement cache 默认值，接入三类启动入口。未修改资源业务 reader，不承诺关开关仍可读旧资源。

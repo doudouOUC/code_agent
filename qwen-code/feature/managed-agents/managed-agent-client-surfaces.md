@@ -1,5 +1,13 @@
 # Managed 普通客户端、交互与事件投影
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 已在同步 rename 去 tenant guard：先锁目标 Session，再查不带锁的 receipt，同键异 Session 竞争交唯一键仲裁；SQL 标题权威、actor/digest/revision 与提交后 best-effort 通知未改。并发新增用例为 H2，本次未运行，不代表 MySQL 已验收。
+
+[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 收敛设计提议未来由 Public 吸收交互能力再迁移 WebShell/宿主；本 PR 并未删除当前 WebShell 路由、生成客户端或模型。设计页引用的仓外宿主事实本次未独立取证，不能承诺宿主改造已完成。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：[#17006](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17006.md)/[#17043](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17043.md) 已使 public/WebShell 的 SQL title 成为显示权威：原授权与同键 digest 检查后同步 SQL 结算，HTTP 200 不要求 Harness journal 同步成功，不新增响应字段。通知在提交后 best-effort，revision>0 才发；旧 FAILED/PENDING 键重新结算会发新 revision，COMPLETED replay 返回当前 SQL 标题且不重发。

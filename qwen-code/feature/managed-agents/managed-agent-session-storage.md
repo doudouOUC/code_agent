@@ -1,5 +1,13 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) 已把 activation lease、CSI admission/retirement、writer/native head 与维护入口接 pack fallback，inline 同样核 SQL 长度/摘要；无对象存储 fail closed。[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 独立 object-storage.enabled 默认 false，但 MaintenanceObjectStores.settingsOss 仍受 publication 开关限制；不把所有 operator 接线概括为统一独立开关，也不承诺关开关后所有旧 locator 可读。基线现为 V1 46 表/reader 5。
+
+[#17069](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17069.md) 普通可见未 pin root 只作一致读；pin/缺失转主键 FOR UPDATE，缺失仍有 gap。collector 直接 current read，保 publication→root→head 及等待期间 lease 可见性。[#17072](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17072.md) 去元数据与重复 root 锁，保启动生成列校验/marker 拒绝；[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) SQL rename Session-first、非锁定 replay、receipt 唯一键仲裁。[#17075](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17075.md) 删转发 alias 不改 DDL/catalog；[#17073](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17073.md) 只盘点，head claim mirror 未删除。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：[#16956](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 将 CSI record/candidate/body/command 预算统一为 128/16/256/384 KiB，terminalHistory 检查实际 body 长度；[#16957](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 删除闲置 checkpoint snapshot/log reader，未删当前 CSI authority。[#16984](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 明确 JournalStoreRows.activationLeaseRow、JdbcCsiActivationAdmission、JdbcCsiExecutionAdmission 仍有直接正文读取，不能只凭 pack 已发布或 72 小时宽限开启 deletion-enabled。

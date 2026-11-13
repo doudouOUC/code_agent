@@ -1,5 +1,13 @@
 # Qwen Code Managed Agents 双链路方案
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md)/[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md)/[#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 已合入 pack-aware CSI/lease 读取、OSS bean 解耦/池默认值/嵌入调度器修正与单 exec 分发；代码接线不等于真实 OSS/回收验收。主干仍 V1/reader 5，当前基线 46 表。[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用 SPI/冷补热仍当前 open diff，不能作为 main 能力承诺。
+
+[#17069](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17069.md) 区分普通一致读与 collector 当前锁读；[#17072](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17072.md) 一次 root 读取保 pin/marker 拒绝，[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 去同步 rename 的 tenant guard。[#17073](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17073.md) 盘点仍保 claim 镜像/guard；[#17075](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17075.md) 直接保 ManagedSchema 唯一入口。[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 的嵌入回归和死 tag repair 删除已落地，API/模块/preflight/schema 收敛仍为后续提案，HTTP/协议删减按原设想撤回。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：[#16953](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) 已合入 InMemory repository 退役，测试改用 JDBC/H2，并非新增生产持久能力。[#16956](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 合入 CSI 四层大小预算和补漏检查；[#16957](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 清掉无调用 snapshot/log reader，[#16984](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 强调其余 direct readers 的 pack-only 前置条件。[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 已加十分钟 builder 租约/发布行数围栏，不代表正文删除资格完成。

@@ -1,5 +1,13 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware 读取与维护接线已合入；[#17072](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17072.md) binding control 依赖启动 catalog 校验，一次锁读决定 pin/完整证据，root 消失或残留 marker 仍拒绝。[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 仅同步 rename 去不再需要的 tenant guard，其他 lifecycle/placement 顺序不自动放宽。
+
+[#17073](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17073.md) 明确 operation 是 claim authority、head 是 protocol 1/2 镜像，Broker 现仍共享锁 head；去镜像须 operation-before-head、全部 writer/drain CASE 配套及 MySQL races，不是文档已实现。[#17075](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17075.md) 唯一 ManagedSchema 初始化入口保 catalog 拒绝。[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 设计的 Public API 吸收交互能力、模块/Settings 等收敛仍待实施，双 HTTP server 与多代协议仍在，不能从设计 merged 推导它们已合并。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 把 pack 的副本 builder 身份和十分钟 BUILDING 租约纳入持久发布协议：活跃异主不抢删，BUILDING→VERIFIED、水位 CAS、VERIFIED→PUBLISHED 各恰一行。它只解决发布并发，不能推导所有 CSI 消费者可读已清空正文。

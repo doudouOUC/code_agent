@@ -1,5 +1,13 @@
 # qwen-code feature 技术方案
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：本周累计 37 个本人 PR，36 merged / 1 open。[#17047](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md)/[#17058](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md)/[#17064](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 的 pack-aware readers、OSS 读热路径/独立开关与单 exec 分发均已合入，不再是候选；[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用冷归档仍当前 open diff，不能作为 main 能力承诺。主干唯一 V1 46 表/reader 5，候选旧基底 42 表/reader 6 不是兼容证明。
+
+[#17069](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17069.md) 为普通可见 Session 避开 pin 二级索引锁，collector 用 current read 保 lease 可见性，absent root 的主键 gap 仍在。[#17072](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17072.md) 去 binding 热路径 catalog probe/重复 root 锁；[#17074](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 同步 rename 去 tenant guard。[#17075](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17075.md) 删 schema 纯转发 alias；[#17073](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17073.md) 仅盘点 claim mirror/guard，镜像仍保留。[#17139](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 补嵌入 scheduler 回归、删旧 tag repair；API/模块等收敛仍属设计，不是已落地能力。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：本周累计 31 个本人 PR，27 merged / 4 open。[#16953](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16953.md) InMemory 三 repository 退役及 JDBC/H2 fixture 已合入；H2 不代表 MySQL/Hosted 验收。[#16956](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 统一 CSI record/candidate/body/command 为 128/16/256/384 KiB 并补 terminalHistory 上限，保 canonical/digest。[#16957](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 删除无调用 snapshot/log reader，[#16984](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 同步正文删除前置清单。

@@ -1,5 +1,13 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 锁与收敛边界，2026-11-14
+
+main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) 已合入 pack fallback 与可关闭的维护客户端；storeless 仍拒绝，settings 入口仍有 publication 门禁。[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) OSS/池/调度器修正及 [#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 单 exec 分发均已落地，library 与 loader.main 维护入口保留。真实 pack-only、故障回收和旧 classifier 外部调用迁移仍需证据。
+
+[#17069](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17069.md) 保普通、pinned、absent 及 collector 的不同锁/快照语义；[#17072](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17072.md) 去热路径 probe/重复锁但不去准入，[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 去同步 rename tenant guard。[#17073](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17073.md) 镜像/guard 盘点不是删锁授权；[#17075](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17075.md) 删 schema alias 不放宽 catalog 拒绝。[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 去旧 tag repair/patch/backfill，保 Javadoc gate 断言并补实际调度器枚举回归；本次未运行任何产品或发布验收。
+
+本次只核源码、diff、文件清单和测试定义，未运行产品/CI/MySQL/OSS/仓外宿主或平台验收。下方日期段保留历史，重叠状态、表数、锁/读取和分发边界以本节为准。
+
 ## CSI、pack 与同步标题边界，2026-11-13
 
 main `19c6af15b730`：[#16956](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16956.md)/[#16981](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16981.md) 已统一 CSI 预算并补 terminalHistory 限额；[#16957](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16957.md) 删除旧 snapshot/log reader，[#16984](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16984.md) 明确剩余 direct readers 未通过 pack-only 前不能启正文删除。[#16983](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16983.md) 十分钟 builder 租约和发布三步行数围栏已合入，不能代替回收/读并发验收。[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware reader 迁移仍为当前 open diff，不能作为 main 能力承诺。
