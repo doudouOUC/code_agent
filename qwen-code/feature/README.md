@@ -1,5 +1,15 @@
 # qwen-code feature 技术方案
 
+## 归档、外部内容与恢复候选，2026-11-17
+
+main `1e455fd68a26`：W47 首日 8 个本人 PR，4 merged / 4 open。[#17415](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已将 Kubernetes Runtime、resident CSI 与 Kubernetes Harness discovery 的 Java 源码/测试移入不接 Maven/CI 的冷归档，活动四类 backend 与 static discovery 保留。唯一 V1 仍 46 表、reader 5，但专属列/索引/枚举已移除，不能据表数相同认定旧 catalog 兼容。
+
+[#17439](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17439.md) 的 hook 字符串 metadata/HTTP if parser 修复与 [#17457](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17457.md) 的准入前等待 Workspace 准备已入 main；[#17450](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 默认关闭的外部 content-only 子 Agent 仅功能分支 merged。[#17449](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) Public API/Web Shell 迁移、[#17459](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17459.md) 精确字节 journal 结算、[#17466](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17466.md) macOS 身份重认定及 [#17480](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17480.md) 共享扩展 owner 解析仍是当前 open diff，不能作为 main 能力承诺。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方日期段保留历史；重叠的状态、路径与配置边界以本节为准，旧周 PR 不按后续合入时间移动。
+
+#17450 的 merge 目标为 `stack/17247-external-content-base`，不是 main；本节有关 content child 的说明仅为功能分支观察，不能作为 main 能力承诺。
+
 ## W46 完整周复核，2026-11-16
 
 main `516e963f7a40`：按北京时间 11-09 至 11-15 的 author/createdAt 完整窗口复核 37 个本人 PR，36 merged / 1 open / 0 closed，周末无新增。唯一 V1 仍为 46 张业务表、reader 5；[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用冷归档仍为旧基底 42 表/reader 6 的当前 open diff，不能作为 main 能力承诺，表数/reader 不证明兼容。

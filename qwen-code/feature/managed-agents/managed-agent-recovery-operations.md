@@ -1,5 +1,15 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 归档、外部内容与恢复候选，2026-11-17
+
+main `1e455fd68a26`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 后不能继续运行旧 CSI/resident admin 或配置 Kubernetes Runtime/discovery；冷归档不是可直接安装的 provider，部署在 Kubernetes 上与该 Runtime backend 是两回事。[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅功能分支的外部 content child 按原 lineage 回收，[#17457](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17457.md) 新 Workspace 在 harness.loadTimeout 预算内准备，持续查取消/dispatch lease，晚完成不再提交。
+
+[#17459](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17459.md) 超时 append 结算、[#17466](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17466.md) macOS 同路径身份 plan/begin/retire/complete 和 [#17480](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17480.md) 共享扩展原 owner 查找仍为当前 open diff，不能作为 main 能力承诺。重认定要求原停止证据、有效 fence、无活跃 writer、原 inventory digest；不能直接修改 marker/catalog 解除拒绝。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方日期段保留历史；重叠的状态、路径与配置边界以本节为准，旧周 PR 不按后续合入时间移动。
+
+#17450 的 merge 目标为 `stack/17247-external-content-base`，不是 main；本节有关 content child 的说明仅为功能分支观察，不能作为 main 能力承诺。
+
 ## W46 完整周复核，2026-11-16
 
 main `516e963f7a40`：[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 保留非空独立 HTTP 浏览器 token、签名密钥至少 32 UTF-8 字节；当前 terminal upgrade 另经路径白名单和一次性 ticket，不能用 bearer HTTP 测试替代 WebSocket 断连/关停验收。[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 的同源路由计划已包含后续 terminal/shared-publication 分支，原 v1/v2 测试枚举不等于当前完整运行验收。完整周本人 PR 状态不变，不把后续主干扩展计入原 PR 规模。

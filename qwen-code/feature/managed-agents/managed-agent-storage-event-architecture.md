@@ -1,5 +1,15 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 归档、外部内容与恢复候选，2026-11-17
+
+main `1e455fd68a26`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 把专属 Kubernetes/CSI 实现移冷归档，通用 canonical/JSON/引用校验改由 ManagedCheckpointHistory/RuntimeToolMeasurements 承担；归档类不再参加活动 reactor。[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅功能分支的 content-only root/bundle 与持久父子 lineage 保留 SQL/actor/config authority，不引入任意扩展执行。[#17457](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17457.md) 在原 Turn dispatch lease 下等待 warm，再 load/submit，取消/失租不取消共享 warm。
+
+[#17459](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17459.md) journal 原字节复投结算和 [#17480](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17480.md) 共享 scope 原 slot 查询仍仅当前 open diff，不能作为 main 能力承诺；前者依赖原幂等字节身份，后者不 acquire/provision 新 owner。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方日期段保留历史；重叠的状态、路径与配置边界以本节为准，旧周 PR 不按后续合入时间移动。
+
+#17450 的 merge 目标为 `stack/17247-external-content-base`，不是 main；本节有关 content child 的说明仅为功能分支观察，不能作为 main 能力承诺。
+
 ## W46 完整周复核，2026-11-16
 
 main `516e963f7a40`：[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 的共享 publisher mode/worker route plan 仍是路由组合依据。合入时 v1 仅 owned/provider 的枚举不再完整：当前 terminal capability 会增加 terminal control route，v2 以 isMeasuredWorkspaceCapability 判断测量工具，并把已挂载的共享 publication 通道同步列入 allowlist。仍需区分路由可达性、token/attestation 与操作授权；这些后续主干扩展不计入该 PR 的七文件规模，也未在本次执行真实 worker 验收。

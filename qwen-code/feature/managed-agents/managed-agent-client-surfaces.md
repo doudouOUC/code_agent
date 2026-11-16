@@ -1,5 +1,15 @@
 # Managed 普通客户端、交互与事件投影
 
+## 归档、外部内容与恢复候选，2026-11-17
+
+main `1e455fd68a26`：[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅功能分支 merged 的 external content child 仍受默认关闭开关与受限 profile，不应在客户端展示为外部 Shell/完整插件。[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 仍当前 open diff，不能作为 main 能力承诺：候选补 PublicSession/能力、模型/审批/transcript/文件入口，client 转 /v1/agents，adapter 保组件 camelCase；只为 Session/Turn/Event/Item 做秒转毫秒，事件 data 不改键，其他 family 不重复换算。
+
+候选生成器仅选非 planned Public operation，local proxy 保 traversal 拒绝；旧 WebShell compatibility 入口仍存在，不写成旧 API 已删除。需要实际浏览器 SSE 重连、分页/导出、文件流和认证拒绝验收，本次未执行。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方日期段保留历史；重叠的状态、路径与配置边界以本节为准，旧周 PR 不按后续合入时间移动。
+
+#17450 的 merge 目标为 `stack/17247-external-content-base`，不是 main；本节有关 content child 的说明仅为功能分支观察，不能作为 main 能力承诺。
+
 ## W46 完整周复核，2026-11-16
 
 main `516e963f7a40`：[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 放宽的是独立 Managed Web 的非空浏览器 HTTP token，不是签名密钥或所有传输的认证要求。当前 Session terminal 路径可转发 WebSocket upgrade，仅传握手白名单、不转发 cookie/Authorization，控制面消费一次性 ticket；这段后续主干上下文不属于该 PR 的新增规模，也不证明终端、浏览器或部署验收通过。

@@ -1,5 +1,15 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 归档、外部内容与恢复候选，2026-11-17
+
+main `1e455fd68a26`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 去活动 CSI/resident guard、退役入口和专属 schema 字段；共享表与通用 journal/资源校验仍在，唯一 V1 46 表/reader 5，无在线升级链。下方历史 CsiPackRecords/ManagedLegacySessionGuard 等已随冷归档移出活动代码，不能再作为当前 reader/锁入口；不能据归档说明推断普通 OSS pack 也被删除。
+
+[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅功能分支的 content-only 资源闭包按原 writer/config command/pin 授权并核长度/digest，单资源 64 KiB、总计 256 文件/8 MiB。[#17459](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17459.md) 保存精确 append 字节并按 landed/absent/unknown 结算、[#17466](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17466.md) 离线身份重认定仍仅当前 open diff，不能作为 main 能力承诺，也不允许新 key 重放未知副作用或强改存储身份。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方日期段保留历史；重叠的状态、路径与配置边界以本节为准，旧周 PR 不按后续合入时间移动。
+
+#17450 的 merge 目标为 `stack/17247-external-content-base`，不是 main；本节有关 content child 的说明仅为功能分支观察，不能作为 main 能力承诺。
+
 ## W46 完整周复核，2026-11-16
 
 main `516e963f7a40`：完整周窗口复核后仍为 36 merged / 1 open，唯一 V1 46 表/reader 5。已合入的 [#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware readers 与 [#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) OSS 读取/独立 bean 开关边界仍适用；静态接线不等于真实 pack-only、正文删除或对象存储并发验收。[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 仍是旧基底 42 表/reader 6 的当前 open diff，不能作为 main 能力承诺，不与主干 OSS pack 混写。

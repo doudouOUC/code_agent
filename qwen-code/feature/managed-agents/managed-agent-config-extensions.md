@@ -1,5 +1,15 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 归档、外部内容与恢复候选，2026-11-17
+
+main `1e455fd68a26`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 删除活动 Kubernetes Runtime、CSI/resident 与 Kubernetes discovery 配置，static discovery 保留；归档不接 Maven/CI，不能仅恢复 YAML。[#17439](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17439.md) 四类 hook 接受字符串 description/statusMessage，HTTP 接受字符串 if，保闭集/类型校验；command/http/function 公开 control 摘要不泄露这些 worker 私有配置。
+
+[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅功能分支默认关闭 workspace-content-agents-enabled，使用 external-files/2 content-only profile；无 MCP/hook/settingsRevision、Plan/memory/capture 或 child worktree/snapshot，资源 pin 必须匹配原 configuration operation，不等于完整开发包执行。[#17480](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17480.md) 共享 Workspace 扩展控制 owner 修复仍当前 open diff，不能作为 main 能力承诺；找不到原 owner 不创建替代 Runtime。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品/CI/MySQL/OSS/浏览器或平台验收。下方日期段保留历史；重叠的状态、路径与配置边界以本节为准，旧周 PR 不按后续合入时间移动。
+
+#17450 的 merge 目标为 `stack/17247-external-content-base`，不是 main；本节有关 content child 的说明仅为功能分支观察，不能作为 main 能力承诺。
+
 ## 锁与收敛边界，2026-11-14
 
 main `7fab512f79d9`：[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 已合入独立默认关闭 object-storage.enabled、OSS 读免重复 versioning probe、三类启动入口池默认值，以及 sessionWorktreeScheduler 的 defaultCandidate=false；[#17139](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17139.md) 用实际 bean 枚举补嵌入隔离回归。MaintenanceObjectStores.settingsOss 仍依赖 publication 开关，Spring bean 独立不代表所有维护入口已独立。
