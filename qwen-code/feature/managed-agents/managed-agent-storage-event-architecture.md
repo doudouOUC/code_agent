@@ -1,5 +1,11 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## W46 完整周复核，2026-11-16
+
+main `516e963f7a40`：[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 的共享 publisher mode/worker route plan 仍是路由组合依据。合入时 v1 仅 owned/provider 的枚举不再完整：当前 terminal capability 会增加 terminal control route，v2 以 isMeasuredWorkspaceCapability 判断测量工具，并把已挂载的共享 publication 通道同步列入 allowlist。仍需区分路由可达性、token/attestation 与操作授权；这些后续主干扩展不计入该 PR 的七文件规模，也未在本次执行真实 worker 验收。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、OSS、浏览器或平台验收；下方带日期内容保留历史，重叠口径以本节为准。
+
 ## 锁与收敛边界，2026-11-14
 
 main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware 读取与维护接线已合入；[#17072](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17072.md) binding control 依赖启动 catalog 校验，一次锁读决定 pin/完整证据，root 消失或残留 marker 仍拒绝。[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 仅同步 rename 去不再需要的 tenant guard，其他 lifecycle/placement 顺序不自动放宽。

@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## W46 完整周复核，2026-11-16
+
+main `516e963f7a40`：[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 放宽的是独立 Managed Web 的非空浏览器 HTTP token，不是签名密钥或所有传输的认证要求。当前 Session terminal 路径可转发 WebSocket upgrade，仅传握手白名单、不转发 cookie/Authorization，控制面消费一次性 ticket；这段后续主干上下文不属于该 PR 的新增规模，也不证明终端、浏览器或部署验收通过。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、OSS、浏览器或平台验收；下方带日期内容保留历史，重叠口径以本节为准。
+
 ## 锁与收敛边界，2026-11-14
 
 main `7fab512f79d9`：[#17074](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17074.md) 已在同步 rename 去 tenant guard：先锁目标 Session，再查不带锁的 receipt，同键异 Session 竞争交唯一键仲裁；SQL 标题权威、actor/digest/revision 与提交后 best-effort 通知未改。并发新增用例为 H2，本次未运行，不代表 MySQL 已验收。

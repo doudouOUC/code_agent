@@ -40,4 +40,4 @@
 | [#17075](https://github.com/QwenLM/qwen-code/pull/17075) | merged | refactor(managed-agent): delete the redundant JdbcRuntimeBrokerSchema alias | [pr-17075.md](pr-17075.md) |
 | [#17139](https://github.com/QwenLM/qwen-code/pull/17139) | merged | chore(managed-agent): convergence alignment — embedding regression test, release repair removal, design | [pr-17139.md](pr-17139.md) |
 
-_按个人 PR 口径更新于 2026-11-14；累计收录北京时间 11-09 至 11-13 创建的目标 PR，非完整周窗口。_
+_按个人 PR 口径更新于 2026-11-16；完整核验北京时间 11-09 至 11-15 创建的 37 个本人 PR，36 merged / 1 open / 0 closed。_

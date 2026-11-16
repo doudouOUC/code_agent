@@ -1,5 +1,11 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## W46 完整周复核，2026-11-16
+
+main `516e963f7a40`：[#16723](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 保留非空独立 HTTP 浏览器 token、签名密钥至少 32 UTF-8 字节；当前 terminal upgrade 另经路径白名单和一次性 ticket，不能用 bearer HTTP 测试替代 WebSocket 断连/关停验收。[#16788](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 的同源路由计划已包含后续 terminal/shared-publication 分支，原 v1/v2 测试枚举不等于当前完整运行验收。完整周本人 PR 状态不变，不把后续主干扩展计入原 PR 规模。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、OSS、浏览器或平台验收；下方带日期内容保留历史，重叠口径以本节为准。
+
 ## 锁与收敛边界，2026-11-14
 
 main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) 已合入 pack fallback 与可关闭的维护客户端；storeless 仍拒绝，settings 入口仍有 publication 门禁。[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) OSS/池/调度器修正及 [#17064](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 单 exec 分发均已落地，library 与 loader.main 维护入口保留。真实 pack-only、故障回收和旧 classifier 外部调用迁移仍需证据。

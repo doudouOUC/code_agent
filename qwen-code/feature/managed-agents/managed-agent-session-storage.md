@@ -1,5 +1,11 @@
 # Managed Session：记录格式、提交与协议限额
 
+## W46 完整周复核，2026-11-16
+
+main `516e963f7a40`：完整周窗口复核后仍为 36 merged / 1 open，唯一 V1 46 表/reader 5。已合入的 [#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) pack-aware readers 与 [#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) OSS 读取/独立 bean 开关边界仍适用；静态接线不等于真实 pack-only、正文删除或对象存储并发验收。[#16837](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 仍是旧基底 42 表/reader 6 的当前 open diff，不能作为 main 能力承诺，不与主干 OSS pack 混写。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、OSS、浏览器或平台验收；下方带日期内容保留历史，重叠口径以本节为准。
+
 ## 锁与收敛边界，2026-11-14
 
 main `7fab512f79d9`：[#17047](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md) 已把 activation lease、CSI admission/retirement、writer/native head 与维护入口接 pack fallback，inline 同样核 SQL 长度/摘要；无对象存储 fail closed。[#17058](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md) 独立 object-storage.enabled 默认 false，但 MaintenanceObjectStores.settingsOss 仍受 publication 开关限制；不把所有 operator 接线概括为统一独立开关，也不承诺关开关后所有旧 locator 可读。基线现为 V1 46 表/reader 5。

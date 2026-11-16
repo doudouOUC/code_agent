@@ -1,5 +1,13 @@
 # qwen-code feature 技术方案
 
+## W46 完整周复核，2026-11-16
+
+main `516e963f7a40`：按北京时间 11-09 至 11-15 的 author/createdAt 完整窗口复核 37 个本人 PR，36 merged / 1 open / 0 closed，周末无新增。唯一 V1 仍为 46 张业务表、reader 5；[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用冷归档仍为旧基底 42 表/reader 6 的当前 open diff，不能作为 main 能力承诺，表数/reader 不证明兼容。
+
+[#16723](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16723.md) 的非空独立浏览器 token 与签名密钥下限仍保留；该 HTTP 结论不覆盖当前 terminal upgrade 的一次性 ticket 链。[#16788](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16788.md) 的 mode/route-plan 同源结构仍在，但当前路由集合已扩展，不能以合入时的 v1 枚举代替当前 plan。后续主干上下文不另列他人 PR，也不改变本人 PR 的归属或规模。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、OSS、浏览器或平台验收；下方带日期内容保留历史，重叠口径以本节为准。
+
 ## 锁与收敛边界，2026-11-14
 
 main `7fab512f79d9`：本周累计 37 个本人 PR，36 merged / 1 open。[#17047](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17047.md)/[#17058](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17058.md)/[#17064](../weekly-report/2026-11-09_2026-11-15/implementations/pr-17064.md) 的 pack-aware readers、OSS 读热路径/独立开关与单 exec 分发均已合入，不再是候选；[#16837](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16837.md) 通用冷归档仍当前 open diff，不能作为 main 能力承诺。主干唯一 V1 46 表/reader 5，候选旧基底 42 表/reader 6 不是兼容证明。
