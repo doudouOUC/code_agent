@@ -7,8 +7,16 @@
 | [#17449](https://github.com/QwenLM/qwen-code/pull/17449) | open | feat(managed-agent): Public API parity (slice 4a) and Web Shell consumer migration (slice 4b) | [pr-17449.md](pr-17449.md) |
 | [#17450](https://github.com/QwenLM/qwen-code/pull/17450) | merged | feat(managed-agent): Support external content child agents | [pr-17450.md](pr-17450.md) |
 | [#17457](https://github.com/QwenLM/qwen-code/pull/17457) | merged | fix(managed-agent): Wait for workspace preparation before turn admission | [pr-17457.md](pr-17457.md) |
-| [#17459](https://github.com/QwenLM/qwen-code/pull/17459) | open | fix(managed-agent): recover timed-out hosted journal commits | [pr-17459.md](pr-17459.md) |
-| [#17466](https://github.com/QwenLM/qwen-code/pull/17466) | open | fix(managed-agent): recover macOS workspaces after reboot | [pr-17466.md](pr-17466.md) |
-| [#17480](https://github.com/QwenLM/qwen-code/pull/17480) | open | fix(managed-agent): resolve shared workspace owners for extension control | [pr-17480.md](pr-17480.md) |
+| [#17459](https://github.com/QwenLM/qwen-code/pull/17459) | merged | fix(managed-agent): recover timed-out hosted journal commits | [pr-17459.md](pr-17459.md) |
+| [#17466](https://github.com/QwenLM/qwen-code/pull/17466) | merged | fix(managed-agent): recover macOS workspaces after reboot | [pr-17466.md](pr-17466.md) |
+| [#17480](https://github.com/QwenLM/qwen-code/pull/17480) | merged | fix(managed-agent): resolve shared workspace owners for extension control | [pr-17480.md](pr-17480.md) |
+| [#17507](https://github.com/QwenLM/qwen-code/pull/17507) | merged | chore(managed-agent): deduplicate verification Failsafe profiles and land #17139 follow-ups | [pr-17507.md](pr-17507.md) |
+| [#17508](https://github.com/QwenLM/qwen-code/pull/17508) | merged | refactor(managed-agent): unify coordinator dispatch deduplication and lease renewal | [pr-17508.md](pr-17508.md) |
+| [#17509](https://github.com/QwenLM/qwen-code/pull/17509) | merged | refactor(managed-agent): replace regex DDL catalog parsing with a tokenizing parser | [pr-17509.md](pr-17509.md) |
+| [#17510](https://github.com/QwenLM/qwen-code/pull/17510) | merged | refactor(managed-agent): require canonical Broker URLs at the preflight and Harness entry | [pr-17510.md](pr-17510.md) |
+| [#17513](https://github.com/QwenLM/qwen-code/pull/17513) | merged | feat: add qwen4-max support with native effort ladder, cache TTL, and image detail | [pr-17513.md](pr-17513.md) |
+| [#17521](https://github.com/QwenLM/qwen-code/pull/17521) | merged | fix(managed-agent): recover vanished Harness admissions safely | [pr-17521.md](pr-17521.md) |
+| [#17527](https://github.com/QwenLM/qwen-code/pull/17527) | merged | docs(design): propose idle Session suspension toward a stateless Hosted Harness | [pr-17527.md](pr-17527.md) |
+| [#17654](https://github.com/QwenLM/qwen-code/pull/17654) | open | fix(serve): Prevent automatic work from blocking worktree restore | [pr-17654.md](pr-17654.md) |
 
-_按个人 PR 口径更新于 2026-11-17；收录北京时间 11-16 创建的 8 个本人 PR，4 merged / 4 open / 0 closed，非完整周窗口。#17450 仅合入功能分支 `stack/17247-external-content-base`，不在 main；当前 merged 统计含此项。_
+_按个人 PR 口径更新于 2026-11-18；北京时间 11-17 新增 8 个，本周累计 16 个：14 merged / 2 open / 0 closed；#17450 仅功能分支 merged，#17527 仅设计合入，非完整周窗口。_

@@ -1,5 +1,13 @@
 # Managed 普通客户端、交互与事件投影
 
+## 最终恢复、模型接入与设计边界，2026-11-18
+
+main `b3291cb932b9`：[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 当前 open diff 的 Public API/Web Shell 迁移仍不能作为 main 能力承诺，兼容入口保留。
+
+[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅 `stack/17247-external-content-base` 功能分支 merged，未在 main，不能作为 main 能力承诺；默认关闭 content-only 受原 actor/writer/config/lineage 约束。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、Hosted、浏览器、真实 provider 或平台验收。下方日期段保留历史；重叠状态、路径与边界以本节为准，不移动 PR 创建周。
+
 ## 归档、外部内容与恢复候选，2026-11-17
 
 main `1e455fd68a26`：[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅功能分支 merged 的 external content child 仍受默认关闭开关与受限 profile，不应在客户端展示为外部 Shell/完整插件。[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 仍当前 open diff，不能作为 main 能力承诺：候选补 PublicSession/能力、模型/审批/transcript/文件入口，client 转 /v1/agents，adapter 保组件 camelCase；只为 Session/Turn/Event/Item 做秒转毫秒，事件 data 不改键，其他 family 不重复换算。

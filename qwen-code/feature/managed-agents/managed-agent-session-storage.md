@@ -1,5 +1,19 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 最终恢复、模型接入与设计边界，2026-11-18
+
+main `b3291cb932b9`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已入 main；Kubernetes/CSI Java 冷归档不接活动 reactor/CI，唯一 V1 仍 46 表/reader 5，不证明旧 catalog 兼容。
+
+[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅 `stack/17247-external-content-base` 功能分支 merged，未在 main，不能作为 main 能力承诺；默认关闭 content-only 受原 actor/writer/config/lineage 约束。
+
+[#17459](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17459.md) 已入 main；精确 append records 按 landed/absent/unknown 结算，250ms 重读、30秒预算后额外读，absent 只原字节复投；最终增加 activation 分配 epoch 前先 settle。
+
+[#17466](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17466.md) 已入 main；VolumeUUID 稳定身份与离线 plan/begin/retire/complete；混合 legacy plan/稳定 completion 核同卷锚点并保原稳定字节，拒错卷/替换/活跃 writer。
+
+[#17509](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17509.md) 已合入：结构化 tokenizer 共用 splitter，保 catalog 严格拒绝；非 schema 升级。 `ManagedSchemaDdlParser:splitStatements/parse` 感知引号/注释/括号；不支持语法拒绝，无新迁移。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、Hosted、浏览器、真实 provider 或平台验收。下方日期段保留历史；重叠状态、路径与边界以本节为准，不移动 PR 创建周。
+
 ## 归档、外部内容与恢复候选，2026-11-17
 
 main `1e455fd68a26`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 去活动 CSI/resident guard、退役入口和专属 schema 字段；共享表与通用 journal/资源校验仍在，唯一 V1 46 表/reader 5，无在线升级链。下方历史 CsiPackRecords/ManagedLegacySessionGuard 等已随冷归档移出活动代码，不能再作为当前 reader/锁入口；不能据归档说明推断普通 OSS pack 也被删除。

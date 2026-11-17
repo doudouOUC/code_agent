@@ -1,5 +1,19 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 最终恢复、模型接入与设计边界，2026-11-18
+
+main `b3291cb932b9`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已入 main；Kubernetes/CSI Java 冷归档不接活动 reactor/CI，唯一 V1 仍 46 表/reader 5，不证明旧 catalog 兼容。
+
+[#17439](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17439.md) 已入 main；Hook 字符串 metadata/HTTP if 保闭集校验和私有 control 投影。
+
+[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅 `stack/17247-external-content-base` 功能分支 merged，未在 main，不能作为 main 能力承诺；默认关闭 content-only 受原 actor/writer/config/lineage 约束。
+
+[#17480](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17480.md) 已入 main；共享 Workspace 按完整 request slot 找原 READY owner，保 scope/generation/drain，不 provision 替代者。
+
+[#17510](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17510.md) 已合入：两端与 launcher 限 canonical origin，保 HTTP loopback；不是通用 SSRF 方案。 `managed-runtime-broker-url.ts:resolveManagedRuntimeBrokerBaseUrl` 与 `HarnessBrokerUrl:read`、pool launcher 同步拒非标准 IPv4/端口/path；HTTPS 不替代出站授权。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、Hosted、浏览器、真实 provider 或平台验收。下方日期段保留历史；重叠状态、路径与边界以本节为准，不移动 PR 创建周。
+
 ## 归档、外部内容与恢复候选，2026-11-17
 
 main `1e455fd68a26`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 删除活动 Kubernetes Runtime、CSI/resident 与 Kubernetes discovery 配置，static discovery 保留；归档不接 Maven/CI，不能仅恢复 YAML。[#17439](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17439.md) 四类 hook 接受字符串 description/statusMessage，HTTP 接受字符串 if，保闭集/类型校验；command/http/function 公开 control 摘要不泄露这些 worker 私有配置。

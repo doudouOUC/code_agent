@@ -1,5 +1,11 @@
 # auth / provider 技术方案
 
+## 最终恢复、模型接入与设计边界，2026-11-18
+
+main `b3291cb932b9`：[#17513](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17513.md) 已合入：原生 effort 与预算、qwen4 DashScope TTL、image detail；真实 provider 未验收。 `packages/core/src/core/openaiContentGenerator/pipeline.ts` 将 qwen4-max 档位映射 low/high/xhigh（默认 high），thinking 预算 4096/131072/262144；最终禁用形状 cap 131072。`packages/core/src/core/openaiContentGenerator/provider/dashscope.ts` 仅 qwen4 + cacheRetention=1h 发 ttl，`packages/core/src/core/openaiContentGenerator/converter.ts` 仅设置时发 image_url.detail。其他 qwen4 不套新 ladder/预算，未测真实配额、命中或成本。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、Hosted、浏览器、真实 provider 或平台验收。下方日期段保留历史；重叠状态、路径与边界以本节为准，不移动 PR 创建周。
+
 > 范围：QwenLM/qwen-code 的认证（auth）与模型提供方（model providers）子系统。
 > 代码定位：`provider` 配置解析、`apiKey` 跨重启保留、`qwen auth status` 识别、daemon 设备流均已随 #4490 进入 `main`；本文少量 `@daemon_mode_b_main` 标注保留原始撰写时语境，阅读时以当前 `main` 源码为准。
 > 行号为撰写时快照，符号名（`file:symbol`）为稳定锚点。

@@ -1,5 +1,11 @@
 # daemon/serve 模式（Mode B）技术方案
 
+## 最终恢复、模型接入与设计边界，2026-11-18
+
+main `b3291cb932b9`：[#17654](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17654.md) 当前 open diff，不能作为 main 能力承诺：strict sidecar 锁下判定，可信 ACP hold，成功 cwd 后释放与统一 scheduled restore。 `session-restore.ts:restoreSessionCore` 锁下 strict 读为准；`acpAgent.ts` 仅可信私有父进程设置 hold，成功 set-cwd 才释放。scheduled keepalive/rehydrate 跟 owning runtime generation，AUQ call 保最后以邻接回答；sidecar 降级则 cleanup。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、Hosted、浏览器、真实 provider 或平台验收。下方日期段保留历史；重叠状态、路径与边界以本节为准，不移动 PR 创建周。
+
 ## 命令快照与字节保留预算，2026-11-07
 
 main `45cde869985a`：[#16413](../../weekly-report/2026-11-02_2026-11-08/implementations/pr-16413.md) 已合入：Session 成功发送完整命令快照后才记 SHA-256，重复内容不再发、失败可重试，构造/发送串行且复查 held/disposed。EventBus ring/compaction 只存去 availableSkillDetails 的轻投影，另保最新完整 slot，live ACP 完整、SDK/浏览器仍脱敏，重连仅原 ID 恢复最新正文。--event-ring-max-bytes 默认 8 MiB、最大 256 MiB 正安全整数，与 8000 个事件上限/订阅队列/replay burst 独立；计费含最新 slot，单超大事件或 slot 可超预算并至少保一帧，非总 heap 上限。status 暴露保留 count/bytes/earliest ID/累计淘汰和完整 slot bytes；reset/close 清当前占用而不重置生命周期淘汰计数。原 epoch/resync 规则保留。

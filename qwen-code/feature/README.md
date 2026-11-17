@@ -1,5 +1,43 @@
 # qwen-code feature 技术方案
 
+## 最终恢复、模型接入与设计边界，2026-11-18
+
+main `b3291cb932b9`：W47 日更至 11-17，本日新增 8 个，本周累计 16 个本人 PR，14 merged / 2 open；13 个 merge 在 main，另 1 个仅功能分支。
+
+[#17415](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已入 main；Kubernetes/CSI Java 冷归档不接活动 reactor/CI，唯一 V1 仍 46 表/reader 5，不证明旧 catalog 兼容。
+
+[#17439](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17439.md) 已入 main；Hook 字符串 metadata/HTTP if 保闭集校验和私有 control 投影。
+
+[#17449](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 当前 open diff 的 Public API/Web Shell 迁移仍不能作为 main 能力承诺，兼容入口保留。
+
+[#17450](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仅 `stack/17247-external-content-base` 功能分支 merged，未在 main，不能作为 main 能力承诺；默认关闭 content-only 受原 actor/writer/config/lineage 约束。
+
+[#17457](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17457.md) 已入 main；warm 等待后再 load/submit，取消/失租不取消共享 warm，续租接线由本次 helper 统一。
+
+[#17459](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17459.md) 已入 main；精确 append records 按 landed/absent/unknown 结算，250ms 重读、30秒预算后额外读，absent 只原字节复投；最终增加 activation 分配 epoch 前先 settle。
+
+[#17466](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17466.md) 已入 main；VolumeUUID 稳定身份与离线 plan/begin/retire/complete；混合 legacy plan/稳定 completion 核同卷锚点并保原稳定字节，拒错卷/替换/活跃 writer。
+
+[#17480](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17480.md) 已入 main；共享 Workspace 按完整 request slot 找原 READY owner，保 scope/generation/drain，不 provision 替代者。
+
+[#17507](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17507.md) 已合入：共享 Failsafe execution，保 profile 选择器，补专用 Bean 与发布 gate 断言。
+
+[#17508](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17508.md) 已合入：实例内 dispatchOnce 与可关闭续租句柄，SQL fencing 仍由调用方负责。 `LeaseRenewalRunner:dispatchOnce/startFixedDelay/startFixedRate` 保提交失败清 key、sticky 失租与原节奏，不构成分布式 exactly-once。
+
+[#17509](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17509.md) 已合入：结构化 tokenizer 共用 splitter，保 catalog 严格拒绝；非 schema 升级。 `ManagedSchemaDdlParser:splitStatements/parse` 感知引号/注释/括号；不支持语法拒绝，无新迁移。
+
+[#17510](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17510.md) 已合入：两端与 launcher 限 canonical origin，保 HTTP loopback；不是通用 SSRF 方案。 `managed-runtime-broker-url.ts:resolveManagedRuntimeBrokerBaseUrl` 与 `HarnessBrokerUrl:read`、pool launcher 同步拒非标准 IPv4/端口/path；HTTPS 不替代出站授权。
+
+[#17513](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17513.md) 已合入：原生 effort 与预算、qwen4 DashScope TTL、image detail；真实 provider 未验收。 `packages/core/src/core/openaiContentGenerator/pipeline.ts` 将 qwen4-max 档位映射 low/high/xhigh（默认 high），thinking 预算 4096/131072/262144；最终禁用形状 cap 131072。`packages/core/src/core/openaiContentGenerator/provider/dashscope.ts` 仅 qwen4 + cacheRetention=1h 发 ttl，`packages/core/src/core/openaiContentGenerator/converter.ts` 仅设置时发 image_url.detail。其他 qwen4 不套新 ladder/预算，未测真实配额、命中或成本。
+
+[#17521](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17521.md) 已合入：coded404 按引用清缓存，准入单次恢复/pool 重选，Turn 重入绑定与快照。 只重试 404 hosted_session_not_found；不重放 stop/cancel 等操作，不省略 lease/snapshot/watermark。
+
+[#17527](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17527.md) 仅设计文档合入：提出 idle suspension/失败 gate 与四阶段边界，未启运行时能力。 十分钟/八个冷开与后续 Runtime owner、wake、parked approvals 均非已接受默认或能力；首次 teardown 后未知结果保 gate/原证据，不能复活半关闭对象。
+
+[#17654](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17654.md) 当前 open diff：strict sidecar 锁下判定，可信 ACP hold，成功 cwd 后释放与统一 scheduled restore。 `session-restore.ts:restoreSessionCore` 锁下 strict 读为准；`acpAgent.ts` 仅可信私有父进程设置 hold，成功 set-cwd 才释放。scheduled keepalive/rehydrate 跟 owning runtime generation，AUQ call 保最后以邻接回答；sidecar 降级则 cleanup。
+
+本次只核源码、diff、完整文件清单和测试定义，未运行产品测试、CI、MySQL、Hosted、浏览器、真实 provider 或平台验收。下方日期段保留历史；重叠状态、路径与边界以本节为准，不移动 PR 创建周。
+
 ## 归档、外部内容与恢复候选，2026-11-17
 
 main `1e455fd68a26`：W47 首日 8 个本人 PR，4 merged / 4 open。[#17415](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已将 Kubernetes Runtime、resident CSI 与 Kubernetes Harness discovery 的 Java 源码/测试移入不接 Maven/CI 的冷归档，活动四类 backend 与 static discovery 保留。唯一 V1 仍 46 表、reader 5，但专属列/索引/枚举已移除，不能据表数相同认定旧 catalog 兼容。
