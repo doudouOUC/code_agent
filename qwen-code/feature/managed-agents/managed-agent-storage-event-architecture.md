@@ -1,5 +1,15 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 恢复前置与默认 Skills，2026-11-19
+
+main `164bb1eb58bb`：[#17680](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17680.md) 已合入：epoch-less 恢复的 ready park 明确 continue，守 lease/水位并阻塞 workflow 重跑。 `HarnessCoordinator:runClaimed` 只对 continuation-ready 调原 checkpoint/activation 的 continue，再记新水位；Action park 不自动 continue，workflow 未知执行仍阻塞。
+
+[#17681](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17681.md) 已合入：SDK 退役精确引用通知与两缓存清理，暂态分类和等待老化保错误码。 `HostedHarnessClient:onAttachmentRetirement` 仅通知精确引用，connector 按对象身份清两类缓存/marker；generation/pool 等待以当前阶段 max(1,budget)×4 的无进展计数老化，不是墙钟 deadline。closing/open_busy 与 teardown_blocked 分开，SDK 合入不等于已发行。
+
+[#17690](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17690.md) 当前 open diff：idle gate/非终态 teardown/冷开、候选租约界自动清理与 durable recovery view；未在 main。 不能作为 main 能力承诺。候选 `hosted-session-suspension.ts` 有独立 gate、10分钟/10% jitter/8冷开/30秒等待/5次 teardown 参数；首次 teardown 后不回滚，按步骤非终态释放、停续租、seal 后才 stopLocal。cap 后清 gate 依赖 Session 租约+默认30秒请求超时+10秒 margin 的假设，真实迟到请求/旧资源义务尚未验证。候选 recovery view 要求 SEALED、released、activation/wake revision 同 journal 且无 durable work，不能只看缓存或 sealed。
+
+本次只核 diff、完整文件、源码和测试定义，未运行产品、CI、数据库、Hosted、业务 provider 或浏览器验收。保留后续旧日期段；重叠状态/路径以上述新快照为准，不改变创建周。
+
 ## 最终恢复、模型接入与设计边界，2026-11-18
 
 main `b3291cb932b9`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已入 main；Kubernetes/CSI Java 冷归档不接活动 reactor/CI，唯一 V1 仍 46 表/reader 5，不证明旧 catalog 兼容。

@@ -1,5 +1,11 @@
 # 会话生命周期（深入）
 
+## 恢复前置与默认 Skills，2026-11-19
+
+main `164bb1eb58bb`：[#17654](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17654.md) 已合入最终版：strict sidecar 锁下判定、可信 ACP hold 和成功 cwd 后释放保留；hold 不再隐式 suppress 非 Channel 的 child worktree restore，因此缺 ownership marker 的修复与 resumed notice 仍执行，deferred AUQ 独立传递。scheduled restore 仍经 owning runtime/generation 的统一流程。
+
+本次只核 diff、完整文件、源码和测试定义，未运行产品、CI、数据库、Hosted、业务 provider 或浏览器验收。保留后续旧日期段；重叠状态/路径以上述新快照为准，不改变创建周。
+
 ## 最终恢复、模型接入与设计边界，2026-11-18
 
 main `b3291cb932b9`：[#17654](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17654.md) 当前 open diff，不能作为 main 能力承诺：strict sidecar 锁下判定，可信 ACP hold，成功 cwd 后释放与统一 scheduled restore。 `session-restore.ts:restoreSessionCore` 锁下 strict 读为准；`acpAgent.ts` 仅可信私有父进程设置 hold，成功 set-cwd 才释放。scheduled keepalive/rehydrate 跟 owning runtime generation，AUQ call 保最后以邻接回答；sidecar 降级则 cleanup。

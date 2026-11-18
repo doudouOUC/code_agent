@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 恢复前置与默认 Skills，2026-11-19
+
+main `164bb1eb58bb`：[#17703](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 已合入：授权发现默认 Skill→原不可变发布→创建 receipt pin；隐藏默认 revision，按已安装配置读目录。 `ManagedSkillCatalogSource` 只在权限/profile/导入 gate 允许时做事务外发现；显式 extensions:[] 跳默认，最多32默认 pin/256目录，编译后512KiB body与联合 UTF-8 预算由同源 entry 校验。`ManagedSkillCatalogService:get` 优先已安装配置、无 revision 才初始 pin；非 invocable/command 不显示，覆盖不全拒绝。V1 ma_extension_package 增 standalone_skill_json/is_catalog_listed，表数46/reader5不变不代表旧 catalog 兼容；自动默认 revision 不进显式 Workspace list。
+
+本次只核 diff、完整文件、源码和测试定义，未运行产品、CI、数据库、Hosted、业务 provider 或浏览器验收。保留后续旧日期段；重叠状态/路径以上述新快照为准，不改变创建周。
+
 ## 最终恢复、模型接入与设计边界，2026-11-18
 
 main `b3291cb932b9`：[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 当前 open diff 的 Public API/Web Shell 迁移仍不能作为 main 能力承诺，兼容入口保留。

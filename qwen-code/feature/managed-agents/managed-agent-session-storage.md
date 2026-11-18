@@ -1,5 +1,13 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 恢复前置与默认 Skills，2026-11-19
+
+main `164bb1eb58bb`：[#17690](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17690.md) 当前 open diff：idle gate/非终态 teardown/冷开、候选租约界自动清理与 durable recovery view；未在 main。 不能作为 main 能力承诺。候选 `hosted-session-suspension.ts` 有独立 gate、10分钟/10% jitter/8冷开/30秒等待/5次 teardown 参数；首次 teardown 后不回滚，按步骤非终态释放、停续租、seal 后才 stopLocal。cap 后清 gate 依赖 Session 租约+默认30秒请求超时+10秒 margin 的假设，真实迟到请求/旧资源义务尚未验证。候选 recovery view 要求 SEALED、released、activation/wake revision 同 journal 且无 durable work，不能只看缓存或 sealed。
+
+[#17703](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 已合入：授权发现默认 Skill→原不可变发布→创建 receipt pin；隐藏默认 revision，按已安装配置读目录。 `ManagedSkillCatalogSource` 只在权限/profile/导入 gate 允许时做事务外发现；显式 extensions:[] 跳默认，最多32默认 pin/256目录，编译后512KiB body与联合 UTF-8 预算由同源 entry 校验。`ManagedSkillCatalogService:get` 优先已安装配置、无 revision 才初始 pin；非 invocable/command 不显示，覆盖不全拒绝。V1 ma_extension_package 增 standalone_skill_json/is_catalog_listed，表数46/reader5不变不代表旧 catalog 兼容；自动默认 revision 不进显式 Workspace list。
+
+本次只核 diff、完整文件、源码和测试定义，未运行产品、CI、数据库、Hosted、业务 provider 或浏览器验收。保留后续旧日期段；重叠状态/路径以上述新快照为准，不改变创建周。
+
 ## 最终恢复、模型接入与设计边界，2026-11-18
 
 main `b3291cb932b9`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已入 main；Kubernetes/CSI Java 冷归档不接活动 reactor/CI，唯一 V1 仍 46 表/reader 5，不证明旧 catalog 兼容。

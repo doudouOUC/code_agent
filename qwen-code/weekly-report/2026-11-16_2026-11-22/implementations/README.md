@@ -17,6 +17,10 @@
 | [#17513](https://github.com/QwenLM/qwen-code/pull/17513) | merged | feat: add qwen4-max support with native effort ladder, cache TTL, and image detail | [pr-17513.md](pr-17513.md) |
 | [#17521](https://github.com/QwenLM/qwen-code/pull/17521) | merged | fix(managed-agent): recover vanished Harness admissions safely | [pr-17521.md](pr-17521.md) |
 | [#17527](https://github.com/QwenLM/qwen-code/pull/17527) | merged | docs(design): propose idle Session suspension toward a stateless Hosted Harness | [pr-17527.md](pr-17527.md) |
-| [#17654](https://github.com/QwenLM/qwen-code/pull/17654) | open | fix(serve): Prevent automatic work from blocking worktree restore | [pr-17654.md](pr-17654.md) |
+| [#17654](https://github.com/QwenLM/qwen-code/pull/17654) | merged | fix(serve): Prevent automatic work from blocking worktree restore | [pr-17654.md](pr-17654.md) |
+| [#17680](https://github.com/QwenLM/qwen-code/pull/17680) | merged | fix(managed-agent): drive continuation-ready parks in the epoch-less resubmission arm | [pr-17680.md](pr-17680.md) |
+| [#17681](https://github.com/QwenLM/qwen-code/pull/17681) | merged | feat(managed-agent): notify attachment retirement and age out suspension waits | [pr-17681.md](pr-17681.md) |
+| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | open | feat(managed-agent): implement stateless Hosted Harness phase 1 idle suspension | [pr-17690.md](pr-17690.md) |
+| [#17703](https://github.com/QwenLM/qwen-code/pull/17703) | merged | feat(managed-agent): Discover and pin default workspace Skills | [pr-17703.md](pr-17703.md) |
 
-_按个人 PR 口径更新于 2026-11-18；北京时间 11-17 新增 8 个，本周累计 16 个：14 merged / 2 open / 0 closed；#17450 仅功能分支 merged，#17527 仅设计合入，非完整周窗口。_
+_按个人 PR 口径更新于 2026-11-19；北京时间11-18新增4个，本周累计20个：18 merged / 2 open / 0 closed。#17450 仅功能分支 merged，#17527 仅设计合入，非完整周窗口。_

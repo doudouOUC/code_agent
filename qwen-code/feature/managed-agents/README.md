@@ -1,5 +1,21 @@
 # Qwen Code Managed Agents 双链路方案
 
+## 恢复前置与默认 Skills，2026-11-19
+
+main `164bb1eb58bb`：W47 日更至11-18，新增4个，本周累计20个，18 merged / 2 open；17个 merge 在 main，#17450 仍仅功能分支，#17527 仍仅设计。
+
+[#17680](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17680.md) 已合入：epoch-less 恢复的 ready park 明确 continue，守 lease/水位并阻塞 workflow 重跑。 `HarnessCoordinator:runClaimed` 只对 continuation-ready 调原 checkpoint/activation 的 continue，再记新水位；Action park 不自动 continue，workflow 未知执行仍阻塞。
+
+[#17681](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17681.md) 已合入：SDK 退役精确引用通知与两缓存清理，暂态分类和等待老化保错误码。 `HostedHarnessClient:onAttachmentRetirement` 仅通知精确引用，connector 按对象身份清两类缓存/marker；generation/pool 等待以当前阶段 max(1,budget)×4 的无进展计数老化，不是墙钟 deadline。closing/open_busy 与 teardown_blocked 分开，SDK 合入不等于已发行。
+
+[#17690](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17690.md) 当前 open diff：idle gate/非终态 teardown/冷开、候选租约界自动清理与 durable recovery view；未在 main。 不能作为 main 能力承诺。候选 `hosted-session-suspension.ts` 有独立 gate、10分钟/10% jitter/8冷开/30秒等待/5次 teardown 参数；首次 teardown 后不回滚，按步骤非终态释放、停续租、seal 后才 stopLocal。cap 后清 gate 依赖 Session 租约+默认30秒请求超时+10秒 margin 的假设，真实迟到请求/旧资源义务尚未验证。候选 recovery view 要求 SEALED、released、activation/wake revision 同 journal 且无 durable work，不能只看缓存或 sealed。
+
+[#17703](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 已合入：授权发现默认 Skill→原不可变发布→创建 receipt pin；隐藏默认 revision，按已安装配置读目录。 `ManagedSkillCatalogSource` 只在权限/profile/导入 gate 允许时做事务外发现；显式 extensions:[] 跳默认，最多32默认 pin/256目录，编译后512KiB body与联合 UTF-8 预算由同源 entry 校验。`ManagedSkillCatalogService:get` 优先已安装配置、无 revision 才初始 pin；非 invocable/command 不显示，覆盖不全拒绝。V1 ma_extension_package 增 standalone_skill_json/is_catalog_listed，表数46/reader5不变不代表旧 catalog 兼容；自动默认 revision 不进显式 Workspace list。
+
+[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) Public API/Web Shell 迁移仍 open；[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仍只合入 `stack/17247-external-content-base`，未在 main。[#17527](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17527.md) 的设计文档合入不证明自动暂停接线已落地。
+
+本次只核 diff、完整文件、源码和测试定义，未运行产品、CI、数据库、Hosted、业务 provider 或浏览器验收。保留后续旧日期段；重叠状态/路径以上述新快照为准，不改变创建周。
+
 ## 最终恢复、模型接入与设计边界，2026-11-18
 
 main `b3291cb932b9`：[#17415](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17415.md) 已入 main；Kubernetes/CSI Java 冷归档不接活动 reactor/CI，唯一 V1 仍 46 表/reader 5，不证明旧 catalog 兼容。

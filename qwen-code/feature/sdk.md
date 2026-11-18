@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 恢复前置与默认 Skills，2026-11-19
+
+main `164bb1eb58bb`：[#17681](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17681.md) 已合入：SDK 退役精确引用通知与两缓存清理，暂态分类和等待老化保错误码。 `HostedHarnessClient:onAttachmentRetirement` 仅通知精确引用，connector 按对象身份清两类缓存/marker；generation/pool 等待以当前阶段 max(1,budget)×4 的无进展计数老化，不是墙钟 deadline。closing/open_busy 与 teardown_blocked 分开，SDK 合入不等于已发行。
+
+本次只核 diff、完整文件、源码和测试定义，未运行产品、CI、数据库、Hosted、业务 provider 或浏览器验收。保留后续旧日期段；重叠状态/路径以上述新快照为准，不改变创建周。
+
 ## Hosted 私有旁路查询契约，2026-11-11
 
 main `74b8cde46612` 的 [#16758](../weekly-report/2026-11-09_2026-11-15/implementations/pr-16758.md) 已同步 Java Hosted 客户端、OpenAPI 和生成类型的 side-query claim、输入/资源、进度/结果与取消接口。服务绑定原 instance/boot/generation/token、冻结模型/历史并校验输入；tenant/Session/actor 私有隔离及原幂等键不因 SDK 透传而省略。它是不启动主 Runtime、无工具的旁路模型查询，不是子任务执行接口，也不自动扩展其他语言 SDK 的公开能力。
