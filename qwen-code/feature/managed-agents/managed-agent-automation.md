@@ -1,5 +1,13 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## MCP挂起保活与SQL候选，2026-11-20
+
+main `41f98a638dc4`：[#17805](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17805.md) 仅双语Phase 3设计合入：3a提议head到期提示、四态proof、完整仅未来证明不占缓存、已知且到期扫描和一律被动recoverForWake；ready/seal要冷态可重导的逐输入未尝试证明。3b独立后续要求原始字节staging、已接收/已持久位置、幂等重传、稳定身份/代际授权及只探测后台hold。两能力门/常量均非当前配置；pending notBefore与活后台仍阻挂起，无第二journal writer，性能比例尚未实测。
+
+[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md) 当前 open diff，不能作为 main 能力承诺：canonical键/窄投影/EXISTS、UNION两臂先有序LIMIT、请求内授权去重与32事务聚合，保原鉴权/预算；automation的is_run_terminal由projection与root锁下结算维护，active计数单SQL、blocking候选keyset。退役直接enqueue/撤queued，补偿按32源id固定轮次且活行也推进。pack新增PUT闭合/active range键，十分钟过期只退役，未知PUT保删除债务；对象IO在短事务外，同长摘要见证闭合后才收对象与精确SQL身份，Session GC等pack债务。不是纯索引改动，也不是实测容量承诺。
+
+本次只核diff、完整文件、源码与测试定义，未运行产品、CI、MySQL、Hosted、OSS、provider、浏览器或性能验收。下方日期段保留历史；重叠状态、表数与路径以本节为准，不移动createdAt归属周。
+
 ## 主干存储与生命周期边界，2026-11-12
 
 main `3c0140f98c26`：[#16826](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16826.md) 已合入共享 bodyCode、结构化 getErrorCode 优先、cause 保留和 stdout 虚拟线程；存储 Skills reader 将非 session_skills_conflict 异常规范到该 409 code，caller admission 仍保原词汇。最终 diff 没有取消键回收，不能将本 PR 描述为取消泄漏已修复。[#16827](../../weekly-report/2026-11-09_2026-11-15/implementations/pr-16827.md) 的请求内 occurrence 复用仍保持，不新增跨请求缓存。

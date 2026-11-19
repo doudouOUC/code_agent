@@ -1,14 +1,14 @@
-# qwen-code PRs · 2026-11-16 ~ 2026-11-22 (W47 日更至 11-18)
+# qwen-code PRs · 2026-11-16 ~ 2026-11-22 (W47 日更至 11-19)
 
-> 本次日更新增北京时间 2026-11-18 00:00:00 至 23:59:59 创建的 @doudouOUC 个人 PR，UTC 窗口 `[2026-11-17T16:00:00Z, 2026-11-18T16:00:00Z)`，新增4个；本周累计独立分页核验 author 与 createdAt 窗口 `[2026-11-15T16:00:00Z, 2026-11-18T16:00:00Z)` 的20个，尚非完整周报。不按更新/关闭/合入时间补收其他周或其他作者，不移动原创建周。状态、规模与 head 为北京时间 2026-11-19 凌晨快照，对照 main `164bb1eb58bb`。#17450 仅合入 `stack/17247-external-content-base`，不在 main；18 merged 含该项，主干已合入17个，其中 #17527 仅设计文档。#17449/#17690 为当前 open diff，不能作为 main 能力承诺。
+> 本次日更新增北京时间 2026-11-19 00:00:00 至 23:59:59 创建的 @doudouOUC 个人 PR，UTC 窗口 `[2026-11-18T16:00:00Z, 2026-11-19T16:00:00Z)`，新增4个；本周累计独立分页核验 author 与 createdAt 窗口 `[2026-11-15T16:00:00Z, 2026-11-19T16:00:00Z)` 的24个，尚非完整周报。不按更新/关闭/合入时间补收其他周或其他作者，不移动原创建周。状态、规模与 head 为北京时间 2026-11-20 凌晨快照，对照 main `41f98a638dc4`。#17450 仅合入 `stack/17247-external-content-base`，不在 main；22 merged 含该项，主干已合入21个，其中 #17527/#17805 仅设计文档。#17449/#17856 为当前 open diff，不能作为 main 能力承诺。
 
-**主题**: worktree restore 最终修正、park continue/退役通知/等待老化与默认 Skills 已合；idle suspension Phase 1 仍候选
+**主题**: idle suspension Phase 1 与默认关闭 MCP parking 已合；Phase 3 仅设计，SQL热路径与pack清理仍候选
 
-**PR 统计**: 20 PRs - 18 merged / 2 open / 0 closed
-**当前已合并 PR 代码量**: +16,547 / -8,324，651 个文件变更
-**全量代码量**: +40,984 / -19,471，749 个文件变更
-**类型分布**: refactor ×4, fix ×8, feat ×6, chore ×1, docs ×1
-**范围 (scope)**: managed-agent ×16, serve ×2, unscoped ×1, design ×1
+**PR 统计**: 24 PRs - 22 merged / 2 open / 0 closed
+**当前已合并 PR 代码量**: +22,479 / -8,449，733 个文件变更
+**全量代码量**: +49,757 / -20,129，874 个文件变更
+**类型分布**: refactor ×4, fix ×9, feat ×7, chore ×1, docs ×2, perf ×1
+**范围 (scope)**: managed-agent ×19, serve ×2, unscoped ×1, design ×1, managed-agent-server ×1
 
 ---
 
@@ -34,8 +34,12 @@
 | [#17654](https://github.com/QwenLM/qwen-code/pull/17654) | merged | @doudouOUC | fix(serve): Prevent automatic work from blocking worktree restore | +989/-114 | 19 | 2026-11-17 14:33:19 | 2026-11-18 05:54:57 |
 | [#17680](https://github.com/QwenLM/qwen-code/pull/17680) | merged | @doudouOUC | fix(managed-agent): drive continuation-ready parks in the epoch-less resubmission arm | +205/-5 | 2 | 2026-11-18 02:40:14 | 2026-11-18 04:02:18 |
 | [#17681](https://github.com/QwenLM/qwen-code/pull/17681) | merged | @doudouOUC | feat(managed-agent): notify attachment retirement and age out suspension waits | +485/-61 | 16 | 2026-11-18 02:40:23 | 2026-11-18 04:54:43 |
-| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | open | @doudouOUC | feat(managed-agent): implement stateless Hosted Harness phase 1 idle suspension | +2824/-77 | 27 | 2026-11-18 05:20:40 | - |
+| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | merged | @doudouOUC | feat(managed-agent): implement stateless Hosted Harness phase 1 idle suspension | +2824/-77 | 27 | 2026-11-18 05:20:40 | 2026-11-18 16:33:56 |
 | [#17703](https://github.com/QwenLM/qwen-code/pull/17703) | merged | @doudouOUC | feat(managed-agent): Discover and pin default workspace Skills | +1144/-98 | 35 | 2026-11-18 08:59:16 | 2026-11-18 11:01:12 |
+| [#17749](https://github.com/QwenLM/qwen-code/pull/17749) | merged | @doudouOUC | feat(managed-agent): keep idle MCP connections across suspension | +2413/-31 | 49 | 2026-11-18 16:38:14 | 2026-11-19 03:24:33 |
+| [#17753](https://github.com/QwenLM/qwen-code/pull/17753) | merged | @doudouOUC | fix(managed-agent): restore the class-size and facade-population gates | +17/-17 | 4 | 2026-11-18 17:08:29 | 2026-11-18 17:43:23 |
+| [#17805](https://github.com/QwenLM/qwen-code/pull/17805) | merged | @doudouOUC | docs(managed-agent): add Phase 3 control-plane wake design | +678/-0 | 2 | 2026-11-19 07:24:04 | 2026-11-19 13:07:42 |
+| [#17856](https://github.com/QwenLM/qwen-code/pull/17856) | open | @doudouOUC | perf(managed-agent-server): bound hot-path SQL scans and round-trips | +5665/-610 | 70 | 2026-11-19 15:29:23 | - |
 
 ---
 
@@ -61,23 +65,28 @@
 | [#17654](https://github.com/QwenLM/qwen-code/pull/17654) | 恢复持久 worktree Session 时，cron/goal/notification 在 cwd relocation 前先启动会使恢复被 active work 阻塞，或在旧目录执行；AUQ 恢复还需保工具调用与回答相邻。 | 已合入：strict sidecar 锁下判定，可信 ACP hold，成功 cwd 后释放与统一 scheduled restore；非 Channel 仍修 marker/notice。 | 更新Feature 总览、daemon 总览、daemon 会话生命周期；完整实现/观察见 [implementations/pr-17654.md](implementations/pr-17654.md)。 |
 | [#17680](https://github.com/QwenLM/qwen-code/pull/17680) | 曾发出 submit 但尚未绑定 event epoch 的 Turn，重提交遇到已准入/需恢复的 coded 409 后，即使 attach 带回 continuation-ready park，旧分支也只开 stream；这不会驱动 continue，Turn 因而停在可恢复点。 | 已合入：epoch-less 恢复的 ready park 明确 continue，守 lease/水位并阻塞 workflow 重跑。 | 更新Feature 总览、Managed Agents、存储事件架构、恢复与运维；完整实现/观察见 [implementations/pr-17680.md](implementations/pr-17680.md)。 |
 | [#17681](https://github.com/QwenLM/qwen-code/pull/17681) | Java SDK 心跳确认 attachment 消失后，控制面独立缓存仍可能留旧引用；closing/cold-open/pool 等暂态等待若永远豁免预算，Turn 会无进展地无限重试，teardown 阻塞还可能丢失原错误码。 | 已合入：SDK 退役精确引用通知与两缓存清理，暂态分类和等待老化保错误码。 | 更新Feature 总览、Managed Agents、存储事件架构、恢复与运维、SDK；完整实现/观察见 [implementations/pr-17681.md](implementations/pr-17681.md)。 |
-| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | idle Hosted Session 持续占 writer/activation 续租、内存和 Runtime owner；直接 detach 会终结输入，缓存缺失也不能证明恢复已就绪。需要保 durable obligations 的非终态暂停与可审计的冷开恢复。 | 当前 open diff：idle gate/非终态 teardown/冷开、候选租约界自动清理与 durable recovery view；未在 main。 | 更新Feature 总览、Managed Agents、存储事件架构、恢复与运维、Session 存储；完整实现/观察见 [implementations/pr-17690.md](implementations/pr-17690.md)。 |
+| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | idle Hosted Session 持续占 writer/activation 续租、内存和 Runtime owner；直接 detach 会终结输入，缓存缺失也不能证明恢复已就绪。需要保 durable obligations 的非终态暂停与可审计的冷开恢复。 | 已合入 Phase 1：idle gate/非终态 teardown/冷开、租约界自动清理与 durable recovery view；后续可选 MCP parking 单列。 | 更新Feature 总览、Managed Agents、存储事件架构、恢复与运维、Session 存储；完整实现/观察见 [implementations/pr-17690.md](implementations/pr-17690.md)。 |
 | [#17703](https://github.com/QwenLM/qwen-code/pull/17703) | 业务来源缺少默认 Skill 发现协议，创建 Session 只能靠显式选择；直接动态读来源又会让撤权/版本变动污染已受理请求，自动导入包还可能意外暴露在 Workspace 显式目录中。 | 已合入：授权发现默认 Skill→原不可变发布→创建 receipt pin；隐藏默认 revision，按已安装配置读目录。 | 更新Feature 总览、Managed Agents、配置与扩展、Session 存储、客户端；完整实现/观察见 [implementations/pr-17703.md](implementations/pr-17703.md)。 |
+| [#17749](https://github.com/QwenLM/qwen-code/pull/17749) | Phase 1 每次 idle suspension 都关闭 MCP，下一次冷开重建 stdio/HTTP 连接；简单不关连接又会让无人回收的 owner 长期占据 Workspace 成员资格，阻塞维护，或把失效连接误当可复用。 | 已合入：可选原 MCP owner parking、重开 revalidate/替代后退役，专用回收与 mount-claim 围栏；默认关闭。 | 更新Feature 总览、Managed Agents、Session 存储、存储事件架构、恢复与运维、配置与扩展；完整实现/观察见 [implementations/pr-17749.md](implementations/pr-17749.md)。 |
+| [#17753](https://github.com/QwenLM/qwen-code/pull/17753) | 默认 Skills 增加的 creationToolProfile 留在 AgentSessionPolicies 后触碰类规模门禁，facade 委派清单又未登记新方法，使实际默认创建行为正确时结构 gate 仍失败。 | 已合入：creationToolProfile 移 admissions、facade 改委派并补方法清单；不放宽门禁。 | 更新Feature 总览、Managed Agents、配置与扩展、恢复与运维；完整实现/观察见 [implementations/pr-17753.md](implementations/pr-17753.md)。 |
+| [#17805](https://github.com/QwenLM/qwen-code/pull/17805) | Phase 1/2 仍拒绝带未来 wake 输入或活后台观测的 Session 挂起：时钟/输出观察在 Harness，长延迟 loop 或安静 Monitor 仍支付常驻成本；原崩溃兜底不是及时的到期调度器。 | 仅设计合入：3a 到期提示/四态 proof/被动 wake；3b 字节 staging 与观测独立后续，未实现。 | 更新Feature 总览、Managed Agents、存储事件架构、恢复与运维、自动任务与交付；完整实现/观察见 [implementations/pr-17805.md](implementations/pr-17805.md)。 |
+| [#17856](https://github.com/QwenLM/qwen-code/pull/17856) | 终态历史增长会放大 active-run/子结果发现、列表窗口、全历史 GC 补偿及逐项补查；只在最外层 LIMIT 不能限制 UNION/过滤前源扫描，减少查询又可能破坏终态镜像、锁顺序与未知对象 PUT 的清理安全。 | 当前 open diff：canonical/有界查询与索引、终态镜像/GC轮次；pack闭合债务协议非纯性能改动，未在 main。 | 更新Feature 总览、Managed Agents、Session 存储、存储事件架构、恢复与运维、配置与扩展、自动任务与交付；完整实现/观察见 [implementations/pr-17856.md](implementations/pr-17856.md)。 |
 
 ## PR 对应 feature 覆盖
 
 | feature 文档 | 本周新增/复核 PR | 文档动作 |
 |---|---|---|
-| [Feature 总览](../../feature/README.md) | #17415(merged), #17439(merged), #17449(open), #17450(merged), #17457(merged), #17459(merged), #17466(merged), #17480(merged), #17507(merged), #17508(merged), #17509(merged), #17510(merged), #17513(merged), #17521(merged), #17527(merged), #17654(merged), #17680(merged), #17681(merged), #17690(open), #17703(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
-| [Managed Agents](../../feature/managed-agents/README.md) | #17415(merged), #17439(merged), #17449(open), #17450(merged), #17457(merged), #17459(merged), #17466(merged), #17480(merged), #17507(merged), #17508(merged), #17509(merged), #17510(merged), #17521(merged), #17527(merged), #17680(merged), #17681(merged), #17690(open), #17703(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
-| [Session 存储](../../feature/managed-agents/managed-agent-session-storage.md) | #17415(merged), #17450(merged), #17459(merged), #17466(merged), #17509(merged), #17690(open), #17703(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
-| [存储事件架构](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #17415(merged), #17450(merged), #17457(merged), #17459(merged), #17480(merged), #17508(merged), #17509(merged), #17521(merged), #17527(merged), #17680(merged), #17681(merged), #17690(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
-| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #17415(merged), #17450(merged), #17457(merged), #17459(merged), #17466(merged), #17480(merged), #17507(merged), #17508(merged), #17510(merged), #17521(merged), #17527(merged), #17680(merged), #17681(merged), #17690(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
-| [配置与扩展](../../feature/managed-agents/managed-agent-config-extensions.md) | #17415(merged), #17439(merged), #17450(merged), #17480(merged), #17510(merged), #17703(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [Feature 总览](../../feature/README.md) | #17415(merged), #17439(merged), #17449(open), #17450(merged), #17457(merged), #17459(merged), #17466(merged), #17480(merged), #17507(merged), #17508(merged), #17509(merged), #17510(merged), #17513(merged), #17521(merged), #17527(merged), #17654(merged), #17680(merged), #17681(merged), #17690(merged), #17703(merged), #17749(merged), #17753(merged), #17805(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [Managed Agents](../../feature/managed-agents/README.md) | #17415(merged), #17439(merged), #17449(open), #17450(merged), #17457(merged), #17459(merged), #17466(merged), #17480(merged), #17507(merged), #17508(merged), #17509(merged), #17510(merged), #17521(merged), #17527(merged), #17680(merged), #17681(merged), #17690(merged), #17703(merged), #17749(merged), #17753(merged), #17805(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [Session 存储](../../feature/managed-agents/managed-agent-session-storage.md) | #17415(merged), #17450(merged), #17459(merged), #17466(merged), #17509(merged), #17690(merged), #17703(merged), #17749(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [存储事件架构](../../feature/managed-agents/managed-agent-storage-event-architecture.md) | #17415(merged), #17450(merged), #17457(merged), #17459(merged), #17480(merged), #17508(merged), #17509(merged), #17521(merged), #17527(merged), #17680(merged), #17681(merged), #17690(merged), #17749(merged), #17805(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [恢复与运维](../../feature/managed-agents/managed-agent-recovery-operations.md) | #17415(merged), #17450(merged), #17457(merged), #17459(merged), #17466(merged), #17480(merged), #17507(merged), #17508(merged), #17510(merged), #17521(merged), #17527(merged), #17680(merged), #17681(merged), #17690(merged), #17749(merged), #17753(merged), #17805(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [配置与扩展](../../feature/managed-agents/managed-agent-config-extensions.md) | #17415(merged), #17439(merged), #17450(merged), #17480(merged), #17510(merged), #17703(merged), #17749(merged), #17753(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
 | [客户端](../../feature/managed-agents/managed-agent-client-surfaces.md) | #17449(open), #17450(merged), #17703(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
 | [模型与 Provider](../../feature/auth-providers.md) | #17513(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
 | [daemon 总览](../../feature/daemon-serve-mode/README.md) | #17654(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
 | [daemon 会话生命周期](../../feature/daemon-serve-mode/03-session-lifecycle.md) | #17654(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
 | [SDK](../../feature/sdk.md) | #17681(merged) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
+| [自动任务与交付](../../feature/managed-agents/managed-agent-automation.md) | #17805(merged), #17856(open) | 按最终 diff 与新 main 复核，保留有效历史；open/设计/功能分支单列边界。 |
 
-_按个人 PR 口径更新于 2026-11-19；本次只核静态文档、diff、完整文件、源码与测试定义，未运行产品测试、CI、数据库、Hosted、业务 provider 或浏览器验收。_
+_按个人 PR 口径更新于 2026-11-20；本次只核静态文档、diff、完整文件、源码与测试定义，未运行产品测试、CI、数据库、Hosted、OSS、业务 provider 或浏览器验收。_

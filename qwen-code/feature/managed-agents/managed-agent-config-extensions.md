@@ -1,5 +1,17 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## MCP挂起保活与SQL候选，2026-11-20
+
+main `41f98a638dc4`：[#17749](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17749.md) 已合入可选 MCP parking：`HostedMcpSession:suspend/park` 仅保settled/active原owner，重开 acquire→status→revalidate，HTTP5秒ping（-32601可接受），替代落定后退役旧配置。`RuntimeBrokerService:mcpParkable/reclaimParkedMcp` 只在回收job装配时广告，排除external；mount claim防后继被释放。默认mcp-parking.enabled=false、idle30分钟、scan1分钟、batch100（1至1000）；维护busy只加速下一趟，仍核SEALED。worker原16连接quota仅选其他owner闲300秒且无pending的最旧连接。pending配置/操作仍阻挂起，client-files按active判断；park保留存储成员资格，不是跨主机连接恢复。
+
+[#17753](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17753.md) 已把`creationToolProfile`移至`AgentSessionAdmissions`，facade委派与decomposition清单同步，不改profile/权限或门禁阈值；[#17703](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 默认Skills发现/receipt pin语义不变。
+
+[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md) 当前 open diff，不能作为 main 能力承诺：canonical键/窄投影/EXISTS、UNION两臂先有序LIMIT、请求内授权去重与32事务聚合，保原鉴权/预算；automation的is_run_terminal由projection与root锁下结算维护，active计数单SQL、blocking候选keyset。退役直接enqueue/撤queued，补偿按32源id固定轮次且活行也推进。pack新增PUT闭合/active range键，十分钟过期只退役，未知PUT保删除债务；对象IO在短事务外，同长摘要见证闭合后才收对象与精确SQL身份，Session GC等pack债务。不是纯索引改动，也不是实测容量承诺。
+
+当前main V1重数47业务表/reader5（后续含ma_pr_watch_binding）；SQL候选也47表/reader5但列、索引与pack唯一键不同。既有46表日期段是历史；按baseline策略重建开发catalog，不新增升级链，也不据相同reader认定兼容。
+
+本次只核diff、完整文件、源码与测试定义，未运行产品、CI、MySQL、Hosted、OSS、provider、浏览器或性能验收。下方日期段保留历史；重叠状态、表数与路径以本节为准，不移动createdAt归属周。
+
 ## 恢复前置与默认 Skills，2026-11-19
 
 main `164bb1eb58bb`：[#17703](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 已合入：授权发现默认 Skill→原不可变发布→创建 receipt pin；隐藏默认 revision，按已安装配置读目录。 `ManagedSkillCatalogSource` 只在权限/profile/导入 gate 允许时做事务外发现；显式 extensions:[] 跳默认，最多32默认 pin/256目录，编译后512KiB body与联合 UTF-8 预算由同源 entry 校验。`ManagedSkillCatalogService:get` 优先已安装配置、无 revision 才初始 pin；非 invocable/command 不显示，覆盖不全拒绝。V1 ma_extension_package 增 standalone_skill_json/is_catalog_listed，表数46/reader5不变不代表旧 catalog 兼容；自动默认 revision 不进显式 Workspace list。

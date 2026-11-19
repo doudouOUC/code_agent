@@ -20,7 +20,11 @@
 | [#17654](https://github.com/QwenLM/qwen-code/pull/17654) | merged | fix(serve): Prevent automatic work from blocking worktree restore | [pr-17654.md](pr-17654.md) |
 | [#17680](https://github.com/QwenLM/qwen-code/pull/17680) | merged | fix(managed-agent): drive continuation-ready parks in the epoch-less resubmission arm | [pr-17680.md](pr-17680.md) |
 | [#17681](https://github.com/QwenLM/qwen-code/pull/17681) | merged | feat(managed-agent): notify attachment retirement and age out suspension waits | [pr-17681.md](pr-17681.md) |
-| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | open | feat(managed-agent): implement stateless Hosted Harness phase 1 idle suspension | [pr-17690.md](pr-17690.md) |
+| [#17690](https://github.com/QwenLM/qwen-code/pull/17690) | merged | feat(managed-agent): implement stateless Hosted Harness phase 1 idle suspension | [pr-17690.md](pr-17690.md) |
 | [#17703](https://github.com/QwenLM/qwen-code/pull/17703) | merged | feat(managed-agent): Discover and pin default workspace Skills | [pr-17703.md](pr-17703.md) |
+| [#17749](https://github.com/QwenLM/qwen-code/pull/17749) | merged | feat(managed-agent): keep idle MCP connections across suspension | [pr-17749.md](pr-17749.md) |
+| [#17753](https://github.com/QwenLM/qwen-code/pull/17753) | merged | fix(managed-agent): restore the class-size and facade-population gates | [pr-17753.md](pr-17753.md) |
+| [#17805](https://github.com/QwenLM/qwen-code/pull/17805) | merged | docs(managed-agent): add Phase 3 control-plane wake design | [pr-17805.md](pr-17805.md) |
+| [#17856](https://github.com/QwenLM/qwen-code/pull/17856) | open | perf(managed-agent-server): bound hot-path SQL scans and round-trips | [pr-17856.md](pr-17856.md) |
 
-_按个人 PR 口径更新于 2026-11-19；北京时间11-18新增4个，本周累计20个：18 merged / 2 open / 0 closed。#17450 仅功能分支 merged，#17527 仅设计合入，非完整周窗口。_
+_按个人 PR 口径更新于 2026-11-20；北京时间11-19新增4个，本周累计24个：22 merged / 2 open / 0 closed。#17450 仅功能分支 merged，#17527/#17805 仅设计合入，非完整周窗口。_

@@ -1,5 +1,23 @@
 # qwen-code feature 技术方案
 
+## MCP挂起保活与SQL候选，2026-11-20
+
+main `41f98a638dc4`：W47 日更至11-19，新增4个，累计24个本人 PR，22 merged / 2 open；21个 merge 在 main，另1个仅功能分支。[#17449](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 仍 open；[#17450](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仍仅合入 `stack/17247-external-content-base`，未在 main。
+
+[#17690](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17690.md) Phase 1 已合入 main：idle10分钟、最多10% jitter、8冷开、30秒工作等待与5次teardown；首次teardown后不可回滚，停续租/activation release/seal后stopLocal。自动清gate的租约+请求超时+margin推导仍需真实迟到请求证据；SEALED或缓存缺失单项不证明ready。[#17527](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17527.md) 原设计范围不变，后续实现不回填成本设计已验收。
+
+[#17749](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17749.md) 已合入可选 MCP parking：`HostedMcpSession:suspend/park` 仅保settled/active原owner，重开 acquire→status→revalidate，HTTP5秒ping（-32601可接受），替代落定后退役旧配置。`RuntimeBrokerService:mcpParkable/reclaimParkedMcp` 只在回收job装配时广告，排除external；mount claim防后继被释放。默认mcp-parking.enabled=false、idle30分钟、scan1分钟、batch100（1至1000）；维护busy只加速下一趟，仍核SEALED。worker原16连接quota仅选其他owner闲300秒且无pending的最旧连接。pending配置/操作仍阻挂起，client-files按active判断；park保留存储成员资格，不是跨主机连接恢复。
+
+[#17753](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17753.md) 已把`creationToolProfile`移至`AgentSessionAdmissions`，facade委派与decomposition清单同步，不改profile/权限或门禁阈值；[#17703](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 默认Skills发现/receipt pin语义不变。
+
+[#17805](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17805.md) 仅双语Phase 3设计合入：3a提议head到期提示、四态proof、完整仅未来证明不占缓存、已知且到期扫描和一律被动recoverForWake；ready/seal要冷态可重导的逐输入未尝试证明。3b独立后续要求原始字节staging、已接收/已持久位置、幂等重传、稳定身份/代际授权及只探测后台hold。两能力门/常量均非当前配置；pending notBefore与活后台仍阻挂起，无第二journal writer，性能比例尚未实测。
+
+[#17856](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md) 当前 open diff，不能作为 main 能力承诺：canonical键/窄投影/EXISTS、UNION两臂先有序LIMIT、请求内授权去重与32事务聚合，保原鉴权/预算；automation的is_run_terminal由projection与root锁下结算维护，active计数单SQL、blocking候选keyset。退役直接enqueue/撤queued，补偿按32源id固定轮次且活行也推进。pack新增PUT闭合/active range键，十分钟过期只退役，未知PUT保删除债务；对象IO在短事务外，同长摘要见证闭合后才收对象与精确SQL身份，Session GC等pack债务。不是纯索引改动，也不是实测容量承诺。
+
+当前main V1重数47业务表/reader5（后续含ma_pr_watch_binding）；SQL候选也47表/reader5但列、索引与pack唯一键不同。既有46表日期段是历史；按baseline策略重建开发catalog，不新增升级链，也不据相同reader认定兼容。
+
+本次只核diff、完整文件、源码与测试定义，未运行产品、CI、MySQL、Hosted、OSS、provider、浏览器或性能验收。下方日期段保留历史；重叠状态、表数与路径以本节为准，不移动createdAt归属周。
+
 ## 恢复前置与默认 Skills，2026-11-19
 
 main `164bb1eb58bb`：W47 日更至11-18，新增4个，本周累计20个，18 merged / 2 open；17个 merge 在 main，#17450 仍仅功能分支，#17527 仍仅设计。
