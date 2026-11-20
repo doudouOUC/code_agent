@@ -25,6 +25,18 @@
 | [#17749](https://github.com/QwenLM/qwen-code/pull/17749) | merged | feat(managed-agent): keep idle MCP connections across suspension | [pr-17749.md](pr-17749.md) |
 | [#17753](https://github.com/QwenLM/qwen-code/pull/17753) | merged | fix(managed-agent): restore the class-size and facade-population gates | [pr-17753.md](pr-17753.md) |
 | [#17805](https://github.com/QwenLM/qwen-code/pull/17805) | merged | docs(managed-agent): add Phase 3 control-plane wake design | [pr-17805.md](pr-17805.md) |
-| [#17856](https://github.com/QwenLM/qwen-code/pull/17856) | open | perf(managed-agent-server): bound hot-path SQL scans and round-trips | [pr-17856.md](pr-17856.md) |
+| [#17856](https://github.com/QwenLM/qwen-code/pull/17856) | merged | perf(managed-agent-server): bound hot-path SQL scans and round-trips | [pr-17856.md](pr-17856.md) |
+| [#17864](https://github.com/QwenLM/qwen-code/pull/17864) | merged | refactor(managed-agent): converge pre-production version machinery | [pr-17864.md](pr-17864.md) |
+| [#17866](https://github.com/QwenLM/qwen-code/pull/17866) | merged | fix(web-shell): render local-path and failed markdown images as text chips | [pr-17866.md](pr-17866.md) |
+| [#17869](https://github.com/QwenLM/qwen-code/pull/17869) | merged | docs(managed-agent): add Phase 3 seal-time wake stamp addendum | [pr-17869.md](pr-17869.md) |
+| [#17871](https://github.com/QwenLM/qwen-code/pull/17871) | merged | refactor(managed-agent): files-on-v2 lifecycle and public child relaxation (D3/D5') | [pr-17871.md](pr-17871.md) |
+| [#17886](https://github.com/QwenLM/qwen-code/pull/17886) | merged | fix(managed-agent): settle recovery from durable native terminals | [pr-17886.md](pr-17886.md) |
+| [#17907](https://github.com/QwenLM/qwen-code/pull/17907) | merged | fix(managed-agent-server): keep journal blob reclamation moving past sealed heads | [pr-17907.md](pr-17907.md) |
+| [#17908](https://github.com/QwenLM/qwen-code/pull/17908) | merged | feat(managed-agent): stamp clean suspensions for wake dispatch | [pr-17908.md](pr-17908.md) |
+| [#17909](https://github.com/QwenLM/qwen-code/pull/17909) | merged | test(managed-agent): re-home publication lifecycle IT v1 witness to external-files | [pr-17909.md](pr-17909.md) |
+| [#17912](https://github.com/QwenLM/qwen-code/pull/17912) | merged | docs(managed-agent): design Runtime-owned background observation (Phase 3b) | [pr-17912.md](pr-17912.md) |
+| [#17927](https://github.com/QwenLM/qwen-code/pull/17927) | open | refactor(managed-agent): key tenant guard on readable VARCHAR scope (identity de-hash increment 1) | [pr-17927.md](pr-17927.md) |
+| [#17932](https://github.com/QwenLM/qwen-code/pull/17932) | merged | fix(managed-agent): settle a parked turn whose runtime is terminally lost | [pr-17932.md](pr-17932.md) |
+| [#17944](https://github.com/QwenLM/qwen-code/pull/17944) | open | feat(managed-agent): degrade process components per package in content-only extension runtimes | [pr-17944.md](pr-17944.md) |
 
-_按个人 PR 口径更新于 2026-11-20；北京时间11-19新增4个，本周累计24个：22 merged / 2 open / 0 closed。#17450 仅功能分支 merged，#17527/#17805 仅设计合入，非完整周窗口。_
+_按个人PR口径更新于2026-11-21；北京时间11-20新增12个，本周累计36个：33 merged / 3 open / 0 closed。#17450仅功能分支合入，#17527/#17805/#17869/#17912为设计文档交付，非完整周窗口。_

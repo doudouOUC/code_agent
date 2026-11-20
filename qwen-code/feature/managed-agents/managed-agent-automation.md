@@ -1,5 +1,17 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 版本事实、wake戳与恢复收敛，2026-11-21
+
+main `0ca8266fff86`：[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md)已合入最终+5800/-724、73文件：保SQL/GC/未知PUT债务边界，最终撤回PUBLIC Session的channel scope-key join，发现SQL移ChildResultRelayQueries；后续正文回收见17907。原规模不计后续PR。
+
+[#17869](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17869.md) 原3a的独立dispatcher/四态proof/不入缓存路线由seal-time wake stamp替代，后续17908有代码；本 PR 仅为设计交付，不把历史H2复现当MySQL验收。
+
+[#17908](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17908.md) 默认wake-dispatch.enabled=false，acquire/renew grant广告后才放行未来未尝试wake。正常seal认证精确revision，acquire清戳；现有兜底到期跳proof后被动load，无戳保旧证明。transport未来/空pending给NOT_DUE，到期仍原activateForWake；不新增dispatcher。
+
+[#17912](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17912.md) 独立3b仍仅提案：worker捕获/Monitor策略/有序outbox，Broker现有租约下拉取stage，先attach后drain、稳定record水位幂等及仅排空终态wake。取代父设计持久worker授权/三方交接；stage原始字节不先于journal提交删，无3b运行时接线。
+
+本次仅核完整diff/文件、源码与测试定义并做静态审计；未运行产品、构建、CI、MySQL、Hosted、OSS、性能、provider或浏览器验收。保留旧日期段，重叠状态/路径/reader与方案以本节为准，不移动createdAt周归属。
+
 ## MCP挂起保活与SQL候选，2026-11-20
 
 main `41f98a638dc4`：[#17805](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17805.md) 仅双语Phase 3设计合入：3a提议head到期提示、四态proof、完整仅未来证明不占缓存、已知且到期扫描和一律被动recoverForWake；ready/seal要冷态可重导的逐输入未尝试证明。3b独立后续要求原始字节staging、已接收/已持久位置、幂等重传、稳定身份/代际授权及只探测后台hold。两能力门/常量均非当前配置；pending notBefore与活后台仍阻挂起，无第二journal writer，性能比例尚未实测。

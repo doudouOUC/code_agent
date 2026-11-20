@@ -1,5 +1,15 @@
 # Managed 普通客户端、交互与事件投影
 
+## 版本事实、wake戳与恢复收敛，2026-11-21
+
+main `0ca8266fff86`：[#17866](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17866.md) MarkdownImage只把本地路径/实时加载失败降为可选择文本，保共享isSafeImageSrc、同源asset与document不回显URL/data。selectionClipboard保alt及原Markdown引用；不是浏览器本地文件读取能力。
+
+[#17886](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17886.md) ACTIVE head可凭同turn的native来源terminal、无cached attachment/active Turn/其他durable义务返回ready；SQL终态/缓存空单项不足。recheck typed decline409，其他不可达503并保cause。
+
+[#17944](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17944.md) 当前open无stage时只用内容视图过profile门，保完整贡献/摘要；逐包degradedComponents持久进bundle并从active快照公开。staged失败不降级，64KiB仍fail-closed，不能作为main能力承诺。
+
+本次仅核完整diff/文件、源码与测试定义并做静态审计；未运行产品、构建、CI、MySQL、Hosted、OSS、性能、provider或浏览器验收。保留旧日期段，重叠状态/路径/reader与方案以本节为准，不移动createdAt周归属。
+
 ## 恢复前置与默认 Skills，2026-11-19
 
 main `164bb1eb58bb`：[#17703](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17703.md) 已合入：授权发现默认 Skill→原不可变发布→创建 receipt pin；隐藏默认 revision，按已安装配置读目录。 `ManagedSkillCatalogSource` 只在权限/profile/导入 gate 允许时做事务外发现；显式 extensions:[] 跳默认，最多32默认 pin/256目录，编译后512KiB body与联合 UTF-8 预算由同源 entry 校验。`ManagedSkillCatalogService:get` 优先已安装配置、无 revision 才初始 pin；非 invocable/command 不显示，覆盖不全拒绝。V1 ma_extension_package 增 standalone_skill_json/is_catalog_listed，表数46/reader5不变不代表旧 catalog 兼容；自动默认 revision 不进显式 Workspace list。

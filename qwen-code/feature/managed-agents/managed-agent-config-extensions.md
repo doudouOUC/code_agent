@@ -1,5 +1,19 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## 版本事实、wake戳与恢复收敛，2026-11-21
+
+main `0ca8266fff86`：[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md)已合入最终+5800/-724、73文件：保SQL/GC/未知PUT债务边界，最终撤回PUBLIC Session的channel scope-key join，发现SQL移ChildResultRelayQueries；后续正文回收见17907。原规模不计后续PR。
+
+[#17864](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17864.md) 数字storage-reader头/字段/bean已删除；has_activity_diagnostics单调事实保restore重建。新header省minimumReader、显式旧字段仍验证；Action普通v3/批量question v4。V1仍47表、重建开发catalog，不是reader5继续协商或旧状态兼容。
+
+[#17871](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17871.md) ordinary files用lifecycle2，external-files保1；SSH/pool按feature/profile/isolation与配置准入child，root才launch。已受理SSH attach/background面依持久publicChildAgentsVersion，新建开关关闭不剥离既有面。
+
+[#17908](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17908.md) 默认wake-dispatch.enabled=false，acquire/renew grant广告后才放行未来未尝试wake。正常seal认证精确revision，acquire清戳；现有兜底到期跳proof后被动load，无戳保旧证明。transport未来/空pending给NOT_DUE，到期仍原activateForWake；不新增dispatcher。
+
+[#17944](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17944.md) 当前open无stage时只用内容视图过profile门，保完整贡献/摘要；逐包degradedComponents持久进bundle并从active快照公开。staged失败不降级，64KiB仍fail-closed，不能作为main能力承诺。
+
+本次仅核完整diff/文件、源码与测试定义并做静态审计；未运行产品、构建、CI、MySQL、Hosted、OSS、性能、provider或浏览器验收。保留旧日期段，重叠状态/路径/reader与方案以本节为准，不移动createdAt周归属。
+
 ## MCP挂起保活与SQL候选，2026-11-20
 
 main `41f98a638dc4`：[#17749](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17749.md) 已合入可选 MCP parking：`HostedMcpSession:suspend/park` 仅保settled/active原owner，重开 acquire→status→revalidate，HTTP5秒ping（-32601可接受），替代落定后退役旧配置。`RuntimeBrokerService:mcpParkable/reclaimParkedMcp` 只在回收job装配时广告，排除external；mount claim防后继被释放。默认mcp-parking.enabled=false、idle30分钟、scan1分钟、batch100（1至1000）；维护busy只加速下一趟，仍核SEALED。worker原16连接quota仅选其他owner闲300秒且无pending的最旧连接。pending配置/操作仍阻挂起，client-files按active判断；park保留存储成员资格，不是跨主机连接恢复。

@@ -1,5 +1,11 @@
 # daemon/serve 模式（Mode B）技术方案
 
+## Markdown 图片回退，2026-11-21
+
+main `0ca8266fff86`：[#17866](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17866.md) MarkdownImage只把本地路径/实时加载失败降为可选择文本，保共享isSafeImageSrc、同源asset与document不回显URL/data。selectionClipboard保alt及原Markdown引用；不是浏览器本地文件读取能力。
+
+本次仅核完整diff/文件、源码与测试定义并做静态审计；未运行产品、构建、CI、MySQL、Hosted、OSS、性能、provider或浏览器验收。保留旧日期段，重叠状态/路径/reader与方案以本节为准，不移动createdAt周归属。
+
 ## 恢复前置与默认 Skills，2026-11-19
 
 main `164bb1eb58bb`：[#17654](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17654.md) 已合入最终版：strict sidecar 锁下判定、可信 ACP hold 和成功 cwd 后释放保留；hold 不再隐式 suppress 非 Channel 的 child worktree restore，因此缺 ownership marker 的修复与 resumed notice 仍执行，deferred AUQ 独立传递。scheduled restore 仍经 owning runtime/generation 的统一流程。

@@ -1,5 +1,37 @@
 # Qwen Code Managed Agents 双链路方案
 
+## 版本事实、wake戳与恢复收敛，2026-11-21
+
+main `0ca8266fff86`：W47日更至11-20，新增12个，累计36个，33 merged / 3 open；32个在main，[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md)仍仅`stack/17247-external-content-base`；[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md)仍open。
+
+[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md)已合入最终+5800/-724、73文件：保SQL/GC/未知PUT债务边界，最终撤回PUBLIC Session的channel scope-key join，发现SQL移ChildResultRelayQueries；后续正文回收见17907。原规模不计后续PR。
+
+[#17864](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17864.md) 数字storage-reader头/字段/bean已删除；has_activity_diagnostics单调事实保restore重建。新header省minimumReader、显式旧字段仍验证；Action普通v3/批量question v4。V1仍47表、重建开发catalog，不是reader5继续协商或旧状态兼容。
+
+[#17869](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17869.md) 原3a的独立dispatcher/四态proof/不入缓存路线由seal-time wake stamp替代，后续17908有代码；本 PR 仅为设计交付，不把历史H2复现当MySQL验收。
+
+[#17871](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17871.md) ordinary files用lifecycle2，external-files保1；SSH/pool按feature/profile/isolation与配置准入child，root才launch。已受理SSH attach/background面依持久publicChildAgentsVersion，新建开关关闭不剥离既有面。
+
+[#17886](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17886.md) ACTIVE head可凭同turn的native来源terminal、无cached attachment/active Turn/其他durable义务返回ready；SQL终态/缓存空单项不足。recheck typed decline409，其他不可达503并保cause。
+
+[#17907](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17907.md) 正文回收撤ACTIVE-only，以coverage/PUT闭合及原锁证明推进SEALED包退出32项窗口；pristine/header/original receipt读SQL空正文时从pack按原revision/digest/length回读。
+
+[#17908](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17908.md) 默认wake-dispatch.enabled=false，acquire/renew grant广告后才放行未来未尝试wake。正常seal认证精确revision，acquire清戳；现有兜底到期跳proof后被动load，无戳保旧证明。transport未来/空pending给NOT_DUE，到期仍原activateForWake；不新增dispatcher。
+
+[#17909](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17909.md) 仅把publication lifecycle IT的v1见证移external-files/协议1；不改变ordinary files2生产行为，也未由本次运行MySQL。
+
+[#17912](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17912.md) 独立3b仍仅提案：worker捕获/Monitor策略/有序outbox，Broker现有租约下拉取stage，先attach后drain、稳定record水位幂等及仅排空终态wake。取代父设计持久worker授权/三方交接；stage原始字节不先于journal提交删，无3b运行时接线。
+
+[#17927](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17927.md) 当前open只把ma_tenant_guard两domain改VARCHAR96/0900_bin可读scope，仍参数化插入/锁与timeout；全库去哈希只是计划，不能作为main能力承诺。
+
+[#17932](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17932.md) passive遇精确runtime_broker_runtime_lost后只读原账本；全部pending abandoned才结算，混合/未知/无pending仍原拒绝，不acquire替代owner或execute。
+
+[#17944](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17944.md) 当前open无stage时只用内容视图过profile门，保完整贡献/摘要；逐包degradedComponents持久进bundle并从active快照公开。staged失败不降级，64KiB仍fail-closed，不能作为main能力承诺。
+
+[#17527](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17527.md)、[#17690](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17690.md)、[#17805](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17805.md) 的原设计/Phase1边界保留；当前状态由后续seal戳与native-terminal代码扩展，不再一律要求所有pending notBefore常驻，也不把所有ready概括为SEALED。
+
+本次仅核完整diff/文件、源码与测试定义并做静态审计；未运行产品、构建、CI、MySQL、Hosted、OSS、性能、provider或浏览器验收。保留旧日期段，重叠状态/路径/reader与方案以本节为准，不移动createdAt周归属。
+
 ## MCP挂起保活与SQL候选，2026-11-20
 
 main `41f98a638dc4`：W47 日更至11-19，新增4个，累计24个本人 PR，22 merged / 2 open；21个 merge 在 main，另1个仅功能分支。[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md) 仍 open；[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md) 仍仅合入 `stack/17247-external-content-base`，未在 main。
