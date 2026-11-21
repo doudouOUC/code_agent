@@ -35,8 +35,16 @@
 | [#17908](https://github.com/QwenLM/qwen-code/pull/17908) | merged | feat(managed-agent): stamp clean suspensions for wake dispatch | [pr-17908.md](pr-17908.md) |
 | [#17909](https://github.com/QwenLM/qwen-code/pull/17909) | merged | test(managed-agent): re-home publication lifecycle IT v1 witness to external-files | [pr-17909.md](pr-17909.md) |
 | [#17912](https://github.com/QwenLM/qwen-code/pull/17912) | merged | docs(managed-agent): design Runtime-owned background observation (Phase 3b) | [pr-17912.md](pr-17912.md) |
-| [#17927](https://github.com/QwenLM/qwen-code/pull/17927) | open | refactor(managed-agent): key tenant guard on readable VARCHAR scope (identity de-hash increment 1) | [pr-17927.md](pr-17927.md) |
+| [#17927](https://github.com/QwenLM/qwen-code/pull/17927) | merged | refactor(managed-agent): key tenant guard on readable VARCHAR scope (identity de-hash increment 1) | [pr-17927.md](pr-17927.md) |
 | [#17932](https://github.com/QwenLM/qwen-code/pull/17932) | merged | fix(managed-agent): settle a parked turn whose runtime is terminally lost | [pr-17932.md](pr-17932.md) |
-| [#17944](https://github.com/QwenLM/qwen-code/pull/17944) | open | feat(managed-agent): degrade process components per package in content-only extension runtimes | [pr-17944.md](pr-17944.md) |
+| [#17944](https://github.com/QwenLM/qwen-code/pull/17944) | merged | feat(managed-agent): degrade process components per package in content-only extension runtimes | [pr-17944.md](pr-17944.md) |
+| [#17953](https://github.com/QwenLM/qwen-code/pull/17953) | open | feat(managed-agent): runtime-owned background observation (Phase 3b slice 1 + staging schema) | [pr-17953.md](pr-17953.md) |
+| [#17954](https://github.com/QwenLM/qwen-code/pull/17954) | merged | test(managed-agent): run the wake stamp suites on MySQL and pin each suspension gate clause | [pr-17954.md](pr-17954.md) |
+| [#17955](https://github.com/QwenLM/qwen-code/pull/17955) | merged | fix(managed-agent): load transport wakes through the passive verb | [pr-17955.md](pr-17955.md) |
+| [#17958](https://github.com/QwenLM/qwen-code/pull/17958) | merged | refactor(managed-agent): drop redundant storage keys | [pr-17958.md](pr-17958.md) |
+| [#17959](https://github.com/QwenLM/qwen-code/pull/17959) | merged | refactor(managed-agent): drop redundant in-process locks and the archived legacy Session guard stub | [pr-17959.md](pr-17959.md) |
+| [#17960](https://github.com/QwenLM/qwen-code/pull/17960) | merged | docs(managed-agent): correct identity budgets and record duplicate-key survey in de-hash design | [pr-17960.md](pr-17960.md) |
+| [#17961](https://github.com/QwenLM/qwen-code/pull/17961) | merged | fix(managed-agent): hand the Hosted Harness client over under one lock | [pr-17961.md](pr-17961.md) |
+| [#18019](https://github.com/QwenLM/qwen-code/pull/18019) | merged | refactor(managed-agent): drop redundant same-row identity hash keys | [pr-18019.md](pr-18019.md) |
 
-_按个人PR口径更新于2026-11-21；北京时间11-20新增12个，本周累计36个：33 merged / 3 open / 0 closed。#17450仅功能分支合入，#17527/#17805/#17869/#17912为设计文档交付，非完整周窗口。_
+_按个人 PR 口径更新于2026-11-22；11-21新增8个，本周累计44个，42 merged / 2 open / 0 closed；#17450仅功能分支合入，设计与测试交付不作为完整运行时验收。_

@@ -1,5 +1,11 @@
 # Managed 普通客户端、交互与事件投影
 
+## 扩展组件降级已合入，2026-11-22
+
+main `14b52c7e1606`：[#17944](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17944.md) 已合入最终版（+1468/-20，14文件）：无stage内容准入保完整贡献/摘要，逐包 degradedComponents 从active bundle公开；staged失败不降级、64KiB仍fail-closed。
+
+本次仅核完整 diff/文件、源码与测试定义并静态审计，未运行产品、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期段，重叠状态、键路径与方案以本节为准，createdAt 周归属不变。
+
 ## 版本事实、wake戳与恢复收敛，2026-11-21
 
 main `0ca8266fff86`：[#17866](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17866.md) MarkdownImage只把本地路径/实时加载失败降为可选择文本，保共享isSafeImageSrc、同源asset与document不回显URL/data。selectionClipboard保alt及原Markdown引用；不是浏览器本地文件读取能力。

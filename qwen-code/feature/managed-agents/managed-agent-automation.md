@@ -1,5 +1,17 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 同行键清理、被动唤醒与后台观测候选，2026-11-22
+
+main `14b52c7e1606`：[#17953](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17953.md) 当前 open：worker 捕获/outbox、Broker 单拉取者 staging、先 attach 后 drain 和后台 seal 候选；main 无第48表及3b接线。
+
+[#17954](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17954.md) 已合入：共享 wake eligibility 谓词逐条件回归，原 stamp/recovery 断言复用到两个 MySqlIT；非本次执行证明。
+
+[#17955](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17955.md) 已合入：transport 改 recoverForWake，去 ALREADY_ATTACHED；NOT_DUE 和失败后 live-writer 复核保留。
+
+当前 main 仍47业务表、无数字reader协商；原3a到期仍active的描述已由 transport passive 修正取代。3b仅 open 候选，不把设计或测试定义当已部署能力。
+
+本次仅核完整 diff/文件、源码与测试定义并静态审计，未运行产品、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期段，重叠状态、键路径与方案以本节为准，createdAt 周归属不变。
+
 ## 版本事实、wake戳与恢复收敛，2026-11-21
 
 main `0ca8266fff86`：[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md)已合入最终+5800/-724、73文件：保SQL/GC/未知PUT债务边界，最终撤回PUBLIC Session的channel scope-key join，发现SQL移ChildResultRelayQueries；后续正文回收见17907。原规模不计后续PR。

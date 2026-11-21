@@ -1,5 +1,27 @@
 # Managed Runtime：持久回执、平台与运行验收
 
+## 同行键清理、被动唤醒与后台观测候选，2026-11-22
+
+main `14b52c7e1606`：[#17927](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17927.md) 已合入最终版（+839/-99，27文件）：guard 为 VARCHAR96/0900_bin，保参数化 SQL 与原锁域；最终另删 memory_store/package/settings 重复键，后续同行 scope 迁移由18019完成，不是全库 VARCHAR 转换。
+
+[#17953](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17953.md) 当前 open：worker 捕获/outbox、Broker 单拉取者 staging、先 attach 后 drain 和后台 seal 候选；main 无第48表及3b接线。
+
+[#17954](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17954.md) 已合入：共享 wake eligibility 谓词逐条件回归，原 stamp/recovery 断言复用到两个 MySqlIT；非本次执行证明。
+
+[#17955](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17955.md) 已合入：transport 改 recoverForWake，去 ALREADY_ATTACHED；NOT_DUE 和失败后 live-writer 复核保留。
+
+[#17958](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17958.md) 已合入：逻辑 alias 保 alias_key，物理 owner 保 storage_key；删重复列/唯一键并同步注册、迁移和 admission。
+
+[#17959](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17959.md) 已合入：getter 去重入锁、callback setter 保锁，placements 用单 monitor；空 legacy guard 改调原 SQL 锁。
+
+[#17961](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17961.md) 已合入：adopt/client/close 统一 clientLock，map 清理与旧 client close 留锁外；非 SDK wire/发行变更。
+
+[#18019](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18019.md) 已合入：同行 hash 改原业务键、保 VARBINARY/登记标记/跨表与生成身份，前缀仅非唯一索引；不是全库去哈希。
+
+当前 main 仍47业务表、无数字reader协商；原3a到期仍active的描述已由 transport passive 修正取代。3b仅 open 候选，不把设计或测试定义当已部署能力。
+
+本次仅核完整 diff/文件、源码与测试定义并静态审计，未运行产品、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期段，重叠状态、键路径与方案以本节为准，createdAt 周归属不变。
+
 ## 版本事实、wake戳与恢复收敛，2026-11-21
 
 main `0ca8266fff86`：[#17856](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17856.md)已合入最终+5800/-724、73文件：保SQL/GC/未知PUT债务边界，最终撤回PUBLIC Session的channel scope-key join，发现SQL移ChildResultRelayQueries；后续正文回收见17907。原规模不计后续PR。

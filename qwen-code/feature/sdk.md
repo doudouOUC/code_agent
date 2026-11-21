@@ -1,5 +1,11 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 客户端交接与发行边界，2026-11-22
+
+main `14b52c7e1606`：[#17961](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17961.md) 已合入：adopt/client/close 统一 clientLock，map 清理与旧 client close 留锁外；非 SDK wire/发行变更。
+
+本次仅核完整 diff/文件、源码与测试定义并静态审计，未运行产品、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期段，重叠状态、键路径与方案以本节为准，createdAt 周归属不变。
+
 ## 恢复前置与默认 Skills，2026-11-19
 
 main `164bb1eb58bb`：[#17681](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17681.md) 已合入：SDK 退役精确引用通知与两缓存清理，暂态分类和等待老化保错误码。 `HostedHarnessClient:onAttachmentRetirement` 仅通知精确引用，connector 按对象身份清两类缓存/marker；generation/pool 等待以当前阶段 max(1,budget)×4 的无进展计数老化，不是墙钟 deadline。closing/open_busy 与 teardown_blocked 分开，SDK 合入不等于已发行。
