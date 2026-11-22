@@ -1,5 +1,27 @@
 # Qwen Code Managed Agents 双链路方案
 
+## Phase 3b 已合入、Action parking 与身份迁移候选，2026-11-23
+
+main `ad61a4f41030`：W47日更至11-22：本日新增7个，累计51个，48 merged / 3 open；47个在main，[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md)仍仅功能分支。[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md)、[#18058](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18058.md)、[#18115](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18115.md)仍open。本次覆盖完整创建周，周一上午独立周更另行复核，不提前标为已完成周更。
+
+[#17953](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17953.md) 已合入最终版（+10394/-180，75文件）：worker后台捕获、单拉取者staging和先attach后drain已在 main，runtime-observation默认关闭且后台挂起还要求wakeDispatch等原能力。段128KiB、每页最多256描述、逐段revision，512KiB请求/8MiB outbox；有界stage、资源原子持久及提交后ack仍需真实故障/容量验收，不保留早期候选一段一页或独立协议标签口径。
+
+[#18041](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18041.md) 已合入：删死列/重复索引，Action 决策按原 scope_key 查询，保已有 receipt 唯一约束及 Harness placement 歧义拒绝。
+
+[#18047](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18047.md) 仅设计合入：冻结可恢复 waiter、seal 证书、Turn CAS/解除停靠与原 G3 恢复；运行时代码另见 open #18115。
+
+[#18048](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18048.md) 已合入：新资源/pack/output key 改可读身份与 slot，已有对象继续按 SQL 保存的 object_key 读取，不迁移旧对象。
+
+[#18058](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18058.md) 当前 open：按类别收紧身份准入并改部分 VARCHAR，跨表协调键用有界可逆 ASCII refs；仍有二进制列及 stage hash，不是全库完成。
+
+[#18110](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18110.md) 已合入：资源 publish 先核单路径段，stop 先做 tenant 持久预检再 adopt，测试用 close 后惰性等待最终写链。
+
+[#18115](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18115.md) 当前 open：WeakMap 注册/冻结 waiter、带 prompt/expiry/revision 的 seal、Turn CAS 和事务解除停靠；默认关闭且要求 wake dispatch。
+
+[#18118](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18118.md) 已合入：K8s 分发/脚本及旧验收资源冷归档，删除 hosted-csi Session 链；保活跃 managed-csi worker 协议，旧 prepare 字段显式拒绝。
+
+当前 main V1 为48业务表、无数字reader协商；Action parking及完整身份迁移候选不是 main 承诺。旧日期段保留，重叠状态、列/索引、路径及阶段边界以本节为准，PR 按 createdAt 固定归属周。本次仅静态审计，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。
+
 ## 同行键清理、被动唤醒与后台观测候选，2026-11-22
 
 main `14b52c7e1606`：W47日更至11-21，新增8个，累计44个，42 merged / 2 open；41个在main，[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md)仍仅功能分支，[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md)仍open。

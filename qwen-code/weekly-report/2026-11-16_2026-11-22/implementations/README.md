@@ -38,7 +38,7 @@
 | [#17927](https://github.com/QwenLM/qwen-code/pull/17927) | merged | refactor(managed-agent): key tenant guard on readable VARCHAR scope (identity de-hash increment 1) | [pr-17927.md](pr-17927.md) |
 | [#17932](https://github.com/QwenLM/qwen-code/pull/17932) | merged | fix(managed-agent): settle a parked turn whose runtime is terminally lost | [pr-17932.md](pr-17932.md) |
 | [#17944](https://github.com/QwenLM/qwen-code/pull/17944) | merged | feat(managed-agent): degrade process components per package in content-only extension runtimes | [pr-17944.md](pr-17944.md) |
-| [#17953](https://github.com/QwenLM/qwen-code/pull/17953) | open | feat(managed-agent): runtime-owned background observation (Phase 3b slice 1 + staging schema) | [pr-17953.md](pr-17953.md) |
+| [#17953](https://github.com/QwenLM/qwen-code/pull/17953) | merged | feat(managed-agent): runtime-owned background observation with suspend-safe staging and drain (Phase 3b) | [pr-17953.md](pr-17953.md) |
 | [#17954](https://github.com/QwenLM/qwen-code/pull/17954) | merged | test(managed-agent): run the wake stamp suites on MySQL and pin each suspension gate clause | [pr-17954.md](pr-17954.md) |
 | [#17955](https://github.com/QwenLM/qwen-code/pull/17955) | merged | fix(managed-agent): load transport wakes through the passive verb | [pr-17955.md](pr-17955.md) |
 | [#17958](https://github.com/QwenLM/qwen-code/pull/17958) | merged | refactor(managed-agent): drop redundant storage keys | [pr-17958.md](pr-17958.md) |
@@ -46,5 +46,12 @@
 | [#17960](https://github.com/QwenLM/qwen-code/pull/17960) | merged | docs(managed-agent): correct identity budgets and record duplicate-key survey in de-hash design | [pr-17960.md](pr-17960.md) |
 | [#17961](https://github.com/QwenLM/qwen-code/pull/17961) | merged | fix(managed-agent): hand the Hosted Harness client over under one lock | [pr-17961.md](pr-17961.md) |
 | [#18019](https://github.com/QwenLM/qwen-code/pull/18019) | merged | refactor(managed-agent): drop redundant same-row identity hash keys | [pr-18019.md](pr-18019.md) |
+| [#18041](https://github.com/QwenLM/qwen-code/pull/18041) | merged | refactor(managed-agent): drop dead and redundant schema objects | [pr-18041.md](pr-18041.md) |
+| [#18047](https://github.com/QwenLM/qwen-code/pull/18047) | merged | docs(managed-agent): design Action parking (stateless Harness phase 4) | [pr-18047.md](pr-18047.md) |
+| [#18048](https://github.com/QwenLM/qwen-code/pull/18048) | merged | refactor(managed-agent): use plaintext identity segments in OSS object keys | [pr-18048.md](pr-18048.md) |
+| [#18058](https://github.com/QwenLM/qwen-code/pull/18058) | open | refactor(managed-agent): de-hash identity columns with bounded VARCHAR and canonical refs | [pr-18058.md](pr-18058.md) |
+| [#18110](https://github.com/QwenLM/qwen-code/pull/18110) | merged | fix(managed-agent): close three confirmed post-merge observation audit findings | [pr-18110.md](pr-18110.md) |
+| [#18115](https://github.com/QwenLM/qwen-code/pull/18115) | open | feat(managed-agent): park recoverable Action waits behind a sealed certificate (Phase 4) | [pr-18115.md](pr-18115.md) |
+| [#18118](https://github.com/QwenLM/qwen-code/pull/18118) | merged | chore(managed-agent): retire K8s harness deployment templates and clean up archived CSI remnants | [pr-18118.md](pr-18118.md) |
 
-_按个人 PR 口径更新于2026-11-22；11-21新增8个，本周累计44个，42 merged / 2 open / 0 closed；#17450仅功能分支合入，设计与测试交付不作为完整运行时验收。_
+_按个人 PR 口径更新于2026-11-23；11-22新增7个，累计51个，48 merged / 3 open / 0 closed；#17450仅功能分支合入，覆盖完整创建周，尚未标为周一上午周更。_

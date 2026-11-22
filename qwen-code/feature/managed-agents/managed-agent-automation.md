@@ -1,5 +1,15 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## Phase 3b 已合入、Action parking 与身份迁移候选，2026-11-23
+
+main `ad61a4f41030`：[#17953](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17953.md) 已合入最终版（+10394/-180，75文件）：worker后台捕获、单拉取者staging和先attach后drain已在 main，runtime-observation默认关闭且后台挂起还要求wakeDispatch等原能力。段128KiB、每页最多256描述、逐段revision，512KiB请求/8MiB outbox；有界stage、资源原子持久及提交后ack仍需真实故障/容量验收，不保留早期候选一段一页或独立协议标签口径。
+
+[#18047](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18047.md) 仅设计合入：冻结可恢复 waiter、seal 证书、Turn CAS/解除停靠与原 G3 恢复；运行时代码另见 open #18115。
+
+[#18115](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18115.md) 当前 open：WeakMap 注册/冻结 waiter、带 prompt/expiry/revision 的 seal、Turn CAS 和事务解除停靠；默认关闭且要求 wake dispatch。
+
+当前 main V1 为48业务表、无数字reader协商；Action parking及完整身份迁移候选不是 main 承诺。旧日期段保留，重叠状态、列/索引、路径及阶段边界以本节为准，PR 按 createdAt 固定归属周。本次仅静态审计，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。
+
 ## 同行键清理、被动唤醒与后台观测候选，2026-11-22
 
 main `14b52c7e1606`：[#17953](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17953.md) 当前 open：worker 捕获/outbox、Broker 单拉取者 staging、先 attach 后 drain 和后台 seal 候选；main 无第48表及3b接线。
