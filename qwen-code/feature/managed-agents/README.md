@@ -1,5 +1,17 @@
 # Qwen Code Managed Agents 双链路方案
 
+## W47 周更：Action parking 最终实现，2026-11-23
+
+main `d4b28087f457`，本节为周一上午独立周更快照，取代此前日更中的重叠状态与代码边界；旧日期记录保留。
+
+北京时间11-16至11-22创建的个人 PR 共51个，49 merged / 2 open；48个在 main，[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md)仍仅功能分支，[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md)仍open。统计按 createdAt，不按后续合入时间移动归属。
+
+[#18115](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18115.md) 已合入最终版（+2627/-129，48文件）：持久可恢复审批/提问等待在原 prompt 文本、唯一根输入、无 Hooks/MCP/command-step 等资格下冻结，resolution 计数和 polling 竞争拒绝走可逆回滚。seal 固定 prompt/较早到期与可选 approval revision；staged wake 事务会清停靠字段，普通 park CAS 释放派发租约而保 RUNNING Turn及Runtime成员资格。审批/规则变更仅凭完整证书且唯一活工作豁免对应 busy gate；Public/WebShell 隐藏内部停靠 errorCode，恢复视图仍为 turn_active，不因证书已清而报 ready。默认 action-parking.enabled=false，开启仍要求 wake-dispatch。
+
+[#18058](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18058.md) 仍是当前 open diff（+8104/-6140，399文件），不能作为 main 能力承诺。最新候选已重基到 Phase4 main，actorScopeRef 与侧查询 actor_scope_ref/active_slot 为550字节；Runtime scope/request 在构造准入计算具名预算，Hook闭合记录与抽取后的child正文完整性校验保留。canonical refs 仍二进制存储，child-run256与operation镜像128双门禁、stage hash仍在；不是全库身份契约已兼容或收敛。
+
+main V1仍48业务表、无数字storage reader协商，已包含3个Action停靠列；同表数不证明候选列/索引/编码兼容，开发catalog重建而无升级链。本次仅文档与源码静态审计，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。
+
 ## Phase 3b 已合入、Action parking 与身份迁移候选，2026-11-23
 
 main `ad61a4f41030`：W47日更至11-22：本日新增7个，累计51个，48 merged / 3 open；47个在main，[#17450](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17450.md)仍仅功能分支。[#17449](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17449.md)、[#18058](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18058.md)、[#18115](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18115.md)仍open。本次覆盖完整创建周，周一上午独立周更另行复核，不提前标为已完成周更。

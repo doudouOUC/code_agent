@@ -2,7 +2,7 @@
 
 我（[@doudouOUC](https://github.com/doudouOUC)）在 [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) 提交的 PR，按周整理。每个周目录下的 `README.md` 含该周完整明细（类型 / 代码量 / 文件数 / 链接）及逐 PR 的“解决了什么问题 / 怎么做的”摘要；已建立深读记录的 PR，其完整中文实现或方案观察放在对应周目录的 `implementations/` 下。最终口径以 merged diff、changed files、patch、测试/配置路径和关闭状态为准；PR body 只作为目标线索。
 
-> 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 周更完整集合已核验，2026-10-13 完成整理并刷新后续合入状态；W42 于 2026-10-19 周一上午完成周更；W43 于 2026-10-26 周一上午独立复核北京时间 10-19 至 10-25 完整创建集合及最新状态/实现；W44 于 2026-11-02 周一上午独立复核北京时间 10-26 至 11-01 完整创建集合及最新状态/实现；W45 于 2026-11-09 周一上午独立复核北京时间 11-02 至 11-08 完整创建集合及最新状态/实现，未发布周更于 11-10 凌晨完成最终状态/规模复核；W46 于 2026-11-16 周一上午独立核验北京时间 11-09 至 11-15 完整创建集合及最新状态/实现，共 37 个本人 PR，36 merged / 1 open / 0 closed。PR 按 createdAt 固定周归属，不能按后续合入日期移动，#13642 后续合入也仍属 W41。单 PR 文档可后续复核为最终状态；W47 日更至 11-22，本日新增7个、累计51个本人PR，48 merged / 3 open / 0 closed；#17450仅功能分支合入，Phase3b与后续修正已合，身份迁移/Action parking仍open；覆盖完整创建周但周一上午独立周更另行复核。
+> 历史周目录 `README.md` 的状态与规模保留归档快照；W39/W40 已在 2026-10-09 同次复核，W41 周更完整集合已核验，2026-10-13 完成整理并刷新后续合入状态；W42 于 2026-10-19 周一上午完成周更；W43 于 2026-10-26 周一上午独立复核北京时间 10-19 至 10-25 完整创建集合及最新状态/实现；W44 于 2026-11-02 周一上午独立复核北京时间 10-26 至 11-01 完整创建集合及最新状态/实现；W45 于 2026-11-09 周一上午独立复核北京时间 11-02 至 11-08 完整创建集合及最新状态/实现，未发布周更于 11-10 凌晨完成最终状态/规模复核；W46 于 2026-11-16 周一上午独立核验北京时间 11-09 至 11-15 完整创建集合及最新状态/实现，共 37 个本人 PR，36 merged / 1 open / 0 closed。PR 按 createdAt 固定周归属，不能按后续合入日期移动，#13642 后续合入也仍属 W41。单 PR 文档可后续复核为最终状态；W47 于2026-11-23周一上午独立核验北京时间11-16至11-22完整创建周，共51个本人PR，49 merged / 2 open / 0 closed；#17450仅功能分支合入，48个在main；Phase3b与Action parking已合入且默认关闭，身份迁移仍open。
 
 **时间范围**: 2026-04-06 ~ 2026-11-22（持续更新）
 **总计**: 868 PRs（W39–W46 保留完整创建周归档快照）
@@ -48,7 +48,7 @@
 | 2026-10-26 ~ 2026-11-01 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-10-26_2026-11-01) · [Obsidian](2026-10-26_2026-11-01/README.md)) (W44 周更) | 29 | 27/1/1 | +84,462/-33,501 | Broker 工作流/dispatcher 与 Store 构造注入已合入；E2B open，完整历史关闭未合入 |
 | 2026-11-02 ~ 2026-11-08 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-11-02_2026-11-08) · [Obsidian](2026-11-02_2026-11-08/README.md)) (W45 周更) | 63 | 60/2/1 | +156,701/-33,730 | 模型/活动诊断、Mem0、自助安装与 Runtime Skill 已合主干；测量/OAuth 候选 |
 | 2026-11-09 ~ 2026-11-15 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-11-09_2026-11-15) · [Obsidian](2026-11-09_2026-11-15/README.md)) (W46 周更) | 37 | 36/1/0 | +42,299/-34,672 | CSI/rename 锁修复、guard 盘点与嵌入/发布收敛；通用冷归档仍 open |
-| 2026-11-16 ~ 2026-11-22 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-11-16_2026-11-22) · [Obsidian](2026-11-16_2026-11-22/README.md)) (W47 日更至 11-22) | 51 | 48/3/0 | +82,421/-37,788 | Phase3b已合、Action parking与身份迁移候选 |
+| 2026-11-16 ~ 2026-11-22 ([GitHub](https://github.com/doudouOUC/code_agent/tree/main/qwen-code/weekly-report/2026-11-16_2026-11-22) · [Obsidian](2026-11-16_2026-11-22/README.md)) (W47 周更) | 51 | 49/2/0 | +83,991/-37,962 | Phase3b/Action parking已合、身份迁移候选 |
 
 ## 类型分布
 

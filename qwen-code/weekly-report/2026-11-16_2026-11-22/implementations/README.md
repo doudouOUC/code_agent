@@ -51,7 +51,7 @@
 | [#18048](https://github.com/QwenLM/qwen-code/pull/18048) | merged | refactor(managed-agent): use plaintext identity segments in OSS object keys | [pr-18048.md](pr-18048.md) |
 | [#18058](https://github.com/QwenLM/qwen-code/pull/18058) | open | refactor(managed-agent): de-hash identity columns with bounded VARCHAR and canonical refs | [pr-18058.md](pr-18058.md) |
 | [#18110](https://github.com/QwenLM/qwen-code/pull/18110) | merged | fix(managed-agent): close three confirmed post-merge observation audit findings | [pr-18110.md](pr-18110.md) |
-| [#18115](https://github.com/QwenLM/qwen-code/pull/18115) | open | feat(managed-agent): park recoverable Action waits behind a sealed certificate (Phase 4) | [pr-18115.md](pr-18115.md) |
+| [#18115](https://github.com/QwenLM/qwen-code/pull/18115) | merged | feat(managed-agent): park recoverable Action waits behind a sealed certificate (Phase 4) | [pr-18115.md](pr-18115.md) |
 | [#18118](https://github.com/QwenLM/qwen-code/pull/18118) | merged | chore(managed-agent): retire K8s harness deployment templates and clean up archived CSI remnants | [pr-18118.md](pr-18118.md) |
 
 _按个人 PR 口径更新于2026-11-23；11-22新增7个，累计51个，48 merged / 3 open / 0 closed；#17450仅功能分支合入，覆盖完整创建周，尚未标为周一上午周更。_

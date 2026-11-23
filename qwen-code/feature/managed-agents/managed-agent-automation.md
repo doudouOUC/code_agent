@@ -1,5 +1,13 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## W47 周更：Action parking 最终实现，2026-11-23
+
+main `d4b28087f457`，本节为周一上午独立周更快照，取代此前日更中的重叠状态与代码边界；旧日期记录保留。
+
+[#18115](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-18115.md) 已合入最终版（+2627/-129，48文件）：持久可恢复审批/提问等待在原 prompt 文本、唯一根输入、无 Hooks/MCP/command-step 等资格下冻结，resolution 计数和 polling 竞争拒绝走可逆回滚。seal 固定 prompt/较早到期与可选 approval revision；staged wake 事务会清停靠字段，普通 park CAS 释放派发租约而保 RUNNING Turn及Runtime成员资格。审批/规则变更仅凭完整证书且唯一活工作豁免对应 busy gate；Public/WebShell 隐藏内部停靠 errorCode，恢复视图仍为 turn_active，不因证书已清而报 ready。默认 action-parking.enabled=false，开启仍要求 wake-dispatch。
+
+main V1仍48业务表、无数字storage reader协商，已包含3个Action停靠列；同表数不证明候选列/索引/编码兼容，开发catalog重建而无升级链。本次仅文档与源码静态审计，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。
+
 ## Phase 3b 已合入、Action parking 与身份迁移候选，2026-11-23
 
 main `ad61a4f41030`：[#17953](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17953.md) 已合入最终版（+10394/-180，75文件）：worker后台捕获、单拉取者staging和先attach后drain已在 main，runtime-observation默认关闭且后台挂起还要求wakeDispatch等原能力。段128KiB、每页最多256描述、逐段revision，512KiB请求/8MiB outbox；有界stage、资源原子持久及提交后ack仍需真实故障/容量验收，不保留早期候选一段一页或独立协议标签口径。
