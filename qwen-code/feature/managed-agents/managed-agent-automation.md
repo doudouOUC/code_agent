@@ -1,5 +1,29 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## W48 恢复与停靠覆盖增量，2026-11-24
+
+main `2fef40262f36`；本节更新北京时间11-23创建的个人PR，保留旧日期史料，重叠状态与实现边界以本快照为准。
+
+[#18151](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18151.md) 仅设计与实施前测试合入：按冷恢复前提分切片扩大停靠，未一次实现图片/wake/Hooks/MCP 等能力。
+
+[#18157](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18157.md) 已合入：共享冷恢复形状门、持久等待携 typed refusal 注册，按每个等待首个原因计数，不放开既有禁区。
+
+[#18164](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18164.md) 当前 open：原附件输入可恢复为空文本，统一缺失判定；main 尚不承诺纯图片等待停靠。
+
+[#18166](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18166.md) 当前 open：真实冻结 command-step waiter，共享扩展恢复形状门；普通 Hooks/MCP 批次不因此开放。
+
+[#18170](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18170.md) 当前 open：部分 wake 来源优先恢复原 await_action；与main已合的取消/推进 fallback 是不同路径。
+
+[#18172](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18172.md) 已合入：await_action 原 Action 取消并推进等待，未读到持久 verdict 不消费输入；不是恢复原审批。
+
+[#18173](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18173.md) 已合入：内部受契约中间件保护的 metrics 接真实 suspensionStats，保可选回调兼容，不改变停靠门。
+
+[#18186](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18186.md) 仅文档修正合入：MCP Action park回收豁免是S6待实施项，不是现有Broker能力。
+
+原Phase4仍默认关闭，当前main保留文本、command-step、wake-owned、Hooks/MCP等相应门；图片/command-step/恢复wake等待的候选不等于已扩大停靠覆盖。设计的MCP owner回收保护也尚未接线。
+
+本次仅完整diff、源码/测试定义与文档静态核验，未运行产品测试、构建、CI、MySQL、Hosted、provider、OSS、性能或浏览器验收。
+
 ## W47 周更：Action parking 最终实现，2026-11-23
 
 main `d4b28087f457`，本节为周一上午独立周更快照，取代此前日更中的重叠状态与代码边界；旧日期记录保留。

@@ -1,5 +1,13 @@
 # Managed 普通客户端、交互与事件投影
 
+## W48 恢复与停靠覆盖增量，2026-11-24
+
+main `2fef40262f36`；本节更新北京时间11-23创建的个人PR，保留旧日期史料，重叠状态与实现边界以本快照为准。
+
+[#18132](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18132.md) 已合入：本地未准入取消查询 Session 最后 accepted input，只按完整 cleanup 证据定向 recheck，缺证据保持保守。
+
+本次仅完整diff、源码/测试定义与文档静态核验，未运行产品测试、构建、CI、MySQL、Hosted、provider、OSS、性能或浏览器验收。
+
 ## 扩展组件降级已合入，2026-11-22
 
 main `14b52c7e1606`：[#17944](../../weekly-report/2026-11-16_2026-11-22/implementations/pr-17944.md) 已合入最终版（+1468/-20，14文件）：无stage内容准入保完整贡献/摘要，逐包 degradedComponents 从active bundle公开；staged失败不降级、64KiB仍fail-closed。

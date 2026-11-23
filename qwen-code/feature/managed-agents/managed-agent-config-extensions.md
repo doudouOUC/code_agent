@@ -1,5 +1,21 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## W48 恢复与停靠覆盖增量，2026-11-24
+
+main `2fef40262f36`；本节更新北京时间11-23创建的个人PR，保留旧日期史料，重叠状态与实现边界以本快照为准。
+
+[#18125](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18125.md) 已合入：application/context 双加载器发现、按 factory Class 去重，保真正重复 kind 拒绝和原后端校验。
+
+[#18157](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18157.md) 已合入：共享冷恢复形状门、持久等待携 typed refusal 注册，按每个等待首个原因计数，不放开既有禁区。
+
+[#18166](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18166.md) 当前 open：真实冻结 command-step waiter，共享扩展恢复形状门；普通 Hooks/MCP 批次不因此开放。
+
+[#18186](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18186.md) 仅文档修正合入：MCP Action park回收豁免是S6待实施项，不是现有Broker能力。
+
+原Phase4仍默认关闭，当前main保留文本、command-step、wake-owned、Hooks/MCP等相应门；图片/command-step/恢复wake等待的候选不等于已扩大停靠覆盖。设计的MCP owner回收保护也尚未接线。
+
+本次仅完整diff、源码/测试定义与文档静态核验，未运行产品测试、构建、CI、MySQL、Hosted、provider、OSS、性能或浏览器验收。
+
 ## W47 周更：Action parking 最终实现，2026-11-23
 
 main `d4b28087f457`，本节为周一上午独立周更快照，取代此前日更中的重叠状态与代码边界；旧日期记录保留。
