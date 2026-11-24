@@ -1,5 +1,31 @@
 # Managed Agent：有效配置、初始化、Skills、MCP 与 Hooks
 
+## W48 停靠覆盖与客户端边界，2026-11-25
+
+main `f38f6fe7c3e2`；本节新增/复核11-24日更范围。
+
+[#18157](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18157.md) 已合入：共享冷恢复形状门、持久等待携 typed refusal 注册，按每个等待首个原因计数，不放开既有禁区。
+
+[#18166](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18166.md) 已合入：command-step真实freeze与共享恢复shape，最终补bare-load保护；后续Hooks/MCP另案。
+
+[#18186](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18186.md) 仅设计修正合入：原回收保护要求后续由18234实现，受限MCP审批由18236接线。
+
+[#18195](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18195.md) 已合入：名称/测试对齐既有36 UTF16单元门，不改变生产长度算法。
+
+[#18218](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18218.md) 仅设计/测试合入：核配置owner与启动Hook/原prompt历史；不等于新增原生Hooks停靠代码。
+
+[#18231](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18231.md) 仅设计/测试合入：核public-children既有Shell原reservation恢复，不新增普通Shell停靠。
+
+[#18234](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18234.md) 已合入：sealedFor仅给无Action证书的owner回收证明，idle/expedite共用。
+
+[#18236](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18236.md) 已合入：owner限定、Hook结果digest只读恢复、MCP原目录/输入核对及bare-load保护；非任意Hooks/MCP放行。
+
+[#18267](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18267.md) 当前open：状态/boot/model/定义投影改命名值，保wire/digest与动态扩展，不是schema迁移。
+
+当前资格不再沿用旧日期段的图片/lineage/wake/Hooks/MCP一概拒绝：原输入、保存计划、owner、Hook结果和MCP原目录仍逐项校验。wake owner无SQL Turn，background staged wake保原证书并使其到期；command-step wake、activation Hook owner等仍拒绝。action-parking默认关闭且要求wake-dispatch，MCP还需可保留连接；不等于部署已开启。
+
+本次仅核完整diff/文件、源码与测试定义，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期史料，重叠状态/资格/路径以本节为准，不改变createdAt归属周。
+
 ## W48 恢复与停靠覆盖增量，2026-11-24
 
 main `2fef40262f36`；本节更新北京时间11-23创建的个人PR，保留旧日期史料，重叠状态与实现边界以本快照为准。

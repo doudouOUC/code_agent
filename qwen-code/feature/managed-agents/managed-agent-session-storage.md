@@ -1,5 +1,35 @@
 # Managed Session：记录格式、提交与协议限额
 
+## W48 停靠覆盖与客户端边界，2026-11-25
+
+main `f38f6fe7c3e2`；本节新增/复核11-24日更范围。
+
+[#18151](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18151.md) 仅设计与实施前测试合入：按冷恢复前提分切片扩大停靠，未一次实现图片/wake/Hooks/MCP 等能力。
+
+[#18186](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18186.md) 仅设计修正合入：原回收保护要求后续由18234实现，受限MCP审批由18236接线。
+
+[#18187](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18187.md) 已合入：后台能力随 grant 协商，staged wake 使证书立即到期而保留原身份，事务解除 SQL 停靠。
+
+[#18190](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18190.md) 已合入：资源/artifact 类型对齐，转换放在 probe 侧并保精确残余条件；MySQL 计划断言未独立执行。
+
+[#18194](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18194.md) 已合入：wake owner 证书和 grant，不新建 ma_turn；按原输入/审批修订唤醒并保 cleanup 边界。
+
+[#18195](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18195.md) 已合入：名称/测试对齐既有36 UTF16单元门，不改变生产长度算法。
+
+[#18211](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18211.md) 仅测试合入：从索引名提升到实际复合键使用列，增加取消证据规模场景。
+
+[#18234](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18234.md) 已合入：sealedFor仅给无Action证书的owner回收证明，idle/expedite共用。
+
+[#18236](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18236.md) 已合入：owner限定、Hook结果digest只读恢复、MCP原目录/输入核对及bare-load保护；非任意Hooks/MCP放行。
+
+[#18267](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18267.md) 当前open：状态/boot/model/定义投影改命名值，保wire/digest与动态扩展，不是schema迁移。
+
+当前资格不再沿用旧日期段的图片/lineage/wake/Hooks/MCP一概拒绝：原输入、保存计划、owner、Hook结果和MCP原目录仍逐项校验。wake owner无SQL Turn，background staged wake保原证书并使其到期；command-step wake、activation Hook owner等仍拒绝。action-parking默认关闭且要求wake-dispatch，MCP还需可保留连接；不等于部署已开启。
+
+main V1仍48业务表，新增wake_seal_parked_owner并对齐resource/artifact文本连接；无数字storage reader协商，开发catalog重建而非升级。闭合JSON候选未改DDL或持久wire。
+
+本次仅核完整diff/文件、源码与测试定义，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期史料，重叠状态/资格/路径以本节为准，不改变createdAt归属周。
+
 ## W48 恢复与停靠覆盖增量，2026-11-24
 
 main `2fef40262f36`；本节更新北京时间11-23创建的个人PR，保留旧日期史料，重叠状态与实现边界以本快照为准。

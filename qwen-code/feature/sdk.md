@@ -1,5 +1,15 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## W48 停靠覆盖与客户端边界，2026-11-25
+
+main `f38f6fe7c3e2`；本节新增/复核11-24日更范围。
+
+[#18247](../weekly-report/2026-11-23_2026-11-29/implementations/pr-18247.md) 当前open：公开Java客户端与签名transport/SSE候选，写入不自动重试，分页/重连由调用者负责。
+
+Java公开客户端仍候选：caller保幂等键、未知结果不自动重试，SSE resync由调用方回补Items/重连；不是Hosted私有connector的新发行，也不表示Python/TypeScript已有同等封装。
+
+本次仅核完整diff/文件、源码与测试定义，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期史料，重叠状态/资格/路径以本节为准，不改变createdAt归属周。
+
 ## 客户端交接与发行边界，2026-11-22
 
 main `14b52c7e1606`：[#17961](../weekly-report/2026-11-16_2026-11-22/implementations/pr-17961.md) 已合入：adopt/client/close 统一 clientLock，map 清理与旧 client close 留锁外；非 SDK wire/发行变更。

@@ -1,5 +1,19 @@
 # Managed 普通客户端、交互与事件投影
 
+## W48 停靠覆盖与客户端边界，2026-11-25
+
+main `f38f6fe7c3e2`；本节新增/复核11-24日更范围。
+
+[#18132](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18132.md) 已合入：本地未准入取消查询 Session 最后 accepted input，只按完整 cleanup 证据定向 recheck，缺证据保持保守。
+
+[#18212](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18212.md) 已合入：仅本地未准入取消允许旧cleanup欠账，保锁/准入识别和后续清理证明。
+
+[#18247](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18247.md) 当前open：公开Java客户端与签名transport/SSE候选，写入不自动重试，分页/重连由调用者负责。
+
+Java公开客户端仍候选：caller保幂等键、未知结果不自动重试，SSE resync由调用方回补Items/重连；不是Hosted私有connector的新发行，也不表示Python/TypeScript已有同等封装。
+
+本次仅核完整diff/文件、源码与测试定义，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。保留旧日期史料，重叠状态/资格/路径以本节为准，不改变createdAt归属周。
+
 ## W48 恢复与停靠覆盖增量，2026-11-24
 
 main `2fef40262f36`；本节更新北京时间11-23创建的个人PR，保留旧日期史料，重叠状态与实现边界以本快照为准。
