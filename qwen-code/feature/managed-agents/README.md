@@ -554,6 +554,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [Java 存储、事件与恢复](managed-agent-storage-event-architecture.md) | `AgentStateStore`、事件批次、提交后 SSE、SQL/MQ/物化边界、MySQL/PostgreSQL 与恢复阶段 |
 | [Runtime Broker JDBC 持久化](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) | Binding/Session/Execution Repository、四表 schema、CAS/租约 fencing、H2/真实 MySQL 验证与 Spring 接线边界 |
 | [Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md) | reconcile + attest + CAS + 本地 gate、route 单源、失败分类、跨 TS/Java 契约门禁与部署身份 |
+| [Harness 拉模型调度](managed-agent-harness-pull-scheduling.zh-CN.md) / [English](managed-agent-harness-pull-scheduling.md) | 多实例 Harness 与负载均衡：现状限制、Claude Managed Agents 参考、推/拉两方案对比、拉模型的认领/租约/信号与 P0～P6 迁移；提案，未提交上游 |
 | [Public API 与 WebShell 契约](managed-agent-api-contract.md) / [OpenAPI](managed-agent-public-api.openapi.yaml) | 统一公共/WebShell 路由、DTO、错误、幂等、分页、SSE 与租户范围 |
 | [MySQL v1.10 目标增量结构](managed-agent-storage-schema.mysql.sql) | 真实 V1/V2 后新增 Batch/Delivery/Receipt/immutable Snapshot/Owner，保留已有 Item/Part 与每 Session 进度 |
 | [Session 兼容](managed-agent-session-compatibility.md) / [方法映射](managed-agent-session-method-map.md) | 复用 daemon 契约及原调用者审计 |
