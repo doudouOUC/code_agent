@@ -1,5 +1,17 @@
 # Managed 普通客户端、交互与事件投影
 
+## S8a、职责拆分与验收边界，2026-11-26
+
+main `be11490df47e`；本节更新11-25日更。
+
+[#18247](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18247.md) 当前open：命名请求/DTO、分页和SSE payload已扩展，保签名、未知写不重试及调用方resync回补。
+
+[#18290](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18290.md) 已合入：16职责模块、原注册顺序/状态作用域与re-export保留；非新协议或pull调度实现。
+
+候选现为命名builder/DTO与SSE payload，不再沿用下方旧日期“全Map”口径；开放schema仍保JSON，分页/重连/Items水位回补由调用者负责，mutation未知结果不自动重试。并非SDK已发行。
+
+本次只做文档与源码静态审计，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。旧日期内容保留，重叠状态/范围/代码路径以上述快照为准，createdAt周归属不变。
+
 ## W48 停靠覆盖与客户端边界，2026-11-25
 
 main `f38f6fe7c3e2`；本节新增/复核11-24日更范围。

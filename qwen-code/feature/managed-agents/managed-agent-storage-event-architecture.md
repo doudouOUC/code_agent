@@ -1,5 +1,25 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## S8a、职责拆分与验收边界，2026-11-26
+
+main `be11490df47e`；本节更新11-25日更。
+
+[#18267](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18267.md) 已合入：Runtime状态/Boot/模型配置和固定定义用命名值，保历史wire/digest与动态扩展。
+
+[#18278](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18278.md) 已合入：四字段Object命名值替代Map索引，保历史数值/null、wire与摘要，不增值验证。
+
+[#18290](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18290.md) 已合入：16职责模块、原注册顺序/状态作用域与re-export保留；非新协议或pull调度实现。
+
+[#18325](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18325.md) 已合入：197生产Java类型引用整理及指定行数pin，保歧义限定/字面量；未独立验证字节码等价。
+
+[#18353](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18353.md) 当前open：ResultSet共用UTF8身份读取消除String/byte[]假定，并增加version0两lane验收定义。
+
+当前public Shell version0按原definition/profile/captureBytes识别两lane，仅派发前等待；background只有publication lane。公共Shell+MCP仍被idle谓词阻止，MCP profile原等待与之不同。action-parking仍默认关闭且依赖wake dispatch，不能由测试合入推断启用或验收。18353仅当前open登记前置修复。
+
+V1仍48业务表，未新增升级链或数字storage reader。闭合JSON与measurements命名投影保原wire/digest；18353只改身份读取，不放松同host目录重叠拒绝。
+
+本次只做文档与源码静态审计，未运行产品测试、构建、CI、MySQL、Hosted、OSS、provider、性能或浏览器验收。旧日期内容保留，重叠状态/范围/代码路径以上述快照为准，createdAt周归属不变。
+
 ## W48 停靠覆盖与客户端边界，2026-11-25
 
 main `f38f6fe7c3e2`；本节新增/复核11-24日更范围。

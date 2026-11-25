@@ -30,7 +30,14 @@
 | [#18233](https://github.com/QwenLM/qwen-code/pull/18233) | merged | test(managed-agent): wait for the resumed wake Turn to free the Session before closing | [pr-18233.md](pr-18233.md) |
 | [#18234](https://github.com/QwenLM/qwen-code/pull/18234) | merged | fix(managed-agent): keep an Action-parked Session's MCP owner from reclamation | [pr-18234.md](pr-18234.md) |
 | [#18236](https://github.com/QwenLM/qwen-code/pull/18236) | merged | feat(managed-agent): park Hooks and MCP Session approval waits | [pr-18236.md](pr-18236.md) |
-| [#18247](https://github.com/QwenLM/qwen-code/pull/18247) | open | feat(sdk-java): Add a public Managed Agent client | [pr-18247.md](pr-18247.md) |
-| [#18267](https://github.com/QwenLM/qwen-code/pull/18267) | open | refactor(managed-agent): Make closed JSON fields explicit | [pr-18267.md](pr-18267.md) |
+| [#18247](https://github.com/QwenLM/qwen-code/pull/18247) | open | feat(sdk-java): Add a typed public Managed Agent client | [pr-18247.md](pr-18247.md) |
+| [#18267](https://github.com/QwenLM/qwen-code/pull/18267) | merged | refactor(managed-agent): Make closed JSON fields explicit | [pr-18267.md](pr-18267.md) |
+| [#18276](https://github.com/QwenLM/qwen-code/pull/18276) | merged | test(managed-agent): Add real-process Action parking acceptance | [pr-18276.md](pr-18276.md) |
+| [#18278](https://github.com/QwenLM/qwen-code/pull/18278) | merged | refactor(runtime-broker): Type measurement diagnostics metadata | [pr-18278.md](pr-18278.md) |
+| [#18279](https://github.com/QwenLM/qwen-code/pull/18279) | merged | docs(managed-agent): design S8a Shell approval parking and confirm its pre-start checks | [pr-18279.md](pr-18279.md) |
+| [#18290](https://github.com/QwenLM/qwen-code/pull/18290) | merged | refactor(serve): Split Hosted Harness Session by responsibility | [pr-18290.md](pr-18290.md) |
+| [#18303](https://github.com/QwenLM/qwen-code/pull/18303) | merged | feat(managed-agent): park Shell approvals on version-0 public Shell Sessions (S8a) | [pr-18303.md](pr-18303.md) |
+| [#18325](https://github.com/QwenLM/qwen-code/pull/18325) | merged | refactor(managed-agent): Simplify Java type references | [pr-18325.md](pr-18325.md) |
+| [#18353](https://github.com/QwenLM/qwen-code/pull/18353) | open | fix(managed-agent): Restore Workspace registration for Action parking acceptance | [pr-18353.md](pr-18353.md) |
 
-_按个人 PR 口径更新于 2026-11-25_
+_按个人 PR 口径更新于 2026-11-26_
