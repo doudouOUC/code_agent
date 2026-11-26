@@ -614,7 +614,7 @@ A～H 表示能力阶段，完整 D 不阻塞 E 的现有产品 API 首版闭环
 | [Java 存储、事件与恢复](managed-agent-storage-event-architecture.md) | `AgentStateStore`、事件批次、提交后 SSE、SQL/MQ/物化边界、MySQL/PostgreSQL 与恢复阶段 |
 | [Runtime Broker JDBC 持久化](managed-runtime-broker-jdbc.zh-CN.md) / [English](managed-runtime-broker-jdbc.md) | Binding/Session/Execution Repository、四表 schema、CAS/租约 fencing、H2/真实 MySQL 验证与 Spring 接线边界 |
 | [Runtime 身份核验与就绪门禁](managed-runtime-attestation.zh-CN.md) / [English](managed-runtime-attestation.md) | reconcile + attest + CAS + 本地 gate、route 单源、失败分类、跨 TS/Java 契约门禁与部署身份 |
-| [Harness 拉模型调度](managed-agent-harness-pull-scheduling.zh-CN.md) / [English](managed-agent-harness-pull-scheduling.md) | 无状态、可弹性扩缩的 Harness 调度：现状（Java 按 placement 路由、释放与回收已合入、分配不看容量）、运行中 Turn 的两个 owner、Claude Managed Agents 参考、Java 路由推模型（中间形态）与拉模型（终态）对比、拉模型为终态的理由、SQL 实例注册表（P0）与事件上报（P4）、P0～P6 迁移；提案，未提交上游 |
+| [Harness 拉模型调度](managed-agent-harness-pull-scheduling.zh-CN.md) / [English](managed-agent-harness-pull-scheduling.md) | 无状态、可弹性扩缩的 Harness 调度：现状（Java 按 placement 路由、释放与回收已合入、分配不看容量）、运行中 Turn 的两个 owner、Claude Managed Agents 参考、Java 路由推模型（中间形态）与拉模型（终态）对比、拉模型为终态的理由、B 不需要注册表、用 MQ 做传输的取舍、事件上报（P4）与迁移计划；提案，未提交上游 |
 | [Java 控制面多实例部署](managed-agent-java-multi-instance.zh-CN.md) / [English](managed-agent-java-multi-instance.md) | 多个 Java 实例挂在轮询负载均衡后、external runner：现状阻碍、进程内状态只做缓存、终端 ticket 入 SQL、跨实例 SSE 水位通知、数据库时钟租约、Broker 缺失即接管与 M1～M5；提案，未提交上游 |
 | [Public API 与 WebShell 契约](managed-agent-api-contract.md) / [OpenAPI](managed-agent-public-api.openapi.yaml) | 统一公共/WebShell 路由、DTO、错误、幂等、分页、SSE 与租户范围 |
 | [MySQL v1.10 目标增量结构](managed-agent-storage-schema.mysql.sql) | 真实 V1/V2 后新增 Batch/Delivery/Receipt/immutable Snapshot/Owner，保留已有 Item/Part 与每 Session 进度 |

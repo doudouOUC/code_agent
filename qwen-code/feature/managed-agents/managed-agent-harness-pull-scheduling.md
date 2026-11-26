@@ -17,9 +17,10 @@ Three options were considered:
 **Decision (proposed):**
 
 1. **B is the end state.** Statelessness itself does not depend on the call direction. It comes from the journal, `wake` and placement release, which A0 already has. Elastic scaling does depend on it. A0 can add and remove instances once membership is dynamic, but it places Sessions without knowing capacity, needs every Java instance to reach every Harness, and has no queue to scale on (§9).
-2. **A0 + P0 + P4 is the intermediate state and the rollback state.** P0, an SQL instance registry, and P4, event ingest from the Harness, are useful in both shapes. The P0 registry becomes the record of poller liveness and capacity in B, and P4 is part of B.
-3. **No A0-only investment.** Load-aware member selection and re-placement after `hosted_session_open_busy` are not built in A0, because B replaces them. A network-addressable Harness listener is built only if independent Harness Pods are needed before P5 (§5.2).
-4. **Order.** Migrate P0, P4, P1, P3, P5, P6, each behind a capability bit (§10). Independent, autoscaled Harness Pods become possible once P5 removes the last Java-to-Harness call.
+2. **A0 + P4 is the intermediate state and the rollback state.** P4, event ingest from the Harness, is part of B, and under either option it removes the Java instance that has to stay attached to a running Turn (§2.4, §7).
+3. **No A0-only investment.** Load-aware member selection and re-placement after `hosted_session_open_busy` are not built. An SQL instance registry and a network-addressable Harness listener are built only as an optional bridge, if independent Harness Pods are needed before P5 (§5.2). B needs neither (§6.8).
+4. **Order.** Migrate P4, P1, P3, P5, P6, each behind a capability bit (§10). Independent, autoscaled Harness Pods become possible once P5 removes the last Java-to-Harness call.
+5. **No message queue.** B runs on SQL and HTTP. Where a broker is already deployed it can carry wake-up hints, but not requests or results (§6.9).
 
 ## 2. Current State
 
@@ -119,19 +120,18 @@ A0 has none of these gaps, because Java, not a load balancer, picks the instance
 ### 5.2 What the intermediate state needs
 
 1. **The Phase 1–4 rollout.** The measurement gates decide how short the idle period can become, and a short idle period is what turns placement stickiness into cache affinity. This is independent of the call direction.
-2. **P0, an SQL instance registry.** Implement `HarnessDiscovery` over a registry table:
-   - Each Harness registers its instance ID, base URL, boot ID, accepting state and free capacity on a private Java route, and renews a heartbeat measured in database time. It already holds an authenticated outbound connection to Java for the Session Store.
-   - The snapshot lists rows with a live heartbeat. When the query fails, the snapshot is not current. Refresh then withholds new placements and skips the reaper, as it already does for a non-current snapshot, while calls to existing owners continue.
-   - Every Java instance reads the same table, so all of them see the same member list.
-   - A departed instance drops out of the snapshot, and the existing reaper picks up its suspended placements. Because each row carries a boot ID, the reaper's exclusion can be narrowed from instance IDs to instance-and-boot pairs. That closes the boot-level reclamation gap under the same expiry proof.
-   - Java sends Session credentials to a registered URL, so registration must be authenticated per instance and bound to the instance ID, preferably through mTLS.
-   - In B the same table records poller liveness and capacity, refreshed by polling instead of a separate heartbeat. P0 is not discarded.
-3. **Optional bridge: a network-addressable Harness.** Needed only if independent Harness Pods are required before P5. Either allow a non-loopback bind with mTLS on the Harness, or put a TLS proxy in front of each instance; Java already requires mTLS for remote endpoints. P6 removes it.
-4. **Not built.** Load-aware member selection and re-placement after `hosted_session_open_busy` would rebuild in Java what capacity-gated claims give B (§9), so A0 keeps round robin.
+2. **P4, event ingest** (§7).
+3. **Optional: boot-level reclamation.** Java knows the boot ID each reachable member negotiated, because its member map is keyed by instance and boot. The reaper can therefore exclude only a configured instance's current boot instead of the whole instance, under the same expiry proof and without a registry. Request-driven takeover after lease expiry already keeps these Sessions correct, so the change only cleans up earlier.
+4. **Optional bridge: dynamic membership outside the Java Pod.** Needed only if independent Harness Pods are required before P5. Inside the Java Pod the Pod spec fixes the members, so the two parts only make sense together:
+   - **An SQL instance registry as `HarnessDiscovery`.** Each Harness registers its instance ID, base URL, boot ID and accepting state on a private Java route, and renews a heartbeat measured in database time. The snapshot lists rows with a live heartbeat. When the query fails, the snapshot is not current; refresh then withholds new placements and skips the reaper, as it already does for a non-current snapshot, while calls to existing owners continue. Every Java instance reads the same table, so all of them see the same members, and a departed instance drops out of the snapshot for the existing reaper. Java sends Session credentials to a registered URL, so registration must be authenticated per instance and bound to the instance ID, preferably through mTLS.
+   - **A network-addressable Harness.** Either allow a non-loopback bind with mTLS on the Harness, or put a TLS proxy in front of each instance. Java already requires mTLS for remote endpoints.
+   - P6 removes both. B needs neither (§6.8).
+5. **Not built.** Load-aware member selection and re-placement after `hosted_session_open_busy` would rebuild in Java what capacity-gated claims give B (§9), so A0 keeps round robin.
 
 ### 5.3 Limits
 
 - Sessions are placed without knowing member capacity (§2.6).
+- Membership stays static unless the optional bridge is built.
 - Every Java instance must be able to reach every Harness instance.
 - The Harness keeps an inbound listener for 43 private routes.
 - The Java-side owner of a running Turn remains until P4.
@@ -172,7 +172,7 @@ While a Session is held, Java delivers new work for it to the holder through the
 
 ### 6.4 Signals to the holder
 
-- **Wakeup.** The poll lists the Sessions the instance holds, and Java answers early when any of them gets work. With one Java instance this is an in-process wakeup. With several, the Java instance holding the poll learns of work written elsewhere the way #18431 streams learn of events: one batched SQL query, every few hundred milliseconds, over the work watermarks of the Sessions its pollers hold. LiteTopic, which has no TypeScript consumer, is not needed.
+- **Wakeup.** The poll lists the Sessions the instance holds, and Java answers early when any of them gets work. With one Java instance this is an in-process wakeup. With several, the Java instance holding the poll learns of work written elsewhere the way #18431 streams learn of events: one batched SQL query, every few hundred milliseconds, over the work watermarks of the Sessions its pollers hold. A message queue is not needed; where one is deployed, a per-Session LiteTopic can carry the same hint (§6.9).
 - **Bounded fallback.** A missed signal is caught by a periodic recheck of held Sessions, so lost signals cost latency, never correctness.
 - **Cancel** is the latency-sensitive case. It is a durable `CANCELLING` status plus a signal. The holder aborts on the signal, and the fallback bounds the worst case. Claude documents the same effect: an interrupt can take longer to apply while tools run.
 
@@ -198,6 +198,24 @@ While a Session is held, Java delivers new work for it to the holder through the
 | Signal lost | The periodic recheck delivers the work later |
 | Claim races | The placement CAS admits one claimer; others get no item |
 
+### 6.8 What B does not need
+
+- **No instance registry.** Each poll carries the instance identity, authenticated through mTLS, with its protocol version, capability digest, free capacity and the Sessions it holds. Liveness is the per-Session writer lease that the Store already keeps, and the rule that a held Session's work never goes to another instance checks that lease, not whether an instance is registered.
+- **No reaper.** A Session with new work becomes claimable by any poller under the existing takeover proof. A stale placement of a Session without work is harmless until work arrives. Boot-level reclamation needs nothing either.
+- A table of each instance's last poll time can serve dashboards. Correctness does not depend on it.
+
+### 6.9 A message queue as transport (alternative)
+
+A variant replaces long-polls with a message queue: Java publishes requests to one queue, Harness instances consume them, and results return through a second queue that Java consumes. It keeps B's benefits (an outbound-only Harness, consumption gated by capacity, the backlog as a scaling metric), but it cannot be the scheduler:
+
+1. **Session-bound work.** Cancel, decisions and messages for a running Turn, and reads of resident state, must reach the writer-lease holder (§2.3). Competing consumers deliver them to any instance. Partitioning by Session keeps a Session on one consumer, but consumer rebalancing and the writer lease are two independent ownerships that disagree during scaling and crashes. Ordered consumption also serializes a queue, so a Turn that runs for minutes blocks the other Sessions on it. One LiteTopic per Session avoids the blocking, but subscribing to it after a claim is B's claim-then-deliver, and the claim is still a MySQL CAS.
+2. **Acknowledgement timing.** MQ3 measured that a crashed consumer's unacknowledged message moves to another member only after the broker expires the client, after 121 to 129 seconds locally, with the topic's later messages waiting behind it ([MQ3 finding 1](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)). Acknowledging after the Turn stalls the Session that long after a crash. Acknowledging on receipt loses the message on a crash, and recovery comes from SQL.
+3. **Delivery is at least once, ordered or not.** Redelivery after a crash or an acknowledgement timeout, a queue lock expiring during rebalance, a producer retry after a timed-out send, and broker failover all duplicate messages. The [event transport design](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-04-managed-agent-event-transport.md) already requires idempotent consumers (invariant 5) and does not rely on ordered delivery for correctness. Even exactly-once delivery would not cover side effects outside the broker: model calls, tool executions, file edits and Store writes. Exactly-once execution comes from the Store and the journal. Writer generation and placement epoch fence stale processors, operation IDs make completions idempotent, and the tool execution ledger keeps the execution ID and dispatch generation, so recovery queries the Worker instead of executing again. Recovery resumes from the journal, not from the request.
+4. **Two writes.** Turns, decisions and operations must be in SQL first: the public API reads them, and single-writer and idempotency checks depend on them. Publishing them to a queue is a second write that needs an outbox. MQ3 also found no producer retry buffer, so envelopes sent during a long broker outage are dropped ([MQ3 finding 2](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)). Results posted to a queue still have to be written to SQL with fencing by whichever Java instance consumes them, so a result queue only adds a hop.
+5. **Infrastructure.** Event transport is off by default ([`EventTransportConfiguration.java:56-57`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/config/EventTransportConfiguration.java#L56-L57)), the Helm deployment has no broker, a node cannot start while the broker is down ([MQ3 finding 3](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)), and the TypeScript side has no consumer.
+
+Where a broker is already deployed, it can carry hints. A shared "Session has work" topic carries only tenant and Session; an instance with capacity consumes a hint, claims through Java, and acknowledges whether or not the claim succeeds. A per-Session LiteTopic carries the holder's wake-ups. Requests, results and events stay in SQL and HTTP, and a lost or late hint costs only latency. B therefore defines wake-up as an interface whose default implementation is SQL watermark polling, with LiteTopic as an optional implementation.
+
 ## 7. Event Ingest (P4)
 
 P4 changes only how Java receives a running Turn's events. It does not depend on who starts the Turn, so it applies to A0 and B alike.
@@ -211,8 +229,8 @@ P4 changes only how Java receives a running Turn's events. It does not depend on
 
 | Concern | A0: Java-routed push | B: pull |
 | --- | --- | --- |
-| Reaches the stateless end state | Yes, with P0 and the Phase 1–4 rollout | Yes, with the same prerequisites plus the protocol move |
-| Membership | SQL registry (P0) | The same registry, kept current by polling |
+| Reaches the stateless end state | Yes, with the Phase 1–4 rollout | Yes, with the same rollout plus the protocol move |
+| Membership | Static list; an SQL registry only with the optional bridge | None: polls carry identity, version, capacity and held Sessions; liveness is the writer lease |
 | Capacity-aware placement | No: round robin, placement recorded before the call | Yes: an instance claims only when it has capacity |
 | A new instance takes work | Only new or released Sessions, when round robin reaches it; a Session placed on a busy member waits for it | Immediately: it claims the oldest pending work |
 | Autoscaling signal | Derived from placements and instance counters | Queue depth and oldest pending work |
@@ -224,11 +242,12 @@ P4 changes only how Java receives a running Turn's events. It does not depend on
 | Cancel and decision latency | One direct call | Signal plus fallback, within the P3 budget |
 | Synchronous reads | Unchanged | Java-side reads or request items |
 | Rolling upgrade | Homogeneous pool | Work gated by poller version; contract undefined |
-| Size of change | Small: one registry and one registration route | Large: 43 routes over P1, P3, P5 and P6 |
+| Infrastructure | MySQL | MySQL; a broker is optional for hints |
+| Size of change | Small: P4; the optional bridge adds a registry and a listener | Large: 43 routes over P1, P3, P5 and P6 |
 
 ## 9. Why Pull Is the End State
 
-A0 can scale. With P0, a new instance joins without a configuration change and starts taking new Sessions within one refresh, and drain, suspension release and the reaper handle removal. It scales poorly for three reasons, all of which come from Java choosing the instance before knowing whether that instance can take the work:
+A0 can scale. With an instance registry (the optional bridge, §5.2), a new instance joins without a configuration change and starts taking new Sessions within one refresh, and drain, suspension release and the reaper handle removal. It scales poorly for three reasons, all of which come from Java choosing the instance before knowing whether that instance can take the work:
 
 1. **Capacity.** A0 records the placement first and calls second, round robin (§2.6). A busy member refuses with `hosted_session_open_busy`, the Session waits on it, and a newly added idle member gets nothing until round robin reaches it with a new Session. Fixing this in A0 needs load reports in the registry, load-aware selection and re-placement after a refusal: a second scheduler in Java. In B an instance claims only when it has capacity, so a new instance starts on the oldest pending work, and a full one simply stops claiming.
 2. **Connectivity.** A0 needs every Java instance to reach every Harness instance over mTLS, so autoscaled Harness Pods need addresses, certificates and registrations that every Java instance trusts. In B each Harness opens outbound connections to Java through one load balancer. A customer-hosted Harness needs the same, which is the constraint Claude's self-hosted workers answer with outbound-only polling.
@@ -244,43 +263,48 @@ Each phase is behind a capability bit, and push and pull coexist until P6. Until
 
 | Phase | Change | Role in the end state | Exit criteria | Status |
 | --- | --- | --- | --- | --- |
-| P2 | Release the placement on clean suspension and park; reaper for departed instances | Kept | A released Session is claimed by any member without waiting for its lease | Done (#18404, #18443); boot-level reclamation moves to P0 |
-| P0 | SQL instance registry as `HarnessDiscovery`, with authenticated self-registration; reaper exclusion by instance and boot | Kept as the record of poller liveness and capacity | Instances join and leave without a Java configuration change; all Java instances see one list; earlier-boot placements are reclaimed; the static pool still works | Proposed |
+| P2 | Release the placement on clean suspension and park; reaper for departed instances | Release kept; the reaper is removed at P6 | A released Session is claimed by any member without waiting for its lease | Done (#18404, #18443) |
 | P4 | Event ingest from the Harness (§7) | Kept | Public events identical to today for the same journal; killing the dispatching Java instance mid-Turn needs no stream reattach | Proposed |
 | P1 | Pull for work that already goes to any instance: wake inputs, parked decisions, relay deliveries to suspended Sessions | Kept | These paths never call a Harness; same outcomes on real-process MySQL tests | |
 | P3 | Signals and pull for resident work: Turns, decisions, cancel, messages | Kept | Cancel and decision latency within a budget measured against today's direct calls; a full instance receives no new Session while another has capacity | |
 | P5 | Reads served by Java from SQL and the journal; request items for the remaining management routes and side queries | Kept | Every `/session/:id/*` route has a pull or Java-side equivalent; Harness Pods can be scheduled independently of Java | |
-| P6 | Remove push routes, the static pool and any optional listener bridge | — | A Harness with no private listener passes the full suite; scaling on queue depth adds and removes instances | |
+| P6 | Remove push routes, the static pool, the reaper and the optional bridge | — | A Harness with no private listener passes the full suite; scaling on queue depth adds and removes instances | |
+| Bridge | Optional, A0 only: SQL instance registry as `HarnessDiscovery` with authenticated self-registration, plus a network-addressable Harness (§5.2) | Removed at P6 | Instances join and leave without a Java configuration change; all Java instances see one member list | Only if independent Harness Pods are needed before P5 |
+| Reaper by boot | Optional, A0 only: exclude a configured instance's current boot, not the whole instance (§5.2) | Removed at P6 | Placements left by an earlier boot are reclaimed without waiting for a request | Optional |
 
 ## 11. Risks and Open Questions
 
-1. **Registry trust (P0).** A registered base URL receives Session credentials. Registration must be authenticated per instance and bound to the instance ID.
-2. **Ingest ordering and fencing (P4).** Per-Session order, the event-epoch check, retries after a lost acknowledgement, and retraction handling must match today's stream consumer exactly.
-3. **Event projection.** Harness ingest keeps one projection implementation. Projecting in Java removes a hop but duplicates logic across languages.
-4. **Latency (P3).** Cancel, decisions and the first event go through a signal. They are measured against today's direct calls as P3's exit criterion.
-5. **Signal cost with several Java instances.** The SQL watermark poll costs one query per instance per tick. #18431 notes that index use at production scale is unmeasured for its event-tail query; the same applies here.
-6. **Protocol size.** 43 routes move. The phases must stay small enough to review.
-7. **Interim scaling.** Until P5, Harness Pods cannot be scheduled independently of Java unless the optional listener bridge is built, and P6 discards that bridge.
+1. **Ingest ordering and fencing (P4).** Per-Session order, the event-epoch check, retries after a lost acknowledgement, and retraction handling must match today's stream consumer exactly.
+2. **Event projection.** Harness ingest keeps one projection implementation. Projecting in Java removes a hop but duplicates logic across languages.
+3. **Latency (P3).** Cancel, decisions and the first event go through a signal. They are measured against today's direct calls as P3's exit criterion.
+4. **Signal cost with several Java instances.** The SQL watermark poll costs one query per instance per tick. #18431 notes that index use at production scale is unmeasured for its event-tail query; the same applies here. A broker can replace the poll as a hint where one is deployed (§6.9).
+5. **Protocol size.** 43 routes move. The phases must stay small enough to review.
+6. **Interim scaling.** Until P5, Harness Pods cannot be scheduled independently of Java unless the optional bridge is built, and P6 discards that bridge.
+7. **Registry trust (bridge only).** A registered base URL receives Session credentials. Registration must be authenticated per instance and bound to the instance ID.
 8. **Capacity accounting.** The free capacity a poller reports must cover cold opens, active Turns and held Runtimes. Otherwise claims overload an instance just as round robin does.
 9. **Roadmap gates.** The stateless roadmap's measurement gates still decide how short the idle period can become. Neither option makes cold opens cheaper.
 10. **Fairness.** A tenant flooding work must not starve others at claim time.
 
 ## 12. Acceptance Criteria
 
-Intermediate state (Phase 1–4 rollout, P0, P4):
+Intermediate state (Phase 1–4 rollout, P4):
 
-1. Adding or removing a Harness instance needs no Java configuration change, and every Java instance sees the same members.
-2. Killing a Harness instance moves its Sessions to other members after the lease lapses, with no replayed tool call. An idle-released Session moves on its next request.
-3. Placements left by an earlier boot of a restarted instance are reclaimed by the reaper under the same expiry proof.
-4. Killing the Java instance that dispatched a running Turn leaves the Turn completed and its public events identical, with no stream reattach.
+1. Killing a Harness instance moves its Sessions to other members after the lease lapses, with no replayed tool call. An idle-released Session moves on its next request.
+2. Killing the Java instance that dispatched a running Turn leaves the Turn completed and its public events identical, with no stream reattach.
+
+Optional bridge and reaper change, if built:
+
+3. Adding or removing a Harness instance needs no Java configuration change, and every Java instance sees the same members.
+4. Placements left by an earlier boot of a restarted instance are reclaimed by the reaper under the same expiry proof.
 
 End state (B):
 
 5. A Harness with no private listener serves a Session end to end: create, Turn, approval, cancel, close.
-6. A newly started instance claims pending work without a Java configuration change, and a full instance receives no new Session while another has capacity.
+6. A newly started instance claims pending work without a Java configuration change or registration, and a full instance receives no new Session while another has capacity.
 7. Scaling on queue depth adds and removes instances under load, with no lost or replayed work.
 8. An incompatible poller receives no work.
 9. Cancel and decision latency stay within the budget set in P3.
+10. With no broker deployed, every criterion above holds.
 
 Every phase passes the real-process MySQL 8.4 suites, not only unit or H2 tests.
 
@@ -288,12 +312,13 @@ Every phase passes the real-process MySQL 8.4 suites, not only unit or H2 tests.
 
 - B stays the end state. The case for it now rests on elastic scaling (capacity, connectivity, scaling signal) rather than on statelessness, which A0 also reaches.
 - Option A is dropped. A0, the code on `main`, is the intermediate and rollback state.
-- P2 is marked done, and boot-level reclamation moves into P0.
-- P0 is an SQL instance registry that B keeps as the record of poller liveness. It no longer includes a claim ticket at acquire, since neither A0 nor B lets a third party pick the instance.
-- P4 moves before P1, and §7 explains why it is independent of the call direction.
+- P2 is marked done.
+- The first draft's P0 is no longer on the main path. B needs no instance registry and no reaper (§6.8). The registry survives only as an optional bridge together with a network-addressable Harness, and boot-level reclamation as an optional reaper change. The claim ticket at acquire is dropped, since neither A0 nor B lets a third party pick the instance.
+- P4 moves first, and §7 explains why it is independent of the call direction.
 - P5 prefers Java-side reads over request items.
-- No capacity work is done in A0, and the off-Pod listener is an optional bridge.
-- The multi-Java risk is rewritten: the slices are merging, and signals can reuse SQL watermark polling instead of LiteTopic.
+- No capacity work is done in A0.
+- §6.9 records why a message queue can carry wake-up hints but not requests or results: Session-bound work, acknowledgement timing, at-least-once delivery, the second write and the extra infrastructure.
+- The multi-Java risk is rewritten: the slices are merging, and signals use SQL watermark polling by default.
 - Current-state references move to `afcc98595a`, and the route count is corrected to 43.
 
 ## 14. Sources
