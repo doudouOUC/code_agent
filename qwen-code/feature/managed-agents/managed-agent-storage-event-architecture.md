@@ -1,5 +1,35 @@
 # Managed Agent 存储、事件与会话恢复设计
 
+## 多实例恢复与停靠释放，2026-11-27
+
+main `afcc98595ac6`；本节更新11-26日更，重叠状态/实现取代下方旧日期观察。
+
+[#18353](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18353.md) 已合入：最终为Shell/Hook/MCP闭合记录校验和publisher generation fencing；早期身份读取补丁不在最终diff。
+
+[#18404](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18404.md) 已合入：协商后quiesce→seal→可重试ownership release；离任回收仍需精确SQL租约/seal证明。
+
+[#18426](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18426.md) 已合入：SQL哈希ticket、DB时钟30秒和条件DELETE单次消费；upgrade重读binding，配额是软预算。
+
+[#18431](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18431.md) 已合入：200ms固定延迟批读订阅Session水位，通知后按原cursor回SQL；非消息总线或延迟SLA。
+
+[#18433](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18433.md) 已合入：精确already_attached冲突可被动重附着；保代际/身份门，双控制面测试不等于任意拓扑验收。
+
+[#18440](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18440.md) 已合入：私有认证下无client只读status，2秒有界和精确placement/prompt核对；不加载或接管Session。
+
+[#18443](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18443.md) 已合入：原锁/证明下RELEASED takeover将旧lease截至DB now，不抢占普通活写者。
+
+[#18444](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18444.md) 已合入：单Pod两个loopback Harness成员及wake dispatch配置；不是多Pod/跨主机HA或部署通过。
+
+[#18453](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18453.md) 已合入：审批恢复也重接后台publisher，settled Monitor精确释放旧hold并规范cleanup commandId。
+
+[#18455](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18455.md) 已合入：原prompt限定的Broker恢复标记与精确解block，外部EXECUTING有界重观察；未独立failover验收。
+
+18353最终已撤出早期身份读取补丁，交付恢复记录闭合校验与publisher fencing。placement释放不是抢占活writer；池回收仍需SQL seal/lease证明，单Pod双Harness不是跨机HA。action-parking仍默认关闭，chart只显式开wake dispatch。18455已合入原Turn限定的Broker恢复链；测试定义仍不代替真实failover验收。
+
+V1因SQL终端票据增为49表，parked/action prompt上限128；开发旧目录重建，无升级链。ticket预算为并发可超出的软上限，票据只存hash；SSE通知仅促使按原cursor回读。
+
+本次仅文档/源码静态核验，未执行产品测试、构建、CI、MySQL、Hosted、Kubernetes、provider、性能或浏览器验收。保留完整旧日期史料和createdAt周归属，不采用旧段状态作为当前承诺。
+
 ## S8a、职责拆分与验收边界，2026-11-26
 
 main `be11490df47e`；本节更新11-25日更。

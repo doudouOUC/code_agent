@@ -1,5 +1,23 @@
 # Managed Session：记录格式、提交与协议限额
 
+## 多实例恢复与停靠释放，2026-11-27
+
+main `afcc98595ac6`；本节更新11-26日更，重叠状态/实现取代下方旧日期观察。
+
+[#18353](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18353.md) 已合入：最终为Shell/Hook/MCP闭合记录校验和publisher generation fencing；早期身份读取补丁不在最终diff。
+
+[#18404](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18404.md) 已合入：协商后quiesce→seal→可重试ownership release；离任回收仍需精确SQL租约/seal证明。
+
+[#18419](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18419.md) 已合入：原wake prompt上限统一128并扩展验收定义/CI预算；不改原身份或提供升级链。
+
+[#18426](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18426.md) 已合入：SQL哈希ticket、DB时钟30秒和条件DELETE单次消费；upgrade重读binding，配额是软预算。
+
+[#18443](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18443.md) 已合入：原锁/证明下RELEASED takeover将旧lease截至DB now，不抢占普通活写者。
+
+V1因SQL终端票据增为49表，parked/action prompt上限128；开发旧目录重建，无升级链。ticket预算为并发可超出的软上限，票据只存hash；SSE通知仅促使按原cursor回读。
+
+本次仅文档/源码静态核验，未执行产品测试、构建、CI、MySQL、Hosted、Kubernetes、provider、性能或浏览器验收。保留完整旧日期史料和createdAt周归属，不采用旧段状态作为当前承诺。
+
 ## S8a、职责拆分与验收边界，2026-11-26
 
 main `be11490df47e`；本节更新11-25日更。

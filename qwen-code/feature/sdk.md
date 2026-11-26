@@ -1,5 +1,13 @@
 # SDK (Python / TypeScript / Java) 技术方案
 
+## 多实例恢复与停靠释放，2026-11-27
+
+main `afcc98595ac6`；本节更新11-26日更，重叠状态/实现取代下方旧日期观察。
+
+[#18440](../weekly-report/2026-11-23_2026-11-29/implementations/pr-18440.md) 已合入：私有认证下无client只读status，2秒有界和精确placement/prompt核对；不加载或接管Session。
+
+本次仅文档/源码静态核验，未执行产品测试、构建、CI、MySQL、Hosted、Kubernetes、provider、性能或浏览器验收。保留完整旧日期史料和createdAt周归属，不采用旧段状态作为当前承诺。
+
 ## 强类型公开Java客户端候选，2026-11-26
 
 main `be11490df47e`；本节更新11-25日更。

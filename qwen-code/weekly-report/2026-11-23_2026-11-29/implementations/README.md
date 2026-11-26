@@ -38,6 +38,18 @@
 | [#18290](https://github.com/QwenLM/qwen-code/pull/18290) | merged | refactor(serve): Split Hosted Harness Session by responsibility | [pr-18290.md](pr-18290.md) |
 | [#18303](https://github.com/QwenLM/qwen-code/pull/18303) | merged | feat(managed-agent): park Shell approvals on version-0 public Shell Sessions (S8a) | [pr-18303.md](pr-18303.md) |
 | [#18325](https://github.com/QwenLM/qwen-code/pull/18325) | merged | refactor(managed-agent): Simplify Java type references | [pr-18325.md](pr-18325.md) |
-| [#18353](https://github.com/QwenLM/qwen-code/pull/18353) | open | fix(managed-agent): Restore Workspace registration for Action parking acceptance | [pr-18353.md](pr-18353.md) |
+| [#18353](https://github.com/QwenLM/qwen-code/pull/18353) | merged | fix(managed-agent): Restore Workspace registration for Action parking acceptance | [pr-18353.md](pr-18353.md) |
+| [#18404](https://github.com/QwenLM/qwen-code/pull/18404) | merged | feat(managed-agent): Release and reclaim suspended Harness placements | [pr-18404.md](pr-18404.md) |
+| [#18410](https://github.com/QwenLM/qwen-code/pull/18410) | merged | test(managed-agent): Cover healthy pool handover for parked Actions | [pr-18410.md](pr-18410.md) |
+| [#18414](https://github.com/QwenLM/qwen-code/pull/18414) | merged | docs(managed-agent): Sync Action parking rollout status | [pr-18414.md](pr-18414.md) |
+| [#18419](https://github.com/QwenLM/qwen-code/pull/18419) | merged | fix(managed-agent): Preserve wake prompt IDs across Action parking | [pr-18419.md](pr-18419.md) |
+| [#18426](https://github.com/QwenLM/qwen-code/pull/18426) | merged | feat(managed-agent): Store terminal tickets in SQL | [pr-18426.md](pr-18426.md) |
+| [#18431](https://github.com/QwenLM/qwen-code/pull/18431) | merged | feat(managed-agent): Wake event streams for other instances' commits | [pr-18431.md](pr-18431.md) |
+| [#18433](https://github.com/QwenLM/qwen-code/pull/18433) | merged | fix(managed-agent): Reattach Hosted Harness sessions across control planes | [pr-18433.md](pr-18433.md) |
+| [#18440](https://github.com/QwenLM/qwen-code/pull/18440) | merged | feat(managed-agent): Read Harness recovery status across replicas | [pr-18440.md](pr-18440.md) |
+| [#18443](https://github.com/QwenLM/qwen-code/pull/18443) | merged | fix(managed-agent): End released writer leases on takeover | [pr-18443.md](pr-18443.md) |
+| [#18444](https://github.com/QwenLM/qwen-code/pull/18444) | merged | feat(kubernetes): Enable a two-member Hosted Harness pool | [pr-18444.md](pr-18444.md) |
+| [#18453](https://github.com/QwenLM/qwen-code/pull/18453) | merged | fix(managed-agent): Restore Action parking across Harness replacement | [pr-18453.md](pr-18453.md) |
+| [#18455](https://github.com/QwenLM/qwen-code/pull/18455) | merged | fix(managed-agent): Resume Managed Turns after Broker failover | [pr-18455.md](pr-18455.md) |
 
-_按个人 PR 口径更新于 2026-11-26_
+_按个人 PR 口径更新于 2026-11-27_

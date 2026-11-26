@@ -1,5 +1,27 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 多实例恢复与停靠释放，2026-11-27
+
+main `afcc98595ac6`；本节更新11-26日更，重叠状态/实现取代下方旧日期观察。
+
+[#18353](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18353.md) 已合入：最终为Shell/Hook/MCP闭合记录校验和publisher generation fencing；早期身份读取补丁不在最终diff。
+
+[#18404](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18404.md) 已合入：协商后quiesce→seal→可重试ownership release；离任回收仍需精确SQL租约/seal证明。
+
+[#18410](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18410.md) 仅测试合入：健康双成员、旧lease未到期的Allow/Deny交接矩阵；不是本次实测通过。
+
+[#18414](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18414.md) 仅双语设计更新：Stages0–5交付状态与剩余CI/发布测量分开，不新增运行时支持。
+
+[#18419](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18419.md) 已合入：原wake prompt上限统一128并扩展验收定义/CI预算；不改原身份或提供升级链。
+
+[#18453](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18453.md) 已合入：审批恢复也重接后台publisher，settled Monitor精确释放旧hold并规范cleanup commandId。
+
+[#18455](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18455.md) 已合入：原prompt限定的Broker恢复标记与精确解block，外部EXECUTING有界重观察；未独立failover验收。
+
+18353最终已撤出早期身份读取补丁，交付恢复记录闭合校验与publisher fencing。placement释放不是抢占活writer；池回收仍需SQL seal/lease证明，单Pod双Harness不是跨机HA。action-parking仍默认关闭，chart只显式开wake dispatch。18455已合入原Turn限定的Broker恢复链；测试定义仍不代替真实failover验收。
+
+本次仅文档/源码静态核验，未执行产品测试、构建、CI、MySQL、Hosted、Kubernetes、provider、性能或浏览器验收。保留完整旧日期史料和createdAt周归属，不采用旧段状态作为当前承诺。
+
 ## S8a、职责拆分与验收边界，2026-11-26
 
 main `be11490df47e`；本节更新11-25日更。
