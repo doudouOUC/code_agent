@@ -2,15 +2,15 @@
 
 [English](managed-agent-java-multi-instance.md) | [简体中文](managed-agent-java-multi-instance.zh-CN.md)
 
-状态：提案，2026-11-25。个人设计草稿，未提交上游。现状结论对照 QwenLM/qwen-code `main` 的 [`67f85d324e`](https://github.com/QwenLM/qwen-code/commit/67f85d324e5f83cabca9229e1e9fc6161b794947) 核实。本文与 [Harness 拉模型调度](managed-agent-harness-pull-scheduling.zh-CN.md)互补：那份文档处理 Harness 多实例，本文处理 Java 控制面多实例。
+状态为提案，始于 2026-11-25，更新于 2026-11-26。个人设计草稿。原始基线为 QwenLM/qwen-code `main` 的 [`67f85d324e`](https://github.com/QwenLM/qwen-code/commit/67f85d324e5f83cabca9229e1e9fc6161b794947)，时钟相关结论在 [`a37a7612c9`](https://github.com/QwenLM/qwen-code/commit/a37a7612c964fee585b6da6459c95076e9372c9e) 复核。本文处理 Java 控制面多实例，与 [Harness 拉模型调度](managed-agent-harness-pull-scheduling.zh-CN.md)互补。
 
 ## 1. 问题与结论
 
 目标部署：多个 Java 控制面实例（每个都内嵌 Runtime Broker）挂在轮询负载均衡后面，Runtime 使用 external provisioner（`external-scratch` 或 `external-workspace`）。任意请求都可以落到任意实例，不依赖会话粘性。
 
-现状：上游只支持一个 Java 控制面（[README "Hosted recovery scope"](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/README.md?plain=1#L2155-L2175)）。耐久状态已经在 SQL 里，并有 CAS、租约和 generation 隔离，所以多个实例同时运行不会写坏数据。但有六处依赖进程内状态或本机时钟，在轮询负载均衡下会表现为功能失败或延迟（§3.2）。
+上游目前只支持一个 Java 控制面（[README "Hosted recovery scope"](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/README.md?plain=1#L2155-L2175)）。持久状态已存入 SQL，并有 CAS、租约和 generation 隔离。仍有六处依赖进程内状态或本机时钟，在轮询负载均衡下可能出现功能失败或延迟（§3.2）。
 
-**结论（提议）：** 不引入 Java 侧的 Session 属主路由，也不依赖会话粘性。原则只有一条：**进程内状态只做缓存，缺失时从 SQL 重建；跨实例的约束一律落到 SQL，并使用数据库时钟。** 共七项改动（§4）和一组部署要求（§5），不需要 MQ。
+方案用 SQL 保存共享状态并执行跨实例约束，进程内状态作为可按需重建的缓存。首期部署同步 Java 和数据库的时钟，剩余使用 JVM 时钟的租约后续再统一到数据库时间（§5.1）。拓扑采用轮询路由，无需 Java 侧 Session 属主路由、会话粘性或 MQ。
 
 ## 2. 范围
 
@@ -45,7 +45,7 @@
 | --- | --- | --- | --- |
 | 1 | 终端 WebSocket 的 ticket 存在进程内 Map | 在 A 签发的 ticket，upgrade 落到 B 时失败。sessionId 在请求体里，按路径哈希也无法路由 | [`TerminalTicketStore.java:41`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/api/TerminalTicketStore.java#L41)、[`TerminalRelayHandshakeInterceptor.java:69`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/api/TerminalRelayHandshakeInterceptor.java#L69)、[`TerminalTicketController.java:36`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/api/TerminalTicketController.java#L36) |
 | 2 | SSE 推送只经过本进程的 hub。Turn 在接收请求的实例上立即执行；其他实例上的流只能等 `events.poll-interval`（默认 5 s）后重读 SQL。MQ 公共通道只触发物化，不推送 SSE | 在非执行实例上，流式输出每 5 秒才到一批 | [`SessionEventHub.java:20`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/SessionEventHub.java#L20)、[`CompositeCommittedEventPublisher.java:67`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/event/CompositeCommittedEventPublisher.java#L67)、[`ManagedEventStreamService.java:128`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/ManagedEventStreamService.java#L128)、[`ManagedAgentService.java:1830`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/ManagedAgentService.java#L1830)、[`EventTransportConsumer.java:150`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/event/EventTransportConsumer.java#L150) |
-| 3 | 派发租约用 JVM 时钟写入和比较 | 时钟快出超过租约时长（默认 60 s）的实例，会接管仍在运行的 Turn，最终把它判为失败。MQ3 发现 6 已实测 | [`AgentTurnExecution.java:80-104`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L80-L104) |
+| 3 | Turn 派发用 JVM 时钟写入和比较租约，恢复期取消则用数据库时间检查同一条租约 | 时钟比持有者快，且超前量超过租约剩余时间时，可能提前接管。默认租约 60 s、每 20 s 续租，按时续租前的名义余量约为 40 s。MQ3 发现 6 用 10 分钟的超前量复现了提前接管。部署要求见 §5.1 | [Turn 派发](https://github.com/QwenLM/qwen-code/blob/a37a7612c9/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L81-L104)、[恢复期取消](https://github.com/QwenLM/qwen-code/blob/a37a7612c9/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/JdbcWorkspaceExecutionStore.java#L153-L163) |
 | 4 | 回调地址按实例推导：`session-store.base-url` 和 `client-files.relay-url` 默认取本实例的 loopback 地址。Harness 对常驻 Session 会比较 `storeBaseUrl`，lifecycle 路径还会深比较整个 Store 描述符 | 不同实例给同一个 Session 发出不同地址时，返回 409 `hosted_session_store_mismatch` | [`ManagedAgentProperties.java:311,351`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/config/ManagedAgentProperties.java#L311)、[`QwenHostedHarnessConnector.java:2665-2689`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/adapters/src/main/java/com/alibaba/qwen/code/managedagent/harness/QwenHostedHarnessConnector.java#L2665-L2689)、[`session-open.ts:837`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/cli/src/serve/hosted-harness-session/session-open.ts#L837-L838)、[`session-open.ts:1058`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/cli/src/serve/hosted-harness-session/session-open.ts#L1058) |
 | 5 | Java 侧的 Harness attachment 和 recovery 证据只存在于加载它的那个实例的内存里 | [#17538](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/docs/design/2026-11-19-managed-recovery-native-terminal.md) 已让终态 Turn 改用持久证据；其余依赖 attachment 的路径，在没有 attachment 的实例上仍然拿不到证据或直接失败 | 同左设计 §1、§3 |
 | 6 | Broker 的 Runtime Session 和 live binding 都在进程内。约 28 个调用点要求 Runtime Session 在本进程，否则返回 404；只有 monitor 操作和执行恢复会在缺失时接管。`ma_runtime_session` 没有 Broker 归属列。external placement 也在进程内，上限 1024 且从不淘汰 | Harness 的 Broker 地址经过负载均衡时，大量请求返回 `runtime_session_not_found`；每个实例都会积累几乎全部 Session 的 placement，最终返回 `runtime_external_capacity` | [`RuntimeBindingRegistry.java:147-167`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/runtime-broker/src/main/java/com/alibaba/qwen/code/runtimebroker/service/RuntimeBindingRegistry.java#L147-L167)、[`RuntimeBrokerService.java:797-799`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/runtime-broker/src/main/java/com/alibaba/qwen/code/runtimebroker/service/RuntimeBrokerService.java#L797-L799)、[`V1__managed_schema.sql:1034`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/persistence/src/main/resources/db/managed-schema/V1__managed_schema.sql#L1034)、[`ExternalRuntimeProvisioner.java:53,63,340`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/runtime-external/src/main/java/com/alibaba/qwen/code/runtimebroker/provisioning/external/ExternalRuntimeProvisioner.java#L53-L64) |
@@ -53,6 +53,8 @@
 ## 4. 方案
 
 ### 4.1 终端 ticket 存入 SQL
+
+[PR #18426](https://github.com/QwenLM/qwen-code/pull/18426) 实现这一部分，截至 2026-11-26 仍在审阅。
 
 新增表 `ma_terminal_ticket`，字段为 `ticket_hash`（SHA-256，唯一）、`tenant_id`、`actor_id`、`session_id`、`terminal_id`、`binding_id`、`binding_generation`、`expires_at`。按模块规则，直接修改 V1 基线，不加 V2 迁移。
 
@@ -62,6 +64,8 @@
 - 不存明文 ticket，也不序列化整个 binding 记录。
 
 ### 4.2 跨实例 SSE 通知
+
+这是下一项实现。它解决 SSE 连接在另一实例时默认要等最多约 5 s 才看到新事件的问题，可以和 [#18426](https://github.com/QwenLM/qwen-code/pull/18426) 并行推进。
 
 每个实例运行一个通知循环，周期默认 200 ms：
 
@@ -76,23 +80,17 @@
 - 代价是每个实例每个周期一条唯一键 IN 查询，与连接数无关；只有出现新事件的 Session 才会多一次读取。
 - 这就是[存储与事件架构 §7.1](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/docs/design/2026-09-20-managed-agent-storage-event-architecture.md#71-sse-and-multiple-instances)里"按节点批量检查水位"的做法，只是去掉了它前面的节点间通知，因此不需要服务发现，也不需要 MQ。
 
-### 4.3 所有租约改用数据库时钟
-
-- 所有派发和认领租约的写入与过期比较都改用数据库时间，不再用 `clock.millis()`。涉及 Turn、生命周期操作、Action 停靠与响应、任务取消，以及各 relay 账本。
-- 现有的 `ManagedSchemaTime.SQL_NOW` 是秒精度（`UNIX_TIMESTAMP()`），租约需要毫秒精度，可以用 `UNIX_TIMESTAMP(NOW(3)) * 1000`，或者在认领前读一次数据库时间。实现时选定一种，全模块保持一致。
-- Journal writer lease 和唤醒判断已经在用数据库时钟，本项只补齐其余租约。
-- 候选文件包括 `AgentTurnExecution`、`AgentLifecycleOperations`、`AgentActionParking`、`AgentSessionCommands`、`JdbcChildResultRelayStore` 等。实现前要逐个确认用到的时间戳是租约还是普通时间戳。
-
-### 4.4 回调地址与实例无关
+### 4.3 回调地址与实例无关
 
 以下回调地址在所有实例上必须相同，都指向内部负载均衡地址，由它转发到任意 Java 实例的内部监听：
 
 - `session-store.base-url`
 - `client-files.relay-url`
 - `tool-publication.service-base-url`
-- Harness 使用的 Broker 地址（见 §4.6）
 
-依据：
+到 M3 为止，Harness 使用一个固定的 Broker 地址。完成 M4 后，再把多个 Broker 接入独立的内部负载均衡（§4.5）。
+
+共享地址使 Session Store 描述符保持一致。
 
 - Store 路由只读写 JDBC，任意实例都能服务。
 - writer token 是基于 binding key 的确定性 HMAC（[`WriterCredentialPolicy.java:115-116`](https://github.com/QwenLM/qwen-code/blob/67f85d324e5f83cabca9229e1e9fc6161b794947/packages/managed-agent-server/contracts/src/main/java/com/alibaba/qwen/code/managedagent/contracts/security/WriterCredentialPolicy.java#L115-L116)），描述符里的 `writerId` 是 Harness 的 boot ID。
@@ -100,7 +98,7 @@
 
 本项只是配置要求，不改代码。
 
-### 4.5 Harness attachment 只做缓存
+### 4.4 Harness attachment 只做缓存
 
 规则：
 
@@ -108,7 +106,7 @@
 2. **需要调用 Harness 的写操作，在本实例没有 attachment 时先 attach 再调用。** 涉及提交 Turn、投递审批、取消、MCP 和扩展管理、client-files 注册以及 side query。attach 的方式是复用常驻 Session 的 load；不能因为缺少本地 attachment 就返回失败或空证据。
 3. **实现前先列出所有读取 attachment 缓存的调用点**（`QwenHostedHarnessConnector` 中的 `attachments`、`selectedAttachments` 和 recovery 缓存），逐个归入规则 1 或规则 2。
 
-### 4.6 Broker 缺失即接管，placement 改为可淘汰缓存
+### 4.5 Broker 缺失即接管，placement 改为可淘汰缓存
 
 - Runtime Session 的解析统一为：本进程有就直接用，没有就从 SQL 读取，再经 reconcile 和 attest 接管，也就是现有 `requireOrAdoptReadySession` 的路径。覆盖全部约 28 个调用点后，Harness 的 Broker 地址就可以经过内部负载均衡。
 - 执行级隔离保持不变：每次执行都有 SQL dispatch lease 和 generation（`ma_tool_execution`）；后台观察每个 binding 只认领一个 puller；终端 hold 是持久的。
@@ -118,7 +116,7 @@
   - 两个 Broker 同时接管同一个 binding 时，worker 是否接受两次 attest；
   - 接管是否推进 runtime generation。如果推进，前一个 Broker 上正在进行的执行会被隔离成 UNKNOWN，那就要么要求只在原 Runtime Session 空闲时接管，要么为 `ma_runtime_session` 增加 Broker 归属租约。
 
-### 4.7 优雅下线
+### 4.6 优雅下线
 
 - 收到 SIGTERM 后，实例把 readiness 置为 false，扫描停止认领新工作。
 - 对尚未提交给 Harness 的 Turn，调用现有的 `releaseTurnLease` 立即释放，其他实例在下一次扫描（1 s）就能接手，不必等 60 s 租约过期。
@@ -133,23 +131,34 @@
   - Harness token 和 capability digest，`harness.base-url` 或池成员列表；
   - `external-provider-id`、`external-provider-url`、`workspace-id`；
   - `session-store.writer-lease-duration`；
-  - §4.4 中的回调地址。
+  - §4.3 中的回调地址。
 - **网络**：
   - 公共负载均衡只暴露公共路由。
   - `/internal/**` 放在独立的内部监听上（`internal-server.port`），只对 Harness 和 Runtime 所在网络开放，并配置 binding key。
   - 公共负载均衡要关闭 SSE 缓冲，空闲超时大于 15 s 心跳，并支持 WebSocket upgrade。
-- **时钟**：完成 §4.3 后，正确性不再依赖实例时钟；为了日志和指标准确，仍建议开启 NTP。
 - **MQ**：保持 `event-transport.enabled=false`，本方案不依赖 MQ。
+
+### 5.1 时钟同步与后续加固
+
+Turn 派发租约默认 60 s，续租周期 20 s，按时续租前约剩 40 s。JVM 暂停、调度延迟或数据库阻塞都会压缩这段余量。竞争实例的时钟超前量大于剩余时间时，可能提前接管。时钟较慢的竞争实例可能在持有者崩溃后晚一些接管。MQ3 的第 6 项发现用人为注入的 10 分钟超前量复现了提前接管。 [派发默认值](https://github.com/QwenLM/qwen-code/blob/a37a7612c9/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/config/ManagedAgentProperties.java#L898-L913) · [续租周期](https://github.com/QwenLM/qwen-code/blob/a37a7612c9/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/LeaseRenewalRunner.java#L78-L86) · [MQ3 第 6 项发现](https://github.com/QwenLM/qwen-code/blob/a37a7612c9/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#L159-L165)
+
+所有 Java 主机和 MySQL 服务器都要同步到同一时间基准。恢复期取消会用 MySQL 时间检查 JVM 写入的 Turn 租约，Journal writer lease 和唤醒判断也已使用数据库时间。使用托管数据库时，确认服务商的时钟同步策略，并监控各 JVM 看到的数据库时间。
+
+- 使用 NTP，例如 chrony。服务接流量后使用平滑校时（slew），大幅跳变校时（step）仅在启动且尚未就绪时执行。
+- 任意两个 Java 实例之间，或 Java 与 MySQL 之间的时钟偏差超过 1 s 时告警。这是运维告警阈值。
+- 虚拟机暂停或热迁移后检查时钟偏差，这些场景可能出现时钟跳变。
+
+把剩余跨实例租约及重试判定改用数据库时间，列为后续加固项。复用现有的 [`ManagedSchemaTime.SQL_NOW`](https://github.com/QwenLM/qwen-code/blob/a37a7612c9/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/runtimebroker/managedschema/ManagedSchemaTime.java#L7-L10)，它已用 `CURRENT_TIMESTAMP(6)` 的小数部分计算出 Unix 毫秒时间戳。改动前逐条核对租约路径，包括 Turn 扫描、认领、续租和恢复期取消校验。加固完成后单独注入 10 分钟偏差，确认运行中的 Turn 仍由原持有者处理。
 
 ## 6. 实施阶段
 
 | 阶段 | 内容 | 完成标准 |
 | --- | --- | --- |
-| M1 | §4.1、§4.3、§4.4 | 3 个实例轮询时，终端从任意实例都能连上；把一个实例的时钟调快 10 分钟，它不会抢走运行中的 Turn |
-| M2 | §4.2 | 在非执行实例上，首个文本增量的 p95 延迟不超过通知周期加一次 SQL 读取 |
-| M3 | §4.5 | 提交、审批、取消、MCP 管理和 side query 落到任意实例都能成功；同一个 Session 的读取结果在各实例间一致 |
-| M4 | §4.6 | Broker 经过内部负载均衡时不再出现 `runtime_session_not_found`；placement 数量有界；§4.6 的开放问题有结论 |
-| M5 | §4.7 和多实例门禁 | 杀掉任意一个实例，它名下的 Turn 在租约过期后由其他实例完成，或按现有规则阻塞，且不重放任何工具调用 |
+| M1 | §4.1（[#18426](https://github.com/QwenLM/qwen-code/pull/18426) 进行中）、§4.3 和时钟同步（§5.1） | 3 个实例轮询时，任意实例签发的 ticket 可以在任意实例上成功升级一次 WebSocket |
+| M2 | §4.2，下一项实现 | 从首个文本增量提交到另一实例经 SSE 推送，p95 延迟不超过通知周期加一次 SQL 事件读取。带 `Last-Event-ID` 连到另一实例后，事件连续且不重复 |
+| M3 | §4.4 | 提交、审批、取消、MCP 管理和 side query 落到任意实例都能成功。同一个 Session 的读取结果在各实例间一致 |
+| M4 | §4.5 | Broker 经过内部负载均衡时不再出现 `runtime_session_not_found`。placement 数量有界，且 §4.5 的开放问题有结论 |
+| M5 | §4.6 和多实例门禁 | 杀掉任意一个实例，它名下的 Turn 在租约过期后由其他实例完成，或按现有规则阻塞。不重放任何工具调用 |
 
 ## 7. 验收方式
 
@@ -157,10 +166,10 @@
 
 ## 8. 风险与开放问题
 
-1. **Broker 并发接管**：见 §4.6。
-2. **cleanup 窗口**：§4.5 规则 1 留下了属主实例短暂的 cleanup 窗口，需要验证派发重试能否完全吸收。
+1. **Broker 并发接管**：见 §4.5。
+2. **cleanup 窗口**：§4.4 规则 1 留下了属主实例短暂的 cleanup 窗口，需要验证派发重试能否完全吸收。
 3. **通知循环的数据库负载**：订阅数很大时，IN 列表的规模和周期需要压测后确定。
-4. **与拉模型调度的关系**：拉模型在多个 Java 实例下需要向持有者广播工作信号，可以复用 §4.2 按 Session 水位轮询的做法；§4.3 的数据库时钟也是它的前提。
+4. **与拉模型调度的关系**：拉模型在多个 Java 实例下需要向持有者广播工作信号，可以复用 §4.2 按 Session 水位轮询的做法。拉模型自身的跨实例认领和属主期限应使用数据库时间。
 5. **进程级限额**：终端 ticket 之外，tool publication 并发和 artifact 读并发等进程级限额，在多实例下会变成 N 倍。本方案不改动它们，按单实例容量规划即可。
 
 ## 9. 参考资料
