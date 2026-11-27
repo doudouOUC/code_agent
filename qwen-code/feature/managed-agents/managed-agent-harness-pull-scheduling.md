@@ -2,7 +2,7 @@
 
 [English](managed-agent-harness-pull-scheduling.md) | [简体中文](managed-agent-harness-pull-scheduling.zh-CN.md)
 
-Personal design proposal, first drafted on 2026-11-25 and revised on 2026-11-27. Upstream submission is pending. The scheduling paths were rechecked against QwenLM/qwen-code `main` at [`d1a313445a`](https://github.com/QwenLM/qwen-code/commit/d1a313445aee7848e45a8d819a2b81752ff9f686). The November 26 source links retain their original snapshot (`afcc98595a`). §12 describes proposed acceptance tests. This proposal builds on the stateless Hosted Harness design ([#17527](https://github.com/QwenLM/qwen-code/pull/17527)) and [the gap analysis on #18149](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186), and complements [Java control-plane multi-instance deployment](managed-agent-java-multi-instance.md).
+Personal design proposal, first drafted on 2026-11-25 and revised on 2026-11-27. Upstream submission is pending. The scheduling paths were rechecked against QwenLM/qwen-code `main` at [`d1a313445a`](https://github.com/QwenLM/qwen-code/commit/d1a313445aee7848e45a8d819a2b81752ff9f686). The P4 paths in §7 were rechecked against [`099ce50da2`](https://github.com/QwenLM/qwen-code/commit/099ce50da29f0c793f7e8c56028ff17417505591) and have not changed since `d1a313445a`. The November 26 source links retain their original snapshot (`afcc98595a`). §12 describes proposed acceptance tests. This proposal builds on the stateless Hosted Harness design ([#17527](https://github.com/QwenLM/qwen-code/pull/17527)) and [the gap analysis on #18149](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186), and complements [Java control-plane multi-instance deployment](managed-agent-java-multi-instance.md).
 
 ## 1. Problem and Decision
 
@@ -19,7 +19,7 @@ Three options were considered:
 1. **Choose B for an independently autoscaled Harness pool.** A Harness with a free slot can claim runnable work immediately. If the deployment only needs failover among a fixed set of members, A0 already routes to the owner and supports safe handoff after a clean release. Both designs recover through the journal, `wake` and placement fencing (§5, §9).
 2. **A0 + P4 is the intermediate state and the rollback state.** P4, event ingest from the Harness, is part of B, and under either option it removes the Java instance that has to stay attached to a running Turn (§2.4, §7).
 3. **No A0-only investment.** Load-aware member selection and re-placement after `hosted_session_open_busy` are not built. An SQL instance registry and a network-addressable Harness listener are built only as an optional bridge, if independent Harness Pods are needed before P5 (§5.2). B needs neither (§6.8).
-4. **Order.** Migrate P4, P1, P3, P5 and P6 behind capability bits (§10). Before scaling Harness Pods separately, remove the remaining Java-to-Harness calls or enable the A0 bridge, and establish cross-Pod access to the Session Store and any enabled Runtime Broker (§12).
+4. **Order.** Migrate P4, P1, P3, P5 and P6 behind capability bits (§10); P1 depends on P4 (§7). Before scaling Harness Pods separately, remove the remaining Java-to-Harness calls or enable the A0 bridge, and establish cross-Pod access to the Session Store and any enabled Runtime Broker (§12).
 5. **No message queue.** B runs on SQL and HTTP. Where a broker is already deployed it can carry wake-up hints, but not requests or results (§6.9).
 
 ## 2. Current State
@@ -220,9 +220,21 @@ Where a broker is already deployed, it can carry hints. A shared "Session has wo
 
 P4 moves event delivery and its authorization off the dispatching Java instance. The same change applies whether Java pushes the Turn or a Harness claims it.
 
+It must also land before P1. P1 requires that a Harness can claim a parked Session and continue the original Turn without Java calling it. Today the continued Turn's events and its terminal settlement are recorded only by the dispatcher that reopened the stream after claiming the Turn. Without P4, Java would still have to reach the claimer to pull that stream.
+
 - **Current transaction.** Java locks the Session and Turn, checks the dispatch owner, lease deadline and event epoch, then advances the source cursor, appends public events and settles a terminal Turn in one transaction. Its increasing-source-ID check assumes ordered input from one stream. [Event persistence](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L568-L627)
 - **Batch ingest.** The Harness sends the existing envelopes to any Java instance. Each batch identifies the Turn, source epoch, expected previous journal cursor and the journal range it covers. Under the same transaction, verify the current writer grant and Turn binding, acknowledge an already committed retry, and advance only from the expected cursor. A batch arriving ahead of a gap receives the last committed cursor for replay. Retractions and terminal events follow their source order. The public SSE cursor keeps its own sequence.
 - **Replay after a crash.** If the Harness exits after journal commit but before delivery or acknowledgement, resume from the projection cursor using the committed journal. A successor must establish its current authority and preserve the source identity of replayed events, including bounded retractions. Once ingestion and terminal settlement work without a live Java dispatch lease, that lease can end after admission. [Journal-to-envelope projection](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/cli/src/serve/hosted-harness-session/observation-routes.ts#L312-L339)
+- **Duties of the stream consumer.** The dispatcher's stream loop does more than write events, and each duty needs an owner after P4. [Stream consumer](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L968-L1110)
+  - An Action park is inferred: a stream that ends cleanly without a terminal event parks the Turn through `parkTurnForAction`. Ingest needs an explicit park report from the Harness.
+  - Every 15 seconds the loop probes whether the Harness stopped with recovery blocked, and marks the Turn through `markTurnRecoveryBlocked`. The observation lane for a Turn already parked this way also reads the stream ([`observeBlockedHarness`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L942-L966)).
+  - It skips events of other prompts, batches text deltas by interval, count and bytes, and records the first visible text at once. Whichever side batches after P4 sets the first-text latency.
+  - It flushes the pending batch before a retraction and passes the bounded retraction source (`sourceBootId`, `sourceEventEpoch`) to the Store.
+  - It builds each event's source key as `bootId:eventEpoch:sourceId`. Replayed events must keep it.
+- **Sweep and liveness.** The dispatch sweep treats a lapsed dispatch lease as "no Java instance is driving this Turn" ([`findDispatchable`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L55-L64)). Ending that lease after admission would make every running Turn dispatchable on the next scan. P4 therefore needs a Turn marker meaning that ingest records its events, and a liveness test for that state. Today a Harness that dies mid-Turn is noticed when the dispatcher's stream fails. After P4 the sweep must notice the lapsed writer lease (`ma_session_head.writer_lease_until`) and drive the existing takeover and continuation.
+- **Epoch adoption.** On claim, the dispatcher reconciles the attachment's event epoch and journal tail with the admission and continuation epochs before it opens the stream ([`runClaimed`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L539-L937)). That reconciliation moves into the ingest transaction as the expected-cursor and source-epoch check, and the fence moves from `dispatch_owner` to the writer grant plus the Turn's boot binding. This changes the persistence fencing model and is the riskiest part of P4.
+- **Transport.** Each resident Session already holds its Session Store base URL and writer token ([`session-state.ts:85`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/cli/src/serve/hosted-harness-session/session-state.ts#L85)), so the ingest route can sit on the Store surface with no new connection or authentication.
+- **Slices.** (1) The Java ingest transaction, with the dispatcher still streaming and the capability bit off. (2) Harness push, replay from the projection cursor, and explicit park and recovery-blocked reports. (3) The sweep change, after which the dispatch lease ends at admission.
 - **Later alternative.** Java projects public events directly from the journal commits it already receives on the Store route. That removes the ingest hop but duplicates the TypeScript projection in Java (§11).
 
 ## 8. Comparison
@@ -237,7 +249,7 @@ P4 moves event delivery and its authorization off the dispatching Java instance.
 | Harness inbound listener | Required, behind mTLS once off-Pod | None |
 | Java-to-Harness reachability | Every Java instance must reach every Harness | Harness reaches Java through a load balancer |
 | Owner routing | Done by Java from the placement | Not needed: work goes to the holder |
-| Fencing change | P4 replaces the dispatch-owner check for event ingest | Same P4 change. Claims reuse placement and writer fences |
+| Fencing change | P4 replaces the dispatch-owner check for event ingest and the sweep's liveness test | Same P4 change. Claims reuse placement and writer fences |
 | Java-side owner of a running Turn | Removed by P4 | Removed by P4, which B includes |
 | Cancel and decision latency | One direct call | Signal plus fallback, within the P3 budget |
 | Synchronous reads | Unchanged | Java-side reads or request items |
@@ -264,7 +276,7 @@ Each phase is behind a capability bit, and push and pull coexist until P6. Until
 | Phase | Change | Role in the end state | Exit criteria | Status |
 | --- | --- | --- | --- | --- |
 | P2 | Release the placement on clean suspension and park; reaper for departed instances | Release kept; the reaper is removed at P6 | A released Session is claimed by any member without waiting for its lease | Done (#18404, #18443) |
-| P4 | Event ingest from the Harness (§7) | Kept | Public events identical to today for the same journal; killing the dispatching Java instance mid-Turn needs no stream reattach | Proposed |
+| P4 | Event ingest from the Harness, in three slices (§7) | Kept | Public events identical to today for the same journal; killing the dispatching Java instance mid-Turn needs no stream reattach; a Harness that dies mid-Turn is recovered through its lapsed writer lease | Proposed |
 | P1 | Pull for work that already goes to any instance: wake inputs, parked decisions, relay deliveries to suspended Sessions | Kept | These paths never call a Harness; same outcomes on real-process MySQL tests | |
 | P3 | Signals and pull for resident work: Turns, decisions, cancel, messages | Kept | Cancel and decision latency within a budget measured against today's direct calls; a full instance receives no new Session while another has capacity | |
 | P5 | Reads served by Java from SQL and the journal; request items for the remaining management routes and side queries | Kept | Every `/session/:id/*` route has a pull or Java-side equivalent; Harness Pods can be scheduled independently of Java | |
@@ -274,7 +286,7 @@ Each phase is behind a capability bit, and push and pull coexist until P6. Until
 
 ## 11. Risks and Open Questions
 
-1. **Ingest ordering and fencing (P4).** Per-Session order, the event-epoch check, retries after a lost acknowledgement, and retraction handling must match today's stream consumer exactly.
+1. **Ingest ordering and fencing (P4).** Per-Session order, the event-epoch check, retries after a lost acknowledgement, and retraction handling must match today's stream consumer exactly, and so must its park and recovery-blocked decisions. Once the dispatch lease ends at admission, a dead Harness is found only through its lapsed writer lease: the new sweep predicate must neither redispatch a Turn whose writer is alive nor strand one whose writer is gone.
 2. **Event projection.** Harness ingest keeps one projection implementation. Projecting in Java removes a hop but duplicates logic across languages.
 3. **Latency (P3).** Cancel, decisions and the first event go through a signal. They are measured against today's direct calls as P3's exit criterion.
 4. **Signal cost with several Java instances.** The SQL watermark poll costs one query per instance per tick. #18431 notes that index use at production scale is unmeasured for its event-tail query; the same applies here. A broker can replace the poll as a hint where one is deployed (§6.9).
@@ -290,7 +302,7 @@ Each phase is behind a capability bit, and push and pull coexist until P6. Until
 Intermediate state (Phase 1–4 rollout, P4):
 
 1. Kill a Harness with an active tool execution. After lease expiry and a safe takeover, query the original Worker under the same execution ID. A confirmed result resumes the Turn once. An unknown result stays pending reconciliation. A cleanly released idle Session can move on its next request.
-2. Kill the dispatching Java instance mid-Turn. Deliver the second ingest batch before the first, drop an acknowledgement after commit, and terminate the Harness after a journal commit but before ingest. Reconnect public SSE from its last public cursor and compare with A0 on the same journal. Text deltas, retractions and the single terminal event must match without reattaching the dispatcher.
+2. Kill the dispatching Java instance mid-Turn. Deliver the second ingest batch before the first, drop an acknowledgement after commit, and terminate the Harness after a journal commit but before ingest. Reconnect public SSE from its last public cursor and compare with A0 on the same journal. Text deltas, retractions and the single terminal event must match without reattaching the dispatcher. Then kill the Harness mid-Turn with no dispatcher attached: the sweep must find the lapsed writer lease and recover the Turn through takeover. A Turn that parks for an Action, and one that stops with recovery blocked, must be recorded as they are today.
 
 Optional bridge and reaper change, if built:
 
@@ -323,6 +335,7 @@ Each phase requires real-process MySQL 8.4 verification. The P1 handoff, P4 faul
 - The multi-Java risk is rewritten: the slices are merging, and signals use SQL watermark polling by default.
 - Current-state references move to `afcc98595a`, and the route count is corrected to 43.
 - The November 27 review adds #18463, the P4 replay contract, a first P1 healthy-member handoff, and the independent-Pod and load tests in §12.
+- The November 27 recheck against `099ce50da2` expands §7: P4 as a prerequisite of P1, the stream consumer's other duties (park, recovery blocked, filtering, batching, retractions, source keys), the sweep's liveness test, epoch adoption, the existing Store transport, and three slices. §1, §8, §10, §11 and §12 follow.
 
 ## 14. Sources
 

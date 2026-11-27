@@ -2,7 +2,7 @@
 
 [English](managed-agent-harness-pull-scheduling.md) | [简体中文](managed-agent-harness-pull-scheduling.zh-CN.md)
 
-个人设计提案，2026-11-25 起草，2026-11-27 修订，尚未提交上游。调度链路已对照 QwenLM/qwen-code `main` 的 [`d1a313445a`](https://github.com/QwenLM/qwen-code/commit/d1a313445aee7848e45a8d819a2b81752ff9f686) 复核。11 月 26 日的源码链接保留当时的快照（`afcc98595a`）。§12 列出待执行的验收场景。本文基于无状态 Hosted Harness 设计（[#17527](https://github.com/QwenLM/qwen-code/pull/17527)）和 [#18149 的差距分析](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186)，与 [Java 控制面多实例部署](managed-agent-java-multi-instance.zh-CN.md)互为补充。
+个人设计提案，2026-11-25 起草，2026-11-27 修订，尚未提交上游。调度链路已对照 QwenLM/qwen-code `main` 的 [`d1a313445a`](https://github.com/QwenLM/qwen-code/commit/d1a313445aee7848e45a8d819a2b81752ff9f686) 复核。§7 中 P4 涉及的代码路径已对照 [`099ce50da2`](https://github.com/QwenLM/qwen-code/commit/099ce50da29f0c793f7e8c56028ff17417505591) 再次复核，自 `d1a313445a` 以来没有变化。11 月 26 日的源码链接保留当时的快照（`afcc98595a`）。§12 列出待执行的验收场景。本文基于无状态 Hosted Harness 设计（[#17527](https://github.com/QwenLM/qwen-code/pull/17527)）和 [#18149 的差距分析](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186)，与 [Java 控制面多实例部署](managed-agent-java-multi-instance.zh-CN.md)互为补充。
 
 ## 1. 问题与结论
 
@@ -19,7 +19,7 @@
 1. **需要让 Harness 池独立弹性扩缩时，选 B。** 有空位的 Harness 可以直接认领可运行的工作。部署只要求固定成员间故障接管时，沿用 A0 即可：它已经支持定向派发和干净释放后的安全换手。两种方案都依靠 journal、`wake` 和 placement 校验恢复 Session（§5、§9）。
 2. **A0 + P4 是中间形态，也是回退形态。** P4（由 Harness 上报事件）是 B 的一部分；在两个方案下，它都能去掉运行中 Turn 必须挂着的那个 Java 实例（§2.4、§7）。
 3. **不做只服务于 A0 的投入。** 不做按负载选成员，也不做收到 `hosted_session_open_busy` 后改投其他成员。SQL 实例注册表和可网络访问的 Harness 监听只作为可选过渡，在 P5 之前就需要独立的 Harness Pod 时才做（§5.2）。B 两者都不需要（§6.8）。
-4. **迁移顺序。** 按 P4、P1、P3、P5、P6 依次迁移，每一步都用能力位控制（§10）。单独扩缩 Harness Pod 前，需要迁完剩余的 Java → Harness 调用或启用 A0 过渡方案，并打通跨 Pod 的 Session Store 和已启用的 Runtime Broker（§12）。
+4. **迁移顺序。** 按 P4、P1、P3、P5、P6 依次迁移，每一步都用能力位控制（§10）；P1 依赖 P4（§7）。单独扩缩 Harness Pod 前，需要迁完剩余的 Java → Harness 调用或启用 A0 过渡方案，并打通跨 Pod 的 Session Store 和已启用的 Runtime Broker（§12）。
 5. **不依赖消息队列。** B 只用 SQL 和 HTTP。已经部署了 broker 的环境可以用它传递唤醒提示，但不能用它传请求或结果（§6.9）。
 
 ## 2. 现状
@@ -220,9 +220,21 @@ Session 被持有期间，Java 通过同一个长轮询把新工作交给持有�
 
 P4 把事件投递和写入授权从派发 Turn 的 Java 实例上移开。无论 Turn 由 Java 推送，还是由 Harness 领取，都可以先做这项改动。
 
+它还必须先于 P1 落地。P1 要求 Harness 能认领已停靠的 Session 并继续原 Turn，而 Java 不调用它。现在续跑 Turn 的事件和终态结算，只能由认领 Turn 后重新接流的派发者写入；没有 P4，Java 仍要访问认领方才能拉到这条流。
+
 - **现有事务。** Java 锁定 Session 和 Turn，检查派发者、租约有效期和 event epoch，再在一个事务中推进源游标、追加公开事件，并在终态事件到达时结算 Turn。当前按源序号递增接纳事件，依赖同一条流有序送达。[事件持久化实现](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L568-L627)
 - **分批上报。** Harness 把现有 envelope 发给任一 Java 实例。每批携带 Turn、源 epoch、预期的前一 journal 游标以及本批覆盖的日志范围。在同一事务内校验当前 writer 凭证和 Turn 绑定。已提交批次重试时返回确认；仅从预期游标向前提交。后批先到时返回已提交游标，供发送方补齐缺口。撤回和终态按源顺序处理，公开 SSE 继续使用自己的序号。
 - **崩溃后补发。** 如果 Harness 在 journal 提交后、上报或收到确认前退出，从已提交的投影游标读取 journal 并补发。接管者须先取得当前写权限，补发时保留原事件的来源标识，包括有范围的撤回。事件写入和终态结算都能脱离活跃的 Java 派发租约后，该租约才可以在准入完成时结束。[journal 到 envelope 的投影](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/cli/src/serve/hosted-harness-session/observation-routes.ts#L312-L339)
+- **流消费者的其他职责。** 派发者的拉流循环不只是写事件，P4 之后每一项都要有新的归属。[流消费实现](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L968-L1110)
+  - Action 停靠是推断出来的：流正常结束而没有终态事件，就通过 `parkTurnForAction` 停靠 Turn。改为上报后，需要 Harness 显式上报停靠。
+  - 循环每 15 秒探测一次 Harness 是否以 recovery blocked 停下，并通过 `markTurnRecoveryBlocked` 标记 Turn。已按这种方式停靠的 Turn，其观察通道也要读这条流（[`observeBlockedHarness`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L942-L966)）。
+  - 它跳过其他 prompt 的事件，按时间间隔、条数和字节数攒批文本增量，首个可见文本立即写入。P4 之后由哪一侧攒批，决定首字延迟。
+  - 遇到撤回时先写入待发批次，并把有范围撤回的来源（`sourceBootId`、`sourceEventEpoch`）交给 Store。
+  - 每个事件的来源键是 `bootId:eventEpoch:sourceId`，补发的事件必须保留它。
+- **扫描与存活检测。** 派发扫描把派发租约过期当作“没有 Java 实例在驱动这个 Turn”（[`findDispatchable`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L55-L64)）。如果准入后结束派发租约，下一次扫描就会把所有运行中的 Turn 当作可派发。因此 P4 需要一个 Turn 标记，表示其事件由上报路径写入，并为这种状态提供存活检测。现在 Harness 在 Turn 中途死掉，是派发者的流出错时发现的；P4 之后，扫描必须根据过期的 writer lease（`ma_session_head.writer_lease_until`）发现它，再走现有的接管和续跑路径。
+- **epoch 收养。** 认领时，派发者在接流之前，要把 attachment 的 event epoch 和 journal 尾与准入、续跑时的 epoch 对齐（[`runClaimed`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L539-L937)）。这段逻辑要搬进上报事务，变成预期游标和源 epoch 的校验；fencing 也从 `dispatch_owner` 换成 writer 凭证加 Turn 的 boot 绑定。这是持久化层 fencing 模型的改动，也是 P4 风险最集中的部分。
+- **传输。** 每个常驻 Session 已经持有 Session Store 的 base URL 和写权限 token（[`session-state.ts:85`](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/cli/src/serve/hosted-harness-session/session-state.ts#L85)），上报路由可以挂在 Store 接口上，不需要新的连接或认证。
+- **切分。** ① Java 侧的上报事务，派发者照常拉流，能力位关闭；② Harness 推送、从投影游标补发、显式上报停靠和 recovery blocked；③ 修改扫描条件，此后派发租约在准入时结束。
 - **后续备选**：由 Java 直接从它在 Store 路由上已经收到的 journal 提交中投影公开事件。这样省掉摄取这一跳，但要在 Java 里重复实现 TypeScript 的投影逻辑（§11）。
 
 ## 8. 对比
@@ -237,7 +249,7 @@ P4 把事件投递和写入授权从派发 Turn 的 Java 实例上移开。无�
 | Harness 入站监听 | 需要；离开 Pod 后要走 mTLS | 不需要 |
 | Java 到 Harness 的可达性 | 每个 Java 实例都必须能访问每个 Harness | Harness 经负载均衡访问 Java |
 | owner 路由 | Java 根据 placement 完成 | 不需要：工作直接交给持有者 |
-| 写入校验改动 | P4 为事件上报替换派发者校验 | 同样需要 P4 的改动；认领复用 placement 与 writer 校验 |
+| 写入校验改动 | P4 为事件上报替换派发者校验，并替换扫描的存活判断 | 同样需要 P4 的改动；认领复用 placement 与 writer 校验 |
 | 运行中 Turn 在 Java 侧的 owner | 由 P4 去掉 | 由 P4 去掉，B 包含 P4 |
 | cancel 和决定的延迟 | 一次直接调用 | 信号加兜底，控制在 P3 的预算内 |
 | 同步读取 | 不变 | Java 侧读取或请求工作项 |
@@ -264,7 +276,7 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 | 阶段 | 改动 | 在终态中的去留 | 完成标准 | 状态 |
 | --- | --- | --- | --- | --- |
 | P2 | 干净挂起和停靠时释放 placement；为已离开的实例加回收器 | 释放保留；回收器在 P6 时移除 | 已释放的 Session 不必等租约过期，任意成员都能认领 | 已完成（#18404、#18443） |
-| P4 | 由 Harness 上报事件（§7） | 保留 | 同一份 journal 产生的公开事件与现在一致；在 Turn 中途杀掉派发它的 Java 实例，不需要重新接流 | 提议 |
+| P4 | 由 Harness 上报事件，分三步（§7） | 保留 | 同一份 journal 产生的公开事件与现在一致；在 Turn 中途杀掉派发它的 Java 实例，不需要重新接流；Turn 中途死掉的 Harness 通过过期的 writer lease 恢复 | 提议 |
 | P1 | 本来就可以交给任意实例的工作改为拉取：wake 输入、已停靠的决定、发给已挂起 Session 的 relay 投递 | 保留 | 这些路径不再调用 Harness；真实进程 MySQL 测试中结果不变 | |
 | P3 | 为常驻工作加上信号并改为拉取：Turn、决定、cancel、消息 | 保留 | cancel 和决定的延迟在与现有直接调用对比测出的预算内；某个实例满了时，只要还有别的实例有容量，它就不会再拿到新 Session | |
 | P5 | 读取由 Java 从 SQL 和 journal 提供；其余管理路由和 side query 改为请求工作项 | 保留 | 每个 `/session/:id/*` 路由都有拉模型或 Java 侧的等价实现；Harness Pod 可以独立于 Java 调度 | |
@@ -274,7 +286,7 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 
 ## 11. 风险与开放问题
 
-1. **上报的顺序和 fencing（P4）**：每个 Session 的顺序、event epoch 校验、应答丢失后的重试、retraction 处理，都必须和现在的流消费者完全一致。
+1. **上报的顺序和 fencing（P4）**：每个 Session 的顺序、event epoch 校验、应答丢失后的重试、retraction 处理，以及停靠和 recovery blocked 的判定，都必须和现在的流消费者完全一致。准入时结束派发租约后，死掉的 Harness 只能通过过期的 writer lease 发现：新的扫描条件既不能重派 writer 仍存活的 Turn，也不能遗漏 writer 已不在的 Turn。
 2. **事件投影**：由 Harness 上报可以只保留一份投影实现；在 Java 里投影能省一跳，但会造成跨语言重复。
 3. **延迟（P3）**：cancel、决定和首个事件要经过信号，作为 P3 的完成标准，与现在的直接调用对比测量。
 4. **多 Java 实例下的信号开销**：SQL 水位轮询每个实例每个周期一条查询。#18431 说明其事件尾查询在生产规模下的索引使用情况尚未测量，这里同样如此。已部署 broker 的环境里，可以用它作为提示来替代轮询（§6.9）。
@@ -290,7 +302,7 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 中间形态（Phase 1–4 放量、P4）：
 
 1. 在工具执行期间终止 Harness。租约过期并满足安全接管条件后，按原 execution ID 向原 Worker 核对结果。结果确定时原 Turn 只恢复一次；结果未知时保持待核对。已干净释放的空闲 Session 可在下次请求时迁移。
-2. 在 Turn 运行中终止派发它的 Java 实例。分别注入第二批先于第一批送达、提交后确认丢失，以及 journal 已提交但尚未上报时 Harness 退出。从最后收到的公开游标重连 SSE，与 A0 对同一 journal 的投影对照：文本增量、撤回和唯一终态须一致，全程无需派发者重新接流。
+2. 在 Turn 运行中终止派发它的 Java 实例。分别注入第二批先于第一批送达、提交后确认丢失，以及 journal 已提交但尚未上报时 Harness 退出。从最后收到的公开游标重连 SSE，与 A0 对同一 journal 的投影对照：文本增量、撤回和唯一终态须一致，全程无需派发者重新接流。再在没有派发者接流时于 Turn 中途终止 Harness：扫描须发现过期的 writer lease，并通过接管恢复该 Turn。因 Action 停靠的 Turn 和以 recovery blocked 停下的 Turn，须与现在一样被记录。
 
 可选过渡和回收器改动（如果做）：
 
@@ -323,6 +335,7 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 - 重写多 Java 实例的风险：相关工作正在合入，信号默认用 SQL 水位轮询。
 - 现状引用改为 `afcc98595a`，路由数更正为 43。
 - 11 月 27 日复核补入 #18463、P4 的补发契约、P1 的首次健康成员换手，以及 §12 的独立 Pod 验证和负载测试。
+- 11 月 27 日对照 `099ce50da2` 复核后扩充 §7：P4 是 P1 的前提；流消费者的其他职责（停靠、recovery blocked、过滤、攒批、撤回、来源键）；扫描的存活检测；epoch 收养；复用现有 Store 传输；以及三步切分。§1、§8、§10、§11、§12 随之更新。
 
 ## 14. 参考资料
 
