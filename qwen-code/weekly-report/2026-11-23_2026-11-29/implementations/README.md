@@ -51,5 +51,10 @@
 | [#18444](https://github.com/QwenLM/qwen-code/pull/18444) | merged | feat(kubernetes): Enable a two-member Hosted Harness pool | [pr-18444.md](pr-18444.md) |
 | [#18453](https://github.com/QwenLM/qwen-code/pull/18453) | merged | fix(managed-agent): Restore Action parking across Harness replacement | [pr-18453.md](pr-18453.md) |
 | [#18455](https://github.com/QwenLM/qwen-code/pull/18455) | merged | fix(managed-agent): Resume Managed Turns after Broker failover | [pr-18455.md](pr-18455.md) |
+| [#18463](https://github.com/QwenLM/qwen-code/pull/18463) | merged | fix(managed-agent): Recover interrupted Broker polls after failover | [pr-18463.md](pr-18463.md) |
+| [#18497](https://github.com/QwenLM/qwen-code/pull/18497) | merged | feat(managed-agent): Share the Runtime Broker HTTP listener | [pr-18497.md](pr-18497.md) |
+| [#18506](https://github.com/QwenLM/qwen-code/pull/18506) | merged | perf(managed-agent): Avoid replay floor full-table scans | [pr-18506.md](pr-18506.md) |
+| [#18509](https://github.com/QwenLM/qwen-code/pull/18509) | merged | feat(managed-agent): Propose Harness event ingest and add its Store route | [pr-18509.md](pr-18509.md) |
+| [#18519](https://github.com/QwenLM/qwen-code/pull/18519) | merged | feat(cli): Push an ingested Turn's events from the Harness | [pr-18519.md](pr-18519.md) |
 
-_按个人 PR 口径更新于 2026-11-27_
+_按个人 PR 口径更新于 2026-11-28_

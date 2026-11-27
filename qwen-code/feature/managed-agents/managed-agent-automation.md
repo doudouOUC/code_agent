@@ -1,5 +1,19 @@
 # Managed 自动任务、Channels 与子任务交付
 
+## 共享 Broker 入口与事件 ingest 前两片，2026-11-28
+
+main `95502a5c27b9`；本节更新11-27日更，重叠状态、配置和路径取代下方旧日期口径。
+
+[#18463](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18463.md) 已合入：execution poll的类型化网络/超时错误进入原Turn恢复，CANCEL_REQUESTED补重观察；非任意异常放行。
+
+[#18509](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18509.md) 已合入：Store接收端与共用recorder，保writer/Turn owner和cursor；Java fresh提交选择/lease handoff仍未接线。
+
+[#18519](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18519.md) 已合入：显式eventDelivery的Harness条件推送/heartbeat与封存marker；Java正常调度选择和owner转交尚缺。
+
+ingest接收端要求原writer/placement和harness:boot Turn owner，条件推送器只在显式eventDelivery请求启动。Java/SDK正常提交选择与owner handoff尚缺，设计的开关也未接线；正常Turn仍用consumeStream，不是已启用的pull scheduling或无驻留Java执行。sealed park marker是一次尝试，失败仍依赖原lease恢复。
+
+本次仅文档/源码静态核验，未运行产品测试、构建、typecheck、CI、MySQL、Hosted、Kubernetes、provider、性能或浏览器验收。保留旧日期史料及已有调度设计，不改createdAt周归属。
+
 ## 多实例恢复与停靠释放，2026-11-27
 
 main `afcc98595ac6`；本节更新11-26日更，重叠状态/实现取代下方旧日期观察。

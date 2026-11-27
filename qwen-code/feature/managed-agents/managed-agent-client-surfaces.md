@@ -1,5 +1,15 @@
 # Managed 普通客户端、交互与事件投影
 
+## 共享 Broker 入口与事件 ingest 前两片，2026-11-28
+
+main `95502a5c27b9`；本节更新11-27日更，重叠状态、配置和路径取代下方旧日期口径。
+
+[#18497](../../weekly-report/2026-11-23_2026-11-29/implementations/pr-18497.md) 已合入：Broker迁入Spring私有listener，保token/容量门，移除专用socket配置并更新本地两端口和chart origin。
+
+Broker已复用Spring私有HTTP面，保Bearer与32线程/64排队、8MiB门；非loopback公共绑定要求隔离internal listener。专用host/port配置不再使用，chart Broker与Store同loopback8081，managed-local读取兼容旧brokerPort但只分配两端口。代理可达性与目标部署未实测。
+
+本次仅文档/源码静态核验，未运行产品测试、构建、typecheck、CI、MySQL、Hosted、Kubernetes、provider、性能或浏览器验收。保留旧日期史料及已有调度设计，不改createdAt周归属。
+
 ## 多实例恢复与停靠释放，2026-11-27
 
 main `afcc98595ac6`；本节更新11-26日更，重叠状态/实现取代下方旧日期观察。
