@@ -2,7 +2,7 @@
 
 [English](managed-agent-harness-pull-scheduling.md) | [简体中文](managed-agent-harness-pull-scheduling.zh-CN.md)
 
-Status: proposal, 2026-11-25, revised 2026-11-26. Personal design draft; not submitted upstream. Current-state claims were checked against QwenLM/qwen-code `main` at [`afcc98595a`](https://github.com/QwenLM/qwen-code/commit/afcc98595ac61e330021ad325d0ef914eb46ce80); the first draft was checked at `67f85d324e`, and §13 lists what changed. Claude Managed Agents facts come from the public pages listed in §14, read on 2026-11-25. This builds on the stateless Hosted Harness design ([#17527](https://github.com/QwenLM/qwen-code/pull/17527)) and the [gap analysis on #18149](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186), and complements [Java control-plane multi-instance deployment](managed-agent-java-multi-instance.md).
+Personal design proposal, first drafted on 2026-11-25 and revised on 2026-11-27. Upstream submission is pending. The scheduling paths were rechecked against QwenLM/qwen-code `main` at [`d1a313445a`](https://github.com/QwenLM/qwen-code/commit/d1a313445aee7848e45a8d819a2b81752ff9f686). The November 26 source links retain their original snapshot (`afcc98595a`). §12 describes proposed acceptance tests. This proposal builds on the stateless Hosted Harness design ([#17527](https://github.com/QwenLM/qwen-code/pull/17527)) and [the gap analysis on #18149](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186), and complements [Java control-plane multi-instance deployment](managed-agent-java-multi-instance.md).
 
 ## 1. Problem and Decision
 
@@ -16,10 +16,10 @@ Three options were considered:
 
 **Decision (proposed):**
 
-1. **B is the end state.** Statelessness itself does not depend on the call direction. It comes from the journal, `wake` and placement release, which A0 already has. Elastic scaling does depend on it. A0 can add and remove instances once membership is dynamic, but it places Sessions without knowing capacity, needs every Java instance to reach every Harness, and has no queue to scale on (§9).
+1. **Choose B for an independently autoscaled Harness pool.** A Harness with a free slot can claim runnable work immediately. If the deployment only needs failover among a fixed set of members, A0 already routes to the owner and supports safe handoff after a clean release. Both designs recover through the journal, `wake` and placement fencing (§5, §9).
 2. **A0 + P4 is the intermediate state and the rollback state.** P4, event ingest from the Harness, is part of B, and under either option it removes the Java instance that has to stay attached to a running Turn (§2.4, §7).
 3. **No A0-only investment.** Load-aware member selection and re-placement after `hosted_session_open_busy` are not built. An SQL instance registry and a network-addressable Harness listener are built only as an optional bridge, if independent Harness Pods are needed before P5 (§5.2). B needs neither (§6.8).
-4. **Order.** Migrate P4, P1, P3, P5, P6, each behind a capability bit (§10). Independent, autoscaled Harness Pods become possible once P5 removes the last Java-to-Harness call.
+4. **Order.** Migrate P4, P1, P3, P5 and P6 behind capability bits (§10). Before scaling Harness Pods separately, remove the remaining Java-to-Harness calls or enable the A0 bridge, and establish cross-Pod access to the Session Store and any enabled Runtime Broker (§12).
 5. **No message queue.** B runs on SQL and HTTP. Where a broker is already deployed it can carry wake-up hints, but not requests or results (§6.9).
 
 ## 2. Current State
@@ -59,9 +59,9 @@ Most of what Java sends to a Harness already exists as a durable record before i
 Two processes hold state for a running Turn:
 
 - The **Harness owner** holds the Session's writer lease and runs the loop (§2.3).
-- The **Java dispatcher** that claimed the Turn holds its `dispatch_owner` lease ([`AgentTurnExecution.java:81-86`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L81-L86)) and renews it ([`HarnessCoordinator.java:121-122`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L121-L122)). It keeps the Harness event stream open for the whole Turn and turns it into public events ([`HarnessCoordinator.java:934-968`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L934-L968)). If that Java instance dies, another instance's sweep picks the Turn up after the dispatch lease lapses and attaches to the stream again.
+- The **Java dispatcher** that claimed the Turn holds its `dispatch_owner` lease ([`AgentTurnExecution.java:81-86`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L81-L86)) and renews it ([`HarnessCoordinator.java:286-297`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L286-L297)). It keeps the Harness event stream open for the whole Turn and turns it into public events ([`HarnessCoordinator.java:934-968`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L934-L968)). If that Java instance dies, another instance's sweep picks the Turn up after the dispatch lease lapses and attaches to the stream again.
 
-Much of the recent multi-instance work handles this second owner: reattaching Harness Sessions from another control plane ([#18433](https://github.com/QwenLM/qwen-code/pull/18433)), reading recovery status without an attachment ([#18440](https://github.com/QwenLM/qwen-code/pull/18440)), and resuming a Turn after Broker failover ([#18455](https://github.com/QwenLM/qwen-code/pull/18455)). Event ingest (P4) removes it under either option. A0 alone does not.
+Much of the recent multi-instance work handles this second owner: reattaching Harness Sessions from another control plane ([#18433](https://github.com/QwenLM/qwen-code/pull/18433)), reading recovery status without an attachment ([#18440](https://github.com/QwenLM/qwen-code/pull/18440)), and resuming a Turn after Broker failover ([#18455](https://github.com/QwenLM/qwen-code/pull/18455)). [#18463](https://github.com/QwenLM/qwen-code/pull/18463) also covers an interrupted Broker status poll. A surviving Harness and original Runtime Worker can recover the result using the same execution ID and dispatch generation. If the Worker cannot confirm the outcome, the Broker leaves the record pending. Java still dispatches the Turn.
 
 ### 2.5 Stateless roadmap and pool status
 
@@ -101,13 +101,13 @@ How the harness tier ensures a single writer, who calls `wake`, how a harness is
 1. Clients and the control plane never address a harness by process. They write durable work, and whichever harness holds the session consumes it. A0 meets this through placement routing, B through claims.
 2. The scheduling unit is the session, held under a renewable lease and given back. Both options use the existing writer lease and placement.
 3. A wait is a state of the session log, not a resident process. This is Phase 4, Action parking.
-4. The published pull API is the one for self-hosted workers, which run where Anthropic cannot open connections. How the internal harness tier is scheduled is not published beyond the sentence above (§3.2). Statelessness comes from the session log and `wake`, not from the call direction. This design chooses pull for elastic scaling (§9).
+4. Anthropic documents outbound polling for self-hosted **sandbox workers**, which execute tool calls. Its Harness article describes recovery from a Session log. The internal Harness placement algorithm remains unpublished (§3.2). For capacity-driven scheduling, the closer precedent is Temporal’s worker slots (§6.6).
 
 ## 4. Option A: Push Behind a Load Balancer (Dropped)
 
 With a load balancer in front of the Harness, any instance can receive a call for any Session. That creates three gaps: owner routing (forwarding, redirects or consistent hashing to reach the live writer), Session-scoped fencing (moving the expected boot ID from the client to the Session reference), and writer grants that do not name an instance (a claim ticket exchanged at `writers:acquire`).
 
-A0 has none of these gaps, because Java, not a load balancer, picks the instance (§5.1). A load balancer adds nothing that Java's selection does not already do, while adding a forwarding layer that must carry SSE without buffering and must not retry mutations. B does not need a claim ticket either, because the poll response carries the grant after the claim CAS. The first draft's P0 claim-ticket item is therefore dropped.
+A narrower push variant would put only a new `/work` notification behind the load balancer. The receiving Harness would claim through the Store. This can work when the network requires push, but it also needs a protocol for a busy recipient, duplicate delivery and signals to the live owner. A0 already provides owner routing. For an elastic pool, proceed directly to B and issue the writer credential to the successful poller.
 
 ## 5. Option A0: Java-Routed Push (Intermediate State)
 
@@ -167,7 +167,7 @@ While a Session is held, Java delivers new work for it to the holder through the
 
 - **Claim** is the existing placement CAS, now run when a Harness polls instead of when Java picks a member. The takeover rules are unchanged: either a released placement with a receipt, or a lapsed writer lease with a known activation. A refusal means the Session is still held, so the item stays with its holder.
 - **Grant.** The poll response carries the existing placement-bound writer token. The Store keeps checking it on every writer operation, so `JournalFencing` and `requireCurrent` do not change.
-- **Lease.** The writer lease (`writers:renew`, 60 seconds by default) is the claim lease. No second lease is introduced. Claude's `expected_last_heartbeat` precondition corresponds to today's writer generation check.
+- **Lease.** B uses the writer lease (`writers:renew`, 60 seconds by default) as the Session execution lease. Placement assignment and writer acquisition are separate operations today. Losing the poll response before acquisition must allow a retry to discover the current placement or qualify for takeover. The Turn dispatch lease and the Action operation claim generation protect different writes today. Each migrating path must preserve those checks or replace them with an equivalent fence. [Placement takeover](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/JdbcHarnessPlacementStore.java#L181-L247) · [Writer acquisition](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/JournalWriterLifecycle.java#L143-L194) · [Action claim renewal](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/ActionResponseCoordinator.java#L74-L92)
 - **Writer identity** stays the boot ID. The Turn's `bindHarness(bootId)` still records which process runs the Turn, and a change of process still goes through recovery.
 
 ### 6.4 Signals to the holder
@@ -184,7 +184,7 @@ While a Session is held, Java delivers new work for it to the holder through the
 
 ### 6.6 Capacity, drain and security
 
-- An instance polls only for work it can take. The cold-open limit and active Turn count become poll admission. Java hands out new Sessions round robin across tenants, as the shared Harness design requires. Queue depth, oldest pending work and polling instances become scaling signals, like Claude's `work/stats`.
+- Free cold-open and active-Turn slots gate **new** Session claims. A full or draining instance keeps polling for cancellation, approval and other signals for Sessions it already holds. Allocate new work fairly across tenants. Temporal uses worker slots to decide when to poll for new tasks, a useful precedent for this part of the protocol. [Temporal Worker performance](https://docs.temporal.io/develop/worker-performance)
 - **Drain.** Stop claiming new Sessions, keep serving held ones, and release each as it goes idle. A timed-out drain falls back to crash recovery. No inbound drain route is needed.
 - **Security.** The Harness opens no listener, so the loopback-only binding and per-instance TLS proxies are no longer needed. The Harness authenticates to Java with an instance identity, preferably mTLS with the instance ID in the certificate. Grants are issued per claim, so a credential exists only for Sessions the instance holds.
 
@@ -210,7 +210,7 @@ A variant replaces long-polls with a message queue: Java publishes requests to o
 
 1. **Session-bound work.** Cancel, decisions and messages for a running Turn, and reads of resident state, must reach the writer-lease holder (§2.3). Competing consumers deliver them to any instance. Partitioning by Session keeps a Session on one consumer, but consumer rebalancing and the writer lease are two independent ownerships that disagree during scaling and crashes. Ordered consumption also serializes a queue, so a Turn that runs for minutes blocks the other Sessions on it. One LiteTopic per Session avoids the blocking, but subscribing to it after a claim is B's claim-then-deliver, and the claim is still a MySQL CAS.
 2. **Acknowledgement timing.** MQ3 measured that a crashed consumer's unacknowledged message moves to another member only after the broker expires the client, after 121 to 129 seconds locally, with the topic's later messages waiting behind it ([MQ3 finding 1](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)). Acknowledging after the Turn stalls the Session that long after a crash. Acknowledging on receipt loses the message on a crash, and recovery comes from SQL.
-3. **Delivery is at least once, ordered or not.** Redelivery after a crash or an acknowledgement timeout, a queue lock expiring during rebalance, a producer retry after a timed-out send, and broker failover all duplicate messages. The [event transport design](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-04-managed-agent-event-transport.md) already requires idempotent consumers (invariant 5) and does not rely on ordered delivery for correctness. Even exactly-once delivery would not cover side effects outside the broker: model calls, tool executions, file edits and Store writes. Exactly-once execution comes from the Store and the journal. Writer generation and placement epoch fence stale processors, operation IDs make completions idempotent, and the tool execution ledger keeps the execution ID and dispatch generation, so recovery queries the Worker instead of executing again. Recovery resumes from the journal, not from the request.
+3. **Delivery is at least once, ordered or not.** Redelivery after a crash or an acknowledgement timeout, a queue lock expiring during rebalance, a producer retry after a timed-out send, and broker failover all duplicate messages. The [event transport design](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-04-managed-agent-event-transport.md) already requires idempotent consumers (invariant 5) and does not rely on ordered delivery for correctness. Even exactly-once delivery would not cover side effects outside the broker: model calls, tool executions, file edits and Store writes. The Store, journal and Worker evidence govern retries. Writer generation and placement epoch fence stale processors, operation IDs make completions idempotent, and the tool execution ledger keeps the execution ID and dispatch generation, so recovery queries the Worker instead of executing again. Recovery resumes from the journal, not from the request.
 4. **Two writes.** Turns, decisions and operations must be in SQL first: the public API reads them, and single-writer and idempotency checks depend on them. Publishing them to a queue is a second write that needs an outbox. MQ3 also found no producer retry buffer, so envelopes sent during a long broker outage are dropped ([MQ3 finding 2](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)). Results posted to a queue still have to be written to SQL with fencing by whichever Java instance consumes them, so a result queue only adds a hop.
 5. **Infrastructure.** Event transport is off by default ([`EventTransportConfiguration.java:56-57`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/config/EventTransportConfiguration.java#L56-L57)), the Helm deployment has no broker, a node cannot start while the broker is down ([MQ3 finding 3](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)), and the TypeScript side has no consumer.
 
@@ -218,11 +218,11 @@ Where a broker is already deployed, it can carry hints. A shared "Session has wo
 
 ## 7. Event Ingest (P4)
 
-P4 changes only how Java receives a running Turn's events. It does not depend on who starts the Turn, so it applies to A0 and B alike.
+P4 moves event delivery and its authorization off the dispatching Java instance. The same change applies whether Java pushes the Turn or a Harness claims it.
 
-- **Today.** The Java dispatcher reads the Harness event stream for the whole Turn (§2.4).
-- **Change.** The Harness posts the envelopes it streams today, batched and keyed by journal sequence, to an ingest route on any Java instance, fenced by its writer token. The coordinator's stream-consumption logic becomes that route's handler. Duplicates are dropped by sequence, and an envelope whose event epoch differs from the Turn's bound Harness is refused, as the stream consumer refuses it today ([`HarnessCoordinator.java:948`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L948)). The terminal event settles the Turn, as the end of the stream does today.
-- **Effect.** No Java instance has to stay attached for a Turn's lifetime. The dispatch lease can shrink to covering admission. A Java instance that dies mid-Turn needs no reattach, and any instance behind a load balancer can accept the events. A Harness crash is still handled by the writer lease and recovery.
+- **Current transaction.** Java locks the Session and Turn, checks the dispatch owner, lease deadline and event epoch, then advances the source cursor, appends public events and settles a terminal Turn in one transaction. Its increasing-source-ID check assumes ordered input from one stream. [Event persistence](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L568-L627)
+- **Batch ingest.** The Harness sends the existing envelopes to any Java instance. Each batch identifies the Turn, source epoch, expected previous journal cursor and the journal range it covers. Under the same transaction, verify the current writer grant and Turn binding, acknowledge an already committed retry, and advance only from the expected cursor. A batch arriving ahead of a gap receives the last committed cursor for replay. Retractions and terminal events follow their source order. The public SSE cursor keeps its own sequence.
+- **Replay after a crash.** If the Harness exits after journal commit but before delivery or acknowledgement, resume from the projection cursor using the committed journal. A successor must establish its current authority and preserve the source identity of replayed events, including bounded retractions. Once ingestion and terminal settlement work without a live Java dispatch lease, that lease can end after admission. [Journal-to-envelope projection](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/cli/src/serve/hosted-harness-session/observation-routes.ts#L312-L339)
 - **Later alternative.** Java projects public events directly from the journal commits it already receives on the Store route. That removes the ingest hop but duplicates the TypeScript projection in Java (§11).
 
 ## 8. Comparison
@@ -232,12 +232,12 @@ P4 changes only how Java receives a running Turn's events. It does not depend on
 | Reaches the stateless end state | Yes, with the Phase 1–4 rollout | Yes, with the same rollout plus the protocol move |
 | Membership | Static list; an SQL registry only with the optional bridge | None: polls carry identity, version, capacity and held Sessions; liveness is the writer lease |
 | Capacity-aware placement | No: round robin, placement recorded before the call | Yes: an instance claims only when it has capacity |
-| A new instance takes work | Only new or released Sessions, when round robin reaches it; a Session placed on a busy member waits for it | Immediately: it claims the oldest pending work |
-| Autoscaling signal | Derived from placements and instance counters | Queue depth and oldest pending work |
+| A new instance takes work | Only new or released Sessions, when round robin reaches it; a Session placed on a busy member waits for it | Can claim eligible work immediately, subject to tenant fairness and compatible capacity |
+| Autoscaling signal | Derive from durable work and placement | Count and oldest age of Sessions a new worker can claim |
 | Harness inbound listener | Required, behind mTLS once off-Pod | None |
 | Java-to-Harness reachability | Every Java instance must reach every Harness | Harness reaches Java through a load balancer |
 | Owner routing | Done by Java from the placement | Not needed: work goes to the holder |
-| Fencing change | None | None |
+| Fencing change | P4 replaces the dispatch-owner check for event ingest | Same P4 change. Claims reuse placement and writer fences |
 | Java-side owner of a running Turn | Removed by P4 | Removed by P4, which B includes |
 | Cancel and decision latency | One direct call | Signal plus fallback, within the P3 budget |
 | Synchronous reads | Unchanged | Java-side reads or request items |
@@ -249,9 +249,9 @@ P4 changes only how Java receives a running Turn's events. It does not depend on
 
 A0 can scale. With an instance registry (the optional bridge, §5.2), a new instance joins without a configuration change and starts taking new Sessions within one refresh, and drain, suspension release and the reaper handle removal. It scales poorly for three reasons, all of which come from Java choosing the instance before knowing whether that instance can take the work:
 
-1. **Capacity.** A0 records the placement first and calls second, round robin (§2.6). A busy member refuses with `hosted_session_open_busy`, the Session waits on it, and a newly added idle member gets nothing until round robin reaches it with a new Session. Fixing this in A0 needs load reports in the registry, load-aware selection and re-placement after a refusal: a second scheduler in Java. In B an instance claims only when it has capacity, so a new instance starts on the oldest pending work, and a full one simply stops claiming.
+1. **Capacity.** A0 records the placement first and calls second, round robin (§2.6). A busy member refuses with `hosted_session_open_busy`, the Session waits on it, and a newly added idle member gets nothing until round robin reaches it with a new Session. Fixing this in A0 needs load reports in the registry, load-aware selection and re-placement after a refusal: a second scheduler in Java. In B an instance claims only when it has capacity, so a new instance can start eligible work, and a full one simply stops claiming.
 2. **Connectivity.** A0 needs every Java instance to reach every Harness instance over mTLS, so autoscaled Harness Pods need addresses, certificates and registrations that every Java instance trusts. In B each Harness opens outbound connections to Java through one load balancer. A customer-hosted Harness needs the same, which is the constraint Claude's self-hosted workers answer with outbound-only polling.
-3. **Scaling signal.** In B the pending-work queue is the autoscaling metric, through its depth and the age of its oldest item, like Claude's `work/stats`. In A0 the metric has to be derived from placements and instance counters.
+3. **Scaling signal.** Count distinct Sessions with work due now that a new compatible worker can claim, and measure how long the oldest has been eligible. Exclude Sessions waiting for user input, future wake times and work bound to a live writer. A0 could derive the same metric from durable work and placement. In B it follows the claim predicate and can feed a Kubernetes autoscaler as an external metric. [Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)
 
 Removal is about equal: A0 drains, B stops claiming, and both release placements as Sessions go idle. Running Sessions stay with their holder in both, so rebalancing existing load relies on the stateless roadmap's short idle release, not on the call direction.
 
@@ -289,8 +289,8 @@ Each phase is behind a capability bit, and push and pull coexist until P6. Until
 
 Intermediate state (Phase 1–4 rollout, P4):
 
-1. Killing a Harness instance moves its Sessions to other members after the lease lapses, with no replayed tool call. An idle-released Session moves on its next request.
-2. Killing the Java instance that dispatched a running Turn leaves the Turn completed and its public events identical, with no stream reattach.
+1. Kill a Harness with an active tool execution. After lease expiry and a safe takeover, query the original Worker under the same execution ID. A confirmed result resumes the Turn once. An unknown result stays pending reconciliation. A cleanly released idle Session can move on its next request.
+2. Kill the dispatching Java instance mid-Turn. Deliver the second ingest batch before the first, drop an acknowledgement after commit, and terminate the Harness after a journal commit but before ingest. Reconnect public SSE from its last public cursor and compare with A0 on the same journal. Text deltas, retractions and the single terminal event must match without reattaching the dispatcher.
 
 Optional bridge and reaper change, if built:
 
@@ -301,12 +301,14 @@ End state (B):
 
 5. A Harness with no private listener serves a Session end to end: create, Turn, approval, cancel, close.
 6. A newly started instance claims pending work without a Java configuration change or registration, and a full instance receives no new Session while another has capacity.
-7. Scaling on queue depth adds and removes instances under load, with no lost or replayed work.
+7. Keep the Java replica count fixed and scale the Harness workload up and down under load. The reference chart advertises a loopback Session Store at `:8081` and points the optional Runtime Broker client at `:4182`. From a separate Harness Pod, verify authenticated Store access and, with Workspace tools enabled, execute a tool and recover its result through the Broker. A new member must take eligible work. Draining a member must preserve active Turns. [Store configuration](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/deploy/kubernetes/chart/templates/deployment.yaml#L82-L100) · [Harness and Broker configuration](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/deploy/kubernetes/chart/templates/deployment.yaml#L185-L207)
 8. An incompatible poller receives no work.
-9. Cancel and decision latency stay within the budget set in P3.
+9. With the same burst workload and resources, compare B with A0 for p95 runnable-to-start, first visible text, cancellation and approval-delivery latency. Record MySQL query rate and lock waits. Include a saturated or draining owner receiving a cancellation or approval while another Harness takes new Sessions. Agree the latency budgets from the A0 baseline before enabling P3.
 10. With no broker deployed, every criterion above holds.
 
-Every phase passes the real-process MySQL 8.4 suites, not only unit or H2 tests.
+**First P1 acceptance.** Run two Java instances and two real Harness processes against MySQL 8.4. Harness A asks a structured question, parks and releases the Session while remaining healthy. Submit the answer through Java and have B claim it and continue the original Turn. Repeat with a lost claim response before writer acquisition, a duplicate answer and a late write from A. Require one effective writer, one applied answer and one terminal event for the original Turn. The release design lists a healthy two-member parked handoff as follow-up coverage. [Existing verification scope](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/docs/design/2026-11-26-managed-suspension-placement-release.md#L138-L164)
+
+Each phase requires real-process MySQL 8.4 verification. The P1 handoff, P4 fault cases and scaling measurements above are acceptance criteria for this proposal.
 
 ## 13. Changes From the First Draft
 
@@ -320,6 +322,7 @@ Every phase passes the real-process MySQL 8.4 suites, not only unit or H2 tests.
 - §6.9 records why a message queue can carry wake-up hints but not requests or results: Session-bound work, acknowledgement timing, at-least-once delivery, the second write and the extra infrastructure.
 - The multi-Java risk is rewritten: the slices are merging, and signals use SQL watermark polling by default.
 - Current-state references move to `afcc98595a`, and the route count is corrected to 43.
+- The November 27 review adds #18463, the P4 replay contract, a first P1 healthy-member handoff, and the independent-Pod and load tests in §12.
 
 ## 14. Sources
 
@@ -339,3 +342,7 @@ Every phase passes the real-process MySQL 8.4 suites, not only unit or H2 tests.
 - [Cross-instance event stream wake-up](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-11-26-managed-cross-instance-sse.md)
 - [Control-plane attachment recovery](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-11-26-managed-control-plane-attachments.md)
 - [Helm Harness pool](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-11-26-managed-agent-helm-harness-pool.md)
+- [Temporal Worker performance](https://docs.temporal.io/develop/worker-performance) covers execution slots, polling and backlog metrics (§6.6).
+- [Kubernetes Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/) documents how a Deployment scales on custom or external metrics (§9).
+- [Qwen Broker failover recovery](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/docs/design/2026-11-26-managed-broker-turn-recovery.md) defines how to reconcile an interrupted execution with its original Worker (§2.4).
+- [Qwen MQ3 event-transport experiments](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/docs/design/2026-10-14-managed-agent-event-transport-mq3.md) report redelivery and broker-outage behavior from the local test setup (§6.9).

@@ -2,7 +2,7 @@
 
 [English](managed-agent-harness-pull-scheduling.md) | [简体中文](managed-agent-harness-pull-scheduling.zh-CN.md)
 
-状态：提案，2026-11-25，2026-11-26 修订。个人设计草稿，未提交上游。现状结论对照 QwenLM/qwen-code `main` 的 [`afcc98595a`](https://github.com/QwenLM/qwen-code/commit/afcc98595ac61e330021ad325d0ef914eb46ce80) 核实；初稿对照的是 `67f85d324e`，改动列在 §13。Claude Managed Agents 的内容来自 §14 列出的公开页面，阅读日期 2026-11-25。本文建立在 stateless Hosted Harness 设计（[#17527](https://github.com/QwenLM/qwen-code/pull/17527)）和 [#18149 上的差距分析](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186)之上，并与 [Java 控制面多实例部署](managed-agent-java-multi-instance.zh-CN.md)互为补充。
+个人设计提案，2026-11-25 起草，2026-11-27 修订，尚未提交上游。调度链路已对照 QwenLM/qwen-code `main` 的 [`d1a313445a`](https://github.com/QwenLM/qwen-code/commit/d1a313445aee7848e45a8d819a2b81752ff9f686) 复核。11 月 26 日的源码链接保留当时的快照（`afcc98595a`）。§12 列出待执行的验收场景。本文基于无状态 Hosted Harness 设计（[#17527](https://github.com/QwenLM/qwen-code/pull/17527)）和 [#18149 的差距分析](https://github.com/QwenLM/qwen-code/issues/18149#issuecomment-7156978186)，与 [Java 控制面多实例部署](managed-agent-java-multi-instance.zh-CN.md)互为补充。
 
 ## 1. 问题与结论
 
@@ -16,10 +16,10 @@
 
 **结论（提议）：**
 
-1. **B 是终态。** 无状态本身不依赖调用方向，它来自 journal、`wake` 和 placement 释放，这些 A0 已经具备。弹性扩缩则依赖调用方向。成员变成动态之后，A0 也能增减实例，但它在不知道容量的情况下分配 Session，要求每个 Java 实例都能访问每个 Harness，也没有可以用来扩缩的队列（§9）。
+1. **需要让 Harness 池独立弹性扩缩时，选 B。** 有空位的 Harness 可以直接认领可运行的工作。部署只要求固定成员间故障接管时，沿用 A0 即可：它已经支持定向派发和干净释放后的安全换手。两种方案都依靠 journal、`wake` 和 placement 校验恢复 Session（§5、§9）。
 2. **A0 + P4 是中间形态，也是回退形态。** P4（由 Harness 上报事件）是 B 的一部分；在两个方案下，它都能去掉运行中 Turn 必须挂着的那个 Java 实例（§2.4、§7）。
 3. **不做只服务于 A0 的投入。** 不做按负载选成员，也不做收到 `hosted_session_open_busy` 后改投其他成员。SQL 实例注册表和可网络访问的 Harness 监听只作为可选过渡，在 P5 之前就需要独立的 Harness Pod 时才做（§5.2）。B 两者都不需要（§6.8）。
-4. **顺序：** 按 P4、P1、P3、P5、P6 迁移，每一步都用能力位控制（§10）。P5 去掉最后一个 Java 到 Harness 的调用之后，Harness 才能作为独立的 Pod 自动扩缩。
+4. **迁移顺序。** 按 P4、P1、P3、P5、P6 依次迁移，每一步都用能力位控制（§10）。单独扩缩 Harness Pod 前，需要迁完剩余的 Java → Harness 调用或启用 A0 过渡方案，并打通跨 Pod 的 Session Store 和已启用的 Runtime Broker（§12）。
 5. **不依赖消息队列。** B 只用 SQL 和 HTTP。已经部署了 broker 的环境可以用它传递唤醒提示，但不能用它传请求或结果（§6.9）。
 
 ## 2. 现状
@@ -59,9 +59,9 @@ Java 发给 Harness 的大部分内容，在发送之前就已经是持久记录
 一个运行中的 Turn，状态由两个进程持有：
 
 - **Harness owner** 持有 Session 的 writer lease 并运行循环（§2.3）。
-- 认领该 Turn 的 **Java 派发者**持有它的 `dispatch_owner` 租约（[`AgentTurnExecution.java:81-86`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L81-L86)）并持续续租（[`HarnessCoordinator.java:121-122`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L121-L122)）。它在整个 Turn 期间保持 Harness 事件流打开，把它转成公开事件（[`HarnessCoordinator.java:934-968`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L934-L968)）。这个 Java 实例死掉后，要等派发租约过期，另一个实例的扫描才会接手该 Turn，并重新接上事件流。
+- 认领该 Turn 的 **Java 派发者**持有它的 `dispatch_owner` 租约（[`AgentTurnExecution.java:81-86`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L81-L86)）并持续续租（[`HarnessCoordinator.java:286-297`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L286-L297)）。它在整个 Turn 期间保持 Harness 事件流打开，把它转成公开事件（[`HarnessCoordinator.java:934-968`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L934-L968)）。这个 Java 实例死掉后，要等派发租约过期，另一个实例的扫描才会接手该 Turn，并重新接上事件流。
 
-最近的多实例工作有很大一部分在处理这第二个 owner：从另一个控制面重新 attach Harness Session（[#18433](https://github.com/QwenLM/qwen-code/pull/18433)）、不带 attachment 读取恢复状态（[#18440](https://github.com/QwenLM/qwen-code/pull/18440)）、Broker 故障转移后恢复 Turn（[#18455](https://github.com/QwenLM/qwen-code/pull/18455)）。事件上报（P4）在两个方案下都能去掉它，单靠 A0 去不掉。
+最近的多实例工作有很大一部分在处理这第二个 owner：从另一个控制面重新 attach Harness Session（[#18433](https://github.com/QwenLM/qwen-code/pull/18433)）、不带 attachment 读取恢复状态（[#18440](https://github.com/QwenLM/qwen-code/pull/18440)）、Broker 故障转移后恢复 Turn（[#18455](https://github.com/QwenLM/qwen-code/pull/18455)）。[#18463](https://github.com/QwenLM/qwen-code/pull/18463) 又补上了 Broker 状态查询中断的恢复路径。当 Harness 和原 Runtime Worker 存活时，可按同一 execution ID 和 dispatch generation 查回结果。原 Worker 无法证实结果时，Broker 保留待核对记录。Turn 仍由 Java 派发。
 
 ### 2.5 stateless 路线与池的进度
 
@@ -101,13 +101,13 @@ Java 发给 Harness 的大部分内容，在发送之前就已经是持久记录
 1. 客户端和控制面从不按进程寻址 harness。它们写入持久的工作，由持有 session 的 harness 消费。A0 通过 placement 路由做到这一点，B 通过认领做到。
 2. 调度单位是 session，在可续租的租约下持有，用完归还。两个方案都用现有的 writer lease 和 placement。
 3. 等待是 session 日志里的一个状态，而不是一个常驻进程。这就是 Phase 4 的 Action parking。
-4. 公开的拉模型 API 是给自托管 worker 用的，这些 worker 运行在 Anthropic 无法主动连接的地方。内部 harness 层如何调度，除了上表那一句之外没有公开（§3.2）。无状态来自 session 日志和 `wake`，而不是调用方向。本设计选择拉模型是为了弹性扩缩（§9）。
+4. Anthropic 公开的出站轮询用于执行工具调用的自托管 **sandbox worker**。其 Harness 架构文章描述了如何从 Session 日志恢复，内部 Harness 的实例选择算法仍未公开（§3.2）。按容量领取任务可直接参考 Temporal 的 Worker 槽位（§6.6）。
 
 ## 4. 方案 A：负载均衡后面的推模型（放弃）
 
 Harness 前面放负载均衡后，任意实例都可能收到任意 Session 的调用。这带来三个缺口：owner 路由（通过转发、重定向或一致性哈希找到活的 writer）、Session 级 fencing（把期望的 boot ID 从客户端挪到 Session 引用上）、不绑定实例的写权限凭证（在 `writers:acquire` 时用认领票据交换）。
 
-A0 没有这些缺口，因为挑实例的是 Java 而不是负载均衡（§5.1）。负载均衡做的事 Java 的选择逻辑本来就在做，反而多出一层转发：它必须不缓冲地转发 SSE，也不能重试变更请求。B 也不需要认领票据，因为认领 CAS 之后轮询响应直接带上凭证。所以初稿 P0 里的认领票据一项删除。
+如果网络要求推送，可以只把新的 `/work` 通知放在负载均衡后，由收到通知的 Harness 向 Store 认领。这条路可行，但还要约定接收方满载时怎么重试、重复通知怎么合并、控制信号怎么到达当前写者。A0 已能定向派发。对独立弹性池，建议直接迁到 B，向成功认领的轮询方签发写凭证。
 
 ## 5. 方案 A0：Java 路由的推模型（中间形态）
 
@@ -167,7 +167,7 @@ Session 被持有期间，Java 通过同一个长轮询把新工作交给持有�
 
 - **认领**就是现有的 placement CAS，只是改为在 Harness 轮询时执行，而不是在 Java 挑选成员时执行。takeover 规则不变：要么是带收据的已释放 placement，要么是 activation 已知且 writer lease 已过期。被拒绝说明 Session 仍被持有，工作项留给原持有者。
 - **凭证**：轮询响应里带上现有的 placement-bound 写权限 token。Store 继续在每个 writer 操作上校验它，所以 `JournalFencing` 和 `requireCurrent` 都不用改。
-- **租约**：writer lease（`writers:renew`，默认 60 秒）就是认领租约，不引入第二种租约。Claude 的 `expected_last_heartbeat` 前置条件，对应的就是我们现有的 writer generation 校验。
+- **租约。** B 用 writer lease（`writers:renew`，默认 60 秒）作为 Session 的执行租约。当前分配 placement 和获取 writer 是两步。若领取响应在获取 writer 前丢失，重试方必须能查明当前归属，或按接管条件重新领取。现有 Turn 派发租约与 Action 操作的 claim generation 各自保护不同的写入；迁移对应路径时要保留这些校验或提供等价保护。[placement 接管](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/JdbcHarnessPlacementStore.java#L181-L247) · [获取 writer](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/JournalWriterLifecycle.java#L143-L194) · [Action 认领续租](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/ActionResponseCoordinator.java#L74-L92)
 - **writer 身份**仍然是 boot ID。Turn 的 `bindHarness(bootId)` 仍然记录由哪个进程运行这个 Turn，进程变化仍然走恢复路径。
 
 ### 6.4 发给持有者的信号
@@ -184,7 +184,7 @@ Session 被持有期间，Java 通过同一个长轮询把新工作交给持有�
 
 ### 6.6 容量、drain 和安全
 
-- 实例只为自己能接的工作发起轮询，冷启动上限和活跃 Turn 数变成轮询准入条件。Java 按租户轮询分配新 Session，这是共享 Harness 设计的要求。队列深度、最早的待处理工作、正在轮询的实例数作为扩缩容信号，类似 Claude 的 `work/stats`。
+- 领取**新** Session 需要冷启动和活跃 Turn 有空位。实例满载或正在排空时，仍要轮询已持有 Session 的取消、审批等信号。新工作按租户公平分配。Temporal 也用 Worker 的可用槽位决定何时轮询新任务，可作为这部分协议的参考。[Temporal Worker 性能模型](https://docs.temporal.io/develop/worker-performance)
 - **drain**：停止认领新 Session，继续服务已持有的 Session，每个 Session 空闲后就释放。drain 超时则退回崩溃恢复路径。不再需要入站的 drain 路由。
 - **安全**：Harness 不再监听端口，所以不再需要只绑定 loopback，也不再需要每实例一个 TLS 代理。Harness 用实例身份向 Java 认证，最好用证书里写有实例 ID 的 mTLS。凭证按每次认领签发，所以凭证只存在于该实例持有的 Session 上。
 
@@ -210,7 +210,7 @@ Session 被持有期间，Java 通过同一个长轮询把新工作交给持有�
 
 1. **必须交给持有者的工作。** 运行中 Turn 的 cancel、决定和消息，以及对常驻状态的读取，都必须交给持有 writer lease 的实例（§2.3）。竞争消费会把它们交给任意实例。按 Session 分区可以让一个 Session 固定在一个消费者上，但消费者重平衡和 writer lease 是两套独立的归属，在扩缩和崩溃时会不一致。顺序消费还会让一个队列串行处理，一个跑几分钟的 Turn 会堵住同一队列上的其他 Session。每个 Session 一个 LiteTopic 能避免堵塞，但认领之后再订阅它，就是 B 的“先认领、再交给持有者”，而认领仍然是 MySQL 里的 CAS。
 2. **ack 的时机。** MQ3 实测：消费者崩溃后，它没有 ack 的消息要等 broker 判定这个客户端过期才会交给其他成员，本地测得 121 到 129 秒，同一主题后面的消息排在它后面（[MQ3 finding 1](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)）。处理完 Turn 才 ack，崩溃后这个 Session 就要停这么久；收到就 ack，崩溃时消息就丢了，只能从 SQL 恢复。
-3. **不管是否顺序，投递都是至少一次。** 崩溃或 ack 超时后的重投、重平衡时队列锁过期、发送超时后生产者重试、broker 主备切换，都会产生重复消息。[EventTransport 设计](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-04-managed-agent-event-transport.md)已经要求消费者幂等（不变量 5），也不靠有序投递保证正确性。即使投递真能做到只投一次，也覆盖不了 broker 之外的副作用：调模型、执行工具、改文件、写 Store。只执行一次靠的是 Store 和 journal：writer generation 和 placement epoch 挡住过期的处理者，operation ID 让完成结果幂等，工具执行账本保留 execution ID 和 dispatch generation，恢复时只向 Worker 查询而不重新执行；恢复从 journal 继续，而不是从请求重放。
+3. **不管是否顺序，投递都是至少一次。** 崩溃或 ack 超时后的重投、重平衡时队列锁过期、发送超时后生产者重试、broker 主备切换，都会产生重复消息。[EventTransport 设计](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-04-managed-agent-event-transport.md)已经要求消费者幂等（不变量 5），也不靠有序投递保证正确性。即使投递真能做到只投一次，也覆盖不了 broker 之外的副作用：调模型、执行工具、改文件、写 Store。重试依据 Store、journal 和 Worker 的执行证据。writer generation 和 placement epoch 挡住过期的处理者，operation ID 让完成结果幂等，工具执行账本保留 execution ID 和 dispatch generation，恢复时只向 Worker 查询而不重新执行；恢复从 journal 继续，而不是从请求重放。
 4. **双写。** Turn、决定和操作必须先写进 SQL：公开 API 要读它们，单写者和幂等校验也依赖它们。再发一份到队列就是第二次写入，需要 outbox。MQ3 还发现生产者没有重试缓冲，broker 长时间不可用期间发出的 envelope 会被丢弃（[MQ3 finding 2](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)）。发到队列的结果，仍然要由消费它的那个 Java 实例带 fencing 写进 SQL，所以结果队列只是多了一跳。
 5. **基础设施。** EventTransport 默认关闭（[`EventTransportConfiguration.java:56-57`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/server/src/main/java/com/alibaba/qwen/code/managedagent/config/EventTransportConfiguration.java#L56-L57)），Helm 部署里没有 broker，broker 不可用时节点无法启动（[MQ3 finding 3](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-10-14-managed-agent-event-transport-mq3.md#findings)），TypeScript 侧也没有消费者。
 
@@ -218,11 +218,11 @@ Session 被持有期间，Java 通过同一个长轮询把新工作交给持有�
 
 ## 7. 事件上报（P4）
 
-P4 只改变 Java 接收运行中 Turn 事件的方式，和谁发起 Turn 无关，所以对 A0 和 B 同样适用。
+P4 把事件投递和写入授权从派发 Turn 的 Java 实例上移开。无论 Turn 由 Java 推送，还是由 Harness 领取，都可以先做这项改动。
 
-- **现在**：Java 派发者在整个 Turn 期间读取 Harness 事件流（§2.4）。
-- **改动**：Harness 把现在流式发送的 envelope 按 journal 序号分批，发到任意 Java 实例上的一个摄取路由，由它的写权限 token 做 fencing。coordinator 现有的流消费逻辑变成这个路由的处理函数。按序号丢弃重复；event epoch 与 Turn 绑定的 Harness 不一致的 envelope 被拒绝，和现在流消费者的做法一样（[`HarnessCoordinator.java:948`](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/packages/managed-agent-server/control-plane/src/main/java/com/alibaba/qwen/code/managedagent/session/HarnessCoordinator.java#L948)）。终态事件结算 Turn，和现在流结束时一样。
-- **效果**：不再需要某个 Java 实例在整个 Turn 期间挂着。派发租约可以缩小到只覆盖准入。Java 实例在 Turn 中途死掉也不用重新 attach，负载均衡后面的任意实例都能接收事件。Harness 崩溃仍然由 writer lease 和恢复路径处理。
+- **现有事务。** Java 锁定 Session 和 Turn，检查派发者、租约有效期和 event epoch，再在一个事务中推进源游标、追加公开事件，并在终态事件到达时结算 Turn。当前按源序号递增接纳事件，依赖同一条流有序送达。[事件持久化实现](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/managed-agent-server/persistence/src/main/java/com/alibaba/qwen/code/managedagent/persistence/AgentTurnExecution.java#L568-L627)
+- **分批上报。** Harness 把现有 envelope 发给任一 Java 实例。每批携带 Turn、源 epoch、预期的前一 journal 游标以及本批覆盖的日志范围。在同一事务内校验当前 writer 凭证和 Turn 绑定。已提交批次重试时返回确认；仅从预期游标向前提交。后批先到时返回已提交游标，供发送方补齐缺口。撤回和终态按源顺序处理，公开 SSE 继续使用自己的序号。
+- **崩溃后补发。** 如果 Harness 在 journal 提交后、上报或收到确认前退出，从已提交的投影游标读取 journal 并补发。接管者须先取得当前写权限，补发时保留原事件的来源标识，包括有范围的撤回。事件写入和终态结算都能脱离活跃的 Java 派发租约后，该租约才可以在准入完成时结束。[journal 到 envelope 的投影](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/packages/cli/src/serve/hosted-harness-session/observation-routes.ts#L312-L339)
 - **后续备选**：由 Java 直接从它在 Store 路由上已经收到的 journal 提交中投影公开事件。这样省掉摄取这一跳，但要在 Java 里重复实现 TypeScript 的投影逻辑（§11）。
 
 ## 8. 对比
@@ -232,12 +232,12 @@ P4 只改变 Java 接收运行中 Turn 事件的方式，和谁发起 Turn 无�
 | 能否达到 stateless 终态 | 能，需要 Phase 1–4 放量 | 能，放量之外再加协议迁移 |
 | 成员管理 | 静态列表；只有做可选过渡时才有 SQL 注册表 | 不需要：轮询自带身份、版本、容量和所持 Session，存活看 writer lease |
 | 按容量分配 | 否：轮询挑选，调用前就记录 placement | 是：实例只在有容量时认领 |
-| 新实例何时开始承接工作 | 只承接轮到它的新 Session 或已释放的 Session；已分配到忙成员上的 Session 只能等它 | 立即：认领最早的待处理工作 |
-| 扩缩容指标 | 需要从 placement 和实例计数器推导 | 队列深度和最早待处理工作的等待时间 |
+| 新实例何时开始承接工作 | 只承接轮到它的新 Session 或已释放的 Session；已分配到忙成员上的 Session 只能等它 | 有匹配容量即可按租户公平策略认领符合条件的工作 |
+| 扩缩容指标 | 从持久化工作及 placement 推导 | 新实例可认领的 Session 数及最早一项的等待时长 |
 | Harness 入站监听 | 需要；离开 Pod 后要走 mTLS | 不需要 |
 | Java 到 Harness 的可达性 | 每个 Java 实例都必须能访问每个 Harness | Harness 经负载均衡访问 Java |
 | owner 路由 | Java 根据 placement 完成 | 不需要：工作直接交给持有者 |
-| fencing 改动 | 无 | 无 |
+| 写入校验改动 | P4 为事件上报替换派发者校验 | 同样需要 P4 的改动；认领复用 placement 与 writer 校验 |
 | 运行中 Turn 在 Java 侧的 owner | 由 P4 去掉 | 由 P4 去掉，B 包含 P4 |
 | cancel 和决定的延迟 | 一次直接调用 | 信号加兜底，控制在 P3 的预算内 |
 | 同步读取 | 不变 | Java 侧读取或请求工作项 |
@@ -249,9 +249,9 @@ P4 只改变 Java 接收运行中 Turn 事件的方式，和谁发起 Turn 无�
 
 A0 能扩缩。有了实例注册表（可选过渡，§5.2），新实例不改配置就能加入，一个刷新周期内开始承接新 Session；drain、挂起时释放和回收器负责缩容。但它扩缩得不好，原因有三条，都来自同一件事：Java 在不知道实例能不能接这份工作时就替它选好了实例。
 
-1. **容量。** A0 先记录 placement、再发调用，按轮询挑选（§2.6）。忙的成员返回 `hosted_session_open_busy`，Session 就一直等它；新加入的空闲成员要等轮询轮到它、并且来了新 Session 才有活干。要在 A0 里解决，就得在注册表里上报负载、按负载选成员、被拒后重新分配，相当于在 Java 里再做一个调度器。B 里实例只在有容量时认领，新实例一上线就从最早的待处理工作开始干，满了的实例只是停止认领。
+1. **容量。** A0 先记录 placement、再发调用，按轮询挑选（§2.6）。忙的成员返回 `hosted_session_open_busy`，Session 就一直等它；新加入的空闲成员要等轮询轮到它、并且来了新 Session 才有活干。要在 A0 里解决，就得在注册表里上报负载、按负载选成员、被拒后重新分配，相当于在 Java 里再做一个调度器。B 里实例只在有容量时认领，新实例一上线就可以处理符合条件的工作，满了的实例只是停止认领。
 2. **连通性。** A0 要求每个 Java 实例都能通过 mTLS 访问每个 Harness 实例，所以自动扩缩出来的 Harness Pod 需要地址、证书和注册信息，并且被每个 Java 实例信任。B 里每个 Harness 只需经过一个负载均衡向 Java 发起出站连接。客户自托管的 Harness 也需要这一点，Claude 的自托管 worker 面对的就是这个约束，它的答案是只出站的轮询。
-3. **扩缩容指标。** B 里待处理工作的队列本身就是自动扩缩的指标：看队列深度和最早一项的等待时间，类似 Claude 的 `work/stats`。A0 里这个指标只能从 placement 和实例计数器推导。
+3. **扩缩容指标。** 按 Session 去重，统计工作已到期、能被新兼容实例认领的 Session 数，并测量最早一项从可认领起等了多久。排除等待用户输入、尚未到唤醒时间以及仍须由存活写者处理的工作。A0 也可以从持久化工作和 placement 推导该指标；B 可直接复用认领条件，并将其作为 Kubernetes 扩缩容的外部指标。[Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)
 
 缩容两者差不多：A0 做 drain，B 停止认领，两者都在 Session 空闲时释放 placement。正在运行的 Session 在两者里都留在原持有者上，所以存量负载的重新均衡靠的是 stateless 路线的短空闲释放，而不是调用方向。
 
@@ -289,8 +289,8 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 
 中间形态（Phase 1–4 放量、P4）：
 
-1. 杀掉一个 Harness 实例，它的 Session 在租约过期后迁到其他成员，且没有重放任何工具调用。空闲释放的 Session 在下一次请求时迁移。
-2. 杀掉派发某个运行中 Turn 的 Java 实例，该 Turn 仍然完成，公开事件不变，且不需要重新接流。
+1. 在工具执行期间终止 Harness。租约过期并满足安全接管条件后，按原 execution ID 向原 Worker 核对结果。结果确定时原 Turn 只恢复一次；结果未知时保持待核对。已干净释放的空闲 Session 可在下次请求时迁移。
+2. 在 Turn 运行中终止派发它的 Java 实例。分别注入第二批先于第一批送达、提交后确认丢失，以及 journal 已提交但尚未上报时 Harness 退出。从最后收到的公开游标重连 SSE，与 A0 对同一 journal 的投影对照：文本增量、撤回和唯一终态须一致，全程无需派发者重新接流。
 
 可选过渡和回收器改动（如果做）：
 
@@ -301,12 +301,14 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 
 5. 不监听私有路由的 Harness 能端到端服务一个 Session：create、Turn、审批、cancel、close。
 6. 新启动的实例不需要修改 Java 配置、也不需要注册，就能认领待处理工作；某个实例满了时，只要还有别的实例有容量，它就不会再拿到新 Session。
-7. 在负载下按队列深度扩缩，能增减实例，且没有工作丢失或重放。
+7. 固定 Java 副本数，在负载下独立增减 Harness 副本。参考 Helm 通过 loopback 提供 Session Store（`:8081`），可选的 Runtime Broker 客户端也指向 loopback（`:4182`）。从独立 Harness Pod 验证经认证的 Store 访问；开启 Workspace 工具时，再验证工具执行和经 Broker 查询结果。新增成员要能领取可分配的工作，成员排空期间须保全活跃 Turn。[Store 配置](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/deploy/kubernetes/chart/templates/deployment.yaml#L82-L100) · [Harness 与 Broker 配置](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/deploy/kubernetes/chart/templates/deployment.yaml#L185-L207)
 8. 不兼容的轮询方拿不到工作。
-9. cancel 和决定的延迟保持在 P3 设定的预算之内。
+9. 在相同突发负载和资源下对比 B 与 A0，测量从可运行到开始执行、首个可见文本、取消及审批送达的 p95，并记录 MySQL 查询速率与锁等待。覆盖满载或排空的 owner 收到取消或审批、同时另一 Harness 领取新 Session 的情况。启用 P3 前，根据 A0 基线确定延迟预算。
 10. 不部署 broker 时，上面每一条都成立。
 
-每个阶段都通过真实进程 MySQL 8.4 测试套件，不能只靠单元测试或 H2 测试。
+**P1 首个验收场景。** 两个 Java 实例和两个真实 Harness 进程共享 MySQL 8.4。A 发起结构化提问、停靠并释放 Session，随后保持健康。经 Java 提交答案，由 B 认领，接着处理原 Turn。分别注入获取 writer 前领取响应丢失、答案重复提交、A 的旧写入迟到。要求始终只有一个有效写者，答案只生效一次，原 Turn 只产生一个终态事件。主线的释放设计也把两个健康成员之间的停靠换手列为后续验收。[已有验证范围](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/docs/design/2026-11-26-managed-suspension-placement-release.md#L138-L164)
+
+各阶段均要求通过真实进程和 MySQL 8.4 验证。上述 P1 换手、P4 故障注入和伸缩测量属于本提案的待验收项。
 
 ## 13. 相对初稿的改动
 
@@ -320,6 +322,7 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 - 新增 §6.9，说明为什么消息队列可以传唤醒提示，但不能传请求或结果：必须交给持有者的工作、ack 时机、至少一次投递、双写，以及额外的基础设施。
 - 重写多 Java 实例的风险：相关工作正在合入，信号默认用 SQL 水位轮询。
 - 现状引用改为 `afcc98595a`，路由数更正为 43。
+- 11 月 27 日复核补入 #18463、P4 的补发契约、P1 的首次健康成员换手，以及 §12 的独立 Pod 验证和负载测试。
 
 ## 14. 参考资料
 
@@ -339,3 +342,7 @@ P3 对 cancel 和决定的延迟预算是 P3 自己的完成标准，不是选�
 - [跨实例事件流唤醒](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-11-26-managed-cross-instance-sse.md)
 - [控制面 attachment 恢复](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-11-26-managed-control-plane-attachments.md)
 - [Helm Harness 池](https://github.com/QwenLM/qwen-code/blob/afcc98595ac61e330021ad325d0ef914eb46ce80/docs/design/2026-11-26-managed-agent-helm-harness-pool.md)
+- [Temporal Worker 性能模型](https://docs.temporal.io/develop/worker-performance)说明执行槽位、轮询和积压指标的关系（§6.6）。
+- [Kubernetes Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)说明 Deployment 如何使用自定义或外部指标扩缩容（§9）。
+- [Qwen Broker 故障恢复](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/docs/design/2026-11-26-managed-broker-turn-recovery.md)说明执行状态查询中断后如何向原 Worker 核对结果（§2.4）。
+- [Qwen MQ3 事件传输实验](https://github.com/QwenLM/qwen-code/blob/d1a313445aee7848e45a8d819a2b81752ff9f686/docs/design/2026-10-14-managed-agent-event-transport-mq3.md)记录了本地测试环境里的重投和 broker 中断行为（§6.9）。
